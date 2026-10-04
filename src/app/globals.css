@@ -240,3 +240,7 @@ figure.visual summary { min-height: var(--cible); display: flex; align-items: ce
 .progress .w-1 { width: 16.66%; } .progress .w-2 { width: 33.33%; } .progress .w-3 { width: 50%; }
 .progress .w-4 { width: 66.66%; } .progress .w-5 { width: 83.33%; } .progress .w-6 { width: 100%; }
 .reader-actions .btn { min-width: 0; padding: var(--s1) var(--s3); font-size: 15px; line-height: 1.25; text-align: center; }
+
+/* Phase 2b : formulaires, zone de suppression, déconnexion */
+select { width: 100%; min-height: var(--cible); margin-bottom: var(--s3); }
+.danger-zone, .logout { margin-top: var(--s6); }

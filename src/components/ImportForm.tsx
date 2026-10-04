@@ -1,20 +1,52 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LEVELS, type Level } from "@/lib/contracts/schemas";
+import { LEVEL_LABELS } from "@/lib/labels";
 import { fr } from "@/lib/i18n/fr";
 
 type Tab = "file" | "link" | "text";
 const MAX_PASTED = 50_000;
 
 /**
- * Formulaire d'import (PDF p. 5). L'envoi au serveur sera branché avec le stockage
- * privé ; d'ici là, le bouton reste désactivé et l'interface le dit clairement.
+ * Formulaire d'import (PDF p. 5). Phase 2b : le texte collé est branché ; fichiers et
+ * liens restent désactivés et l'interface le dit clairement.
  */
-export function ImportForm() {
-  const [tab, setTab] = useState<Tab>("file");
+export function ImportForm({ enabled, defaultLevel }: { enabled: boolean; defaultLevel: Level }) {
+  const [tab, setTab] = useState<Tab>("text");
   const [text, setText] = useState("");
+  const [level, setLevel] = useState<Level>(defaultLevel);
+  const [pages, setPages] = useState<5 | 7 | 12>(5);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  // Une clé par contenu soumis : un double clic ne crée pas deux rapports.
+  const keyRef = useRef<{ text: string; key: string } | null>(null);
+  const router = useRouter();
   const base = useId();
+  const canSubmit = enabled && tab === "text" && text.trim().length > 0 && !pending;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setPending(true);
+    setError(null);
+    if (keyRef.current?.text !== text) keyRef.current = { text, key: crypto.randomUUID() };
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, level, goal: "comprendre", target_pages: pages, idempotency_key: keyRef.current.key }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message ?? "La création a échoué.");
+      router.push(`/rapports/${body.reportId}`);
+    } catch (err) {
+      setError((err as Error).message);
+      setPending(false);
+    }
+  }
   const tabs: { id: Tab; label: string }[] = [
     { id: "file", label: fr.create.tabs.file },
     { id: "link", label: fr.create.tabs.link },
@@ -29,7 +61,7 @@ export function ImportForm() {
   }
 
   return (
-    <form className="card" onSubmit={(e) => e.preventDefault()} aria-describedby={`${base}-notready`}>
+    <form className="card" onSubmit={submit} aria-describedby={`${base}-notready`}>
       <div className="tabs" role="tablist" aria-label="Type de source">
         {tabs.map((t, i) => (
           <button
@@ -94,10 +126,22 @@ export function ImportForm() {
         </div>
       )}
 
-      <p className="muted">{fr.create.next}</p>
-      <p id={`${base}-notready`} className="notice notice-warn">{fr.create.notReady}</p>
-      <button type="submit" className="btn btn-primary btn-block" aria-disabled="true" disabled>
-        {fr.create.submit}
+      {tab !== "text" && <p id={`${base}-notready`} className="notice notice-warn">{fr.create.notReady}</p>}
+
+      <label htmlFor={`${base}-level`}>{fr.create.levelLabel}</label>
+      <select id={`${base}-level`} value={level} onChange={(e) => setLevel(e.target.value as Level)}>
+        {LEVELS.map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
+      </select>
+      <label htmlFor={`${base}-pages`}>{fr.create.lengthLabel}</label>
+      <select id={`${base}-pages`} value={pages} onChange={(e) => setPages(Number(e.target.value) as 5 | 7 | 12)}>
+        <option value={5}>{fr.create.lengths[5]}</option>
+        <option value={7}>{fr.create.lengths[7]}</option>
+        <option value={12}>{fr.create.lengths[12]}</option>
+      </select>
+
+      {error && <p className="notice notice-warn" role="alert">{error}</p>}
+      <button type="submit" className="btn btn-primary btn-block" disabled={!canSubmit} aria-disabled={!canSubmit}>
+        {pending ? fr.create.submitting : fr.create.submit}
       </button>
     </form>
   );

@@ -1,5 +1,27 @@
 # Avancement
 
+## Phase 2b — Parcours dans l'application (4 octobre 2026)
+
+### FAIT
+- Liste blanche : `gooroosapio@gmail.com` (admin) dans `allowed_emails` du projet Supabase.
+- Connexion par lien magique (`/connexion`, `/auth/callback`, `/auth/deconnexion`) ; réponse identique pour une adresse non autorisée ; pages privées redirigées vers la connexion ; session rafraîchie dans le proxy sans toucher à la CSP.
+- Création depuis un texte collé (`POST /api/reports`) : source, segments, rapport et tâche idempotente ; le worker démarre juste après la réponse (`after()`, 300 s max) ; cron quotidien `/api/worker` (protégé par `CRON_SECRET`) en filet de sécurité.
+- Worker : réservation `claim_job`, étapes et heartbeat visibles, coupe-circuit (global mensuel et par compte sur 24 h), journal de consommation sans double débit, enregistrement connaissance / preuves / version, statut « vérification incomplète » si les contrôles échouent, annulation honorée.
+- Lecteur branché sur les vrais rapports (lectures via RLS, revalidation Zod à l'affichage), suivi de progression, suppression complète (rapport, source, segments, preuves, versions, fichiers) avec compte rendu et journal d'audit.
+- Préférences enregistrées, rechargées, effaçables ; niveau par défaut déduit de la familiarité.
+- Migration `scoped_ids` : clés des segments et preuves propres à chaque source / objet de connaissance (évite les collisions `seg_1`, `ev_1` entre rapports).
+
+### EN TEST (résultats réels)
+- `npm test` 74 tests, typecheck et build OK ; recette SQL locale OK après la migration.
+- Serveur de production local : pages privées → 307 vers `/connexion` ; API sans session → 401 ; cron sans secret → 401 ; Chromium 360 et 1440 px : connexion avec adresse non autorisée → message générique, aucune erreur console ni CSP, aucun débordement.
+
+### NON TESTÉ
+- Parcours complet connecté (création → génération → lecture → suppression) : la clé `service_role` n'est pas visible dans cette session (elle ne sera lue que par une nouvelle session).
+
+### BLOCAGE / À FAIRE CÔTÉ PROPRIÉTAIRE
+- Vercel : `GEMINI_API_KEY`, `LIMPID_MODEL_FAST=gemini-3.5-flash`, `LIMPID_MODEL_QUALITY=gemini-3.5-flash`, `CRON_SECRET`, `LIMPID_SITE_URL`.
+- Supabase → Authentication → URL Configuration : Site URL = URL Vercel, et `https://<domaine>/auth/callback` dans les Redirect URLs.
+
 ## Phase 2a — Données vérifiées et moteur réel (4 octobre 2026)
 
 ### Vérification des accès

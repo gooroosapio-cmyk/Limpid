@@ -114,6 +114,8 @@ export interface GenerationInput {
   budgets: { comprehension: StageBudget; explanation: StageBudget };
   /** Appelé après chaque appel au fournisseur (journal de consommation). */
   onUsage?: (stage: string, attempt: number, usage: UsageReport) => void | Promise<void>;
+  /** Appelé au début de chaque étape (progression affichée, heartbeat du worker). */
+  onStage?: (stage: "comprehension" | "explication" | "verification") => void | Promise<void>;
 }
 
 export interface GenerationOutput {
@@ -358,9 +360,12 @@ async function explanation(
 export async function generateReport(provider: AIProvider, input: GenerationInput): Promise<GenerationOutput> {
   if (input.segments.length === 0) throw new Error("Aucun segment à analyser.");
   const segments = new Map(input.segments.map((s) => [s.id, s]));
+  await input.onStage?.("comprehension");
   const comp = await comprehension(provider, input, segments);
+  await input.onStage?.("explication");
   // Seules les preuves localisées et cohérentes passent à la suite.
   const exp = await explanation(provider, input, comp.knowledge, comp.evidence);
+  await input.onStage?.("verification");
   const ok = comp.validation.blocking_errors.length === 0 && exp.validation.blocking_errors.length === 0;
   return {
     status: ok ? "validated" : "incomplete",
