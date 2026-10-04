@@ -43,6 +43,8 @@ export class ProviderError extends Error {
     public readonly code: ProviderErrorCode,
     message: string,
     public readonly usage?: UsageReport,
+    /** Écarts au schéma (chemins et règles, jamais le contenu) : servent à demander une correction. */
+    public readonly issues: string[] = [],
   ) {
     super(message);
   }

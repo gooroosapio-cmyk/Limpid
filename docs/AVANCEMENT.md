@@ -1,5 +1,25 @@
 # Avancement
 
+## Phase 7 — Cahier V2, lot B : tranche complète réelle (4 octobre 2026)
+
+Détail et mesures : `docs/RECETTE_LOT_B.md` ; exemples : `docs/recette/lot-b/`.
+
+### FAIT
+- **Recette réelle de bout en bout** (`scripts/live-slice.test.ts`) : PDF natif de 4 pages → extraction → Gemini réel → lecteur web (rendu serveur) → export PDF relu ; contrôles de fidélité et de parité web/PDF, mesures par étape.
+- **Réponse hors schéma** : correction demandée au modèle avec la liste des écarts (2 fois au plus) au lieu d'un échec immédiat.
+- **Couverture des réserves** : contrôles déterministes à la compréhension (phrases de réserve ou de limite de la source) et à l'explication (affirmations de réserve), une demande de correction ciblée chacun ; reste consigné en avertissement.
+- **`/admin`** : diagnostic à la demande (configuration, base, aller-retour stockage privé, URL d'envoi signée, appel Gemini facultatif) et durées p50/p95 par étape et par rapport, taux de réussite.
+
+### EN TEST (résultats réels)
+- Gemini réel (`gemini-3.5-flash-lite`) : rapport validé ; citations 12/12 dans source, web et PDF ; nombres 14/14 ; idées essentielles **8/8** (6/8 avant la correction de couverture) ; 5 appels, ≈ 49 s, ≈ 0,07 €.
+- `npm test` : 116 tests (dont correction hors schéma, couverture des réserves, percentiles). Typecheck et build OK ; axe : 0 violation sur l'administration.
+
+### NON TESTÉ
+- Critère final du cahier en production (téléphone, fermeture d'onglet, base et stockage réels) : procédure en 4 étapes dans `docs/RECETTE_LOT_B.md`.
+
+### PROCHAINE ÉTAPE — Lot C
+Écran « Vérifier la source » (pages lues, aperçu, pages peu lisibles) avant la génération ; carte globale du document pour les longs textes ; contrôle indépendant « l'extrait soutient-il l'énoncé » ; statuts `partial` / `contradicted` ; régénération d'une section avec coût annoncé.
+
 ## Phase 6 — Cahier V2, lot A : audit et sécurisation (4 octobre 2026)
 
 Référence : « Le cerveau de Limpid » (directives V2, 23 pages) et trois planches de maquettes (douze vues mobiles).

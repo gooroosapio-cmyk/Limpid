@@ -231,3 +231,34 @@ describe("quota du fournisseur", () => {
     expect(retryDelaySeconds(new Error("autre erreur"))).toBe(0);
   });
 });
+
+describe("réponse hors schéma", () => {
+  it("redemande une réponse conforme en citant les écarts, puis réussit", async () => {
+    const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
+    const fake = new FakeProvider([
+      new ProviderError("schema_mismatch", "hors schéma", usage, ["claims.0.id : identifiant invalide"]),
+      goodComp,
+      goodExpl,
+    ]);
+    const seen: string[] = [];
+    const spy: AIProvider = {
+      name: "fake",
+      isDemo: false,
+      generateStructured: (req) => {
+        seen.push(req.trustedInstructions);
+        return fake.generateStructured(req);
+      },
+    };
+    const out = await generateReport(spy, input());
+    expect(out.status).toBe("validated");
+    expect(seen).toHaveLength(3);
+    expect(seen[1]).toContain("claims.0.id : identifiant invalide");
+    expect(seen[0]).not.toContain("ne respectait pas le schéma");
+  });
+
+  it("abandonne après deux corrections infructueuses", async () => {
+    const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
+    const bad = () => new ProviderError("schema_mismatch", "hors schéma", usage, ["x : invalide"]);
+    await expect(generateReport(new FakeProvider([bad(), bad(), bad(), goodComp]), input())).rejects.toMatchObject({ code: "schema_mismatch" });
+  });
+});

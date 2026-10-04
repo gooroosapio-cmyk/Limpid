@@ -63,3 +63,18 @@ export async function removeAllowedEmail(form: FormData) {
   await audit(user.id, "allowlist.remove", null);
   done(`${email.data} ne peut plus se connecter.`);
 }
+
+export interface DiagnosticState {
+  checks: import("@/lib/diagnostic").DiagnosticCheck[] | null;
+  at: string | null;
+}
+
+/** Diagnostic serveur à la demande ; le test Gemini consomme une requête du quota. */
+export async function runDiagnosticAction(_prev: DiagnosticState, form: FormData): Promise<DiagnosticState> {
+  const user = await requireAdmin();
+  const { runDiagnostic } = await import("@/lib/diagnostic");
+  const gemini = form.get("gemini") === "on";
+  const checks = await runDiagnostic({ gemini });
+  await audit(user.id, "admin.diagnostic", null, { gemini, ok: checks.every((c) => c.ok) });
+  return { checks, at: new Date().toISOString() };
+}

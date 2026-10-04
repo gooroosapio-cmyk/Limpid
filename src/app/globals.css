@@ -329,3 +329,8 @@ code { font-size: 0.9em; overflow-wrap: anywhere; }
 .login-forgot a { display: inline-flex; align-items: center; min-height: var(--cible); }
 .login-or { display: flex; align-items: center; gap: var(--s3); color: var(--gris); margin: var(--s4) 0; }
 .login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--bordure); }
+.diag-list { list-style: none; padding: 0; margin: var(--s3) 0 0; }
+.diag-list li { padding: var(--s2) 0 var(--s2) 28px; border-bottom: 1px solid var(--bordure); position: relative; overflow-wrap: anywhere; }
+.diag-list li::before { position: absolute; left: 0; font-weight: 700; }
+.diag-ok::before { content: "✓"; color: var(--vert); }
+.diag-ko::before { content: "✗"; color: var(--danger); }

@@ -35,6 +35,7 @@ import {
 } from "@/lib/contracts/validate";
 import { FlowData } from "@/lib/render/visuals";
 import { ProviderError, type AIProvider, type StageBudget, type UsageReport } from "./provider";
+import { caveatGaps, droppedCaveatClaims } from "./coverage";
 import { locateQuote } from "./quotes";
 
 export const PROMPT_VERSION = "2026-10-04.1";
@@ -151,6 +152,9 @@ export function resolveEvidence(draft: ComprehensionDraft, segments: Map<string,
   return { evidence, errors };
 }
 
+/** Corrections demandées au modèle quand sa réponse ne respecte pas le schéma JSON. */
+const MAX_SCHEMA_FIXES = 2;
+
 async function callWithRetry<T extends z.ZodType>(
   provider: AIProvider,
   input: GenerationInput,
@@ -158,14 +162,20 @@ async function callWithRetry<T extends z.ZodType>(
   attemptBase: number,
   req: { schema: T; instructions: string; data: { label: string; text: string }[]; budget: StageBudget },
 ): Promise<z.infer<T>> {
-  // Les erreurs passagères (surcharge, quota) sont retentées avec attente ; les autres remontent.
+  // Erreurs passagères (surcharge, quota par minute) : nouvel essai après attente.
+  // Réponse hors schéma : nouvel essai avec la liste des écarts (chemins et règles seulement).
   const delays = [5_000, 20_000, 40_000];
+  let waits = 0;
+  let fixes = 0;
+  let schemaFeedback: string[] = [];
   for (let i = 0; ; i++) {
     try {
       const res = await provider.generateStructured({
         stage,
         schema: req.schema,
-        trustedInstructions: req.instructions,
+        trustedInstructions: schemaFeedback.length
+          ? `${req.instructions}\nTa réponse précédente ne respectait pas le schéma JSON demandé. Écarts :\n- ${schemaFeedback.join("\n- ")}\nRenvoie un objet complet et conforme : identifiants au format demandé, champs obligatoires présents, aucun champ en plus.`
+          : req.instructions,
         untrustedData: req.data,
         budget: req.budget,
         signal: input.signal,
@@ -174,9 +184,14 @@ async function callWithRetry<T extends z.ZodType>(
       return res.value;
     } catch (e) {
       if (e instanceof ProviderError && e.usage) await input.onUsage?.(stage, attemptBase + i, e.usage);
+      if (e instanceof ProviderError && e.code === "schema_mismatch" && fixes < MAX_SCHEMA_FIXES) {
+        fixes++;
+        schemaFeedback = e.issues.length ? e.issues : ["structure générale invalide"];
+        continue;
+      }
       const transient = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited");
-      if (!transient || i >= delays.length) throw e;
-      await new Promise((r) => setTimeout(r, delays[i]));
+      if (!transient || waits >= delays.length) throw e;
+      await new Promise((r) => setTimeout(r, delays[waits++]));
     }
   }
 }
@@ -185,6 +200,8 @@ async function comprehension(provider: AIProvider, input: GenerationInput, segme
   const sourceText = segmentsPayload(input.segments);
   let draft: ComprehensionDraft | null = null;
   let feedback: string[] = [];
+  // Une seule demande de correction pour la couverture des réserves (coût borné).
+  let coverageAsked = false;
   for (let repair = 0; repair <= MAX_REPAIRS; repair++) {
     const data = [{ label: "source", text: sourceText }];
     if (draft) {
@@ -192,7 +209,7 @@ async function comprehension(provider: AIProvider, input: GenerationInput, segme
       data.push({ label: "erreurs a corriger", text: feedback.join("\n") });
     }
     const instructions: string = draft
-      ? `${COMPREHENSION_INSTRUCTIONS}\nUn brouillon précédent contenait des erreurs (listées). Renvoie un objet complet corrigé : recopie les citations exactement depuis la source, ou supprime les preuves et affirmations impossibles à justifier.`
+      ? `${COMPREHENSION_INSTRUCTIONS}\nUn brouillon précédent contenait des erreurs ou des oublis (listés). Renvoie un objet complet corrigé : recopie les citations exactement depuis la source, supprime les preuves et affirmations impossibles à justifier, et reprends les réserves signalées.`
       : COMPREHENSION_INSTRUCTIONS;
     draft = await callWithRetry(provider, input, "comprehension", repair * 10, {
       schema: ComprehensionDraft,
@@ -207,10 +224,18 @@ async function comprehension(provider: AIProvider, input: GenerationInput, segme
     for (const err of errors) v.fail("evidence_quote_located", "quote_match", [err.split(":")[0]!], err);
     validateEvidence(evidence, segments, v);
     validateKnowledge(knowledge, evidence, v);
-    if (v.blocking.length === 0 || repair === MAX_REPAIRS) {
+    const gaps = caveatGaps(input.segments, evidence);
+    const gapLines = gaps.map(
+      (g) => `${g.segment_id}: réserve ou limite non reprise — « ${g.sentence} ». Ajoute l'affirmation correspondante, avec ses qualifiers et une preuve copiée mot pour mot ; une limite du document est aussi une affirmation sourcée (ex. « Le document ne traite pas de … »).`,
+    );
+    const askCoverage = gaps.length > 0 && !coverageAsked && repair < MAX_REPAIRS;
+    if ((v.blocking.length === 0 && !askCoverage) || repair === MAX_REPAIRS) {
+      for (const g of gaps) v.fail("caveat_covered", "reference", [g.segment_id], `réserve non reprise : « ${g.sentence.slice(0, 120)} »`, false);
+      if (gaps.length === 0) v.pass("caveat_covered", "reference", []);
       return { knowledge, evidence, validation: v.result(`${knowledge.id}@${SCHEMA_VERSION}`, repair) };
     }
-    feedback = v.blocking;
+    if (askCoverage) coverageAsked = true;
+    feedback = [...v.blocking, ...(askCoverage ? gapLines : [])];
   }
   throw new Error("inaccessible");
 }
@@ -334,6 +359,7 @@ async function explanation(
   const evidenceIds = new Set(evidence.map((e) => e.id));
   let draft: ExplanationDraft | null = null;
   let feedback: string[] = [];
+  let coverageAsked = false;
   for (let repair = 0; repair <= MAX_REPAIRS; repair++) {
     const data = [{ label: "connaissance validee", text: kp }, ...(variation?.data ?? [])];
     if (draft) {
@@ -351,10 +377,21 @@ async function explanation(
     const v = new ValidationCollector();
     validateExplanation(ex, ko, evidenceIds, v);
     validateBlueprint(bp, ex, ko, evidenceIds, v);
-    if (v.blocking.length === 0 || repair === MAX_REPAIRS) {
+    // Les réserves de la source ne disparaissent pas au passage à l'explication.
+    const used = new Set(ex.sections.flatMap((x) => x.blocks.flatMap((b) => b.claim_ids)));
+    const dropped = droppedCaveatClaims(ko.claims, used);
+    const askCoverage = dropped.length > 0 && !coverageAsked && repair < MAX_REPAIRS;
+    if ((v.blocking.length === 0 && !askCoverage) || repair === MAX_REPAIRS) {
+      for (const id of dropped) v.fail("caveat_kept", "reference", [id], `réserve absente de l'explication : ${id}`, false);
       return { explanation: ex, blueprint: bp, validation: v.result(`${ex.id}@${SCHEMA_VERSION}`, repair) };
     }
-    feedback = v.blocking;
+    if (askCoverage) coverageAsked = true;
+    feedback = [
+      ...v.blocking,
+      ...(askCoverage
+        ? [`Ces affirmations portent une réserve ou une limite et n'apparaissent dans aucun bloc : ${dropped.join(", ")}. Reprends chacune dans un bloc "caution" (ou "fact") qui la cite dans claim_ids avec ses evidence_ids.`]
+        : []),
+    ];
   }
   throw new Error("inaccessible");
 }
