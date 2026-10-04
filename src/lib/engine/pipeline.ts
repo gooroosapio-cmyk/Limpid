@@ -788,3 +788,17 @@ export async function regenerateSection(
   }
   throw new Error("inaccessible");
 }
+
+/**
+ * Explication seule, à partir d'une connaissance déjà validée (même source, autre niveau) :
+ * un appel de rédaction, sans relire le document. Sert aux recettes de niveaux.
+ */
+export async function explainKnowledge(
+  provider: AIProvider,
+  input: Omit<GenerationInput, "segments" | "sourceId">,
+  ko: KnowledgeObject,
+  evidence: Evidence[],
+) {
+  const full: GenerationInput = { ...input, sourceId: ko.source_ids[0]!, segments: [] };
+  return explanation(provider, full, ko, evidence);
+}

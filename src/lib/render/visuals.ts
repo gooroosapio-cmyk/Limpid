@@ -89,3 +89,14 @@ export interface AssetView {
   modifications: string | null;
   model: string | null;
 }
+
+/** Lien externe sûr : http(s) uniquement (jamais javascript:, data:…), sinon null. */
+export function safeHref(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}

@@ -11,7 +11,7 @@ import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, Theme
 import { fr } from "@/lib/i18n/fr";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { sourceEntries } from "./sources";
-import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData } from "./visuals";
+import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, safeHref } from "./visuals";
 
 const FONT_DIR = path.join(process.cwd(), "src/assets/fonts");
 let fontsReady = false;
@@ -367,7 +367,7 @@ function ReportDocument(input: PdfReportInput) {
           <Text style={s.h2} minPresenceAhead={110}>{fr.reader.sources}</Text>
           <Text style={[s.p, s.muted]}>
             {input.sourceTitle}
-            {input.sourceUrl ? <Text> — <Link src={input.sourceUrl}>{input.sourceUrl}</Link></Text> : null}
+            {safeHref(input.sourceUrl) ? <Text> — <Link src={safeHref(input.sourceUrl)!}>{input.sourceUrl}</Link></Text> : null}
           </Text>
           {entries.map((e) => (
             <Text key={e.evidenceId} style={s.source}>
@@ -390,7 +390,13 @@ function ReportDocument(input: PdfReportInput) {
 
 export async function renderReportPdf(input: PdfReportInput): Promise<Buffer> {
   registerFonts();
-  return renderToBuffer(<ReportDocument {...input} />);
+  try {
+    return await renderToBuffer(<ReportDocument {...input} />);
+  } catch (e) {
+    // Une illustration illisible ne bloque pas l'export : le texte, les schémas et les sources restent.
+    if (!input.images || Object.keys(input.images).length === 0) throw e;
+    return renderToBuffer(<ReportDocument {...input} images={{}} />);
+  }
 }
 
 /** Nom de fichier sûr à partir du titre (ASCII pour l'en-tête, UTF-8 encodé en complément). */

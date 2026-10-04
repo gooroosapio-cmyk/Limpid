@@ -38,6 +38,38 @@ export function makePdf(pages: string[][]): Uint8Array {
   return new Uint8Array(Buffer.from(out, "latin1"));
 }
 
+/**
+ * PDF sur deux colonnes écrit ligne par ligne À TRAVERS les colonnes (cas du flux mélangé) :
+ * titre pleine largeur, puis pour chaque rang la ligne gauche (x = 56) et la ligne droite (x = 310).
+ */
+export function makeTwoColumnPdf(title: string, left: string[], right: string[]): Uint8Array {
+  const rows = Math.max(left.length, right.length);
+  let ops = `BT /F1 14 Tf 56 790 Td ${pdfString(title)} Tj ET`;
+  for (let i = 0; i < rows; i++) {
+    const y = 760 - i * 14;
+    if (left[i]) ops += ` BT /F1 10 Tf 56 ${y} Td ${pdfString(left[i]!)} Tj ET`;
+    if (right[i]) ops += ` BT /F1 10 Tf 310 ${y} Td ${pdfString(right[i]!)} Tj ET`;
+  }
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [4 0 R] /Count 1 >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>",
+    `<< /Length ${Buffer.byteLength(ops, "latin1")} >>\nstream\n${ops}\nendstream`,
+  ];
+  let out = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((body, i) => {
+    offsets.push(Buffer.byteLength(out, "latin1"));
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(out, "latin1");
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  out += offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("");
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new Uint8Array(Buffer.from(out, "latin1"));
+}
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** DOCX : paragraphes, avec un style de titre optionnel. */

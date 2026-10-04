@@ -412,3 +412,15 @@ describe("schémas et illustrations déterministes", () => {
     expect(schemas.blueprint.visual_specs.map((v) => v.kind)).toEqual(["flow"]);
   });
 });
+
+describe("panne du fournisseur pendant une nouvelle version", () => {
+  it("échoue proprement sans toucher à la version précédente", async () => {
+    const first = await generateReport(new FakeProvider([goodComp, goodExpl]), input());
+    const snapshot = structuredClone({ e: first.explanation, b: first.blueprint, k: first.knowledge });
+    const { segments: _s, sourceId: _id, ...rest } = input();
+    const down = new ProviderError("quota_exhausted", "Quota du fournisseur épuisé.", { provider: "fake", model: "m", inputTokens: null, outputTokens: null, durationMs: 1, requestId: null });
+    await expect(regenerateSection(new FakeProvider([down]), rest, first.knowledge, first.evidence, first.explanation, first.blueprint, "sec_1", "simpler")).rejects.toBeInstanceOf(ProviderError);
+    await expect(regenerateExplanation(new FakeProvider([down]), rest, first.knowledge, first.evidence, first.explanation, "simpler")).rejects.toBeInstanceOf(ProviderError);
+    expect({ e: first.explanation, b: first.blueprint, k: first.knowledge }).toEqual(snapshot);
+  });
+});
