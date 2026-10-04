@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-04T18:00:55.146Z",
+  "models": [
+    "gemini-3.5-flash-lite"
+  ],
+  "status": "validated",
+  "blocking": [],
+  "warnings": [],
+  "repairs": {
+    "knowledge": 1,
+    "explanation": 1
+  },
+  "source": {
+    "pages": 4,
+    "segments": 4,
+    "chars": 2047
+  },
+  "report": {
+    "claims": 12,
+    "evidence": 12,
+    "cited": 12,
+    "sections": 4,
+    "visuals": 1,
+    "pdf_pages": 4
+  },
+  "checks": {
+    "refs_resolved": true,
+    "quotes_in_source": "12/12",
+    "quotes_in_web": "12/12",
+    "quotes_in_pdf": "12/12",
+    "numbers_in_source": "14/14",
+    "title_in_pdf": true,
+    "coverage": "8/8",
+    "missing": []
+  },
+  "timings": {
+    "extraction_ms": 223,
+    "generation_ms": 48470,
+    "web_render_ms": 18,
+    "pdf_render_ms": 501
+  },
+  "perStage": [
+    {
+      "stage": "comprehension",
+      "calls": 2,
+      "ms": 14387,
+      "input": 4300,
+      "output": 5767,
+      "cents": 3
+    },
+    {
+      "stage": "explication",
+      "calls": 3,
+      "ms": 34043,
+      "input": 9145,
+      "output": 6392,
+      "cents": 4
+    }
+  ],
+  "totalCents": 7
+}

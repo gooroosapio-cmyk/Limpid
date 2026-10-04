@@ -149,7 +149,10 @@ export class GeminiProvider implements AIProvider {
     }
     // Validation serveur systématique, même avec les sorties structurées du fournisseur.
     const parsed = req.schema.safeParse(json);
-    if (!parsed.success) throw new ProviderError("schema_mismatch", "Réponse hors schéma.", usage);
+    if (!parsed.success) {
+      const issues = parsed.error.issues.slice(0, 30).map((i) => `${i.path.join(".") || "(racine)"} : ${i.message}`);
+      throw new ProviderError("schema_mismatch", "Réponse hors schéma.", usage, issues);
+    }
     return { value: parsed.data, usage };
   }
 }

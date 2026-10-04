@@ -1,5 +1,7 @@
 import { fr } from "@/lib/i18n/fr";
 import type { AdminOverview } from "@/lib/admin";
+import type { performance } from "@/lib/diagnostic";
+import { DiagnosticPanel } from "@/components/DiagnosticPanel";
 import { addAllowedEmail, removeAllowedEmail, setGeneration, setMonthlyCap } from "@/app/admin/actions";
 
 const euros = (cents: number) => `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
@@ -14,7 +16,19 @@ const STAGES: Record<string, string> = {
 };
 
 /** Tableau de bord d'administration (données chargées par la page, côté serveur). */
-export function AdminView({ o, userEmail, message }: { o: AdminOverview; userEmail: string | null; message?: string }) {
+const seconds = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`);
+
+export function AdminView({
+  o,
+  perf,
+  userEmail,
+  message,
+}: {
+  o: AdminOverview;
+  perf: Awaited<ReturnType<typeof performance>> | null;
+  userEmail: string | null;
+  message?: string;
+}) {
   const monthPct = o.monthlyCapCents ? Math.min(100, Math.round((o.spentMonthCents / o.monthlyCapCents) * 100)) : 100;
   const models = o.quota.configured.length
     ? [...new Set([...o.quota.configured, ...o.quota.models.map(([m]) => m)])]
@@ -62,6 +76,40 @@ export function AdminView({ o, userEmail, message }: { o: AdminOverview; userEma
           })
         )}
       </section>
+
+      <section className="admin-section" aria-labelledby="adm-diag">
+        <h2 id="adm-diag">{fr.admin.diagnostic}</h2>
+        <p className="muted">{fr.admin.diagIntro}</p>
+        <DiagnosticPanel />
+      </section>
+
+      {perf && (
+        <section className="admin-section" aria-labelledby="adm-perf">
+          <h2 id="adm-perf">{fr.admin.performance}</h2>
+          <p className="muted">
+            {fr.admin.perfReports(perf.reports.count, seconds(perf.reports.p50), seconds(perf.reports.p95))}
+            {perf.reports.successRate !== null && ` ${fr.admin.perfSuccess(Math.round(perf.reports.successRate * 100))}`}
+          </p>
+          {perf.stages.length > 0 && (
+            <div className="table-scroll" tabIndex={0} role="region" aria-label={fr.admin.perfTable}>
+              <table className="admin-table">
+                <thead><tr><th scope="col">{fr.admin.stage}</th><th scope="col">{fr.admin.calls}</th><th scope="col">p50</th><th scope="col">p95</th><th scope="col">{fr.admin.avgCost}</th></tr></thead>
+                <tbody>
+                  {perf.stages.map((x) => (
+                    <tr key={x.stage}>
+                      <td>{STAGES[x.stage] ?? x.stage}</td>
+                      <td>{x.calls}</td>
+                      <td>{seconds(x.p50)}</td>
+                      <td>{seconds(x.p95)}</td>
+                      <td>{euros(Math.round(x.avgCents * 100) / 100)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="admin-section" aria-labelledby="adm-switch">
         <h2 id="adm-switch">{fr.admin.circuit}</h2>
