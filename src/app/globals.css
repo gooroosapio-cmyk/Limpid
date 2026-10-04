@@ -412,3 +412,16 @@ code { font-size: 0.9em; overflow-wrap: anywhere; }
 .section-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0 0; padding-top: var(--s3); border-top: 1px dashed var(--bordure); }
 .section-actions .btn { min-height: var(--cible); padding: 0 var(--s3); font-size: 15px; }
 .section-cost { flex-basis: 100%; margin: 0; }
+
+/* ---------- Progression (étapes réelles, sans pourcentage) ---------- */
+.progress-title { font-size: 20px; margin-bottom: var(--s3); }
+.steps { list-style: none; margin: 0 0 var(--s4); padding: 0; }
+.step { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s2) 0; position: relative; }
+.step-mark {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--bordure); background: var(--blanc);
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;
+}
+.step-done .step-mark { background: var(--jaune); border-color: var(--jaune); color: var(--encre); }
+.step-current .step-mark { border-color: var(--encre); box-shadow: inset 0 0 0 5px var(--blanc); background: var(--jaune); }
+.step-detail { display: block; font-size: 15px; color: var(--gris); }
+.step-todo strong { color: var(--gris); font-weight: 600; }

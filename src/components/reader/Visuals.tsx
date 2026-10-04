@@ -1,6 +1,6 @@
 import type { VisualSpec } from "@/lib/contracts/schemas";
 import { fr } from "@/lib/i18n/fr";
-import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, type AssetView } from "@/lib/render/visuals";
+import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
 
 export type { AssetView };
 import { FlowDiagram } from "./FlowDiagram";
@@ -58,17 +58,19 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
 export function Credit({ asset }: { asset: AssetView }) {
   if (asset.provider === "gemini") return <span className="credit">{fr.visuals.generated(asset.model)}</span>;
   const via = asset.provider === "commons" ? "Wikimedia Commons" : "Unsplash";
+  const licenseUrl = safeHref(asset.licenseUrl);
+  const sourceUrl = safeHref(asset.sourceUrl);
   return (
     <span className="credit">
       {asset.author ? `${asset.author} · ` : ""}
-      {asset.license && asset.licenseUrl ? (
-        <a href={asset.licenseUrl} rel="noopener noreferrer nofollow" target="_blank">{asset.license}</a>
+      {asset.license && licenseUrl ? (
+        <a href={licenseUrl} rel="noopener noreferrer nofollow" target="_blank">{asset.license}</a>
       ) : (
         asset.license
       )}
       {asset.license ? " · " : ""}
-      {asset.sourceUrl ? (
-        <a href={asset.sourceUrl} rel="noopener noreferrer nofollow" target="_blank">{via}</a>
+      {sourceUrl ? (
+        <a href={sourceUrl} rel="noopener noreferrer nofollow" target="_blank">{via}</a>
       ) : (
         via
       )}

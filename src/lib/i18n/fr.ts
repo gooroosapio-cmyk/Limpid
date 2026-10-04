@@ -98,6 +98,12 @@ export const fr = {
     back: "Revenir à l'aperçu",
     createFailed: "La création a échoué. Réessayez.",
   },
+  progress: {
+    title: "Votre rapport prend forme.",
+    leave: "Vous pouvez quitter cet écran : la préparation continue. Retrouvez le rapport dans Mes rapports.",
+    myReports: "Voir mes rapports",
+    states: { done: "terminé", current: "en cours", todo: "à venir" } as Record<string, string>,
+  },
   visuals: {
     notStated: "Non précisé par la source",
     illustration: "Illustration",

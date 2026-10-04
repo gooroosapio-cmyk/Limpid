@@ -86,7 +86,7 @@ export async function adminOverview() {
       since: quotaStart,
       limit: FREE_TIER_DAILY_REQUESTS,
       models: [...byModel.entries()].sort((a, b) => b[1] - a[1]),
-      configured: [process.env.LIMPID_MODEL_FAST, process.env.LIMPID_MODEL_QUALITY].filter((m): m is string => !!m),
+      configured: [process.env.LIMPID_MODEL_FAST, process.env.LIMPID_MODEL_QUALITY, ...(process.env.LIMPID_MODEL_FALLBACKS ?? "").split(",").map((m) => m.trim())].filter((m): m is string => !!m),
     },
     emails: emails.data ?? [],
     jobs: jobs.data ?? [],

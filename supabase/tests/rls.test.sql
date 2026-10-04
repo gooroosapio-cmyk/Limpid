@@ -72,6 +72,29 @@ do $$ declare j public.jobs; begin
   end;
 end $$;
 
+-- Une seule réservation : un second worker ne reçoit pas la même tâche ; un bail expiré est repris.
+insert into public.jobs (id, owner_id, report_id, kind, idempotency_key)
+  values ('30000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000a', '20000000-0000-0000-0000-00000000000a', 'generate_report', 'cle-reservation-1');
+do $$ declare a public.jobs; b public.jobs; c public.jobs; begin
+  select * into a from public.claim_job('worker-a', 60);
+  select * into b from public.claim_job('worker-b', 60);
+  if a.id is distinct from '30000000-0000-0000-0000-00000000000a' then raise exception 'ECHEC : réservation'; end if;
+  if b.id is not null then raise exception 'ECHEC : tâche réservée deux fois'; end if;
+  update public.jobs set lease_expires_at = now() - interval '1 second' where id = a.id;
+  select * into c from public.claim_job('worker-c', 60);
+  if c.id is distinct from a.id or c.lease_owner <> 'worker-c' then raise exception 'ECHEC : bail expiré non repris'; end if;
+end $$;
+
+-- Consommation : une même tentative n'est jamais débitée deux fois.
+insert into public.usage_ledger (owner_id, job_id, stage, attempt, provider, model, status, reserved_cents)
+  values ('00000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-00000000000a', 'explication', 0, 'gemini', 'm', 'settled', 2);
+do $$ begin
+  insert into public.usage_ledger (owner_id, job_id, stage, attempt, provider, model, status, reserved_cents)
+    values ('00000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-00000000000a', 'explication', 0, 'gemini', 'm', 'settled', 2);
+  raise exception 'ECHEC : double débit accepté';
+exception when unique_violation then null;
+end $$;
+
 -- Un client ne peut pas appeler claim_job
 set role authenticated;
 do $$ begin

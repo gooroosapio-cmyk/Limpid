@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId } from "@/lib/contracts/schemas";
 import { sourceEntries } from "@/lib/render/sources";
+import { safeHref } from "@/lib/render/visuals";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { fr } from "@/lib/i18n/fr";
 import { VisualFigure, type AssetView } from "./Visuals";
@@ -118,6 +119,7 @@ export function Reader({
   themeControl?: React.ReactNode;
 }) {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
+  const originalHref = safeHref(sourceUrl);
   const sections = new Map(explanation.sections.map((s) => [s.id, s]));
   const visuals = new Map(blueprint.visual_specs.map((v) => [v.id, v]));
   const first = explanation.sections[0];
@@ -224,10 +226,10 @@ export function Reader({
           <h2 id="sources-h">{fr.reader.sources}</h2>
           <p className="muted">
             {sourceTitle}
-            {sourceUrl && (
+            {originalHref && (
               <>
                 {" — "}
-                <a href={sourceUrl} rel="noopener noreferrer nofollow" target="_blank">{fr.reader.original}</a>
+                <a href={originalHref} rel="noopener noreferrer nofollow" target="_blank">{fr.reader.original}</a>
               </>
             )}
           </p>

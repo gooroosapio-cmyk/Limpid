@@ -5,6 +5,7 @@
  */
 import "server-only";
 import { getDocumentProxy } from "unpdf";
+import { columnText, type PositionedItem } from "./columns";
 import { ExtractionError, type TextBlock } from "./text";
 
 /** En dessous de ce nombre de caractères utiles, une page est considérée comme sans texte. */
@@ -17,11 +18,15 @@ export interface PdfText {
   pagesRead: number;
   /** Pages sans couche texte (scannées, images, vides). */
   emptyPages: number[];
+  /** Pages sur deux colonnes dont l'ordre de lecture a été reconstruit. */
+  columnPages: number[];
 }
 
 interface TextItemLike {
   str?: string;
   hasEOL?: boolean;
+  transform?: number[];
+  width?: number;
 }
 
 /** Recolle les lignes d'une page : césures en fin de ligne supprimées, retours à la ligne en espaces. */
@@ -56,11 +61,16 @@ export async function extractPdf(data: Uint8Array, opts: { maxPages: number }): 
     const labels: (string | null)[] | null = await pdf.getPageLabels().catch(() => null);
     const blocks: TextBlock[] = [];
     const emptyPages: number[] = [];
+    const columnPages: number[] = [];
 
     for (let n = 1; n <= pagesRead; n++) {
       const page = await pdf.getPage(n);
       const content = await page.getTextContent();
-      const raw = (content.items as TextItemLike[]).map((it) => (it.str ?? "") + (it.hasEOL ? "\n" : "")).join("");
+      const items = content.items as TextItemLike[];
+      const positioned = items.filter((it): it is PositionedItem => typeof it.str === "string" && Array.isArray(it.transform) && typeof it.width === "number");
+      const columns = columnText(positioned, page.getViewport({ scale: 1 }).width);
+      if (columns !== null) columnPages.push(n);
+      const raw = columns ?? items.map((it) => (it.str ?? "") + (it.hasEOL ? "\n" : "")).join("");
       page.cleanup();
       const text = joinPdfLines(raw);
       if (text.replace(/\s/g, "").length < MIN_PAGE_CHARS) {
@@ -78,7 +88,7 @@ export async function extractPdf(data: Uint8Array, opts: { maxPages: number }): 
         pageCount,
       );
     }
-    return { blocks, pageCount, pagesRead, emptyPages };
+    return { blocks, pageCount, pagesRead, emptyPages, columnPages };
   } finally {
     await pdf.loadingTask.destroy().catch(() => undefined);
   }

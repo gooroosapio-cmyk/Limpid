@@ -37,10 +37,10 @@ import {
 } from "@/lib/contracts/validate";
 import { ComparisonData, FlowData, safeImageQuery, type ChartData } from "@/lib/render/visuals";
 import { ProviderError, type AIProvider, type StageBudget, type UsageReport } from "./provider";
-import { caveatGaps, droppedCaveatClaims } from "./coverage";
+import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-04.1";
+export const PROMPT_VERSION = "2026-10-04.2";
 const MAX_REPAIRS = 2;
 
 /* ---------- Brouillons demandés au modèle ---------- */
@@ -282,13 +282,21 @@ async function comprehension(provider: AIProvider, input: GenerationInput, segme
     validateEvidence(evidence, segments, v);
     validateKnowledge(knowledge, evidence, v);
     const gaps = caveatGaps(input.segments, evidence);
-    const gapLines = gaps.map(
-      (g) => `${g.segment_id}: réserve ou limite non reprise — « ${g.sentence} ». Ajoute l'affirmation correspondante, avec ses qualifiers et une preuve copiée mot pour mot ; une limite du document est aussi une affirmation sourcée (ex. « Le document ne traite pas de … »).`,
-    );
-    const askCoverage = gaps.length > 0 && !coverageAsked && repair < MAX_REPAIRS;
+    const figures = numberGaps(input.segments, evidence);
+    const gapLines = [
+      ...gaps.map(
+        (g) => `${g.segment_id}: réserve ou limite non reprise — « ${g.sentence} ». Ajoute l'affirmation correspondante, avec ses qualifiers et une preuve copiée mot pour mot ; une limite du document est aussi une affirmation sourcée (ex. « Le document ne traite pas de … »).`,
+      ),
+      ...figures.map(
+        (g) => `${g.segment_id}: chiffre non repris — « ${g.sentence} ». Ajoute l'affirmation correspondante, avec ses nombres (source_form exacte) et une preuve copiée mot pour mot.`,
+      ),
+    ];
+    const askCoverage = gapLines.length > 0 && !coverageAsked && repair < MAX_REPAIRS;
     if ((v.blocking.length === 0 && !askCoverage) || repair === MAX_REPAIRS) {
       for (const g of gaps) v.fail("caveat_covered", "reference", [g.segment_id], `réserve non reprise : « ${g.sentence.slice(0, 120)} »`, false);
+      for (const g of figures) v.fail("figure_covered", "number_match", [g.segment_id], `chiffre non repris : « ${g.sentence.slice(0, 120)} »`, false);
       if (gaps.length === 0) v.pass("caveat_covered", "reference", []);
+      if (figures.length === 0) v.pass("figure_covered", "number_match", []);
       return { knowledge, evidence, validation: v.result(`${knowledge.id}@${SCHEMA_VERSION}`, repair) };
     }
     if (askCoverage) coverageAsked = true;
@@ -619,16 +627,32 @@ async function explanation(
     // Les réserves de la source ne disparaissent pas au passage à l'explication.
     const used = new Set(ex.sections.flatMap((x) => x.blocks.flatMap((b) => b.claim_ids)));
     const dropped = droppedCaveatClaims(ko.claims, used);
-    const askCoverage = dropped.length > 0 && !coverageAsked && repair < MAX_REPAIRS;
+    // Chiffres soutenus oubliés : rappelés une fois (le rédacteur garde ceux qui comptent).
+    const numeric = droppedNumberClaims(ko.claims, used).filter((id) => !dropped.includes(id));
+    // Un bloc qui cite une affirmation chiffrée doit en reprendre les nombres exacts.
+    const unnumbered = blocksMissingNumbers(ex.sections, ko.claims);
+    const askCoverage = (dropped.length > 0 || numeric.length > 0 || unnumbered.length > 0) && !coverageAsked && repair < MAX_REPAIRS;
     if ((v.blocking.length === 0 && !askCoverage) || repair === MAX_REPAIRS) {
       for (const id of dropped) v.fail("caveat_kept", "reference", [id], `réserve absente de l'explication : ${id}`, false);
+      for (const id of numeric) v.fail("figure_kept", "number_match", [id], `chiffre absent de l'explication : ${id}`, false);
+      for (const m of unnumbered) v.fail("figure_in_text", "number_match", [m.block_id], `nombres cités mais absents du texte : ${m.numbers.join(", ")}`, false);
       return { explanation: ex, blueprint: bp, validation: v.result(`${ex.id}@${SCHEMA_VERSION}`, repair) };
     }
     if (askCoverage) coverageAsked = true;
     feedback = [
       ...v.blocking,
       ...(askCoverage
-        ? [`Ces affirmations portent une réserve ou une limite et n'apparaissent dans aucun bloc : ${dropped.join(", ")}. Reprends chacune dans un bloc "caution" (ou "fact") qui la cite dans claim_ids avec ses evidence_ids.`]
+        ? [
+            ...(dropped.length
+              ? [`Ces affirmations portent une réserve ou une limite et n'apparaissent dans aucun bloc : ${dropped.join(", ")}. Reprends chacune dans un bloc "caution" (ou "fact") qui la cite dans claim_ids avec ses evidence_ids.`]
+              : []),
+            ...unnumbered.map(
+              (m) => `Le bloc ${m.block_id} cite une affirmation chiffrée sans en donner les nombres : écris-les tels quels (${m.numbers.join(", ")}).`,
+            ),
+            ...(numeric.length
+              ? [`Ces affirmations chiffrées n'apparaissent dans aucun bloc : ${numeric.join(", ")}. Reprends celles qui comptent pour comprendre le document, dans un bloc "fact" qui les cite avec leurs evidence_ids et leurs nombres exacts.`]
+              : []),
+          ]
         : []),
     ];
   }
@@ -787,4 +811,18 @@ export async function regenerateSection(
     feedback = v.blocking;
   }
   throw new Error("inaccessible");
+}
+
+/**
+ * Explication seule, à partir d'une connaissance déjà validée (même source, autre niveau) :
+ * un appel de rédaction, sans relire le document. Sert aux recettes de niveaux.
+ */
+export async function explainKnowledge(
+  provider: AIProvider,
+  input: Omit<GenerationInput, "segments" | "sourceId">,
+  ko: KnowledgeObject,
+  evidence: Evidence[],
+) {
+  const full: GenerationInput = { ...input, sourceId: ko.source_ids[0]!, segments: [] };
+  return explanation(provider, full, ko, evidence);
 }

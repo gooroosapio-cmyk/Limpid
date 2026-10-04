@@ -21,6 +21,11 @@ export interface GeminiConfig {
   apiKey: string;
   modelFast: string;
   modelQuality: string;
+  /**
+   * Modèles de repli déclarés (même fournisseur), essayés dans l'ordre quand le quota du
+   * modèle principal est épuisé. Le modèle réellement utilisé est journalisé à chaque appel.
+   */
+  fallbackModels?: string[];
 }
 
 export function geminiConfigFromEnv(): GeminiConfig {
@@ -30,7 +35,12 @@ export function geminiConfigFromEnv(): GeminiConfig {
   if (!apiKey || !modelFast || !modelQuality) {
     throw new ProviderError("not_configured", "Gemini n'est pas configuré (clé ou modèles manquants).");
   }
-  return { apiKey, modelFast, modelQuality };
+  const fallbackModels = (process.env.LIMPID_MODEL_FALLBACKS ?? "")
+    .split(",")
+    .map((m) => m.trim())
+    .filter((m) => /^[a-z0-9][a-z0-9.\-]{2,80}$/.test(m))
+    .slice(0, 3);
+  return { apiKey, modelFast, modelQuality, fallbackModels };
 }
 
 /** Mots-clés de bornes refusés en nombre par l'API (400 INVALID_ARGUMENT constaté le 4 octobre 2026). */
@@ -86,7 +96,20 @@ export class GeminiProvider implements AIProvider {
   }
 
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>> {
-    const model = req.budget.tier === "fast" ? this.config.modelFast : this.config.modelQuality;
+    const primary = req.budget.tier === "fast" ? this.config.modelFast : this.config.modelQuality;
+    const models = [primary, ...(this.config.fallbackModels ?? []).filter((m) => m !== primary)];
+    for (let i = 0; ; i++) {
+      try {
+        return await this.generateWith(models[i]!, req);
+      } catch (e) {
+        // Quota du jour épuisé ou modèle surchargé : le modèle de repli déclaré prend le relais.
+        const switchable = e instanceof ProviderError && (e.code === "quota_exhausted" || e.code === "unavailable");
+        if (!switchable || i >= models.length - 1) throw e;
+      }
+    }
+  }
+
+  protected async generateWith<T extends z.ZodType>(model: string, req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>> {
     const nonce = randomBytes(12).toString("hex");
     const started = Date.now();
     const timeout = AbortSignal.timeout(req.budget.timeoutMs);

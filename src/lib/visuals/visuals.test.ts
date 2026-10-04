@@ -204,3 +204,14 @@ describe("orchestration des illustrations", () => {
     expect(carried.sections[0]!.visual_ids).toEqual(["vis_ill_1"]);
   });
 });
+
+describe("panne de la génération d'image", () => {
+  it("se replie sur la banque d'images et journalise l'appel échoué", async () => {
+    const config = { ...configOff, geminiImage: true, imageModel: "img" };
+    const usages: number[] = [];
+    const err = Object.assign(new Error("HTTP 500"), { usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 0, durationMs: 5, requestId: null } });
+    const out = await illustrate(blueprint(), "gemini", config, deps({ generateImage: async () => { throw err; }, onImageUsage: (a) => void usages.push(a) }));
+    expect(out.blueprint.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1"]);
+    expect(usages).toEqual([1, 2]);
+  });
+});

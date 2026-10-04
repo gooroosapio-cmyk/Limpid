@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Evidence, SourceSegment } from "@/lib/contracts/schemas";
-import { caveatGaps, sentences } from "./coverage";
+import { blocksMissingNumbers, CAVEAT, caveatGaps, droppedNumberClaims, hasFigure, numberGaps, sentences } from "./coverage";
 
 const seg = (id: string, text: string): SourceSegment => ({
   id,
@@ -60,5 +60,55 @@ describe("réserves gardées dans l'explication", () => {
     ];
     expect(droppedCaveatClaims(claims, new Set(["clm_1"]))).toEqual(["clm_2", "clm_3"]);
     expect(droppedCaveatClaims(claims, new Set(["clm_1", "clm_2", "clm_3"]))).toEqual([]);
+  });
+});
+
+describe("couverture des chiffres", () => {
+  it("repère les phrases chiffrées sans preuve, pas les simples années", () => {
+    const seg = {
+      id: "seg_1",
+      source_id: "src_1",
+      source_version: "v1",
+      locator: { kind: "section" as const, heading_path: [], paragraph: 1 },
+      text: "Le rapport date de 2025. La consommation atteint 148 litres par habitant. L'objectif est de 135 litres en 2027.",
+      content_hash: "h",
+      extraction_warnings: [],
+    };
+    const ev = [{ id: "ev_1", segment_id: "seg_1", start_offset: 25, end_offset: 70, quote: seg.text.slice(25, 70) }];
+    expect(hasFigure("Le rapport date de 2025.")).toBe(false);
+    expect(hasFigure("Une baisse de 5 %.")).toBe(true);
+    expect(numberGaps([seg as never], ev as never).map((g) => g.sentence)).toEqual(["L'objectif est de 135 litres en 2027."]);
+  });
+  it("signale les affirmations chiffrées soutenues absentes de l'explication", () => {
+    const claims = [
+      { id: "clm_1", numbers: [1], support_status: "supported" },
+      { id: "clm_2", numbers: [], support_status: "supported" },
+      { id: "clm_3", numbers: [1], support_status: "unsupported" },
+      { id: "clm_4", numbers: [1], support_status: "supported" },
+    ];
+    expect(droppedNumberClaims(claims, new Set(["clm_4"]))).toEqual(["clm_1"]);
+  });
+  it("reconnaît une limite de portée", () => {
+    expect(CAVEAT.test("Ces règles valent pour un composteur individuel.")).toBe(true);
+  });
+});
+
+describe("nombres repris dans le texte", () => {
+  it("signale un bloc qui cite une affirmation chiffrée sans ses nombres", () => {
+    const claims = [
+      { id: "clm_1", numbers: [{ source_form: "79,5 %" }, { source_form: "75,6 %" }] },
+      { id: "clm_2", numbers: [{ source_form: "3,9 millions" }] },
+    ];
+    const sections = [
+      {
+        blocks: [
+          { id: "blk_1", type: "fact", text: "Le rendement a progressé en 2025.", claim_ids: ["clm_1"] },
+          { id: "blk_2", type: "fact", text: "La production atteint 3,9 millions de m³.", claim_ids: ["clm_2"] },
+          { id: "blk_3", type: "analogy", text: "Comme une passoire.", claim_ids: ["clm_1"] },
+          { id: "blk_4", type: "fact", text: "Il passe de 75,6 % à 79,5 %.", claim_ids: ["clm_1"] },
+        ],
+      },
+    ];
+    expect(blocksMissingNumbers(sections, claims)).toEqual([{ block_id: "blk_1", numbers: ["79,5 %", "75,6 %"] }]);
   });
 });

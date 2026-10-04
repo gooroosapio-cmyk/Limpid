@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { strToU8, zipSync } from "fflate";
-import { makeDocx, makePdf } from "@/test/fixtures";
+import { makeDocx, makePdf, makeTwoColumnPdf } from "@/test/fixtures";
+import { columnText, type PositionedItem } from "./columns";
 import { blocksFromDocumentXml, decodeXmlEntities } from "./docx";
 import { decodeHtml, extractHtml } from "./html";
 import { extractSource, ExtractionError } from "./index";
@@ -136,5 +137,27 @@ describe("TXT", () => {
     const r = await extractSource("txt", strToU8("﻿Titre\n\nUn paragraphe."), "src_t", opts);
     expect(r.extracted.segments[0]!.locator).toMatchObject({ heading_path: ["Titre"] });
     await rejects(extractSource("txt", new Uint8Array([0xff, 0xfe, 0x00]), "src_t", opts), "binary");
+  });
+});
+
+describe("PDF sur deux colonnes", () => {
+  const L = Array.from({ length: 10 }, (_, i) => `Colonne gauche ligne ${i + 1} : texte suivi assez long.`);
+  const R = Array.from({ length: 10 }, (_, i) => `Colonne droite ligne ${i + 1} : autre texte assez long.`);
+
+  it("reconstruit l'ordre de lecture d'un flux mélangé", async () => {
+    const r = await extractSource("pdf", makeTwoColumnPdf("Titre du rapport", L, R), "src_c", opts);
+    const text = r.extracted.segments.map((s) => s.text).join(" ");
+    const pos = (t: string) => text.indexOf(t);
+    expect(pos("Titre du rapport")).toBeLessThan(pos("Colonne gauche ligne 1 "));
+    expect(pos("Colonne gauche ligne 10 ")).toBeLessThan(pos("Colonne droite ligne 1 "));
+    expect(pos("Colonne droite ligne 9 ")).toBeLessThan(pos("Colonne droite ligne 10 "));
+  });
+
+  it("laisse intacts une page à une colonne et un tableau", () => {
+    const item = (str: string, x: number, y: number, width: number): PositionedItem => ({ str, transform: [1, 0, 0, 1, x, y], width });
+    const single = Array.from({ length: 20 }, (_, i) => item("Une ligne pleine largeur de texte courant qui traverse la page.", 56, 760 - i * 14, 480));
+    expect(columnText(single, 595)).toBeNull();
+    const table = Array.from({ length: 12 }, (_, i) => [item(`Indicateur ${i}`, 56, 760 - i * 14, 60), item(`${i},5 %`, 330, 760 - i * 14, 30), item(`${i},9 %`, 450, 760 - i * 14, 30)]).flat();
+    expect(columnText(table, 595)).toBeNull();
   });
 });
