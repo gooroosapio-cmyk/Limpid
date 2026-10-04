@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { DeleteAccount } from "@/components/DeleteAccount";
 import { PreferencesQuiz } from "@/components/PreferencesQuiz";
+import { isAdmin } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
 import { fr } from "@/lib/i18n/fr";
 import type { Answers } from "@/lib/preferences";
@@ -29,10 +32,17 @@ export default async function PreferencesPage() {
       <h1>{fr.preferences.title}</h1>
       <p className="muted">{fr.preferences.intro}</p>
       <PreferencesQuiz initial={initial} />
-      <form action="/auth/deconnexion" method="post" className="logout">
+      <section className="logout" aria-labelledby="account-h">
+        <h2 id="account-h">{fr.account.title}</h2>
         <p className="muted">{user.email}</p>
-        <button type="submit" className="btn btn-block">{fr.preferences.logout}</button>
-      </form>
+        {(await isAdmin(user.id)) && (
+          <p><Link href="/admin">{fr.admin.link}</Link></p>
+        )}
+        <form action="/auth/deconnexion" method="post">
+          <button type="submit" className="btn btn-block">{fr.preferences.logout}</button>
+        </form>
+        <DeleteAccount />
+      </section>
     </>
   );
 }

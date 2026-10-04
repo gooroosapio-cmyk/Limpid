@@ -1,5 +1,27 @@
 # Avancement
 
+## Phase 5 — Administration, suppression de compte, accessibilité (4 octobre 2026)
+
+### FAIT
+- **Tableau de bord `/admin`**, réservé au rôle admin vérifié en base à chaque requête (page introuvable pour les autres comptes ; lien depuis Préférences pour l'admin) :
+  - dépense estimée du mois et des dernières 24 h face aux plafonds, jauge du plafond mensuel, détail par étape (compréhension, explication, OCR, quiz) ;
+  - **quota gratuit Gemini du jour, par modèle** (requêtes depuis minuit heure du Pacifique, sur 20) ;
+  - coupe-circuit (suspendre / réactiver toute génération) et plafond mensuel modifiable, borné par la configuration serveur ;
+  - liste blanche : ajout (rôle utilisateur ou admin) et retrait, impossible de se retirer soi-même ou de retirer le dernier admin ;
+  - tâches récentes (type, état, code d'erreur) et journal d'audit ; aucune donnée de document affichée. Chaque action admin est journalisée.
+- **Suppression du compte** (Préférences → Mon compte) : confirmation écrite « SUPPRIMER », liste de ce qui est effacé ; rapports marqués supprimés d'abord (le worker ne peut plus écrire), tâches annulées, fichiers effacés (chemins connus puis tout le préfixe du compte dans les buckets), lignes supprimées, puis l'utilisateur d'authentification (cascade). Compte rendu sans contenu dans le journal d'audit ; déconnexion et message de confirmation. L'adresse reste dans la liste blanche (sinon le propriétaire ne pourrait plus revenir).
+- **Accessibilité** : audit axe-core (WCAG 2.0/2.1/2.2 A et AA + bonnes pratiques) sur connexion, démonstration, formulaire Créer, lecteur (quiz, versions, actions), Préférences (+ suppression de compte) et administration, à 360 et 1 440 px ; une violation trouvée (deux régions de même nom sur l'admin) et corrigée → **0 violation**, aucun débordement horizontal.
+
+### EN TEST (résultats réels)
+- `npm test` : 106 tests (dont le calcul de minuit heure du Pacifique, été comme hiver). Typecheck et build OK.
+- Rendu 360 px de l'administration (données fictives) et de la zone de suppression vérifié en Chromium.
+
+### NON TESTÉ
+- Actions admin et suppression de compte contre la vraie base : la clé `service_role` n'est pas utilisable depuis cette session. À essayer en production (pour la suppression : avec une adresse de test ajoutée depuis l'admin, pas avec le compte propriétaire).
+
+### PROCHAINE ÉTAPE — Phase 6 (proposée)
+Passage en revue de sécurité complet avant d'inviter d'autres personnes (2FA admin, cadrage Q8), page « Mes rapports » avec recherche et tri, partage en lecture seule d'un rapport, PWA installable.
+
 ## Phase 4 — Lecture OCR, nouvelles versions, quiz corrigé (4 octobre 2026)
 
 ### FAIT
