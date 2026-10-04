@@ -150,7 +150,7 @@ main {
 .small { font-size: 14px; margin-top: var(--s3); }
 
 label { display: block; font-weight: 600; margin-bottom: var(--s2); }
-input[type="text"], input[type="url"], input[type="email"], input[type="number"], textarea, select {
+input[type="text"], input[type="url"], input[type="email"], input[type="number"], input[type="password"], input[type="search"], textarea, select {
   width: 100%; font: inherit; font-size: 16px; padding: var(--s3); min-height: 48px;
   border: 1px solid var(--bordure); border-radius: 10px; background: var(--blanc); color: var(--encre);
 }
@@ -314,3 +314,18 @@ code { font-size: 0.9em; overflow-wrap: anywhere; }
 .account-delete { border: 1px solid var(--danger); border-radius: var(--rayon); padding: var(--s3) var(--s4); background: var(--blanc); }
 .account-delete summary { cursor: pointer; font-weight: 600; color: var(--danger); min-height: var(--cible); display: flex; align-items: center; }
 .btn-danger { background: var(--danger); border-color: var(--danger); color: var(--blanc); margin-top: var(--s3); }
+
+/* Connexion */
+.lead { font-size: 20px; color: var(--gris); margin-bottom: var(--s2); }
+.password-field { position: relative; }
+.password-field input { padding-right: 104px; }
+.password-toggle {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  min-height: var(--cible); min-width: 88px; border: 0; background: transparent; font: inherit; font-size: 15px;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; color: var(--encre); border-radius: 8px;
+}
+.login label { margin-top: var(--s3); }
+.login-forgot { text-align: right; margin: var(--s1) 0 var(--s3); font-size: 15px; }
+.login-forgot a { display: inline-flex; align-items: center; min-height: var(--cible); }
+.login-or { display: flex; align-items: center; gap: var(--s3); color: var(--gris); margin: var(--s4) 0; }
+.login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--bordure); }

@@ -38,6 +38,7 @@ export default async function PreferencesPage() {
         {(await isAdmin(user.id)) && (
           <p><Link href="/admin">{fr.admin.link}</Link></p>
         )}
+        <p><Link href="/compte/mot-de-passe">{fr.login.setPassword}</Link></p>
         <form action="/auth/deconnexion" method="post">
           <button type="submit" className="btn btn-block">{fr.preferences.logout}</button>
         </form>

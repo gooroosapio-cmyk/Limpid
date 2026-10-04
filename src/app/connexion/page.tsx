@@ -11,8 +11,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { erreur, compte } = await searchParams;
   return (
     <>
-      <h1>Connexion</h1>
-      <p className="muted">Alpha privée : seules les adresses invitées peuvent se connecter. Aucun mot de passe.</p>
+      <h1>{fr.login.title}</h1>
+      <p className="lead">{fr.login.subtitle}</p>
+      <p className="muted">{fr.login.alpha}</p>
       {compte === "supprime" && <p className="notice" role="status">{fr.account.deleted}</p>}
       {erreur && (
         <p className="notice notice-warn" role="alert">

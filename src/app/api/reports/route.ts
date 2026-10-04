@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
         upload_missing: 410,
         url_disabled: 403,
         ocr_consent: 409,
+        limit: 429,
         generation_disabled: 503,
         storage: 500,
       }[e.code];

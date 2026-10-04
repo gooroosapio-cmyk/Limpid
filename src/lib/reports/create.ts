@@ -13,6 +13,7 @@ import { checkUpload, FileRejected } from "@/lib/security/file-type";
 import { checkImageSize, type ImageKind } from "@/lib/security/image";
 import { parsePublicUrl, safeFetch, UrlRejected } from "@/lib/security/safe-fetch";
 import { BUCKET, purgeOriginal, titleFromFileName } from "@/lib/sources/uploads";
+import { assertCanStartJob, LimitError, recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { adminClient } from "@/lib/supabase/admin";
 
 const Params = {
@@ -53,7 +54,8 @@ export class CreateError extends Error {
       | "url_disabled"
       | "url"
       | "storage"
-      | "ocr_consent",
+      | "ocr_consent"
+      | "limit",
     message: string,
     /** Pages à lire par OCR (demande d'accord). */
     public readonly pages?: number,
@@ -269,6 +271,14 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     throw new CreateError("generation_disabled", "La génération est suspendue par l'administrateur.");
   }
 
+  // Limites du compte vérifiées avant toute lecture du document (aucun travail perdu).
+  try {
+    await assertCanStartJob(userId, { newReport: true });
+  } catch (e) {
+    if (e instanceof LimitError) throw new CreateError("limit", e.message);
+    throw e;
+  }
+
   const prepared =
     input.source === "text"
       ? await fromText(input)
@@ -343,5 +353,6 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     }
     throw new CreateError("storage", "Création de la tâche impossible.");
   }
+  await recordLimitEvent(userId, REPORT_CREATED, report.data.id);
   return { reportId: report.data.id };
 }
