@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Reader } from "@/components/reader/Reader";
+import { fr } from "@/lib/i18n/fr";
 import {
   DEMO_SOURCE_TITLE,
   demoBlueprint,
@@ -19,6 +20,7 @@ export default function DemoReportPage() {
       segments={demoSegments}
       sourceTitle={DEMO_SOURCE_TITLE}
       pdfHref="/rapports/demo/pdf"
+      actionsNote={fr.reader.demoActions}
       isDemo
     />
   );

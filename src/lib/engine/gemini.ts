@@ -58,6 +58,23 @@ export function toProviderSchema(schema: unknown): unknown {
   return out;
 }
 
+/** Délai de reprise annoncé par l'API (« retryDelay": "27672s" »), en secondes ; 0 si absent. */
+export function retryDelaySeconds(e: unknown): number {
+  const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(String((e as Error)?.message ?? ""));
+  return m ? Number(m[1]) : 0;
+}
+
+/** Données non fiables délimitées, puis fichiers joints annoncés par une étiquette. */
+function requestParts(req: StructuredRequest<z.ZodType>, nonce: string) {
+  const parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] = [];
+  if (req.untrustedData.length) parts.push({ text: wrapUntrusted(req.untrustedData, nonce) });
+  for (const m of req.media ?? []) {
+    parts.push({ text: `<<<FICHIER_${nonce} label="${m.label.replace(/[^\w .-]/g, "").slice(0, 60)}">>>` });
+    parts.push({ inlineData: { mimeType: m.mimeType, data: Buffer.from(m.data).toString("base64") } });
+  }
+  return parts;
+}
+
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
   readonly isDemo = false;
@@ -78,7 +95,7 @@ export class GeminiProvider implements AIProvider {
     try {
       res = await this.client.models.generateContent({
         model,
-        contents: [{ role: "user", parts: [{ text: wrapUntrusted(req.untrustedData, nonce) }] }],
+        contents: [{ role: "user", parts: requestParts(req, nonce) }],
         config: {
           systemInstruction: `${req.trustedInstructions}\n\n${UNTRUSTED_PREAMBLE(nonce)}`,
           responseMimeType: "application/json",
@@ -94,11 +111,16 @@ export class GeminiProvider implements AIProvider {
       if (req.signal.aborted) throw new ProviderError("cancelled", "Opération annulée.", usage);
       if (timeout.aborted) throw new ProviderError("timeout_ambiguous", "Délai dépassé ; facturation incertaine.", usage);
       const status = (e as { status?: number }).status;
-      if (status === 429) throw new ProviderError("rate_limited", "Limite du fournisseur atteinte.", usage);
+      if (status === 429) {
+        // Quota journalier épuisé (délai de reprise de plusieurs minutes ou plus) : pas de nouvel essai.
+        if (retryDelaySeconds(e) > 120) throw new ProviderError("quota_exhausted", "Quota du fournisseur épuisé pour la journée.", usage);
+        throw new ProviderError("rate_limited", "Limite du fournisseur atteinte.", usage);
+      }
       if (status === 400 && /token|context|too long/i.test(String((e as Error).message))) {
         throw new ProviderError("context_overflow", "Contenu trop long pour le modèle.", usage);
       }
-      throw new ProviderError("unavailable", "Fournisseur indisponible.", usage);
+      // Code HTTP seulement (jamais le contenu de la réponse) : utile au diagnostic.
+      throw new ProviderError("unavailable", `Fournisseur indisponible${status ? ` (HTTP ${status})` : ""}.`, usage);
     }
 
     const usage = {

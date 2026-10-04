@@ -1,10 +1,20 @@
+import { z } from "zod";
 import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment } from "@/lib/contracts/schemas";
 import { sourceEntries } from "@/lib/render/sources";
 import { FlowData } from "@/lib/render/visuals";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { fr } from "@/lib/i18n/fr";
 import { FlowDiagram } from "./FlowDiagram";
+import { CheckQuiz } from "./CheckQuiz";
 import { SourceRef, SourcesProvider } from "./Sources";
+
+/** Correction enregistrée, revalidée avant affichage. */
+const FeedbackSchema = z.object({
+  verdict: z.enum(["correct", "partial", "incorrect"]),
+  points: z.array(z.object({ index: z.number(), covered: z.boolean() })),
+  feedback: z.string(),
+  misconception: z.string().nullable(),
+});
 
 type Block = ExplanationObject["sections"][number]["blocks"][number];
 
@@ -74,6 +84,10 @@ export function Reader({
   sourceUrl = null,
   pdfHref,
   isDemo,
+  reportId = null,
+  answers,
+  actions = null,
+  actionsNote = null,
 }: {
   blueprint: ReportBlueprint;
   explanation: ExplanationObject;
@@ -85,6 +99,12 @@ export function Reader({
   /** Lien de téléchargement du PDF. */
   pdfHref: string;
   isDemo: boolean;
+  /** Rapport réel : active la correction des réponses (null pour la démonstration). */
+  reportId?: string | null;
+  answers?: Record<string, { answer: string; feedback: unknown }>;
+  /** Boutons d'action affichés avant le téléchargement du PDF. */
+  actions?: React.ReactNode;
+  actionsNote?: string | null;
 }) {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
   const sections = new Map(explanation.sections.map((s) => [s.id, s]));
@@ -163,16 +183,22 @@ export function Reader({
         {explanation.checks.length > 0 && (
           <section className="reader-section" aria-labelledby="check-h">
             <h2 id="check-h">{fr.reader.check}</h2>
-            {explanation.checks.map((c) => (
-              <div key={c.id} className="card">
-                <p>{c.question}</p>
-                <details>
-                  <summary>Éléments de réponse</summary>
-                  <ul>{c.expected_points.map((p) => <li key={p}>{p}</li>)}</ul>
-                  <Refs ids={c.evidence_ids} numbers={numbers} />
-                </details>
-              </div>
-            ))}
+            {reportId && <p className="muted">{fr.reader.checkIntro}</p>}
+            {explanation.checks.map((c) => {
+              const prior = answers?.[c.id];
+              const fb = prior ? FeedbackSchema.safeParse(prior.feedback) : null;
+              return (
+                <CheckQuiz
+                  key={c.id}
+                  reportId={reportId}
+                  checkId={c.id}
+                  question={c.question}
+                  expectedPoints={c.expected_points}
+                  refs={<Refs ids={c.evidence_ids} numbers={numbers} />}
+                  initial={prior && fb?.success ? { answer: prior.answer, feedback: fb.data } : null}
+                />
+              );
+            })}
           </section>
         )}
 
@@ -201,13 +227,11 @@ export function Reader({
           </ol>
         </section>
 
-        <div className="reader-actions" role="group" aria-label="Actions sur le rapport" aria-describedby="actions-note">
-          <button className="btn" disabled>{fr.reader.simpler}</button>
-          <button className="btn" disabled>{fr.reader.otherExample}</button>
-          <button className="btn" disabled>{fr.reader.check}</button>
+        <div className="reader-actions" role="group" aria-label="Actions sur le rapport">
+          {actions}
           <a className="btn btn-primary" href={pdfHref} download>{fr.reader.pdf}</a>
         </div>
-        <p id="actions-note" className="muted">{fr.reader.actionsDisabled}</p>
+        {actionsNote && <p className="muted">{actionsNote}</p>}
       </article>
     </SourcesProvider>
   );

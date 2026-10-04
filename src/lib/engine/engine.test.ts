@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { segmentText, ExtractionError } from "@/lib/extract/text";
-import { toProviderSchema } from "./gemini";
-import { ComprehensionDraft, ExplanationDraft, generateReport, type GenerationInput } from "./pipeline";
+import { retryDelaySeconds, toProviderSchema } from "./gemini";
+import {
+  ComprehensionDraft,
+  ExplanationDraft,
+  generateReport,
+  regenerateExplanation,
+  simplerLevel,
+  type GenerationInput,
+} from "./pipeline";
 import { ProviderError, type AIProvider, type StructuredRequest } from "./provider";
 import { locateQuote } from "./quotes";
 
@@ -187,5 +194,40 @@ describe("pipeline de génération", () => {
     const p = new FakeProvider([new ProviderError("refused", "non")]);
     await expect(generateReport(p, input())).rejects.toMatchObject({ code: "refused" });
     expect(p.calls).toHaveLength(1);
+  });
+});
+
+describe("nouvelle version d'une explication", () => {
+  it("rejoue seulement l'explication, avec la version précédente et la consigne de variation", async () => {
+    const first = await generateReport(new FakeProvider([goodComp, goodExpl]), input());
+    const fake = new FakeProvider([{ ...goodExpl, title: "Le cycle de l'eau, plus simplement" }]);
+    let instructions = "";
+    const spy: AIProvider = {
+      name: "fake",
+      isDemo: false,
+      generateStructured: (req) => {
+        instructions = req.trustedInstructions;
+        return fake.generateStructured(req);
+      },
+    };
+    const { segments: _s, sourceId: _id, ...rest } = input();
+    const out = await regenerateExplanation(spy, { ...rest, level: simplerLevel("etudiant") }, first.knowledge, first.evidence, first.explanation, "simpler");
+    expect(out.status).toBe("validated");
+    expect(out.explanation.level).toBe("grand_public");
+    expect(out.blueprint.title).toBe("Le cycle de l'eau, plus simplement");
+    expect(fake.calls).toEqual([{ stage: "explication", data: ["connaissance validee", "version precedente"] }]);
+    expect(instructions).toContain("PLUS SIMPLE");
+  });
+
+  it("ne descend pas sous « ultra simple »", () => {
+    expect(simplerLevel("ultra_simple")).toBe("ultra_simple");
+    expect(simplerLevel("expert_presse")).toBe("professionnel");
+  });
+});
+
+describe("quota du fournisseur", () => {
+  it("lit le délai de reprise annoncé par l'API", () => {
+    expect(retryDelaySeconds(new Error('{"@type":"…RetryInfo","retryDelay":"27672s"}'))).toBe(27672);
+    expect(retryDelaySeconds(new Error("autre erreur"))).toBe(0);
   });
 });

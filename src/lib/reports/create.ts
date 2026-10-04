@@ -10,6 +10,7 @@ import { Goal, Level, TargetPages } from "@/lib/contracts/schemas";
 import { extractSource, ExtractionError, type ExtractableKind, type SourceCoverage } from "@/lib/extract";
 import { segmentText, type ExtractedText } from "@/lib/extract/text";
 import { checkUpload, FileRejected } from "@/lib/security/file-type";
+import { checkImageSize, type ImageKind } from "@/lib/security/image";
 import { parsePublicUrl, safeFetch, UrlRejected } from "@/lib/security/safe-fetch";
 import { BUCKET, purgeOriginal, titleFromFileName } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
@@ -31,7 +32,13 @@ export const CreateRequest = z.preprocess(
       text: z.string().min(1).max(limits.maxPastedChars),
       ...Params,
     }),
-    z.strictObject({ source: z.literal("upload"), upload_id: z.string().uuid(), ...Params }),
+    z.strictObject({
+      source: z.literal("upload"),
+      upload_id: z.string().uuid(),
+      /** Accord explicite pour envoyer l'image ou le PDF scanné à Gemini (cadrage Q15). */
+      allow_ocr: z.boolean().optional(),
+      ...Params,
+    }),
     z.strictObject({ source: z.literal("url"), url: z.string().trim().min(1).max(2048), ...Params }),
   ]),
 );
@@ -39,8 +46,17 @@ export type CreateRequest = z.infer<typeof CreateRequest>;
 
 export class CreateError extends Error {
   constructor(
-    public readonly code: "generation_disabled" | "extraction" | "upload_missing" | "url_disabled" | "url" | "storage",
+    public readonly code:
+      | "generation_disabled"
+      | "extraction"
+      | "upload_missing"
+      | "url_disabled"
+      | "url"
+      | "storage"
+      | "ocr_consent",
     message: string,
+    /** Pages à lire par OCR (demande d'accord). */
+    public readonly pages?: number,
   ) {
     super(message);
   }
@@ -53,11 +69,12 @@ function defaultTitle(text: string): string {
 
 interface PreparedSource {
   sourceId: string;
-  extracted: ExtractedText;
+  /** Absent quand le texte sera lu par OCR dans la tâche (fichier conservé jusque-là). */
+  extracted: ExtractedText | null;
   /** Source déjà enregistrée (fichier envoyé) : mise à jour plutôt qu'insertion. */
   existing: boolean;
   row: {
-    kind: "paste" | "url" | "pdf" | "docx" | "txt";
+    kind: "paste" | "url" | "pdf" | "docx" | "txt" | ImageKind;
     title: string;
     byte_size: number;
     original_url?: string;
@@ -92,7 +109,7 @@ async function fromText(input: Extract<CreateRequest, { source: "text" }>): Prom
   };
 }
 
-async function fromUpload(userId: string, uploadId: string): Promise<PreparedSource> {
+async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): Promise<PreparedSource> {
   const db = adminClient();
   // Réservation : un même envoi ne peut servir qu'une fois.
   const { data: src } = await db
@@ -112,6 +129,11 @@ async function fromUpload(userId: string, uploadId: string): Promise<PreparedSou
     if (await purgeOriginal(src.id, src.storage_path)) await db.from("sources").delete().eq("id", src.id);
     throw new CreateError("extraction", message);
   };
+  // Lecture OCR non encore acceptée : l'envoi reste disponible pour une nouvelle demande.
+  const askConsent = async (message: string, pages: number): Promise<never> => {
+    await db.from("sources").update({ status: "uploaded" }).eq("id", src.id);
+    throw new CreateError("ocr_consent", message, pages);
+  };
 
   const download = await db.storage.from(BUCKET).download(src.storage_path);
   if (download.error || !download.data) {
@@ -119,22 +141,44 @@ async function fromUpload(userId: string, uploadId: string): Promise<PreparedSou
   }
   const buf = new Uint8Array(await download.data.arrayBuffer());
 
-  let kind: ExtractableKind;
+  let kind: "pdf" | "docx" | "txt" | ImageKind;
   try {
     // Signature réelle contre extension déclarée ; le type MIME du navigateur n'est pas fiable.
     const detected = checkUpload(buf, src.title, "", limits.maxFileBytes);
-    if (detected !== src.kind || !["pdf", "docx", "txt"].includes(detected)) {
-      throw new FileRejected("type_mismatch", "Le contenu du fichier ne correspond pas à son extension.");
-    }
-    kind = detected as ExtractableKind;
+    if (detected !== src.kind) throw new FileRejected("type_mismatch", "Le contenu du fichier ne correspond pas à son extension.");
+    if (detected === "png" || detected === "jpeg" || detected === "webp") checkImageSize(buf, detected, limits.maxImageMegapixels);
+    kind = detected;
   } catch (e) {
     return fail(e instanceof FileRejected ? e.code : "type", extractionMessage(e));
   }
+
+  // Lecture OCR : image, ou PDF sans couche texte. Le texte sera lu dans la tâche.
+  const ocr = async (pages: number): Promise<PreparedSource> => {
+    if (buf.length > limits.maxOcrBytes) {
+      return fail("ocr_too_large", `Pour être lu comme une image, le fichier doit faire moins de ${Math.round(limits.maxOcrBytes / 1024 / 1024)} Mo.`);
+    }
+    const what = kind === "pdf" ? `Ce PDF est scanné (${pages} page${pages > 1 ? "s" : ""}).` : "Cette image doit être lue.";
+    if (!allowOcr) return askConsent(`${what} Pour en lire le texte, le fichier sera envoyé à Google Gemini.`, pages);
+    return {
+      sourceId: src.id,
+      extracted: null,
+      existing: true,
+      row: {
+        kind,
+        title: titleFromFileName(src.title),
+        byte_size: buf.length,
+        page_count: kind === "pdf" ? pages : null,
+        coverage: { pending_ocr: true },
+      },
+    };
+  };
+  if (kind !== "pdf" && kind !== "docx" && kind !== "txt") return ocr(1);
 
   let result;
   try {
     result = await extractSource(kind, buf, `src_${src.id}`, { maxChars: limits.maxSourceChars, maxPages: limits.maxPages });
   } catch (e) {
+    if (e instanceof ExtractionError && e.code === "scanned" && kind === "pdf" && e.pageCount) return ocr(e.pageCount);
     return fail(e instanceof ExtractionError ? e.code : "extraction", extractionMessage(e));
   }
   // Le texte est figé en base : l'original n'est plus nécessaire (cadrage Q18).
@@ -145,7 +189,7 @@ async function fromUpload(userId: string, uploadId: string): Promise<PreparedSou
     extracted: result.extracted,
     existing: true,
     row: {
-      kind: kind as "pdf" | "docx" | "txt",
+      kind,
       title: titleFromFileName(src.title),
       byte_size: buf.length,
       page_count: result.pageCount,
@@ -186,6 +230,9 @@ async function fromUrl(rawUrl: string): Promise<PreparedSource> {
       charset: page.charset,
     });
   } catch (e) {
+    if (e instanceof ExtractionError && e.code === "scanned") {
+      throw new CreateError("extraction", `${e.message} Téléchargez-le puis envoyez-le dans l'onglet Fichier pour qu'il soit lu.`);
+    }
     throw new CreateError("extraction", extractionMessage(e));
   }
   const final = new URL(page.finalUrl);
@@ -226,23 +273,26 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     input.source === "text"
       ? await fromText(input)
       : input.source === "upload"
-        ? await fromUpload(userId, input.upload_id)
+        ? await fromUpload(userId, input.upload_id, input.allow_ocr === true)
         : await fromUrl(input.url);
   const { sourceId, extracted, row } = prepared;
   const partial = "partial" in row.coverage && row.coverage.partial === true;
 
-  const fields = {
-    ...row,
-    content_hash: extracted.sourceVersion,
-    status: partial ? "partial" : "extracted",
-  };
+  // Lecture OCR à venir : l'original reste au plus 24 h (cadrage Q18), la tâche le lira avant.
+  const fields = extracted
+    ? { ...row, content_hash: extracted.sourceVersion, status: partial ? "partial" : "extracted" }
+    : { ...row, status: "extracting", original_purge_at: new Date(Date.now() + 24 * 3600_000).toISOString() };
   const src = prepared.existing
     ? await db.from("sources").update(fields).eq("id", sourceId)
     : await db.from("sources").insert({ id: sourceId, owner_id: userId, ...fields });
   if (src.error) throw new CreateError("storage", "Enregistrement de la source impossible.");
 
-  const removeSource = () => db.from("sources").delete().eq("id", sourceId);
-  const segs = await db.from("source_segments").insert(
+  const removeSource = async () => {
+    // Fichier conservé pour l'OCR : effacé avec la source (chemin fixé à l'envoi).
+    if (!extracted) await purgeOriginal(sourceId, `${userId}/${sourceId}`);
+    await db.from("sources").delete().eq("id", sourceId);
+  };
+  const segs = !extracted ? { error: null } : await db.from("source_segments").insert(
     extracted.segments.map((s, i) => ({
       id: s.id,
       source_id: sourceId,
@@ -276,7 +326,7 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     source_id: sourceId,
     kind: "generate_report",
     idempotency_key: input.idempotency_key,
-    params: { level: input.level, goal: input.goal, target_pages: input.target_pages },
+    params: { level: input.level, goal: input.goal, target_pages: input.target_pages, ...(extracted ? {} : { ocr: true }) },
   });
   if (job.error) {
     await removeSource();

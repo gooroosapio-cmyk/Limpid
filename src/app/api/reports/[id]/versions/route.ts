@@ -2,44 +2,35 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { isDemoMode } from "@/lib/config";
 import { drainQueue } from "@/lib/jobs/worker";
-import { CreateError, CreateRequest, createReport } from "@/lib/reports/create";
+import { requestVersion, VersionError, VersionRequest } from "@/lib/reports/versions";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 
-// La génération s'exécute après la réponse, dans la même fonction (durée Vercel max.).
 export const maxDuration = 300;
 
-export async function POST(request: NextRequest) {
+/** Demande une nouvelle version du rapport ; la génération démarre après la réponse. */
+export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "non_connecte" }, { status: 401 });
   if (isDemoMode() || !isAdminConfigured()) {
     return NextResponse.json({ error: "non_configure", message: "La génération n'est pas configurée sur ce serveur." }, { status: 503 });
   }
-  // Même origine uniquement (en plus des cookies SameSite).
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ error: "origine" }, { status: 403 });
-
-  const parsed = CreateRequest.safeParse(await request.json().catch(() => null));
+  const parsed = VersionRequest.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "requete_invalide" }, { status: 400 });
 
+  const { id } = await ctx.params;
   try {
-    const { reportId } = await createReport(user.id, parsed.data);
+    await requestVersion(user.id, id, parsed.data);
     const started = Date.now();
-    after(() => drainQueue(`web-${crypto.randomUUID().slice(0, 8)}`, started + 270_000));
-    return NextResponse.json({ reportId }, { status: 201 });
+    after(() => drainQueue(`ver-${crypto.randomUUID().slice(0, 8)}`, started + 270_000));
+    return NextResponse.json({ status: "queued" }, { status: 202 });
   } catch (e) {
-    if (e instanceof CreateError) {
-      const status = {
-        extraction: 422,
-        url: 422,
-        upload_missing: 410,
-        url_disabled: 403,
-        ocr_consent: 409,
-        generation_disabled: 503,
-        storage: 500,
-      }[e.code];
-      return NextResponse.json({ error: e.code, message: e.message, pages: e.pages }, { status });
+    if (e instanceof VersionError) {
+      const status = { not_found: 404, busy: 409, limit: 409, storage: 500 }[e.code];
+      return NextResponse.json({ error: e.code, message: e.message }, { status });
     }
-    console.error("create report", (e as Error).name);
+    console.error("request version", (e as Error).name);
     return NextResponse.json({ error: "interne" }, { status: 500 });
   }
 }

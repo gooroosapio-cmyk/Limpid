@@ -8,13 +8,26 @@ import { fr } from "@/lib/i18n/fr";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
 type Tab = "file" | "link" | "text";
-type Phase = { step: "idle" } | { step: "upload"; percent: number } | { step: "reading" };
+type Phase =
+  | { step: "idle" }
+  | { step: "upload"; percent: number }
+  | { step: "reading" }
+  // PDF scanné : l'envoi est fait, l'accord pour la lecture par Gemini est demandé.
+  | { step: "consent"; uploadId: string; message: string };
 
 const MAX_PASTED = 50_000;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const ACCEPT = ".pdf,.docx,.txt";
+const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
+const IMAGE = /\.(jpe?g|png|webp)$/i;
 
-class FormError extends Error {}
+class FormError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("fr-FR")} Ko`;
@@ -24,7 +37,9 @@ function formatSize(bytes: number): string {
 async function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new FormError(typeof data.message === "string" ? data.message : "La création a échoué.");
+  if (!res.ok) {
+    throw new FormError(typeof data.message === "string" ? data.message : "La création a échoué.", data.error);
+  }
   return data;
 }
 
@@ -53,17 +68,47 @@ export function ImportForm({ enabled, urlEnabled, defaultLevel }: { enabled: boo
   const [pages, setPages] = useState<5 | 7 | 12>(5);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
+  const [imageConsent, setImageConsent] = useState(false);
   // Une clé par contenu soumis : un double envoi ne crée pas deux rapports.
   const keyRef = useRef<{ content: string; key: string } | null>(null);
   const router = useRouter();
   const base = useId();
-  const pending = phase.step !== "idle";
+  const pending = phase.step !== "idle" && phase.step !== "consent";
+  const isImage = tab === "file" && !!file && IMAGE.test(file.name);
 
   const content =
     tab === "text" ? text.trim() : tab === "link" ? url.trim() : file ? `${file.name}:${file.size}:${file.lastModified}` : "";
   const fileError =
     tab === "file" && file && file.size > MAX_FILE_BYTES ? fr.create.fileTooLarge : null;
-  const canSubmit = enabled && !pending && !!content && !fileError && (tab !== "link" || urlEnabled);
+  const canSubmit =
+    enabled && !pending && phase.step !== "consent" && !!content && !fileError && (tab !== "link" || urlEnabled) && (!isImage || imageConsent);
+
+  async function create(body: Record<string, unknown>) {
+    try {
+      const created = await postJson("/api/reports", body);
+      router.push(`/rapports/${created.reportId}`);
+    } catch (err) {
+      if (err instanceof FormError && err.code === "ocr_consent" && typeof body.upload_id === "string") {
+        setPhase({ step: "consent", uploadId: body.upload_id, message: err.message });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /** Accord donné pour un PDF scanné : même envoi, même clé, lecture OCR autorisée. */
+  async function confirmOcr() {
+    if (phase.step !== "consent" || !keyRef.current) return;
+    const uploadId = phase.uploadId;
+    setError(null);
+    setPhase({ step: "reading" });
+    try {
+      await create({ source: "upload", upload_id: uploadId, allow_ocr: true, level, goal: "comprendre", target_pages: pages, idempotency_key: keyRef.current.key });
+    } catch (err) {
+      setError(err instanceof FormError ? err.message : fr.create.networkError);
+      setPhase({ step: "idle" });
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,7 +123,7 @@ export function ImportForm({ enabled, urlEnabled, defaultLevel }: { enabled: boo
         const up = await postJson("/api/uploads", { file_name: file.name, byte_size: file.size });
         await putFile(String(up.signedUrl), file, (percent) => setPhase({ step: "upload", percent }));
         setPhase({ step: "reading" });
-        body = { source: "upload", upload_id: up.uploadId, ...params };
+        body = { source: "upload", upload_id: up.uploadId, allow_ocr: isImage && imageConsent, ...params };
       } else if (tab === "link") {
         setPhase({ step: "reading" });
         body = { source: "url", url: url.trim(), ...params };
@@ -86,8 +131,7 @@ export function ImportForm({ enabled, urlEnabled, defaultLevel }: { enabled: boo
         setPhase({ step: "reading" });
         body = { source: "text", text, ...params };
       }
-      const created = await postJson("/api/reports", body);
-      router.push(`/rapports/${created.reportId}`);
+      await create(body);
     } catch (err) {
       setError(err instanceof FormError ? err.message : fr.create.networkError);
       setPhase({ step: "idle" });
@@ -145,7 +189,11 @@ export function ImportForm({ enabled, urlEnabled, defaultLevel }: { enabled: boo
             type="file"
             accept={ACCEPT}
             disabled={pending}
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setImageConsent(false);
+              if (phase.step === "consent") setPhase({ step: "idle" });
+            }}
           />
           {file && (
             <p className="file-name" aria-live="polite">
@@ -153,6 +201,12 @@ export function ImportForm({ enabled, urlEnabled, defaultLevel }: { enabled: boo
             </p>
           )}
           {fileError && <p className="notice notice-warn" role="alert">{fileError}</p>}
+          {isImage && (
+            <label className="consent">
+              <input type="checkbox" checked={imageConsent} onChange={(e) => setImageConsent(e.target.checked)} disabled={pending} />
+              <span>{fr.create.imageConsent}</span>
+            </label>
+          )}
         </div>
       )}
 
@@ -202,6 +256,16 @@ export function ImportForm({ enabled, urlEnabled, defaultLevel }: { enabled: boo
       </select>
 
       {error && <p className="notice notice-warn" role="alert">{error}</p>}
+      {phase.step === "consent" && (
+        <div className="notice notice-warn" role="alertdialog" aria-labelledby={`${base}-consent`}>
+          <p id={`${base}-consent`}>{phase.message}</p>
+          <p className="muted">{fr.create.ocrInfo}</p>
+          <div className="consent-actions">
+            <button type="button" className="btn btn-primary" onClick={confirmOcr}>{fr.create.ocrAccept}</button>
+            <button type="button" className="btn" onClick={() => setPhase({ step: "idle" })}>{fr.create.ocrDecline}</button>
+          </div>
+        </div>
+      )}
       {phase.step !== "idle" && (
         <div role="status" aria-live="polite" className="submit-status">
           {phase.step === "upload" ? (

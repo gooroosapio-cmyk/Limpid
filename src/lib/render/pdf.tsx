@@ -156,6 +156,8 @@ export interface PdfReportInput {
   isDemo?: boolean;
   /** Remarques de couverture partielle. */
   notes?: string[];
+  /** Couverture partielle (sinon remarques informatives, ex. lecture OCR). */
+  partial?: boolean;
   generatedAt?: Date;
 }
 
@@ -183,7 +185,7 @@ function ReportDocument(input: PdfReportInput) {
 
         {input.notes && input.notes.length > 0 && (
           <View style={s.caution}>
-            <Text style={s.label}>{fr.reader.partialCoverage}</Text>
+            <Text style={s.label}>{input.partial === false ? fr.reader.aboutSource : fr.reader.partialCoverage}</Text>
             <Bullets items={input.notes} />
           </View>
         )}
