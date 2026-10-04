@@ -76,13 +76,15 @@ export function retryDelaySeconds(e: unknown): number {
 }
 
 /** Données non fiables délimitées, puis fichiers joints annoncés par une étiquette. */
-function requestParts(req: StructuredRequest<z.ZodType>, nonce: string) {
+export function requestParts(req: StructuredRequest<z.ZodType>, nonce: string) {
   const parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] = [];
   if (req.untrustedData.length) parts.push({ text: wrapUntrusted(req.untrustedData, nonce) });
   for (const m of req.media ?? []) {
     parts.push({ text: `<<<FICHIER_${nonce} label="${m.label.replace(/[^\w .-]/g, "").slice(0, 60)}">>>` });
     parts.push({ inlineData: { mimeType: m.mimeType, data: Buffer.from(m.data).toString("base64") } });
   }
+  // Une requête sans aucune donnée (consigne seule, ex. diagnostic) est refusée par l'API : parts vide.
+  if (parts.length === 0) parts.push({ text: "Exécute la consigne." });
   return parts;
 }
 
