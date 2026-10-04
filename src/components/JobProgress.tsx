@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STAGE_LABELS_FR, type JobStage } from "@/lib/jobs/state";
 import { fr } from "@/lib/i18n/fr";
@@ -25,6 +26,16 @@ const ERRORS: Record<string, string> = {
   ocr_source_missing: "Le fichier à lire n'est plus disponible. Envoyez-le à nouveau.",
 };
 
+/** Étapes affichées (maquette « Votre rapport prend forme »), dérivées de l'étape réelle de la tâche. */
+const STEPS: { label: string; detail: string; stages: string[] }[] = [
+  { label: "Source vérifiée", detail: "Lecture et contrôle du document.", stages: ["validation", "extraction"] },
+  { label: "Idées structurées", detail: "Repérage des informations et des extraits.", stages: ["comprehension"] },
+  { label: "Sources contrôlées", detail: "Chaque affirmation relue face à son extrait.", stages: ["verification"] },
+  { label: "Explications", detail: "Rédaction au niveau choisi.", stages: ["explication"] },
+  { label: "Illustrations", detail: "Schémas et images libres de droits, si prévus.", stages: ["illustrations"] },
+  { label: "Contrôle et mise en page", detail: "Vérification finale et mise en forme.", stages: ["mise_en_page"] },
+];
+
 /** Suit la génération (interrogation légère), puis recharge la page quand le rapport est prêt. */
 export function JobProgress({ reportId, initial }: { reportId: string; initial: JobView }) {
   const [job, setJob] = useState(initial);
@@ -44,11 +55,29 @@ export function JobProgress({ reportId, initial }: { reportId: string; initial: 
   }, [active, reportId, router]);
 
   if (active) {
+    const current = job.status === "queued" ? -1 : STEPS.findIndex((st) => st.stages.includes(job.stage ?? ""));
     const label = job.stage ? STAGE_LABELS_FR[job.stage as JobStage] : fr.reports.status.queued;
     return (
-      <div className="card" role="status" aria-live="polite">
-        <p><strong>{label}…</strong></p>
-        <p className="muted">La génération prend en général moins d'une minute. Vous pouvez quitter cette page.</p>
+      <div className="card progress-card">
+        <p className="progress-title"><strong>{fr.progress.title}</strong></p>
+        <p className="sr-only" role="status" aria-live="polite">{label}</p>
+        <ol className="steps">
+          {STEPS.map((st, i) => {
+            const state = i < current ? "done" : i === current ? "current" : "todo";
+            return (
+              <li key={st.label} className={`step step-${state}`} aria-current={state === "current" ? "step" : undefined}>
+                <span className="step-mark" aria-hidden="true">{state === "done" ? "✓" : ""}</span>
+                <span>
+                  <strong>{st.label}</strong>
+                  <span className="sr-only"> ({fr.progress.states[state]})</span>
+                  <span className="step-detail">{st.detail}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="notice">{fr.progress.leave}</p>
+        <Link href="/rapports" className="btn btn-block">{fr.progress.myReports}</Link>
       </div>
     );
   }

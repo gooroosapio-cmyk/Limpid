@@ -1,5 +1,27 @@
 # Avancement
 
+## Phase 10 — Cahier V2, lot E : recette et livraison (4 octobre 2026)
+
+Rapport complet : **`docs/LIVRAISON.md`** (terminé / partiel / non testé, corpus, production, migrations, configuration, versions, captures, procédure téléphone).
+
+### FAIT
+- **Corpus de recette** (`scripts/corpus/`, `scripts/live-corpus.test.ts`) : PDF natif avec tableau, contradiction et source courte, injection, PDF sur deux colonnes, cinq niveaux. Seuils du cahier atteints sur le corpus : références 100 %, 28/28 citations, 29/29 nombres, 20/20 idées essentielles, aucun texte injecté repris.
+- **Correctifs issus de la recette** : chiffres cités mais absents du texte (contrôle par bloc), phrases chiffrées non reprises (couverture des chiffres), limites de portée (« valent pour… »). Consignes `2026-10-04.2`.
+- **PDF sur deux colonnes** : ordre de lecture reconstruit quand le flux mélange les colonnes ; tableaux et pages à une colonne inchangés.
+- **Modèles de repli déclarés** (`LIMPID_MODEL_FALLBACKS`) sur quota épuisé ou surcharge, journalisés ; visibles dans `/admin`.
+- **Scénarios automatisés** : XSS (analyse DOM), liens http(s) seulement, PDF produit malgré une image illisible, panne du fournisseur sans toucher la version précédente, repli d'image, réservation unique, bail expiré repris, pas de double débit (SQL).
+- **Production** : isolation vérifiée (compte inconnu : 0 ligne sur 12 tables ; compte réel : exactement ses lignes ; transaction annulée, aucun contenu lu). Usage réel relevé (agrégats).
+- **Suivi** « Votre rapport prend forme » : liste des étapes réelles (sans pourcentage), « Retrouvez le rapport dans Mes rapports ».
+- **Captures mobiles** (11 écrans, dont 3 en production) et exemples PDF : `docs/recette/lot-e/`.
+
+### EN TEST (résultats réels)
+- `npm test` : 151 tests ; recette SQL OK ; build OK ; axe : 0 violation sur 11 écrans à 360 et 390 px.
+- Gemini Image : quota gratuit à 0 constaté (`gemini-3.1-flash-lite-image`).
+
+### NON TESTÉ / BLOQUANT
+- **Critère final non atteint** : aucune génération n'a encore abouti en production (2 tâches, quota du jour de `gemini-3.5-flash` épuisé). Procédure et réglage du repli dans `docs/LIVRAISON.md`.
+
+
 ## Phase 9 — Cahier V2, lot D : illustrer et optimiser (4 octobre 2026)
 
 Exemples : `docs/recette/lot-d/` (même rapport dans les trois présentations, mesures).

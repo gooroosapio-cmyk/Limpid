@@ -26,7 +26,7 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   add(
     "Modèles Gemini",
     present("LIMPID_MODEL_FAST") && present("LIMPID_MODEL_QUALITY"),
-    `rapide : ${process.env.LIMPID_MODEL_FAST || "absent"} · qualité : ${process.env.LIMPID_MODEL_QUALITY || "absent"}`,
+    `rapide : ${process.env.LIMPID_MODEL_FAST || "absent"} · qualité : ${process.env.LIMPID_MODEL_QUALITY || "absent"} · repli : ${process.env.LIMPID_MODEL_FALLBACKS?.trim() || "aucun"}`,
   );
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");

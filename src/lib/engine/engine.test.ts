@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { segmentText, ExtractionError } from "@/lib/extract/text";
-import { retryDelaySeconds, toProviderSchema } from "./gemini";
+import { GeminiProvider, retryDelaySeconds, toProviderSchema } from "./gemini";
 import {
   ComprehensionDraft,
   ExplanationDraft,
@@ -178,7 +178,7 @@ describe("pipeline de génération", () => {
     const bad = structuredClone(goodComp);
     bad.claims[1]!.numbers[0]!.source_form = "98 %";
     bad.claims[1]!.numbers[0]!.value = 98;
-    const out = await generateReport(new FakeProvider([bad, bad, bad, goodExpl]), input());
+    const out = await generateReport(new FakeProvider([bad, bad, bad, goodExpl, goodExpl]), input());
     expect(out.status).toBe("incomplete");
     expect(out.validation.knowledge.repair_count).toBe(2);
     expect(out.validation.knowledge.blocking_errors.join()).toMatch(/98 %/);
@@ -357,7 +357,7 @@ describe("schémas et illustrations déterministes", () => {
       ...goodExpl,
       chart: { title: "Répartition", bars: [{ label: "Océans", claim_id: "clm_2", source_form: "97 %" }, { label: "Planète", claim_id: "clm_3", source_form: "97 %" }, { label: "Inventé", claim_id: "clm_2", source_form: "50 %" }] },
     };
-    const out = await generateReport(new FakeProvider([withNumbers(), expl]), input());
+    const out = await generateReport(new FakeProvider([withNumbers(), expl, expl]), input());
     const chart = out.blueprint.visual_specs.find((v) => v.kind === "bar_chart")!;
     expect(chart.data).toEqual({
       unit: "%",
@@ -380,7 +380,7 @@ describe("schémas et illustrations déterministes", () => {
         ],
       },
     };
-    const out = await generateReport(new FakeProvider([withNumbers(), expl]), input());
+    const out = await generateReport(new FakeProvider([withNumbers(), expl, expl]), input());
     const table = out.blueprint.visual_specs.find((v) => v.kind === "comparison_table")!;
     expect(table.data).toEqual({
       criteria: ["Rôle", "Part"],
@@ -422,5 +422,44 @@ describe("panne du fournisseur pendant une nouvelle version", () => {
     await expect(regenerateSection(new FakeProvider([down]), rest, first.knowledge, first.evidence, first.explanation, first.blueprint, "sec_1", "simpler")).rejects.toBeInstanceOf(ProviderError);
     await expect(regenerateExplanation(new FakeProvider([down]), rest, first.knowledge, first.evidence, first.explanation, "simpler")).rejects.toBeInstanceOf(ProviderError);
     expect({ e: first.explanation, b: first.blueprint, k: first.knowledge }).toEqual(snapshot);
+  });
+});
+
+describe("modèles de repli déclarés", () => {
+  class Scripted extends GeminiProvider {
+    tried: string[] = [];
+    constructor(private readonly exhausted: Set<string>, fallbackModels: string[]) {
+      super({ apiKey: "k", modelFast: "rapide", modelQuality: "qualite", fallbackModels });
+    }
+    protected override async generateWith<T extends z.ZodType>(model: string, _req: StructuredRequest<T>) {
+      this.tried.push(model);
+      const usage = { provider: "gemini", model, inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
+      if (this.exhausted.has(model)) throw new ProviderError("quota_exhausted", "Quota épuisé.", usage);
+      return { value: { ok: true } as z.infer<T>, usage };
+    }
+  }
+  const req = { stage: "explication", schema: {} as z.ZodType, trustedInstructions: "", untrustedData: [], budget: { tier: "quality" as const, maxInputTokens: 1, maxOutputTokens: 1, timeoutMs: 1 }, signal: new AbortController().signal } as unknown as StructuredRequest<z.ZodType>;
+
+  it("passe au modèle suivant quand le quota est épuisé, et le dit dans l'usage", async () => {
+    const p = new Scripted(new Set(["qualite"]), ["secours-1", "secours-2"]);
+    const r = await p.generateStructured(req);
+    expect(p.tried).toEqual(["qualite", "secours-1"]);
+    expect(r.usage.model).toBe("secours-1");
+  });
+  it("ne change pas de modèle pour une erreur de contenu", async () => {
+    class Refusing extends Scripted {
+      protected override async generateWith<T extends z.ZodType>(model: string, req: StructuredRequest<T>) {
+        this.tried.push(model);
+        throw new ProviderError("refused", "Refus.", { provider: "gemini", model, inputTokens: null, outputTokens: null, durationMs: 1, requestId: null });
+        return super.generateWith(model, req);
+      }
+    }
+    const p = new Refusing(new Set(), ["secours-1"]);
+    await expect(p.generateStructured(req)).rejects.toMatchObject({ code: "refused" });
+    expect(p.tried).toEqual(["qualite"]);
+  });
+  it("sans repli déclaré, l'épuisement remonte tel quel", async () => {
+    const p = new Scripted(new Set(["qualite"]), []);
+    await expect(p.generateStructured(req)).rejects.toMatchObject({ code: "quota_exhausted" });
   });
 });

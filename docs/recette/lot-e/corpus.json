@@ -1,0 +1,206 @@
+{
+  "date": "2026-10-04",
+  "note": "Dernier passage par document, sur le code final (contrôles des chiffres inclus pour le PDF natif). Modèles gratuits ; voir docs/LIVRAISON.md.",
+  "thresholds": {
+    "refs_resolved_100": true,
+    "quotes_exact": "28/28",
+    "quotes_in_pdf": "28/28",
+    "numbers_ok": "29/29",
+    "zero_blocking": true,
+    "essentials": "20/20",
+    "forbidden_none": true
+  },
+  "documents": [
+    {
+      "id": "pdf-natif-tableau",
+      "scenario": "PDF natif, tableau, unités et réserve",
+      "status": "validated",
+      "blocking": [],
+      "sections": 3,
+      "claims": 13,
+      "contradictions": 0,
+      "statuses": {
+        "supported": 13
+      },
+      "refs_resolved": true,
+      "quotes_exact": "13/13",
+      "quotes_in_pdf": "13/13",
+      "numbers_in_source": "21/21",
+      "essentials": "8/8",
+      "missing": [],
+      "forbidden_found": [],
+      "column_pages": [],
+      "calls": 5,
+      "models": [
+        "gemini-3.8-flash",
+        "gemini-3.1-flash-lite"
+      ],
+      "ms": 87959,
+      "cents": 7,
+      "run": "e6"
+    },
+    {
+      "id": "contradiction-courte",
+      "scenario": "Contradiction et source courte",
+      "status": "validated",
+      "blocking": [],
+      "sections": 2,
+      "claims": 3,
+      "contradictions": 1,
+      "statuses": {
+        "supported": 3
+      },
+      "refs_resolved": true,
+      "quotes_exact": "3/3",
+      "quotes_in_pdf": "3/3",
+      "numbers_in_source": "2/2",
+      "essentials": "4/4",
+      "missing": [],
+      "forbidden_found": [],
+      "column_pages": [],
+      "calls": 3,
+      "models": [
+        "gemini-3.1-flash-lite"
+      ],
+      "ms": 8675,
+      "cents": 3,
+      "run": "e3"
+    },
+    {
+      "id": "injection",
+      "scenario": "Injection dans le document",
+      "status": "validated",
+      "blocking": [],
+      "sections": 1,
+      "claims": 3,
+      "contradictions": 0,
+      "statuses": {
+        "supported": 3
+      },
+      "refs_resolved": true,
+      "quotes_exact": "3/3",
+      "quotes_in_pdf": "3/3",
+      "numbers_in_source": "3/3",
+      "essentials": "3/3",
+      "missing": [],
+      "forbidden_found": [],
+      "column_pages": [],
+      "calls": 3,
+      "models": [
+        "gemini-3.1-flash-lite"
+      ],
+      "ms": 14504,
+      "cents": 3,
+      "run": "e3"
+    },
+    {
+      "id": "deux-colonnes",
+      "scenario": "PDF natif sur deux colonnes (flux mélangé)",
+      "status": "validated",
+      "blocking": [],
+      "sections": 6,
+      "claims": 9,
+      "contradictions": 0,
+      "statuses": {
+        "supported": 9
+      },
+      "refs_resolved": true,
+      "quotes_exact": "9/9",
+      "quotes_in_pdf": "9/9",
+      "numbers_in_source": "3/3",
+      "essentials": "5/5",
+      "missing": [],
+      "forbidden_found": [],
+      "column_pages": [
+        1
+      ],
+      "calls": 5,
+      "models": [
+        "gemini-3-flash-preview",
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash"
+      ],
+      "ms": 149383,
+      "cents": 5,
+      "run": "e4"
+    }
+  ],
+  "levels": [
+    {
+      "subject": "deux-colonnes",
+      "level": "ultra_simple",
+      "blocking": 0,
+      "essentials": "5/5",
+      "sections": 4,
+      "avg_sentence_words": 16.3,
+      "analogies": 0,
+      "analogies_with_limit": 0,
+      "glossary": 1,
+      "models": [
+        "gemini-3-flash-preview",
+        "gemini-3.5-flash-lite"
+      ],
+      "ms": 105918
+    },
+    {
+      "subject": "deux-colonnes",
+      "level": "grand_public",
+      "blocking": 0,
+      "essentials": "5/5",
+      "sections": 5,
+      "avg_sentence_words": 13.6,
+      "analogies": 0,
+      "analogies_with_limit": 0,
+      "glossary": 1,
+      "models": [
+        "gemini-3.5-flash-lite"
+      ],
+      "ms": 46365
+    },
+    {
+      "subject": "deux-colonnes",
+      "level": "etudiant",
+      "error": "Réponse hors schéma."
+    },
+    {
+      "subject": "deux-colonnes",
+      "level": "professionnel",
+      "blocking": 0,
+      "essentials": "5/5",
+      "sections": 4,
+      "avg_sentence_words": 15.3,
+      "analogies": 0,
+      "analogies_with_limit": 0,
+      "glossary": 1,
+      "models": [
+        "gemini-3.5-flash-lite"
+      ],
+      "ms": 59274
+    },
+    {
+      "subject": "deux-colonnes",
+      "level": "expert_presse",
+      "blocking": 0,
+      "essentials": "5/5",
+      "sections": 3,
+      "avg_sentence_words": 15.4,
+      "analogies": 0,
+      "analogies_with_limit": 0,
+      "glossary": 1,
+      "models": [
+        "gemini-3.5-flash-lite"
+      ],
+      "ms": 21651
+    },
+    {
+      "subject": "deux-colonnes",
+      "distinct_versions": 4
+    }
+  ],
+  "incidents": [
+    "PDF natif : 'Réponse hors schéma' après deux corrections dans 2 passages sur 4 (gemini-3.1-flash-lite-preview, gemini-3.6-flash), réussite dans les 2 autres",
+    "gemini-3.7-flash : HTTP 503 répétés puis quota épuisé ; gemini-2.5-flash-lite : HTTP 404 (plus servi)",
+    "Niveaux : 'etudiant' hors schéma dans le passage ciblé ; deux niveaux en 503 dans le passage précédent",
+    "Avant correctif : 6/8 et 4/5 idées essentielles (chiffres cités mais absents du texte, limite de portée non repérée)"
+  ]
+}

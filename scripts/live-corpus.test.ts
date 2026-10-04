@@ -26,8 +26,10 @@ import { EAU_VILLE_PAGES, EAU_VILLE_TITLE } from "./corpus/eau-ville";
 const out = process.env.LIMPID_OUT ?? "";
 const norm = (t: string) => t.normalize("NFC").replace(/[’']/g, "'").replace(/[  ]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
 
-function provider(model: string) {
-  return new GeminiProvider({ apiKey: process.env.GEMINI_API_KEY ?? "", modelFast: model, modelQuality: model });
+/** Modèle principal et repli déclaré (variable *_FALLBACKS, séparée par des virgules). */
+function provider(model: string, fallbacks = "") {
+  const fallbackModels = fallbacks.split(",").map((m) => m.trim()).filter(Boolean);
+  return new GeminiProvider({ apiKey: process.env.GEMINI_API_KEY ?? "", modelFast: model, modelQuality: model, fallbackModels });
 }
 
 const budgets: GenerationInput["budgets"] = {
@@ -87,7 +89,8 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot E : corpus réel"
     mkdirSync(out, { recursive: true });
     const corpusModel = process.env.LIMPID_CORPUS_MODEL ?? "gemini-3.5-flash-lite";
     const levelsModel = process.env.LIMPID_LEVELS_MODEL ?? corpusModel;
-    const docs = [EAU, ...CORPUS_E];
+    const only = (process.env.LIMPID_CORPUS_ONLY ?? "").split(",").filter(Boolean);
+    const docs = [EAU, ...CORPUS_E].filter((d) => !only.length || only.includes(d.id));
     const results: Record<string, unknown>[] = [];
     const knowledgeOf: Record<string, { ko: KnowledgeObject; evidence: Evidence[]; segments: SourceSegment[] }> = {};
     const stageMs: Record<string, number[]> = {};
@@ -99,7 +102,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot E : corpus réel"
       const t0 = Date.now();
       let report;
       try {
-        report = await generateReport(provider(corpusModel), {
+        report = await generateReport(provider(corpusModel, process.env.LIMPID_CORPUS_FALLBACKS), {
           sourceId: `src_${doc.id}`,
           segments,
           level: "grand_public",
@@ -113,7 +116,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot E : corpus réel"
           onUsage: (stage, _a, u) => void usage.push({ stage, ...u }),
         });
       } catch (e) {
-        results.push({ id: doc.id, scenario: doc.scenario, error: (e as Error).message });
+        results.push({ id: doc.id, scenario: doc.scenario, error: (e as Error).message, issues: (e as { issues?: string[] }).issues ?? [] });
         continue;
       }
       const ms = Date.now() - t0;
@@ -148,6 +151,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot E : corpus réel"
         forbidden_found: (doc.forbidden ?? []).filter((re) => re.test(text) || re.test(pdfText)).map(String),
         column_pages: columnPages,
         calls: usage.length,
+        models: [...new Set(usage.map((u) => u.model))],
         ms,
         cents: usage.reduce((n, u) => n + estimateCents(u.inputTokens ?? 0, u.outputTokens ?? 0), 0),
       });
@@ -163,7 +167,8 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot E : corpus réel"
       for (const level of LEVELS as readonly Level[]) {
         const t0 = Date.now();
         try {
-          const r = await explainKnowledge(provider(levelsModel), { level, goal: "comprendre", targetPages: 5, preferences: prefs, signal: new AbortController().signal, budgets }, k.ko, k.evidence);
+          const used: string[] = [];
+          const r = await explainKnowledge(provider(levelsModel, process.env.LIMPID_LEVELS_FALLBACKS), { level, goal: "comprendre", targetPages: 5, preferences: prefs, signal: new AbortController().signal, budgets, onUsage: (_s, _a, u) => void used.push(u.model) }, k.ko, k.evidence);
           const text = reportText(r.explanation);
           const analogies = r.explanation.sections.flatMap((s) => s.blocks).filter((b) => b.type === "analogy");
           takeaways.add(r.explanation.sections.map((s) => s.takeaway).join("|"));
@@ -177,6 +182,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot E : corpus réel"
             analogies: analogies.length,
             analogies_with_limit: analogies.filter((a) => a.type === "analogy" && a.limit.trim().length > 0).length,
             glossary: r.explanation.glossary.length,
+            models: [...new Set(used)],
             ms: Date.now() - t0,
           });
         } catch (e) {
