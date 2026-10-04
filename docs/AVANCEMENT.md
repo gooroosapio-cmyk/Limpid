@@ -1,5 +1,41 @@
 # Avancement
 
+## Phase 9 — Cahier V2, lot D : illustrer et optimiser (4 octobre 2026)
+
+Exemples : `docs/recette/lot-d/` (même rapport dans les trois présentations, mesures).
+
+### FAIT
+- **Trois présentations** (Éditorial, Essentiel, Visuel), web et PDF : composition, couleurs et encadrés seulement, même texte et mêmes sources. Choix à la création (« Présentation »), dans le lecteur (changement immédiat, **aucune requête IA**) et par défaut dans Préférences (« Un style, le même contenu »). Essentiel : fond blanc, pas d'image décorative.
+- **Schémas déterministes** dessinés par le code à partir de données validées : flux (existant), **graphique en barres** (les valeurs sont reprises des nombres des affirmations soutenues, jamais du modèle ; unités identiques exigées) et **tableau comparatif** (une cellule sans affirmation soutenue affiche « Non précisé par la source »). Version texte pour chaque schéma.
+- **Illustrations** (au plus 2 par rapport), ordre du cahier : schéma, puis banque autorisée, puis image générée ; sinon texte seul.
+  - **Wikimedia Commons** (gratuit, actif) : recherche limitée aux fichiers, licences réutilisables seulement (CC0, domaine public, CC BY, CC BY-SA), fichiers à restrictions écartés, pertinence vérifiée sur le titre, téléchargement protégé (hôtes Wikimedia seulement, type réel, taille, dimensions), budget de 8 s. Auteur, licence, lien de licence, page d'origine et modification (« Redimensionnée ») conservés et affichés (web et PDF).
+  - **Unsplash** (conditionnel, coupé) : clé et activation requises ; affichage depuis l'hébergeur avec suivi de téléchargement et attribution ; jamais dans le PDF.
+  - **Gemini Image** (coupé) : modèle image séparé (`LIMPID_IMAGE_MODEL`), activation explicite, 20 images/mois/compte, plafonds vérifiés avant chaque image, consigne expurgée sans texte ni chiffre, légende « générée par IA, sans valeur documentaire ».
+  - La requête d'image est générique et expurgée (mots simples en anglais, sans chiffres ni ponctuation) ; aucun extrait du document n'est envoyé aux banques.
+  - Une nouvelle version complète reprend les illustrations déjà trouvées (pas de nouvelle recherche ni de nouvelle image).
+- **Données** : table `visual_assets` (provenance et droits, distincte des preuves), RLS propriétaire, écriture refusée après suppression du rapport, fichiers effacés avec le rapport. Colonnes `reports.theme_id` / `visual_mode`, `reader_preferences.theme_id`, étape « Recherche d'illustrations adaptées ». Migration appliquée en production.
+- **Réglages** : « Présentation » visible ; « Illustrations » sous Options (seuls les modes réellement disponibles sont proposés).
+
+### EN TEST (résultats réels)
+- Recette réelle (`scripts/live-visuals.test.ts`, `gemini-3.5-flash-lite` + Commons réel) : rapport validé ; flux, graphique « Évolution du rendement du réseau » (75,6 % → 79,5 %, valeurs identiques aux affirmations) et une photo Commons CC BY-SA 4.0 trouvée en 0,8 s ; crédits présents dans les PDF Éditorial et Visuel, aucune image en Essentiel ; toutes les sections présentes dans les trois PDF.
+- Défaut trouvé et corrigé : une adresse de crédit trop longue sortait de la page PDF (coupure des chaînes de plus de 40 caractères).
+- `npm test` : 137 tests (connecteurs, licences, pertinence, quota d'images, reprise des illustrations, schémas, PDF dans les trois présentations). Recette SQL (isolation des illustrations entre comptes, écriture tardive refusée) OK sur Postgres 16. Build OK. axe : 0 violation (lecteur dans les trois présentations avec graphique, tableau et illustration, réglages, préférences), 360 et 1 440 px.
+
+### NON TESTÉ
+- Parcours complet en production (illustration stockée puis servie par `/api/reports/:id/assets/:assetId`, export PDF avec image).
+- Unsplash et Gemini Image : non activés (clé ou compte payant requis), donc non essayés en réel.
+
+### NON FAIT / LIMITES
+- Visuels extraits du document (figures du PDF) : non repris, faute de droits connus et de détection de figures.
+- La pertinence d'une photo n'est jugée que sur son titre public ; une image hors sujet reste possible (elle est légendée comme illustration, sans valeur de preuve).
+- Pas encore de compteur « images restantes » côté utilisateur (utile seulement si Gemini Image est activé).
+
+### PROCHAINE ÉTAPE — Lot E
+Recette et livraison : corpus, tests intercomptes et de panne en production, captures mobiles, exemples PDF, rapport final terminé / partiel / non testé.
+
+### DÉCISIONS À PRENDRE
+- Activer Unsplash (clé d'API gratuite à créer) et/ou Gemini Image (compte payant) ?
+
 ## Phase 8 — Cahier V2, lot C : renforcer le cerveau (4 octobre 2026)
 
 ### FAIT

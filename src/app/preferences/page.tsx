@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { PreferencesQuiz } from "@/components/PreferencesQuiz";
+import { ThemePicker } from "@/components/ThemePicker";
+import { ThemeId } from "@/lib/contracts/schemas";
 import { isAdmin } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
 import { fr } from "@/lib/i18n/fr";
 import type { Answers } from "@/lib/preferences";
 import { createUserClient } from "@/lib/supabase/server";
+import { saveTheme } from "./actions";
 
 export const metadata: Metadata = { title: fr.preferences.title };
 
@@ -15,7 +18,7 @@ export default async function PreferencesPage() {
   const supabase = await createUserClient();
   const { data: p } = await supabase
     .from("reader_preferences")
-    .select("goal, familiarity, aids, minutes, density, example_domain")
+    .select("goal, familiarity, aids, minutes, density, example_domain, theme_id")
     .maybeSingle();
   const initial: Answers | null = p
     ? {
@@ -32,6 +35,7 @@ export default async function PreferencesPage() {
       <h1>{fr.preferences.title}</h1>
       <p className="muted">{fr.preferences.intro}</p>
       <PreferencesQuiz initial={initial} />
+      <ThemePicker initial={ThemeId.safeParse(p?.theme_id).data ?? "editorial"} target={{ preference: true }} onSave={saveTheme} />
       <section className="logout" aria-labelledby="account-h">
         <h2 id="account-h">{fr.account.title}</h2>
         <p className="muted">{user.email}</p>

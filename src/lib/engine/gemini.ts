@@ -14,6 +14,7 @@ import {
   type AIProvider,
   type StructuredRequest,
   type StructuredResponse,
+  type UsageReport,
 } from "./provider";
 
 export interface GeminiConfig {
@@ -154,5 +155,50 @@ export class GeminiProvider implements AIProvider {
       throw new ProviderError("schema_mismatch", "Réponse hors schéma.", usage, issues);
     }
     return { value: parsed.data, usage };
+  }
+
+  /**
+   * Illustration générée (cahier V2, § 10) : appel image séparé, une variante, aucun texte
+   * incorporé. Le modèle image est configuré à part ; l'actif est vérifié par l'appelant.
+   */
+  async generateIllustration(req: {
+    model: string;
+    prompt: string;
+    aspectRatio: "4:3" | "16:9";
+    signal: AbortSignal;
+    timeoutMs: number;
+  }): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }> {
+    const started = Date.now();
+    const timeout = AbortSignal.timeout(req.timeoutMs);
+    const base = { provider: this.name, model: req.model, inputTokens: null, outputTokens: null, requestId: null };
+    let res;
+    try {
+      res = await this.client.models.generateContent({
+        model: req.model,
+        contents: [{ role: "user", parts: [{ text: req.prompt }] }],
+        config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: req.aspectRatio }, abortSignal: AbortSignal.any([req.signal, timeout]) },
+      });
+    } catch (e) {
+      const usage = { ...base, durationMs: Date.now() - started };
+      if (req.signal.aborted) throw new ProviderError("cancelled", "Opération annulée.", usage);
+      if (timeout.aborted) throw new ProviderError("timeout_ambiguous", "Délai dépassé ; facturation incertaine.", usage);
+      const status = (e as { status?: number }).status;
+      if (status === 429) throw new ProviderError("quota_exhausted", "Quota image du fournisseur épuisé.", usage);
+      throw new ProviderError("unavailable", `Génération d'image indisponible${status ? ` (HTTP ${status})` : ""}.`, usage);
+    }
+    const usage: UsageReport = {
+      ...base,
+      model: res.modelVersion ?? req.model,
+      inputTokens: res.usageMetadata?.promptTokenCount ?? null,
+      outputTokens: res.usageMetadata?.candidatesTokenCount ?? null,
+      durationMs: Date.now() - started,
+      requestId: res.responseId ?? null,
+    };
+    if (res.promptFeedback?.blockReason || res.candidates?.[0]?.finishReason === "SAFETY") {
+      throw new ProviderError("refused", "Le fournisseur a refusé cette illustration.", usage);
+    }
+    const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+    if (!part?.inlineData?.data) throw new ProviderError("empty", "Aucune image renvoyée.", usage);
+    return { bytes: Buffer.from(part.inlineData.data, "base64"), mime: part.inlineData.mimeType ?? "", usage };
   }
 }

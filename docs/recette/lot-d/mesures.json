@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-04T18:38:59.160Z",
+  "status": "validated",
+  "visuals": [
+    {
+      "id": "vis_flow",
+      "kind": "flow",
+      "caption": "Les étapes, dans l'ordre"
+    },
+    {
+      "id": "vis_chart",
+      "kind": "bar_chart",
+      "caption": "Évolution du rendement du réseau (%)"
+    },
+    {
+      "id": "vis_ill_1",
+      "kind": "illustration",
+      "caption": "Réseau de canalisations et installations de production d'eau",
+      "query": "water treatment plant pipes infrastructure"
+    }
+  ],
+  "dropped": 0,
+  "layout_warnings": [],
+  "illustration_notes": [],
+  "illustration_ms": 822,
+  "assets": [
+    {
+      "license": "CC BY-SA 4.0",
+      "author": "Mk2010",
+      "source": "https://commons.wikimedia.org/wiki/File:Cast_iron_air_relief_pipes_at_the_top_of_the_storage_tank_at_the_Shanshang_Water_Treatment_Plant,_Tainan_(Taiwan)_02.jpg",
+      "size": "960x636",
+      "bytes": 243504
+    }
+  ],
+  "credits_in_pdf": {
+    "editorial": true,
+    "visuel": true,
+    "essentiel_sans_image": true
+  }
+}

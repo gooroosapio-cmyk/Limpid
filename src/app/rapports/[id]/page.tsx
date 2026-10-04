@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteReport } from "@/components/DeleteReport";
 import { JobProgress } from "@/components/JobProgress";
+import { ThemePicker } from "@/components/ThemePicker";
 import { Reader } from "@/components/reader/Reader";
 import { VersionActions } from "@/components/reader/VersionActions";
 import { requireUser } from "@/lib/auth";
@@ -100,6 +101,9 @@ export default async function ReportPage({
         answers={report.answers}
         actions={<VersionActions reportId={id} disabled={preparing || !report.isCurrent} />}
         actionsNote={report.isCurrent ? fr.reader.reportCost : null}
+        theme={report.theme}
+        assets={report.assets}
+        themeControl={<ThemePicker initial={report.theme} target={{ reportId: id }} />}
         sectionActions={
           report.isCurrent && !preparing
             ? (sectionId) => (

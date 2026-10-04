@@ -2,8 +2,9 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { drainQueue } from "@/lib/jobs/worker";
+import { ThemeId } from "@/lib/contracts/schemas";
 import { deleteReport } from "@/lib/reports/delete";
-import { isAdminConfigured } from "@/lib/supabase/admin";
+import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
 
 const Id = z.string().uuid();
@@ -49,4 +50,28 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
   const result = await deleteReport(user.id, id);
   if (result === "not_found") return NextResponse.json({ error: "introuvable" }, { status: 404 });
   return NextResponse.json({ status: result });
+}
+
+const ThemeChange = z.strictObject({ theme_id: ThemeId });
+
+/** Changement de présentation : même contenu validé, nouveau rendu, aucun appel IA. */
+export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "non_connecte" }, { status: 401 });
+  const origin = request.headers.get("origin");
+  if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ error: "origine" }, { status: 403 });
+  const { id } = await ctx.params;
+  if (!Id.safeParse(id).success) return NextResponse.json({ error: "introuvable" }, { status: 404 });
+  const body = ThemeChange.safeParse(await request.json().catch(() => null));
+  if (!body.success) return NextResponse.json({ error: "requete" }, { status: 400 });
+  const { data, error } = await adminClient()
+    .from("reports")
+    .update({ theme_id: body.data.theme_id })
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .is("deleted_at", null)
+    .select("id");
+  if (error) return NextResponse.json({ error: "stockage" }, { status: 500 });
+  if (!data?.length) return NextResponse.json({ error: "introuvable" }, { status: 404 });
+  return NextResponse.json({ theme_id: body.data.theme_id });
 }

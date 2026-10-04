@@ -1,10 +1,9 @@
 import { z } from "zod";
-import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment } from "@/lib/contracts/schemas";
+import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId } from "@/lib/contracts/schemas";
 import { sourceEntries } from "@/lib/render/sources";
-import { FlowData } from "@/lib/render/visuals";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { fr } from "@/lib/i18n/fr";
-import { FlowDiagram } from "./FlowDiagram";
+import { VisualFigure, type AssetView } from "./Visuals";
 import { CheckQuiz } from "./CheckQuiz";
 import { SourceRef, SourcesProvider } from "./Sources";
 
@@ -89,6 +88,9 @@ export function Reader({
   actions = null,
   actionsNote = null,
   sectionActions,
+  theme = "editorial",
+  assets = {},
+  themeControl = null,
 }: {
   blueprint: ReportBlueprint;
   explanation: ExplanationObject;
@@ -108,6 +110,12 @@ export function Reader({
   actionsNote?: string | null;
   /** Actions propres à une partie (réécriture ciblée), rendues sous chaque section. */
   sectionActions?: (sectionId: string, question: string) => React.ReactNode;
+  /** Présentation : composition seulement, même contenu (cahier V2, § 8). */
+  theme?: ThemeId;
+  /** Illustrations disponibles, par identifiant d'actif. */
+  assets?: Record<string, AssetView>;
+  /** Choix de la présentation (rapport réel). */
+  themeControl?: React.ReactNode;
 }) {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
   const sections = new Map(explanation.sections.map((s) => [s.id, s]));
@@ -116,7 +124,7 @@ export function Reader({
 
   return (
     <SourcesProvider entries={entries} sourceTitle={sourceTitle}>
-      <article aria-labelledby="report-title">
+      <article aria-labelledby="report-title" className={`reader theme-${theme}`}>
         {isDemo && <span className="badge badge-demo">{fr.demo.badge}</span>}{" "}
         <span className="badge">{LEVEL_LABELS[explanation.level]}</span>
         <h1 id="report-title" className="reader-title">{blueprint.title}</h1>
@@ -154,20 +162,17 @@ export function Reader({
               )}
               {bs.visual_ids.map((vid) => {
                 const v = visuals.get(vid);
-                if (!v || v.kind !== "flow") return null;
-                const parsed = FlowData.safeParse(v.data);
-                if (!parsed.success) return null; // visuel invalide : le texte reste seul
+                if (!v) return null;
+                const assetId = v.kind === "illustration" ? (v.data as { asset_id?: unknown }).asset_id : null;
                 return (
-                  <figure key={v.id} className="visual">
-                    <FlowDiagram data={parsed.data} labelledBy={`${v.id}-alt`} />
-                    <figcaption>
-                      {v.caption} <Refs ids={v.evidence_ids} numbers={numbers} />
-                    </figcaption>
-                    <details>
-                      <summary>{fr.reader.textAlternative}</summary>
-                      <p id={`${v.id}-alt`}>{v.alt_text}</p>
-                    </details>
-                  </figure>
+                  <VisualFigure
+                    key={v.id}
+                    visual={v}
+                    refs={<Refs ids={v.evidence_ids} numbers={numbers} />}
+                    asset={typeof assetId === "string" ? assets[assetId] : undefined}
+                    // Essentiel : davantage de texte, pas d'images décoratives.
+                    showIllustrations={theme !== "essentiel"}
+                  />
                 );
               })}
             </section>
@@ -235,6 +240,7 @@ export function Reader({
           </ol>
         </section>
 
+        {themeControl}
         <div className="reader-actions" role="group" aria-label="Actions sur le rapport">
           {actions}
           <a className="btn btn-primary" href={pdfHref} download>{fr.reader.pdf}</a>

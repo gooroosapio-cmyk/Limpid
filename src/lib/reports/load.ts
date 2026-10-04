@@ -5,7 +5,8 @@
  */
 import "server-only";
 import { z } from "zod";
-import { Evidence, ExplanationObject, ReportBlueprint, SourceSegment } from "@/lib/contracts/schemas";
+import { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
+import type { AssetView } from "@/lib/render/visuals";
 import { createUserClient } from "@/lib/supabase/server";
 
 /** Remarques de couverture enregistrées à l'extraction (pages non lues, troncature…). */
@@ -50,6 +51,10 @@ export type LoadedReport =
       isCurrent: boolean;
       /** Dernière tâche du rapport (nouvelle version en préparation, échec récent…). */
       latestJob: JobView | null;
+      theme: ThemeId;
+      visualMode: VisualMode;
+      /** Illustrations du rapport, par identifiant d'actif (avec chemin privé pour l'export). */
+      assets: Record<string, AssetView & { storagePath: string | null; mime: string | null }>;
     };
 
 /** `versionNumber` : version à afficher (par défaut la version courante). */
@@ -58,7 +63,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   const supabase = await createUserClient();
   const { data: report } = await supabase
     .from("reports")
-    .select("id, title, source_id, current_version_id, sources(title, coverage, original_url)")
+    .select("id, title, source_id, current_version_id, theme_id, visual_mode, sources(title, coverage, original_url)")
     .eq("id", id)
     .maybeSingle();
   if (!report) return null;
@@ -96,7 +101,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     .eq("id", shown.id)
     .single();
   if (!version) return null;
-  const [{ data: ev }, { data: segs }, { data: ans }] = await Promise.all([
+  const [{ data: ev }, { data: segs }, { data: ans }, { data: assetRows }] = await Promise.all([
     supabase.from("evidence").select("id, segment_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id),
     supabase
       .from("source_segments")
@@ -108,7 +113,32 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
       .select("check_id, answer, feedback")
       .eq("report_version_id", shown.id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("visual_assets")
+      .select("id, provider, source_url, remote_url, storage_path, mime, width, height, author, license, license_url, modifications, model")
+      .eq("report_id", id)
+      .limit(20),
   ]);
+  const assets: Record<string, AssetView & { storagePath: string | null; mime: string | null }> = {};
+  for (const a of assetRows ?? []) {
+    if (!a.width || !a.height) continue;
+    assets[a.id] = {
+      id: a.id,
+      // Actif stocké : servi par Limpid après contrôle du propriétaire ; Unsplash : depuis son hébergeur.
+      src: a.remote_url ?? `/api/reports/${id}/assets/${a.id}`,
+      width: a.width,
+      height: a.height,
+      provider: a.provider,
+      author: a.author,
+      license: a.license,
+      licenseUrl: a.license_url,
+      sourceUrl: a.source_url,
+      modifications: a.modifications,
+      model: a.model,
+      storagePath: a.storage_path,
+      mime: a.mime,
+    };
+  }
   const answers: Record<string, { answer: string; feedback: unknown }> = {};
   for (const a of ans ?? []) answers[a.check_id] = { answer: a.answer, feedback: a.feedback };
 
@@ -138,5 +168,8 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     shownVersion: shown.version_number,
     isCurrent: shown.id === report.current_version_id,
     latestJob: latestJob ?? null,
+    theme: ThemeId.safeParse(report.theme_id).data ?? "editorial",
+    visualMode: VisualMode.safeParse(report.visual_mode).data ?? "auto",
+    assets,
   };
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
+import { ThemeId } from "@/lib/contracts/schemas";
+import { availableVisualModes } from "@/lib/visuals/config";
 import { SourceReview, type PreviewGroup } from "@/components/SourceReview";
 import { requireUser } from "@/lib/auth";
 import type { Level, Locator } from "@/lib/contracts/schemas";
@@ -54,7 +56,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
 
   const [{ data: segs }, { data: prefs }] = await Promise.all([
     supabase.from("source_segments").select("locator, text").eq("source_id", id).order("ordinal").limit(2_000),
-    supabase.from("reader_preferences").select("familiarity, goal").maybeSingle(),
+    supabase.from("reader_preferences").select("familiarity, goal, theme_id").maybeSingle(),
   ]);
   const coverage = Coverage.safeParse(src.coverage).data ?? {};
   const groups = previewGroups((segs ?? []) as { locator: Locator; text: string }[]);
@@ -80,6 +82,8 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
       groups={groups}
       defaultLevel={LEVEL_BY_FAMILIARITY[prefs?.familiarity ?? ""] ?? "grand_public"}
       defaultGoal={(prefs?.goal as "comprendre" | "reviser" | "appliquer" | "decider" | null) ?? "comprendre"}
+      defaultTheme={ThemeId.safeParse(prefs?.theme_id).data ?? "editorial"}
+      visualModes={availableVisualModes()}
     />
   );
 }

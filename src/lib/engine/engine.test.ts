@@ -336,3 +336,79 @@ describe("régénération ciblée d'une section", () => {
     expect(out.blueprint.source_index.slice(0, first.blueprint.source_index.length)).toEqual(first.blueprint.source_index);
   });
 });
+
+describe("schémas et illustrations déterministes", () => {
+  const withNumbers = () => {
+    const c = structuredClone(goodComp);
+    c.claims.push({
+      id: "clm_3",
+      statement: "La planète a environ 97 % de son eau dans les océans.",
+      evidence_ids: ["ev_2"],
+      qualifiers: ["environ"],
+      numbers: [{ value: 97, unit: "%", scope: null, date: null, source_form: "97 %" }],
+      support_status: "supported",
+    });
+    c.claims.push({ id: "clm_4", statement: "Non soutenue.", evidence_ids: ["ev_1"], qualifiers: [], numbers: [], support_status: "unsupported" });
+    return c;
+  };
+
+  it("reprend les valeurs du graphique depuis les affirmations validées", async () => {
+    const expl = {
+      ...goodExpl,
+      chart: { title: "Répartition", bars: [{ label: "Océans", claim_id: "clm_2", source_form: "97 %" }, { label: "Planète", claim_id: "clm_3", source_form: "97 %" }, { label: "Inventé", claim_id: "clm_2", source_form: "50 %" }] },
+    };
+    const out = await generateReport(new FakeProvider([withNumbers(), expl]), input());
+    const chart = out.blueprint.visual_specs.find((v) => v.kind === "bar_chart")!;
+    expect(chart.data).toEqual({
+      unit: "%",
+      bars: [
+        { label: "Océans", value: 97, source_form: "97 %", claim_id: "clm_2" },
+        { label: "Planète", value: 97, source_form: "97 %", claim_id: "clm_3" },
+      ],
+    });
+    expect(chart.alt_text).toContain("Océans : 97 %");
+  });
+
+  it("vide les cellules de comparaison non soutenues", async () => {
+    const expl = {
+      ...goodExpl,
+      comparison: {
+        criteria: ["Rôle", "Part"],
+        options: [
+          { name: "Soleil", cells: [{ text: "Évapore l'eau", claim_id: "clm_1" }, { text: "Invention", claim_id: "clm_4" }] },
+          { name: "Océans", cells: [{ text: "Stockent l'eau", claim_id: null }, { text: "97 %", claim_id: "clm_2" }] },
+        ],
+      },
+    };
+    const out = await generateReport(new FakeProvider([withNumbers(), expl]), input());
+    const table = out.blueprint.visual_specs.find((v) => v.kind === "comparison_table")!;
+    expect(table.data).toEqual({
+      criteria: ["Rôle", "Part"],
+      options: [
+        { name: "Soleil", cells: [{ text: "Évapore l'eau", claim_id: "clm_1" }, { text: null, claim_id: null }] },
+        { name: "Océans", cells: [{ text: null, claim_id: null }, { text: "97 %", claim_id: "clm_2" }] },
+      ],
+    });
+  });
+
+  it("expurge la requête d'illustration et respecte le mode de visuels", async () => {
+    const expl = {
+      ...goodExpl,
+      illustrations: [
+        { section_id: "sec_1", query: "Ocean waves 2024, Jean Dupont!", subject: "Les océans", alt_text: "Des vagues sur l'océan." },
+        { section_id: "sec_inconnue", query: "cloud", subject: "Nuage", alt_text: "Un nuage." },
+      ],
+    };
+    const out = await generateReport(new FakeProvider([goodComp, expl]), input());
+    const ill = out.blueprint.visual_specs.filter((v) => v.kind === "illustration");
+    expect(ill).toHaveLength(1);
+    expect(ill[0]!.data).toEqual({ query: "ocean waves jean dupont", subject: "Les océans", asset_id: null });
+    expect(ill[0]!.illustrative_only).toBe(true);
+    expect(out.blueprint.sections[0]!.visual_ids).toEqual(["vis_flow", "vis_ill_1"]);
+
+    const none = await generateReport(new FakeProvider([goodComp, expl]), { ...input(), visualMode: "aucun" });
+    expect(none.blueprint.visual_specs).toHaveLength(0);
+    const schemas = await generateReport(new FakeProvider([goodComp, expl]), { ...input(), visualMode: "schemas" });
+    expect(schemas.blueprint.visual_specs.map((v) => v.kind)).toEqual(["flow"]);
+  });
+});

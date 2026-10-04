@@ -5,10 +5,11 @@
  */
 import "server-only";
 import { z } from "zod";
-import { Goal, Level, TargetPages, TemplateId } from "@/lib/contracts/schemas";
+import { Goal, Level, TargetPages, TemplateId, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import { assertCanStartJob, LimitError, recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { adminClient } from "@/lib/supabase/admin";
+import { effectiveVisualMode } from "@/lib/visuals/config";
 
 const Settings = {
   level: Level,
@@ -16,6 +17,9 @@ const Settings = {
   target_pages: TargetPages,
   /** Organisation imposée par le lecteur ; absente = choisie par le rédacteur. */
   template: TemplateId.nullable().optional(),
+  /** Présentation (modifiable ensuite sans appel IA) et visuels permis. */
+  theme: ThemeId.optional(),
+  visual_mode: VisualMode.optional(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/),
 };
 
@@ -81,7 +85,7 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   if ("source_id" in input) {
     sourceId = input.source_id;
   } else {
-    const { level: _l, goal: _g, target_pages: _t, template: _tp, idempotency_key: _k, ...source } = input;
+    const { level: _l, goal: _g, target_pages: _t, template: _tp, theme: _th, visual_mode: _vm, idempotency_key: _k, ...source } = input;
     try {
       sourceId = (await prepareSource(userId, source as PrepareRequest)).sourceId;
     } catch (e) {
@@ -105,7 +109,12 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   const { data: used } = await db.from("reports").select("id").eq("source_id", sourceId).is("deleted_at", null).limit(1).maybeSingle();
   if (used) throw new CreateError("source_used", "Ce document a déjà son rapport.", undefined, used.id);
 
-  const report = await db.from("reports").insert({ owner_id: userId, source_id: sourceId, title: src.title }).select("id").single();
+  const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
+  const report = await db
+    .from("reports")
+    .insert({ owner_id: userId, source_id: sourceId, title: src.title, theme_id: input.theme ?? "editorial", visual_mode: visualMode })
+    .select("id")
+    .single();
   if (report.error || !report.data) throw new CreateError("storage", "Création du rapport impossible.");
 
   const job = await db.from("jobs").insert({
@@ -119,6 +128,7 @@ export async function createReport(userId: string, input: CreateRequest): Promis
       goal: input.goal,
       target_pages: input.target_pages,
       ...(input.template ? { template: input.template } : {}),
+      visual_mode: visualMode,
       ...(pendingOcr ? { ocr: true } : {}),
     },
   });

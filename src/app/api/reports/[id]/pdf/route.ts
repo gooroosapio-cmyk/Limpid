@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth";
-import { pdfHeaders, renderReportPdf } from "@/lib/render/pdf";
+import { pdfHeaders, renderReportPdf, type PdfImage } from "@/lib/render/pdf";
+import { creditText } from "@/lib/visuals/credit";
 import { loadReport } from "@/lib/reports/load";
+import { adminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
 
@@ -14,6 +16,24 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!report) return NextResponse.json({ error: "introuvable" }, { status: 404 });
   if (report.state !== "ready") return NextResponse.json({ error: "pas_pret" }, { status: 409 });
 
+  // Illustrations stockées seulement (une image hébergée par un tiers n'est pas embarquée).
+  const images: Record<string, PdfImage> = {};
+  if (report.theme !== "essentiel") {
+    await Promise.all(
+      Object.values(report.assets).map(async (a) => {
+        if (!a.storagePath || (a.mime !== "image/jpeg" && a.mime !== "image/png")) return;
+        const { data } = await adminClient().storage.from("exports").download(a.storagePath);
+        if (!data) return;
+        images[a.id] = {
+          data: Buffer.from(await data.arrayBuffer()),
+          format: a.mime === "image/png" ? "png" : "jpg",
+          width: a.width,
+          height: a.height,
+          credit: creditText(a),
+        };
+      }),
+    );
+  }
   const pdf = await renderReportPdf({
     blueprint: report.blueprint,
     explanation: report.explanation,
@@ -24,6 +44,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     notes: report.notes,
     partial: report.partial,
     generatedAt: report.createdAt,
+    theme: report.theme,
+    images,
   });
   return new NextResponse(new Uint8Array(pdf), { headers: pdfHeaders(report.blueprint.title) });
 }

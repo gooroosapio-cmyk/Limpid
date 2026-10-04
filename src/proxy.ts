@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'nonce-${nonce}'`,
-    "img-src 'self' blob: data:",
+    "img-src 'self' blob: data: https://images.unsplash.com",
     "font-src 'self'",
     `connect-src 'self' ${SUPABASE_URL}`,
     "object-src 'none'",

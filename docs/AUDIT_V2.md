@@ -47,9 +47,9 @@ Légende :
 | États queued/running/succeeded/failed/cancelled, checkpoints | **Existant** | `jobs/state.ts` + trigger SQL ; le checkpoint OCR permet la reprise. Pas d'état `needs_input` : `awaiting_confirmation` existe mais n'est pas utilisé. |
 | Jeton de génération (une ancienne tâche ne remplace pas une version récente) | **Partiel** | Écriture refusée après suppression (trigger). Pas de `generation_epoch` entre deux versions concurrentes : un seul job actif par rapport est imposé à la demande. |
 | report_status / pdf_status séparés | **Partiel** | Le PDF est rendu à la demande ; un échec n'affecte pas le rapport. Pas de statut PDF persistant. |
-| Objets versionnés (SourceVersion, Evidence, KnowledgeObject, ReportVersion, UsageEvent, AuditEvent) | **Existant** | Migrations `supabase/migrations/*`. Il manque `VisualAsset` et `Policy`. |
-| Adaptateur testable (inspectCapabilities, countInput, uploadSource, generateIllustration, deleteProviderArtifacts) | **Partiel** | `generateStructured` (avec fichiers joints) et la détection du quota sont faits. Le reste manque : pas de countTokens, pas de Files API (envoi inline, 14 Mo au plus), pas de génération d'image. |
-| Configuration : TEXT_MODEL_ID / IMAGE_MODEL_ID | **Partiel** | `LIMPID_MODEL_FAST` / `LIMPID_MODEL_QUALITY` existent. Pas de modèle image. |
+| Objets versionnés (SourceVersion, Evidence, KnowledgeObject, ReportVersion, UsageEvent, AuditEvent) | **Existant** | Migrations `supabase/migrations/*`. `VisualAsset` ajouté au lot D (`visual_assets`) ; il manque `Policy`. |
+| Adaptateur testable (inspectCapabilities, countInput, uploadSource, generateIllustration, deleteProviderArtifacts) | **Partiel** | `generateStructured` (avec fichiers joints) et la détection du quota sont faits. Le reste manque : pas de countTokens, pas de Files API (envoi inline, 14 Mo au plus). `generateIllustration` ajouté au lot D. |
+| Configuration : TEXT_MODEL_ID / IMAGE_MODEL_ID | **Existant (lot D)** | `LIMPID_MODEL_FAST` / `LIMPID_MODEL_QUALITY` ; modèle image séparé `LIMPID_IMAGE_MODEL` (coupé par défaut). |
 
 ## Quotas et coûts
 
@@ -84,7 +84,7 @@ Légende :
 | Lecteur (Aa, Plus simple, Sources, Exporter) | Partiel : pas de réglage de taille de police. |
 | Source et extrait (page dédiée) | Partiel : panneau bas, pas de page dédiée. |
 | Mes rapports (recherche, filtres Tous / En cours / Prêts, menu) | Partiel : liste simple. |
-| Préférences / Présentation / Mon compte / Administration | Partiel : pas de choix de thème ni de quota du mois côté utilisateur. Administration faite. |
+| Préférences / Présentation / Mon compte / Administration | Partiel : Présentation faite au lot D ; pas de quota du mois côté utilisateur. Administration faite. |
 
 ## Non vérifié en production (rappel)
 
