@@ -282,6 +282,7 @@ export const fr = {
     sectionActions: (q: string) => `Réécrire la partie « ${q} »`,
     sectionCost: "Réécrire une partie utilise 1 requête IA ; le reste du rapport ne change pas.",
     reportCost: "Réécrire tout le rapport utilise 1 à 3 requêtes IA.",
+    expires: (date: string, days: number) => `Ce rapport sera supprimé automatiquement le ${date} (${days} jours après sa création). Téléchargez le PDF pour le garder.`,
     checkIntro: "Expliquez avec vos propres mots : c'est le meilleur moyen de vérifier que vous avez compris.",
     partialCoverage: "Ce rapport ne couvre qu'une partie du document :",
     aboutSource: "À savoir sur ce document :",

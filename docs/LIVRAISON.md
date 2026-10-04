@@ -27,7 +27,7 @@ Ce document distingue ce qui est **terminé** (fait et vérifié), **partiel** (
 
 - **Couverture globale des longs documents** (carte par morceaux) et **vision sélective** : non faites (coût en appels sur l'offre gratuite).
 - **Quotas produit** (crédits mensuels, 100 USD) : plafonds en euros et limites anti-abus seulement ; décision en attente.
-- **Conservation 30 jours** : rapports gardés jusqu'à suppression ; décision en attente.
+- **Conservation 30 jours** : décidée et appliquée (rapports effacés 30 jours après leur création par le cron quotidien, date affichée dans le lecteur, durée visible dans le diagnostic). Purge non encore observée en production (aucun rapport n'a 30 jours).
 - **Unsplash** et **Gemini Image** : prêts, coupés. Gemini Image : quota gratuit à **0** constaté pour `gemini-3.1-flash-lite-image` (appel de vérification du 4 octobre) → offre payante obligatoire.
 - **Revue humaine** de la clarté et de la fidélité (exigée par le cahier) : à faire sur les exemples PDF.
 - **Comparaison NotebookLM** : non faite (le cahier exige mêmes sources, consignes et évaluateurs).
@@ -116,5 +116,5 @@ Référence complète et commentée : `.env.example`. Secrets à définir unique
 
 1. Modèle de production et repli : garder `gemini-3.5-flash` avec repli, ou passer à un Flash plus récent après benchmark.
 2. Passage à l'offre payante Gemini (prévu « à la fin ») : lève les quotas de 20 requêtes/jour et permet Gemini Image.
-3. Conservation des rapports (30 jours ou suppression manuelle) ; quotas produit (crédits, plafond 100 USD).
+3. Quotas produit (crédits, plafond 100 USD).
 4. Unsplash (clé gratuite) : activer ou non.

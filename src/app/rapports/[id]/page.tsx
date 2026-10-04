@@ -7,6 +7,7 @@ import { ThemePicker } from "@/components/ThemePicker";
 import { Reader } from "@/components/reader/Reader";
 import { VersionActions } from "@/components/reader/VersionActions";
 import { requireUser } from "@/lib/auth";
+import { retention } from "@/lib/config";
 import { fr } from "@/lib/i18n/fr";
 import { LEVEL_LABELS } from "@/lib/labels";
 import type { Level } from "@/lib/contracts/schemas";
@@ -115,6 +116,11 @@ export default async function ReportPage({
             : undefined
         }
       />
+      {report.expiresAt && (
+        <p className="muted small">
+          {fr.reader.expires(report.expiresAt.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }), retention.reportDays)}
+        </p>
+      )}
       <DeleteReport reportId={id} />
     </>
   );
