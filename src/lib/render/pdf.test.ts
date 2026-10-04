@@ -27,6 +27,43 @@ describe("export PDF", () => {
     expect(text).toContain("140 ont été lues");
   }, 30_000);
 
+  it("rend graphique et tableau dans les trois présentations, sans perdre le texte", async () => {
+    const blueprint = structuredClone(demoBlueprint);
+    blueprint.visual_specs.push(
+      {
+        id: "vis_chart",
+        kind: "bar_chart",
+        purpose: "Comparer",
+        claim_ids: ["clm_9"],
+        evidence_ids: [],
+        data: { unit: "%", bars: [{ label: "Océans", value: 97, source_form: "97 %", claim_id: "clm_9" }, { label: "Autres", value: 3, source_form: "3 %", claim_id: "clm_9" }] },
+        alt_text: "Graphique en barres. Océans : 97 %.",
+        caption: "Où se trouve l'eau",
+        illustrative_only: false,
+      },
+      {
+        id: "vis_compare",
+        kind: "comparison_table",
+        purpose: "Comparer",
+        claim_ids: ["clm_9"],
+        evidence_ids: [],
+        data: { criteria: ["Volume", "Sel"], options: [{ name: "Océans", cells: [{ text: "Environ 97 %", claim_id: "clm_9" }, { text: null, claim_id: null }] }, { name: "Glaces", cells: [{ text: null, claim_id: null }, { text: null, claim_id: null }] }] },
+        alt_text: "Tableau",
+        caption: "Réservoirs comparés",
+        illustrative_only: false,
+      },
+    );
+    blueprint.sections[0]!.visual_ids.push("vis_chart", "vis_compare");
+    for (const theme of ["editorial", "essentiel", "visuel"] as const) {
+      const buf = await renderReportPdf({ blueprint, explanation: demoExplanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE, theme });
+      const text = (await extractPdf(new Uint8Array(buf), { maxPages: 50 })).blocks.map((b) => b.text).join(" ");
+      expect(text).toContain("Où se trouve l'eau");
+      expect(text).toContain("Non précisé par la source");
+      expect(text).toContain("Environ 97 %");
+      expect(text).toContain(demoExplanation.sections.at(-1)!.question);
+    }
+  }, 60_000);
+
   it("fabrique un nom de fichier sûr", () => {
     expect(pdfFileName('Le cycle : "eau" / été').ascii).toBe("limpid-Le-cycle-eau-ete.pdf");
     expect(pdfFileName("   ").ascii).toBe("limpid-rapport.pdf");

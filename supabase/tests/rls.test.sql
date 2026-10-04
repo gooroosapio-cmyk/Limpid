@@ -22,6 +22,9 @@ insert into public.sources (id, owner_id, kind, title) values
 insert into public.reports (id, owner_id, source_id, title) values
   ('20000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-00000000000a', 'Rapport A'),
   ('20000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000b', '10000000-0000-0000-0000-00000000000b', 'Rapport B');
+insert into public.visual_assets (owner_id, report_id, provider, kind, query, storage_path) values
+  ('00000000-0000-0000-0000-00000000000a', '20000000-0000-0000-0000-00000000000a', 'commons', 'photo', 'water cycle', 'a/x.jpg'),
+  ('00000000-0000-0000-0000-00000000000b', '20000000-0000-0000-0000-00000000000b', 'commons', 'photo', 'water cycle', 'b/x.jpg');
 
 -- Utilisateur A
 set role authenticated;
@@ -29,6 +32,7 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 do $$ begin
   if (select count(*) from public.reports) <> 1 then raise exception 'ECHEC : A voit % rapports', (select count(*) from public.reports); end if;
   if exists (select 1 from public.sources where title = 'Source B') then raise exception 'ECHEC : A voit la source de B'; end if;
+  if (select count(*) from public.visual_assets) <> 1 then raise exception 'ECHEC : A voit % illustrations', (select count(*) from public.visual_assets); end if;
 end $$;
 -- A ne peut pas écrire un rapport (écritures via serveur uniquement)
 do $$ begin
@@ -80,6 +84,13 @@ reset role;
 -- Suppression : marqueur puis écriture tardive refusée
 update public.reports set deleted_at = now() where id = '20000000-0000-0000-0000-00000000000a';
 do $$ begin
+  insert into public.visual_assets (owner_id, report_id, provider, kind, query, storage_path)
+    values ('00000000-0000-0000-0000-00000000000a', '20000000-0000-0000-0000-00000000000a', 'commons', 'photo', 'late', 'a/y.jpg');
+  raise exception 'ECHEC : illustration tardive acceptée';
+exception when raise_exception then
+  if sqlerrm like 'ECHEC%' then raise; end if;
+end $$;
+do $$ begin
   insert into public.report_versions (report_id, owner_id, version_number, level, goal, template_id, target_pages, provider)
     values ('20000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000a', 1, 'grand_public', 'comprendre', 'comprendre_sujet', 5, 'demo');
   raise exception 'ECHEC : écriture tardive acceptée';
@@ -90,6 +101,7 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 do $$ begin
   if exists (select 1 from public.reports) then raise exception 'ECHEC : rapport supprimé encore visible'; end if;
+  if exists (select 1 from public.visual_assets) then raise exception 'ECHEC : illustration d''un rapport supprimé visible'; end if;
 end $$;
 reset role;
 

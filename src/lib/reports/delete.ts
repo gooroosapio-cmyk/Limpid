@@ -31,6 +31,10 @@ export async function deleteReport(ownerId: string, reportId: string): Promise<"
     .in("report_version_id", (await db.from("report_versions").select("id").eq("report_id", reportId)).data?.map((v) => v.id) ?? []);
   const exportPaths = (exports ?? []).map((e) => e.storage_path as string);
   steps.exports_files = exportPaths.length === 0 || !(await db.storage.from("exports").remove(exportPaths)).error;
+  // Illustrations stockées (crédits et fichiers) : effacées avec le rapport.
+  const { data: assets } = await db.from("visual_assets").select("storage_path").eq("report_id", reportId).not("storage_path", "is", null);
+  const assetPaths = (assets ?? []).map((x) => x.storage_path as string);
+  steps.asset_files = assetPaths.length === 0 || !(await db.storage.from("exports").remove(assetPaths)).error;
 
   if (report.source_id) {
     const { data: src } = await db.from("sources").select("storage_path").eq("id", report.source_id).maybeSingle();

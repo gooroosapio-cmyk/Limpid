@@ -39,6 +39,8 @@ export interface SafeFetchOptions {
   timeoutMs: number;
   maxRedirects: number;
   allowedContentTypes: string[];
+  /** Agent annoncé (certains services exigent un contact). */
+  userAgent?: string;
   /** Pour les tests : remplace la résolution DNS. */
   resolver?: (host: string) => Promise<{ address: string; family: number }[]>;
 }
@@ -125,7 +127,7 @@ function requestOnce(
         method: "GET",
         lookup,
         agent: false,
-        headers: { "user-agent": "LimpidFetcher/0.1", accept: opts.allowedContentTypes.join(", ") },
+        headers: { "user-agent": opts.userAgent ?? "LimpidFetcher/0.1", accept: opts.allowedContentTypes.join(", ") },
         timeout: opts.timeoutMs,
       },
       (res) => {

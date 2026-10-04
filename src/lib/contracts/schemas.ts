@@ -26,6 +26,16 @@ export type Goal = z.infer<typeof Goal>;
 export const TEMPLATES = ["comprendre_sujet", "expliquer_document", "comprendre_processus", "comparer_options"] as const;
 export const TemplateId = z.enum(TEMPLATES);
 
+/** Présentation (cahier V2, § 8) : change la composition, jamais le contenu. */
+export const THEMES = ["editorial", "essentiel", "visuel"] as const;
+export const ThemeId = z.enum(THEMES);
+export type ThemeId = z.infer<typeof ThemeId>;
+
+/** Visuels permis à la génération (cahier V2, § 7 et 9). */
+export const VISUAL_MODES = ["auto", "schemas", "web", "gemini", "aucun"] as const;
+export const VisualMode = z.enum(VISUAL_MODES);
+export type VisualMode = z.infer<typeof VisualMode>;
+
 export const TARGET_PAGES = [5, 7, 12] as const;
 export const TargetPages = z.union([z.literal(5), z.literal(7), z.literal(12)]);
 
@@ -203,7 +213,7 @@ export type ExplanationObject = z.infer<typeof ExplanationObject>;
 
 /* ---------- ReportBlueprint ---------- */
 
-export const VISUAL_KINDS = ["timeline", "flow", "comparison_table", "bar_chart", "concept_map", "steps"] as const;
+export const VISUAL_KINDS = ["timeline", "flow", "comparison_table", "bar_chart", "concept_map", "steps", "illustration"] as const;
 
 export const VisualSpec = z.strictObject({
   id,

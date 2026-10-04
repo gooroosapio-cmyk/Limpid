@@ -25,6 +25,7 @@ import {
   type ReportBlueprint,
   type SourceSegment,
   type ValidationResult,
+  type VisualMode,
   type VisualSpec,
 } from "@/lib/contracts/schemas";
 import {
@@ -34,7 +35,7 @@ import {
   validateExplanation,
   validateKnowledge,
 } from "@/lib/contracts/validate";
-import { FlowData } from "@/lib/render/visuals";
+import { ComparisonData, FlowData, safeImageQuery, type ChartData } from "@/lib/render/visuals";
 import { ProviderError, type AIProvider, type StageBudget, type UsageReport } from "./provider";
 import { caveatGaps, droppedCaveatClaims } from "./coverage";
 import { locateQuote } from "./quotes";
@@ -66,6 +67,29 @@ export const ExplanationDraft = z.strictObject({
   checks: z.array(ComprehensionCheck).max(20),
   limitations: z.array(z.string().trim().min(1).max(2_000)).max(20),
   flow: FlowData.nullable(),
+  // Schémas et illustrations facultatifs : validés et dessinés par le moteur, jamais par le modèle.
+  chart: z
+    .strictObject({
+      title: z.string().trim().min(1).max(80),
+      bars: z
+        .array(z.strictObject({ label: z.string().trim().min(1).max(40), claim_id: draftId, source_form: z.string().min(1).max(120) }))
+        .min(2)
+        .max(6),
+    })
+    .nullable()
+    .optional(),
+  comparison: ComparisonData.nullable().optional(),
+  illustrations: z
+    .array(
+      z.strictObject({
+        section_id: draftId,
+        query: z.string().trim().min(2).max(60),
+        subject: z.string().trim().min(1).max(120),
+        alt_text: z.string().trim().min(1).max(300),
+      }),
+    )
+    .max(2)
+    .optional(),
 });
 export type ExplanationDraft = z.infer<typeof ExplanationDraft>;
 
@@ -123,6 +147,9 @@ ${templates}
   Sans indication : "comprendre_processus" pour une suite d'étapes, "comparer_options" pour une comparaison, "expliquer_document" pour un document précis, sinon "comprendre_sujet".
 - Si la source est courte, fais moins de sections plutôt que d'ajouter des faits pour remplir.
 - flow : si la source décrit un processus en étapes, 2 à 8 étapes (label ≤ 40 caractères, claim_id existant) ; sinon null.
+- chart : seulement si au moins 2 valeurs comparables de même unité figurent dans des affirmations "supported" : une barre par valeur (label court, claim_id, source_form = l'écriture exacte du nombre dans l'affirmation) ; sinon null.
+- comparison : seulement si la source compare des options : critères identiques pour chaque option, une cellule par critère (texte ≤ 80 caractères et claim_id "supported", ou text et claim_id null si la source ne dit rien) ; sinon null.
+- illustrations : 0 à 2 idées d'illustration générique utiles à la compréhension (section_id, query = 2 à 5 mots-clés EN ANGLAIS décrivant une scène ou un objet courant, sans nom propre, sans chiffre, sans donnée du document ; subject = sujet en français ; alt_text). Aucune illustration ne porte un fait.
 - Langue : celle des affirmations.`;
 }
 
@@ -145,6 +172,8 @@ export interface GenerationInput {
   verifyClaims?: boolean;
   /** Template imposé par le lecteur (sinon choisi par le rédacteur). */
   template?: z.infer<typeof TemplateId> | null;
+  /** Visuels permis : « aucun » = texte seul, « schemas » = sans illustration. */
+  visualMode?: VisualMode;
 }
 
 export interface GenerationOutput {
@@ -402,47 +431,140 @@ function buildExplanation(input: GenerationInput, ko: KnowledgeObject, draft: Ex
   };
 }
 
-/** Mise en page déterministe : ordre des sections, visuel de flux validé, index des sources. */
+/** Mise en page déterministe : ordre des sections, schémas validés, illustrations, index des sources. */
 export function buildBlueprint(
   draft: ExplanationDraft,
   ex: ExplanationObject,
   ko: KnowledgeObject,
   evidence: Evidence[],
   targetPages: 5 | 7 | 12,
+  visualMode: VisualMode = "auto",
 ): ReportBlueprint {
   const claims = new Map(ko.claims.map((c) => [c.id, c]));
+  const supported = (id: string | null | undefined) => !!id && claims.get(id)?.support_status === "supported";
   const visuals: VisualSpec[] = [];
+  const placed = new Map<string, string[]>();
   const warnings: string[] = [];
-  let flowSection: string | null = null;
+  const evidenceOf = (claimIds: string[]) => [...new Set(claimIds.flatMap((cid) => claims.get(cid)?.evidence_ids ?? []))].slice(0, 30);
+  // Un visuel accompagne la première section qui cite l'une de ses affirmations.
+  const place = (visualId: string, claimIds: string[], sectionId?: string) => {
+    const target =
+      sectionId ??
+      ex.sections.find((x) => x.blocks.some((b) => b.claim_ids.some((c) => claimIds.includes(c))))?.id ??
+      ex.sections[0]!.id;
+    placed.set(target, [...(placed.get(target) ?? []), visualId].slice(0, 5));
+  };
 
-  if (draft.flow) {
-    const steps = draft.flow.steps.filter((s) => claims.get(s.claim_id)?.support_status === "supported");
+  if (draft.flow && visualMode !== "aucun") {
+    const steps = draft.flow.steps.filter((x) => supported(x.claim_id));
     if (steps.length >= 2) {
-      const claimIds = [...new Set(steps.map((s) => s.claim_id))];
-      const evIds = [...new Set(claimIds.flatMap((cid) => claims.get(cid)!.evidence_ids))].slice(0, 30);
-      const labels = steps.map((s) => s.label);
+      const claimIds = [...new Set(steps.map((x) => x.claim_id))].slice(0, 30);
+      const labels = steps.map((x) => x.label);
       visuals.push({
         id: "vis_flow",
         kind: "flow",
         purpose: "Montrer l'enchaînement des étapes",
-        claim_ids: claimIds.slice(0, 30),
-        evidence_ids: evIds,
+        claim_ids: claimIds,
+        evidence_ids: evidenceOf(claimIds),
         data: { steps, cyclic: draft.flow.cyclic },
         alt_text: `Schéma${draft.flow.cyclic ? " en boucle" : ""} : ${labels.join(", puis ")}.`.slice(0, 2_000),
         caption: "Les étapes, dans l'ordre",
         illustrative_only: false,
       });
-      // Le schéma accompagne la première section qui cite l'une de ses affirmations.
-      flowSection =
-        ex.sections.find((s) => s.blocks.some((b) => b.claim_ids.some((c) => claimIds.includes(c))))?.id ??
-        ex.sections[0]!.id;
+      place("vis_flow", claimIds);
     } else {
       warnings.push("Schéma de flux écarté : étapes insuffisamment sourcées.");
     }
   }
 
+  if (draft.chart && visualMode !== "aucun") {
+    // Chaque valeur est reprise des nombres validés de l'affirmation : le modèle ne fournit que le repère.
+    const norm = (t: string) => t.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+    const bars: ChartData["bars"] = [];
+    const units = new Set<string>();
+    for (const b of draft.chart.bars) {
+      if (!supported(b.claim_id)) continue;
+      const n = claims.get(b.claim_id)!.numbers.find((x) => norm(x.source_form) === norm(b.source_form));
+      if (!n) continue;
+      bars.push({ label: b.label, value: n.value, source_form: n.source_form, claim_id: b.claim_id });
+      units.add(n.unit ?? "");
+    }
+    if (bars.length >= 2 && units.size === 1) {
+      const claimIds = [...new Set(bars.map((x) => x.claim_id))].slice(0, 30);
+      visuals.push({
+        id: "vis_chart",
+        kind: "bar_chart",
+        purpose: "Comparer des valeurs de la source",
+        claim_ids: claimIds,
+        evidence_ids: evidenceOf(claimIds),
+        data: { unit: [...units][0] || null, bars },
+        alt_text: `Graphique en barres. ${bars.map((x) => `${x.label} : ${x.source_form}`).join(" ; ")}.`.slice(0, 2_000),
+        caption: draft.chart.title,
+        illustrative_only: false,
+      });
+      place("vis_chart", claimIds);
+    } else {
+      warnings.push("Graphique écarté : valeurs absentes des affirmations soutenues ou unités différentes.");
+    }
+  }
+
+  if (draft.comparison && visualMode !== "aucun") {
+    const c = draft.comparison;
+    // Une cellule sans affirmation soutenue n'affiche aucun contenu du modèle.
+    const options = c.options.map((o) => ({
+      name: o.name,
+      cells: c.criteria.map((_, i) => {
+        const cell = o.cells[i];
+        return cell && cell.text && supported(cell.claim_id) ? { text: cell.text, claim_id: cell.claim_id } : { text: null, claim_id: null };
+      }),
+    }));
+    const claimIds = [...new Set(options.flatMap((o) => o.cells.flatMap((x) => (x.claim_id ? [x.claim_id] : []))))].slice(0, 30);
+    if (claimIds.length >= 2) {
+      visuals.push({
+        id: "vis_compare",
+        kind: "comparison_table",
+        purpose: "Comparer les options sur des critères identiques",
+        claim_ids: claimIds,
+        evidence_ids: evidenceOf(claimIds),
+        data: { criteria: c.criteria, options },
+        alt_text: options
+          .map((o) => `${o.name} : ${c.criteria.map((k, i) => `${k} — ${o.cells[i]!.text ?? "non précisé"}`).join(", ")}`)
+          .join(". ")
+          .slice(0, 2_000),
+        caption: "Comparaison sur les mêmes critères",
+        illustrative_only: false,
+      });
+      place("vis_compare", claimIds);
+    } else {
+      warnings.push("Tableau comparatif écarté : cellules insuffisamment sourcées.");
+    }
+  }
+
+  if (visualMode !== "aucun" && visualMode !== "schemas") {
+    let n = 0;
+    for (const idea of draft.illustrations ?? []) {
+      const sec = ex.sections.find((x) => x.id === idea.section_id);
+      const query = safeImageQuery(idea.query);
+      const claimIds = sec ? [...new Set(sec.blocks.flatMap((b) => b.claim_ids))].filter(supported).slice(0, 5) : [];
+      if (!sec || !query || claimIds.length === 0 || n >= 2) continue;
+      const id = `vis_ill_${++n}`;
+      visuals.push({
+        id,
+        kind: "illustration",
+        purpose: "Illustrer une idée (sans valeur de preuve)",
+        claim_ids: claimIds,
+        evidence_ids: [],
+        data: { query, subject: idea.subject, asset_id: null },
+        alt_text: idea.alt_text,
+        caption: idea.subject,
+        illustrative_only: true,
+      });
+      place(id, claimIds, sec.id);
+    }
+  }
+
   const perPage = Math.max(1, Math.ceil(ex.sections.length / targetPages));
-  const used = new Set(ex.sections.flatMap((s) => s.blocks.flatMap((b) => b.evidence_ids)));
+  const used = new Set(ex.sections.flatMap((x) => x.blocks.flatMap((b) => b.evidence_ids)));
   return {
     schema_version: SCHEMA_VERSION,
     id: `bp_${ex.id.slice(4)}`,
@@ -450,9 +572,9 @@ export function buildBlueprint(
     template_id: draft.template_id,
     target_pages: targetPages,
     title: draft.title.slice(0, 500),
-    sections: ex.sections.map((s, i) => ({
-      section_id: s.id,
-      visual_ids: s.id === flowSection ? ["vis_flow"] : [],
+    sections: ex.sections.map((x, i) => ({
+      section_id: x.id,
+      visual_ids: placed.get(x.id) ?? [],
       page_hint: Math.min(12, Math.floor(i / perPage) + 1),
     })),
     visual_specs: visuals,
@@ -490,7 +612,7 @@ async function explanation(
     // Un template choisi par le lecteur prime sur celui du rédacteur.
     if (input.template) draft = { ...draft, template_id: input.template };
     const ex = buildExplanation(input, ko, draft);
-    const bp = buildBlueprint(draft, ex, ko, evidence, input.targetPages);
+    const bp = buildBlueprint(draft, ex, ko, evidence, input.targetPages, input.visualMode);
     const v = new ValidationCollector();
     validateExplanation(ex, ko, evidenceIds, v);
     validateBlueprint(bp, ex, ko, evidenceIds, v);

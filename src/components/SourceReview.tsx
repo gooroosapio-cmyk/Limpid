@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GOALS, LEVELS, TEMPLATES, type Goal, type Level } from "@/lib/contracts/schemas";
+import { GOALS, LEVELS, TEMPLATES, THEMES, type Goal, type Level, type ThemeId, type VisualMode } from "@/lib/contracts/schemas";
 import { fr } from "@/lib/i18n/fr";
 import { GOAL_LABELS, LEVEL_DESCRIPTIONS, LEVEL_LABELS, TEMPLATE_LABELS } from "@/lib/labels";
 
@@ -46,11 +46,16 @@ export function SourceReview({
   groups,
   defaultLevel,
   defaultGoal,
+  defaultTheme,
+  visualModes,
 }: {
   source: SourceView;
   groups: PreviewGroup[];
   defaultLevel: Level;
   defaultGoal: Goal;
+  defaultTheme: ThemeId;
+  /** Modes d'illustration réellement disponibles (connecteurs configurés). */
+  visualModes: VisualMode[];
 }) {
   const [step, setStep] = useState<"verify" | "settings">("verify");
   const [index, setIndex] = useState(0);
@@ -58,6 +63,8 @@ export function SourceReview({
   const [pages, setPages] = useState<5 | 7 | 12>(5);
   const [goal, setGoal] = useState<Goal>(defaultGoal);
   const [template, setTemplate] = useState<string>("");
+  const [theme, setTheme] = useState<ThemeId>(defaultTheme);
+  const [visualMode, setVisualMode] = useState<VisualMode>("auto");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const key = useRef(crypto.randomUUID());
@@ -78,6 +85,8 @@ export function SourceReview({
           goal,
           target_pages: pages,
           template: template || null,
+          theme,
+          visual_mode: visualMode,
           idempotency_key: key.current,
         }),
       });
@@ -167,6 +176,12 @@ export function SourceReview({
           ))}
         </fieldset>
 
+        <label htmlFor={`${base}-theme`}>{fr.themes.label}</label>
+        <select id={`${base}-theme`} value={theme} onChange={(e) => setTheme(e.target.value as ThemeId)} aria-describedby={`${base}-theme-desc`}>
+          {THEMES.map((t) => <option key={t} value={t}>{fr.themes.names[t]}</option>)}
+        </select>
+        <p id={`${base}-theme-desc`} className="muted small">{fr.themes.descriptions[theme]}</p>
+
         <details className="options">
           <summary>{fr.source.options}</summary>
           <label htmlFor={`${base}-goal`}>{fr.source.goal}</label>
@@ -178,6 +193,11 @@ export function SourceReview({
             <option value="">{fr.source.templateAuto}</option>
             {TEMPLATES.map((t) => <option key={t} value={t}>{TEMPLATE_LABELS[t]}</option>)}
           </select>
+          <label htmlFor={`${base}-visuals`}>{fr.visuals.modeLabel}</label>
+          <select id={`${base}-visuals`} value={visualMode} onChange={(e) => setVisualMode(e.target.value as VisualMode)} aria-describedby={`${base}-visuals-desc`}>
+            {visualModes.map((m) => <option key={m} value={m}>{fr.visuals.modes[m]}</option>)}
+          </select>
+          <p id={`${base}-visuals-desc`} className="muted small">{fr.visuals.modeHint}</p>
         </details>
       </div>
 

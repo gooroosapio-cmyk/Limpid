@@ -213,6 +213,52 @@ figure.visual figcaption { font-size: 15px; color: var(--gris); margin-top: var(
 figure.visual details { margin-top: var(--s2); font-size: 15px; }
 figure.visual summary { min-height: var(--cible); display: flex; align-items: center; cursor: pointer; }
 
+/* Graphique en barres : couleurs portées par des classes (le thème les change). */
+.chart-bar { fill: var(--encre); }
+.chart-label { fill: var(--encre); }
+
+.table-scroll { overflow-x: auto; }
+table.compare { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.compare caption { caption-side: bottom; text-align: left; color: var(--gris); padding-top: var(--s3); }
+table.compare th, table.compare td { border-bottom: 1px solid var(--bordure); padding: var(--s2); text-align: left; vertical-align: top; }
+table.compare thead th { font-size: 14px; }
+table.compare tbody th { font-weight: 700; }
+
+figure.illustration { padding: 0; overflow: hidden; }
+figure.illustration img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: cover; background: var(--ivoire); }
+figure.illustration figcaption { padding: 0 var(--s4) var(--s4); }
+.credit { font-size: 13px; }
+
+/* ---------- Présentations (même contenu, composition différente) ---------- */
+
+.theme-essentiel { background: var(--blanc); border: 1px solid var(--bordure); border-radius: var(--rayon); padding: var(--s4); }
+.theme-essentiel .takeaway { background: none; border: 2px solid var(--encre); }
+.theme-essentiel .block-analogy, .theme-essentiel .block-example { background: none; border: 0; border-left: 4px solid var(--bordure); border-radius: 0; padding: 0 0 0 var(--s4); }
+.theme-essentiel figure.visual { border: 0; padding: 0; }
+.theme-essentiel .toc { box-shadow: none; }
+
+.theme-visuel .reader-section > h2 { border-left: 6px solid var(--jaune); padding-left: var(--s3); }
+.theme-visuel .block { background: var(--blanc); border: 1px solid var(--bordure); border-radius: var(--rayon); padding: var(--s3) var(--s4); }
+.theme-visuel .block-definition { background: #e8eff6; border-color: #b9cde0; }
+.theme-visuel .block-analogy { background: var(--jaune-doux); border-color: #e6d47a; }
+.theme-visuel .block-example { background: #e6f0ea; border-color: #b7d0c1; }
+.theme-visuel .block-caution { background: #fbeae7; border: 1px solid #e6b8b0; border-left: 6px solid var(--danger); }
+.theme-visuel figure.visual { box-shadow: var(--ombre); padding: var(--s5) var(--s4); }
+.theme-visuel figure.illustration { padding: 0; }
+.theme-visuel .chart-bar { fill: var(--vert); }
+
+.theme-picker { margin: var(--s5) 0 var(--s4); }
+.theme-picker fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: var(--s2); }
+.theme-picker legend { font-weight: 700; margin-bottom: var(--s2); }
+.theme-option {
+  display: flex; gap: var(--s3); align-items: center; min-height: 64px; padding: var(--s3) var(--s4);
+  background: var(--blanc); border: 1px solid var(--bordure); border-radius: var(--rayon); cursor: pointer;
+}
+.theme-option:has(input:checked) { border: 2px solid var(--encre); background: var(--jaune-doux); }
+.theme-option input { width: 22px; height: 22px; accent-color: var(--encre); flex: none; }
+.theme-option strong { display: block; }
+.theme-option span span { display: block; font-size: 15px; font-weight: 400; color: var(--gris); }
+
 /* Actions du lecteur : nouvelle version, téléchargement du PDF. */
 .reader-actions {
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); margin-top: var(--s5);

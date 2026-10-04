@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { ThemeId } from "@/lib/contracts/schemas";
 import { createUserClient } from "@/lib/supabase/server";
 
 const one = <T extends [string, ...string[]]>(values: T) =>
@@ -33,6 +34,18 @@ export async function clearPreferences(): Promise<{ ok: boolean }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false };
   const { error } = await supabase.from("reader_preferences").delete().eq("owner_id", auth.user.id);
+  revalidatePath("/preferences");
+  return { ok: !error };
+}
+
+/** Présentation par défaut des nouveaux rapports (n'affecte pas les rapports existants). */
+export async function saveTheme(theme: unknown): Promise<{ ok: boolean }> {
+  const parsed = ThemeId.safeParse(theme);
+  if (!parsed.success) return { ok: false };
+  const supabase = await createUserClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false };
+  const { error } = await supabase.from("reader_preferences").upsert({ owner_id: auth.user.id, theme_id: parsed.data });
   revalidatePath("/preferences");
   return { ok: !error };
 }

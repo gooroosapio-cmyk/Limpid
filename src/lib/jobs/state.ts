@@ -9,6 +9,7 @@ export const JOB_STAGES = [
   "comprehension",
   "explication",
   "verification",
+  "illustrations",
   "mise_en_page",
 ] as const;
 export type JobStage = (typeof JOB_STAGES)[number];
@@ -57,6 +58,7 @@ export const MAX_ATTEMPTS_PER_STAGE = 3;
 export const LEASE_SECONDS = 90;
 
 export const STAGE_LABELS_FR: Record<JobStage, string> = {
+  illustrations: "Recherche d'illustrations adaptées",
   validation: "Vérification du document",
   extraction: "Lecture du contenu",
   comprehension: "Repérage des informations",

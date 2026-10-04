@@ -16,12 +16,17 @@ import {
   TemplateId,
   type Goal,
   type Level,
+  type VisualMode,
 } from "@/lib/contracts/schemas";
 import { estimateCents, PRICE_BASIS } from "@/lib/budget";
 import { assertBudget, BudgetError } from "./budget-guard";
 import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getProvider } from "@/lib/engine";
+import { GeminiProvider, geminiConfigFromEnv } from "@/lib/engine/gemini";
 import { generateReport, PROMPT_VERSION, regenerateExplanation, regenerateSection, type Variation } from "@/lib/engine/pipeline";
+import { visualConfig } from "@/lib/visuals/config";
+import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
+import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
@@ -49,6 +54,8 @@ interface JobRow {
     base_version_id?: string;
     /** Section à réécrire seule (sinon tout le rapport). */
     section_id?: string;
+    /** Visuels permis (absent : auto). */
+    visual_mode?: VisualMode;
   };
 }
 
@@ -265,7 +272,9 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
     verifyClaims: process.env.LIMPID_VERIFY_CLAIMS !== "off",
     template: job.params.template ?? null,
+    visualMode: job.params.visual_mode ?? "auto",
   });
+  const blueprint = await runIllustrations(job, out.blueprint, controller);
 
   await setStage(job.id, "mise_en_page");
   const model = (await db.from("usage_ledger").select("model").eq("job_id", job.id).limit(1).maybeSingle()).data?.model;
@@ -318,7 +327,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
       template_id: out.blueprint.template_id,
       target_pages: job.params.target_pages,
       explanation: out.explanation,
-      blueprint: out.blueprint,
+      blueprint,
       validation: out.validation.explanation,
       check_status: out.status === "validated" ? "validated" : "incomplete",
       change_reason: "generation_initiale",
@@ -333,11 +342,67 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
 
   const rep = await db
     .from("reports")
-    .update({ current_version_id: version.data.id, title: out.blueprint.title.slice(0, 300) })
+    .update({ current_version_id: version.data.id, title: blueprint.title.slice(0, 300) })
     .eq("id", job.report_id)
     .is("deleted_at", null);
   if (rep.error) throw new JobFailure("persist_report");
   return out.status === "validated" ? "succeeded" : "incomplete_check";
+}
+
+/** Recherche ou génération des illustrations prévues par le plan ; un échec n'arrête jamais le rapport. */
+async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, controller: AbortController): Promise<ReportBlueprint> {
+  if (!job.report_id || pendingIllustrations(blueprint).length === 0) return blueprint;
+  await setStage(job.id, "illustrations");
+  const db = adminClient();
+  const config = visualConfig();
+  const reportId = job.report_id;
+  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY ?? "";
+  const image = config.geminiImage && config.imageModel ? new GeminiProvider(geminiConfigFromEnv()) : null;
+  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+  try {
+    const out = await illustrate(blueprint, job.params.visual_mode ?? "auto", config, {
+      searchCommons: (q, t) => searchCommons(q, undefined, t),
+      downloadCommons: (c, t) => downloadCommons(c, undefined, t),
+      searchUnsplash: config.unsplash ? (q, t) => searchUnsplash(q, unsplashKey, t) : undefined,
+      trackUnsplash: (loc) => trackUnsplashDownload(loc, unsplashKey),
+      generateImage: image
+        ? async (prompt) => {
+            // Plafonds vérifiés avant chaque image ; un refus laisse le rapport sans image.
+            await checkBudget(job.owner_id);
+            return image.generateIllustration({ model: config.imageModel!, prompt, aspectRatio: "4:3", signal: controller.signal, timeoutMs: 60_000 });
+          }
+        : undefined,
+      onImageUsage: (attempt, u) => recordUsage(job, "illustrations", attempt, u),
+      generatedThisMonth: async () =>
+        (
+          await db
+            .from("visual_assets")
+            .select("id", { count: "exact", head: true })
+            .eq("owner_id", job.owner_id)
+            .eq("provider", "gemini")
+            .gte("created_at", monthStart)
+        ).count ?? 0,
+      store: async (img, ext) => {
+        const path = `${job.owner_id}/${reportId}/assets/${crypto.randomUUID()}.${ext}`;
+        const { error } = await db.storage.from("exports").upload(path, img.bytes, { contentType: img.mime, upsert: false });
+        return error ? null : path;
+      },
+      insertAsset: async (row: AssetRow) => {
+        const { data, error } = await db
+          .from("visual_assets")
+          .insert({ ...row, owner_id: job.owner_id, report_id: reportId })
+          .select("id")
+          .single();
+        if (error && row.storage_path) await db.storage.from("exports").remove([row.storage_path]);
+        return error ? null : data.id;
+      },
+    });
+    return out.blueprint;
+  } catch (e) {
+    if (e instanceof JobFailure) throw e; // annulation ou budget
+    // Repli : sans illustration, le rapport reste complet.
+    return (await illustrate(blueprint, "schemas", config, {} as never)).blueprint;
+  }
 }
 
 /** Nouvelle version (« Plus simple », « Un autre exemple ») à partir de la connaissance validée. */
@@ -379,9 +444,12 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
   };
   const sectionId = job.params.section_id;
-  const out = sectionId
-    ? await regenerateSection(provider, generation, knowledge, evidence, previous, ReportBlueprint.parse(base.blueprint), sectionId, variation)
+  const baseBlueprint = ReportBlueprint.parse(base.blueprint);
+  const regenerated = sectionId
+    ? await regenerateSection(provider, generation, knowledge, evidence, previous, baseBlueprint, sectionId, variation)
     : await regenerateExplanation(provider, generation, knowledge, evidence, previous, variation);
+  // Les illustrations déjà choisies sont reprises : pas de nouvelle recherche ni d'image générée.
+  const out = sectionId ? regenerated : { ...regenerated, blueprint: carryIllustrations(baseBlueprint, regenerated.blueprint) };
 
   await setStage(job.id, "mise_en_page");
   const { count } = await db.from("report_versions").select("id", { count: "exact", head: true }).eq("report_id", job.report_id);

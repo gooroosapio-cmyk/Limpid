@@ -5,12 +5,13 @@
  */
 import "server-only";
 import path from "node:path";
-import { Document, Font, Link, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
-import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment } from "@/lib/contracts/schemas";
+import { Document, Font, Image, Link, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
+import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId, VisualSpec } from "@/lib/contracts/schemas";
 import { fr } from "@/lib/i18n/fr";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { sourceEntries } from "./sources";
-import { FlowData } from "./visuals";
+import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData } from "./visuals";
 
 const FONT_DIR = path.join(process.cwd(), "src/assets/fonts");
 let fontsReady = false;
@@ -24,8 +25,9 @@ function registerFonts() {
       { src: path.join(FONT_DIR, "Inter_700Bold.ttf"), fontWeight: 700 },
     ],
   });
-  // Pas de césure automatique (règles anglaises par défaut, fausses en français).
-  Font.registerHyphenationCallback((word) => [word]);
+  // Pas de césure automatique (règles anglaises par défaut, fausses en français) ; seules les
+  // chaînes très longues (adresses, crédits) sont coupées pour ne pas sortir de la page.
+  Font.registerHyphenationCallback((word) => (word.length > 40 ? (word.match(/.{1,30}/g) ?? [word]) : [word]));
   fontsReady = true;
 }
 
@@ -39,7 +41,6 @@ const s = StyleSheet.create({
   badgeDemo: { fontSize: 8, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.encre, color: C.ivoire },
   title: { fontSize: 22, fontWeight: 700, lineHeight: 1.2, marginBottom: 14 },
   meta: { fontSize: 9, color: C.gris, marginBottom: 16 },
-  takeaway: { backgroundColor: C.jauneDoux, borderRadius: 8, padding: 12, marginBottom: 16 },
   boxTitle: { fontWeight: 700, marginBottom: 4 },
   h2: { fontSize: 14, fontWeight: 700, lineHeight: 1.25, marginTop: 14, marginBottom: 8 },
   p: { marginBottom: 8 },
@@ -48,8 +49,6 @@ const s = StyleSheet.create({
   liText: { flex: 1 },
   label: { fontSize: 8, fontWeight: 700, color: C.vert, textTransform: "uppercase", marginBottom: 2 },
   block: { marginBottom: 8 },
-  boxed: { borderLeftWidth: 3, borderLeftColor: C.jaune, paddingLeft: 8, marginBottom: 8 },
-  caution: { borderLeftWidth: 3, borderLeftColor: "#A23B2A", paddingLeft: 8, marginBottom: 8 },
   muted: { color: C.gris },
   italic: { fontStyle: "italic" },
   ref: { fontSize: 7, color: C.vert },
@@ -65,6 +64,55 @@ const s = StyleSheet.create({
   // un texte dynamique ancré par le bas.
   footer: { position: "absolute", top: 806, left: 52, right: 52, fontSize: 8, color: C.gris },
 });
+
+/** Présentation : couleurs et encadrés seulement ; le texte et l'ordre sont identiques. */
+type ThemeStyle = {
+  page: Style;
+  takeaway: Style;
+  boxed: Style;
+  caution: Style;
+  definition: Style;
+  bar: string;
+  illustrations: boolean;
+};
+const THEME_STYLES: Record<ThemeId, ThemeStyle> = {
+  editorial: {
+    page: { backgroundColor: C.ivoire },
+    takeaway: { backgroundColor: C.jauneDoux, borderRadius: 8, padding: 12, marginBottom: 16 },
+    boxed: { borderLeftWidth: 3, borderLeftColor: C.jaune, paddingLeft: 8, marginBottom: 8 },
+    caution: { borderLeftWidth: 3, borderLeftColor: "#A23B2A", paddingLeft: 8, marginBottom: 8 },
+    definition: { marginBottom: 8 },
+    bar: C.encre,
+    illustrations: true,
+  },
+  essentiel: {
+    page: { backgroundColor: "#FFFFFF" },
+    takeaway: { borderWidth: 1.5, borderColor: C.encre, borderRadius: 6, padding: 12, marginBottom: 16 },
+    boxed: { borderLeftWidth: 2, borderLeftColor: C.bordure, paddingLeft: 8, marginBottom: 8 },
+    caution: { borderLeftWidth: 2, borderLeftColor: C.encre, paddingLeft: 8, marginBottom: 8 },
+    definition: { marginBottom: 8 },
+    bar: C.encre,
+    illustrations: false,
+  },
+  visuel: {
+    page: { backgroundColor: "#FFFFFF" },
+    takeaway: { backgroundColor: C.jauneDoux, borderRadius: 8, padding: 12, marginBottom: 16 },
+    boxed: { backgroundColor: C.jauneDoux, borderRadius: 6, padding: 8, marginBottom: 8 },
+    caution: { backgroundColor: "#FBEAE7", borderLeftWidth: 4, borderLeftColor: "#A23B2A", borderRadius: 6, padding: 8, marginBottom: 8 },
+    definition: { backgroundColor: "#E8EFF6", borderRadius: 6, padding: 8, marginBottom: 8 },
+    bar: C.vert,
+    illustrations: true,
+  },
+};
+
+/** Image d'illustration déjà vérifiée (type, taille, dimensions), avec son crédit en texte. */
+export interface PdfImage {
+  data: Buffer;
+  format: "png" | "jpg";
+  width: number;
+  height: number;
+  credit: string;
+}
 
 type Block = ExplanationObject["sections"][number]["blocks"][number];
 
@@ -86,21 +134,21 @@ function Bullets({ items }: { items: string[] }) {
   );
 }
 
-function BlockPdf({ block, numbers }: { block: Block; numbers: Map<string, number> }) {
+function BlockPdf({ block, numbers, t }: { block: Block; numbers: Map<string, number>; t: ThemeStyle }) {
   const refs = <Refs ids={block.evidence_ids} numbers={numbers} />;
   switch (block.type) {
     case "fact":
       return <Text style={s.p}>{block.text}{refs}</Text>;
     case "definition":
       return (
-        <View style={s.block}>
+        <View style={t.definition}>
           <Text style={s.label}>{fr.reader.definition}</Text>
           <Text><Text style={{ fontWeight: 700 }}>{block.term}</Text> — {block.text}{refs}</Text>
         </View>
       );
     case "analogy":
       return (
-        <View style={s.boxed}>
+        <View style={t.boxed}>
           <Text style={s.label}>{fr.reader.analogy}</Text>
           <Text style={s.p}>{block.text}</Text>
           <Text style={s.muted}><Text style={{ fontWeight: 700 }}>{fr.reader.analogyLimit}</Text> {block.limit}</Text>
@@ -108,7 +156,7 @@ function BlockPdf({ block, numbers }: { block: Block; numbers: Map<string, numbe
       );
     case "fictional_example":
       return (
-        <View style={s.boxed}>
+        <View style={t.boxed}>
           <Text style={s.label}>{fr.reader.fictional}</Text>
           <Text style={s.italic}>{block.text}</Text>
         </View>
@@ -122,7 +170,7 @@ function BlockPdf({ block, numbers }: { block: Block; numbers: Map<string, numbe
       );
     case "caution":
       return (
-        <View style={s.caution}>
+        <View style={t.caution}>
           <Text style={s.label}>{fr.reader.caution}</Text>
           <Text>{block.text}{refs}</Text>
         </View>
@@ -146,6 +194,72 @@ function FlowPdf({ data }: { data: FlowData }) {
   );
 }
 
+function ChartPdf({ data, color }: { data: ChartData; color: string }) {
+  const ratios = barRatios(data.bars.map((b) => b.value));
+  return (
+    <View style={{ marginVertical: 8 }}>
+      {data.bars.map((b, i) => (
+        <View key={i} style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+          <Text style={{ width: 120, textAlign: "right", paddingRight: 6 }}>{b.label}</Text>
+          <View style={{ width: Math.max(2, ratios[i]! * 220), height: 12, backgroundColor: color, borderRadius: 2 }} />
+          <Text style={{ paddingLeft: 6, fontWeight: 700 }}>{b.source_form}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function ComparisonPdf({ data }: { data: ComparisonData }) {
+  const cell = { flex: 1, padding: 4, borderBottomWidth: 0.5, borderBottomColor: C.bordure };
+  return (
+    <View style={{ marginVertical: 8 }}>
+      <View style={{ flexDirection: "row" }}>
+        <Text style={cell} />
+        {data.criteria.map((c) => <Text key={c} style={[cell, { fontWeight: 700 }]}>{c}</Text>)}
+      </View>
+      {data.options.map((o) => (
+        <View key={o.name} style={{ flexDirection: "row" }} wrap={false}>
+          <Text style={[cell, { fontWeight: 700 }]}>{o.name}</Text>
+          {data.criteria.map((c, i) => (
+            <Text key={c} style={[cell, o.cells[i]?.text ? {} : s.muted]}>{o.cells[i]?.text ?? fr.visuals.notStated}</Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function VisualPdf({ v, numbers, t, images }: { v: VisualSpec; numbers: Map<string, number>; t: ThemeStyle; images: Record<string, PdfImage> }) {
+  const caption = <Text style={s.caption}>{v.caption}<Refs ids={v.evidence_ids} numbers={numbers} /></Text>;
+  const alt = <Text style={[s.caption, s.italic]}>{fr.reader.textAlternative} : {v.alt_text}</Text>;
+  if (v.kind === "flow") {
+    const d = FlowData.safeParse(v.data);
+    return d.success ? <View wrap={false}><FlowPdf data={d.data} />{caption}{alt}</View> : null;
+  }
+  if (v.kind === "bar_chart") {
+    const d = ChartData.safeParse(v.data);
+    return d.success ? <View wrap={false}><ChartPdf data={d.data} color={t.bar} />{caption}{alt}</View> : null;
+  }
+  if (v.kind === "comparison_table") {
+    const d = ComparisonData.safeParse(v.data);
+    return d.success ? <View><ComparisonPdf data={d.data} />{caption}</View> : null;
+  }
+  if (v.kind === "illustration" && t.illustrations) {
+    const d = IllustrationData.safeParse(v.data);
+    const img = d.success && d.data.asset_id ? images[d.data.asset_id] : undefined;
+    if (!img) return null;
+    const width = 300;
+    return (
+      <View wrap={false} style={{ alignItems: "center", marginVertical: 8 }}>
+        <Image src={{ data: img.data, format: img.format }} style={{ width, height: Math.round((width * img.height) / img.width) }} />
+        <Text style={s.caption}>{fr.visuals.illustration} : {v.caption}</Text>
+        <Text style={[s.caption, { fontSize: 7.5 }]}>{img.credit}</Text>
+      </View>
+    );
+  }
+  return null;
+}
+
 export interface PdfReportInput {
   blueprint: ReportBlueprint;
   explanation: ExplanationObject;
@@ -159,10 +273,14 @@ export interface PdfReportInput {
   /** Couverture partielle (sinon remarques informatives, ex. lecture OCR). */
   partial?: boolean;
   generatedAt?: Date;
+  theme?: ThemeId;
+  /** Illustrations par identifiant d'actif (celles servies par un hébergeur tiers en sont exclues). */
+  images?: Record<string, PdfImage>;
 }
 
 function ReportDocument(input: PdfReportInput) {
   const { blueprint, explanation } = input;
+  const t = THEME_STYLES[input.theme ?? "editorial"];
   const { numbers, entries } = sourceEntries(blueprint, input.evidence, input.segments);
   const sections = new Map(explanation.sections.map((x) => [x.id, x]));
   const visuals = new Map(blueprint.visual_specs.map((v) => [v.id, v]));
@@ -174,7 +292,7 @@ function ReportDocument(input: PdfReportInput) {
 
   return (
     <Document title={blueprint.title} author="Limpid" creator="Limpid" producer="Limpid" language="fr">
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={[s.page, t.page]}>
         <Text style={s.brand}>limpid</Text>
         <View style={s.badges}>
           {input.isDemo && <Text style={s.badgeDemo}>{fr.demo.badge}</Text>}
@@ -184,13 +302,13 @@ function ReportDocument(input: PdfReportInput) {
         <Text style={s.meta}>D'après : {input.sourceTitle} · {date}</Text>
 
         {input.notes && input.notes.length > 0 && (
-          <View style={s.caution}>
+          <View style={t.caution}>
             <Text style={s.label}>{input.partial === false ? fr.reader.aboutSource : fr.reader.partialCoverage}</Text>
             <Bullets items={input.notes} />
           </View>
         )}
 
-        <View style={s.takeaway} wrap={false}>
+        <View style={t.takeaway} wrap={false}>
           <Text style={s.boxTitle}>{fr.reader.essential}</Text>
           <Bullets items={explanation.sections.map((x) => x.takeaway)} />
         </View>
@@ -205,20 +323,12 @@ function ReportDocument(input: PdfReportInput) {
             {/* Le titre reste avec son premier bloc : jamais seul en bas de page. */}
             <View wrap={false}>
               <Text style={s.h2}>{i + 1}. {sec.question}</Text>
-              {sec.blocks[0] && <BlockPdf block={sec.blocks[0]} numbers={numbers} />}
+              {sec.blocks[0] && <BlockPdf block={sec.blocks[0]} numbers={numbers} t={t} />}
             </View>
-            {sec.blocks.slice(1).map((b) => <BlockPdf key={b.id} block={b} numbers={numbers} />)}
+            {sec.blocks.slice(1).map((b) => <BlockPdf key={b.id} block={b} numbers={numbers} t={t} />)}
             {bs.visual_ids.map((vid) => {
               const v = visuals.get(vid);
-              const parsed = v?.kind === "flow" ? FlowData.safeParse(v.data) : null;
-              if (!v || !parsed?.success) return null;
-              return (
-                <View key={v.id} wrap={false}>
-                  <FlowPdf data={parsed.data} />
-                  <Text style={s.caption}>{v.caption}<Refs ids={v.evidence_ids} numbers={numbers} /></Text>
-                  <Text style={[s.caption, s.italic]}>{fr.reader.textAlternative} : {v.alt_text}</Text>
-                </View>
-              );
+              return v ? <VisualPdf key={v.id} v={v} numbers={numbers} t={t} images={input.images ?? {}} /> : null;
             })}
           </View>
         ))}
