@@ -7,6 +7,7 @@ import "server-only";
 import { z } from "zod";
 import { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import type { AssetView } from "@/lib/render/visuals";
+import { reportExpiresAt } from "./retention";
 import { createUserClient } from "@/lib/supabase/server";
 
 /** Remarques de couverture enregistrées à l'extraction (pages non lues, troncature…). */
@@ -53,6 +54,8 @@ export type LoadedReport =
       latestJob: JobView | null;
       theme: ThemeId;
       visualMode: VisualMode;
+      /** Date d'effacement automatique (conservation), ou null si illimitée. */
+      expiresAt: Date | null;
       /** Illustrations du rapport, par identifiant d'actif (avec chemin privé pour l'export). */
       assets: Record<string, AssetView & { storagePath: string | null; mime: string | null }>;
     };
@@ -63,7 +66,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   const supabase = await createUserClient();
   const { data: report } = await supabase
     .from("reports")
-    .select("id, title, source_id, current_version_id, theme_id, visual_mode, sources(title, coverage, original_url)")
+    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources(title, coverage, original_url)")
     .eq("id", id)
     .maybeSingle();
   if (!report) return null;
@@ -170,6 +173,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     latestJob: latestJob ?? null,
     theme: ThemeId.safeParse(report.theme_id).data ?? "editorial",
     visualMode: VisualMode.safeParse(report.visual_mode).data ?? "auto",
+    expiresAt: reportExpiresAt(new Date(report.created_at)),
     assets,
   };
 }

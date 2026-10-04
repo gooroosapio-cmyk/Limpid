@@ -36,8 +36,8 @@ export function isUrlImportEnabled(): boolean {
 export const retention = {
   /** Purge du fichier original après extraction (payload 1 § 6 ; cadrage Q18). */
   originalHours: int("LIMPID_RETENTION_ORIGINAL_HOURS", 24),
-  /** 0 = rapports conservés jusqu'à suppression manuelle (cadrage Q18). */
-  reportDays: int("LIMPID_RETENTION_REPORT_DAYS", 0),
+  /** Rapports effacés N jours après leur création (décision du 4 octobre 2026 : 30) ; 0 = illimité. */
+  reportDays: int("LIMPID_RETENTION_REPORT_DAYS", 30),
 };
 
 export const budget = {

@@ -1,5 +1,11 @@
 # Avancement
 
+## Correctifs après livraison (4 octobre 2026)
+- **Diagnostic Gemini** : une requête sans donnée était refusée (HTTP 400) ; corrigé (PR #10).
+- **Conservation des rapports : 30 jours** après création (décision du propriétaire), effacement complet par le cron quotidien (`purgeExpiredReports`, journal `report.expired`), date affichée dans le lecteur, durée affichée dans le diagnostic. `LIMPID_RETENTION_REPORT_DAYS=30` par défaut.
+- **Administrateur** : rôle admin accordé à l'adresse du propriétaire (liste blanche et profil), action journalisée.
+
+
 ## Phase 10 — Cahier V2, lot E : recette et livraison (4 octobre 2026)
 
 Rapport complet : **`docs/LIVRAISON.md`** (terminé / partiel / non testé, corpus, production, migrations, configuration, versions, captures, procédure téléphone).

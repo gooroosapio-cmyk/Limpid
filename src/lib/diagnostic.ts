@@ -5,7 +5,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import { activeProvider, isUrlImportEnabled } from "@/lib/config";
+import { activeProvider, isUrlImportEnabled, retention } from "@/lib/config";
 import { getProvider } from "@/lib/engine";
 import { ProviderError } from "@/lib/engine/provider";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
@@ -32,6 +32,11 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
   add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || "absente : déduite de la requête");
   add("Import par lien", true, isUrlImportEnabled() ? "activé" : "désactivé");
+  add(
+    "Conservation des rapports",
+    true,
+    retention.reportDays > 0 ? `${retention.reportDays} jours après création, puis effacement complet` : "illimitée (jusqu'à suppression manuelle)",
+  );
 
   if (isAdminConfigured()) {
     const db = adminClient();
