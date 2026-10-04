@@ -21,6 +21,7 @@ export type Level = z.infer<typeof Level>;
 
 export const GOALS = ["comprendre", "reviser", "appliquer", "decider"] as const;
 export const Goal = z.enum(GOALS);
+export type Goal = z.infer<typeof Goal>;
 
 export const TEMPLATES = ["comprendre_sujet", "expliquer_document", "comprendre_processus", "comparer_options"] as const;
 export const TemplateId = z.enum(TEMPLATES);

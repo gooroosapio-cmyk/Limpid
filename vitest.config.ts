@@ -11,5 +11,5 @@ export default defineConfig({
       "server-only": src("./src/test/server-only-stub.ts"),
     },
   },
-  test: { include: ["src/**/*.test.ts"], environment: "node" },
+  test: { include: ["src/**/*.test.ts", "scripts/**/*.test.ts"], environment: "node" },
 });

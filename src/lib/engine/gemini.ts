@@ -1,6 +1,6 @@
 /**
  * Adaptateur Google Gemini (fournisseur actif choisi au cadrage, Q3).
- * STATUT : non testé contre l'API réelle tant qu'aucune clé n'est configurée.
+ * STATUT : essayé contre l'API réelle le 4 octobre 2026 (scripts/live-engine.test.ts).
  * Les identifiants de modèles viennent de la configuration, jamais du code.
  */
 import "server-only";
@@ -32,6 +32,32 @@ export function geminiConfigFromEnv(): GeminiConfig {
   return { apiKey, modelFast, modelQuality };
 }
 
+/** Mots-clés de bornes refusés en nombre par l'API (400 INVALID_ARGUMENT constaté le 4 octobre 2026). */
+const SIZE_KEYWORDS = new Set([
+  "$schema", "minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+]);
+
+/**
+ * Schéma transmis au fournisseur : la structure, les types, les énumérations et les motifs
+ * sont conservés ; les bornes de taille sont retirées. Elles restent appliquées par la
+ * validation Zod côté serveur sur chaque réponse.
+ */
+export function toProviderSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toProviderSchema);
+  if (!schema || typeof schema !== "object") return schema;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (SIZE_KEYWORDS.has(k)) continue;
+    if (k === "properties" && v && typeof v === "object") {
+      // Les noms de propriétés ne sont pas des mots-clés : ne rien filtrer à ce niveau.
+      out[k] = Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, toProviderSchema(pv)]));
+    } else {
+      out[k] = toProviderSchema(v);
+    }
+  }
+  return out;
+}
+
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
   readonly isDemo = false;
@@ -56,7 +82,7 @@ export class GeminiProvider implements AIProvider {
         config: {
           systemInstruction: `${req.trustedInstructions}\n\n${UNTRUSTED_PREAMBLE(nonce)}`,
           responseMimeType: "application/json",
-          responseJsonSchema: z.toJSONSchema(req.schema, { target: "draft-2020-12", io: "output" }),
+          responseJsonSchema: toProviderSchema(z.toJSONSchema(req.schema, { target: "draft-2020-12", io: "output" })),
           maxOutputTokens: req.budget.maxOutputTokens,
           temperature: 0.2,
           abortSignal: signal,

@@ -18,7 +18,7 @@ begin
 end $$;
 
 create or replace function public.touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   new.updated_at := now();
   return new;
@@ -223,7 +223,7 @@ create trigger jobs_touch before update on public.jobs for each row execute func
 
 -- Transitions autorisées (miroir de src/lib/jobs/state.ts).
 create or replace function public.check_job_transition()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   if new.status = old.status then return new; end if;
   if not (
@@ -348,7 +348,7 @@ create table public.audit_log (
 
 -- Toute écriture sur un rapport supprimé est refusée, y compris par le worker.
 create or replace function public.block_writes_on_deleted_report()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 declare
   rid uuid;
 begin
