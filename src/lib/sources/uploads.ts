@@ -11,9 +11,17 @@ import { adminClient } from "@/lib/supabase/admin";
 
 export const BUCKET = "sources";
 
-/** Formats acceptés pour l'instant ; les images et PDF scannés viendront avec l'OCR. */
-export const UPLOAD_KINDS = { pdf: "pdf", docx: "docx", txt: "txt" } as const;
-export type UploadKind = keyof typeof UPLOAD_KINDS;
+/** Extensions acceptées et type de source correspondant (images et PDF scannés : lecture OCR). */
+export const UPLOAD_KINDS = {
+  pdf: "pdf",
+  docx: "docx",
+  txt: "txt",
+  jpg: "jpeg",
+  jpeg: "jpeg",
+  png: "png",
+  webp: "webp",
+} as const;
+export type UploadKind = (typeof UPLOAD_KINDS)[keyof typeof UPLOAD_KINDS];
 
 /** Délai laissé au navigateur pour envoyer le fichier avant purge (l'URL signée vit 2 h). */
 const PENDING_UPLOAD_HOURS = 3;
@@ -35,7 +43,7 @@ export class UploadError extends Error {
 
 export function kindFromFileName(name: string): UploadKind | null {
   const ext = name.toLowerCase().split(".").pop() ?? "";
-  return ext in UPLOAD_KINDS ? (ext as UploadKind) : null;
+  return ext in UPLOAD_KINDS ? UPLOAD_KINDS[ext as keyof typeof UPLOAD_KINDS] : null;
 }
 
 /** Titre lisible : nom du fichier sans extension ni caractères de contrôle. */
@@ -49,7 +57,7 @@ export async function createUpload(
   input: z.infer<typeof UploadRequest>,
 ): Promise<{ uploadId: string; signedUrl: string }> {
   const kind = kindFromFileName(input.file_name);
-  if (!kind) throw new UploadError("type", "Formats acceptés pour l'instant : PDF (avec texte), DOCX et TXT.");
+  if (!kind) throw new UploadError("type", "Formats acceptés : PDF, DOCX, TXT, JPG, PNG et WEBP.");
   if (input.byte_size > limits.maxFileBytes) {
     throw new UploadError("too_large", `Le fichier dépasse ${Math.round(limits.maxFileBytes / 1024 / 1024)} Mo.`);
   }

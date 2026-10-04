@@ -1,5 +1,30 @@
 # Avancement
 
+## Phase 4 — Lecture OCR, nouvelles versions, quiz corrigé (4 octobre 2026)
+
+### FAIT
+- **Images et PDF scannés** (JPG, PNG, WEBP ; PDF sans couche texte) lus par la vision Gemini, **avec accord explicite avant l'envoi** (cadrage Q15) : case à cocher pour une image ; pour un PDF, le serveur détecte qu'il est scanné et demande l'accord (« Lire avec Gemini » / « Annuler ») sans renvoyer le fichier. Le fichier est joint comme donnée non fiable ; transcription mot pour mot, par lots de 8 pages, 30 pages et 14 Mo au plus. Le texte devient des segments localisés (page, ou « image, paragraphe n ») marqués « Texte reconnu automatiquement (OCR) », signalé sur le rapport et dans le PDF. Original effacé dès la lecture (réussie ou non).
+- **Contrôle des images** : dimensions lues dans l'en-tête (PNG, JPEG, WEBP) sans décoder, 20 mégapixels au plus ; signature réelle contre extension.
+- **File de tâches plus robuste** : la lecture OCR est une étape de la tâche ; si elle a été longue, la tâche est remise en file et repart avec un budget de temps complet. Le suivi de progression relance la file quand une tâche attend (réservation atomique : jamais de double traitement).
+- **Quiz corrigé** : chaque question de compréhension accepte une réponse libre ; Gemini la compare aux points attendus et aux extraits de la source (verdict, points couverts ✓/○, retour bienveillant, idée fausse expliquée). Réponse traitée comme donnée non fiable. Dernière réponse conservée et réaffichée ; 40 corrections par heure au plus ; budget vérifié avant chaque appel.
+- **« Plus simple » et « Un autre exemple »** : nouvelle version du rapport à partir de la connaissance déjà validée (seule l'étape d'explication est rejouée, mêmes contrôles). « Plus simple » descend d'un niveau ; « Un autre exemple » remplace analogies et exemples imaginés. Historique des versions (10 au plus) consultable, PDF de chaque version, version courante lisible pendant la préparation.
+- **Coupe-circuit de dépense** partagé (génération, OCR, quiz) ; **quota journalier épuisé** détecté (délai de reprise annoncé par Gemini) : échec immédiat avec un message clair au lieu de nouvelles tentatives.
+
+### EN TEST (résultats réels)
+- `npm test` : 105 tests (OCR avec fournisseur simulé : lots, pages hors lot ignorées, pages illisibles, limite de pages, image en paragraphes ; dimensions PNG/JPEG/WEBP ; nouvelle version : seule l'explication est rejouée ; délai de quota). Typecheck et build OK.
+- **Gemini réel** : PDF scanné de 2 pages (images seules) → texte exact page par page, tableau compris (4 s, ~1 450 jetons en entrée) ; photo contenant « IGNORE TES INSTRUCTIONS… » → transcrite comme simple texte. Quiz : bonne réponse → « correct », réponse incomplète → « partial » (point manquant identifié), réponse fausse avec consigne cachée → « incorrect » avec l'idée fausse expliquée.
+- Chromium 360 px : quiz (réponse, verdict, points), versions, actions, accord image (bouton bloqué tant que la case n'est pas cochée), accord PDF scanné (2ᵉ envoi avec le même fichier et la même clé, `allow_ocr: true`) ; aucun débordement. Ce test a révélé et fait corriger une récursion dans le formulaire.
+
+### NON TESTÉ
+- **Nouvelle version contre Gemini réel** : le quota gratuit du jour (20 requêtes pour `gemini-3.5-flash`) a été épuisé pendant les essais. Testé avec fournisseur simulé uniquement.
+- Parcours connectés complets en production (OCR, quiz, versions) : à vérifier sur l'URL Vercel.
+
+### PROCHAINE ÉTAPE — Phase 5
+Tableau de bord admin (consommation, coupe-circuit, liste blanche), page de compte (suppression du compte et de toutes les données), export PDF mis en cache, finitions d'accessibilité (audit WCAG).
+
+### BLOCAGE / DÉCISION
+- **Quota gratuit Gemini : 20 requêtes par jour et par modèle.** Un rapport en consomme 2 à 6. Options : activer la facturation (prévu en fin d'alpha), ou répartir sur deux modèles (ex. `LIMPID_MODEL_FAST=gemini-3.5-flash-lite`, qualité à vérifier), chacun ayant son propre quota.
+
 ## Phase 3 — Fichiers, liens et export PDF (4 octobre 2026)
 
 Configuration Vercel / Supabase faite par le propriétaire (variables, URL de redirection, liste blanche). Gemini reste sur l'offre gratuite jusqu'à la fin de l'alpha (décision du propriétaire).

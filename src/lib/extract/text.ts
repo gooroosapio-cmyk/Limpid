@@ -22,7 +22,12 @@ export type ExtractionCode =
   | "unsupported";
 
 export class ExtractionError extends Error {
-  constructor(public readonly code: ExtractionCode, message: string) {
+  constructor(
+    public readonly code: ExtractionCode,
+    message: string,
+    /** Nombre de pages du document, quand il est connu (PDF scanné : pour l'OCR). */
+    public readonly pageCount?: number,
+  ) {
     super(message);
   }
 }
@@ -73,6 +78,10 @@ export interface TextBlock {
   /** Page physique (PDF) : le segment est alors localisé par page. */
   page?: number;
   pageLabel?: string | null;
+  /** Texte lu dans une image : localisé « image, paragraphe n ». */
+  image?: boolean;
+  /** Avertissements d'extraction recopiés sur les segments (ex. lecture OCR). */
+  warnings?: string[];
 }
 
 export interface ExtractedText {
@@ -95,7 +104,7 @@ export function buildSegments(
   sourceId: string,
   opts: { maxChars: number; truncate: boolean },
 ): ExtractedText {
-  const kept: { text: string; heading: boolean; page?: number; pageLabel?: string | null }[] = [];
+  const kept: (Omit<TextBlock, "heading"> & { heading: boolean })[] = [];
   let charCount = 0;
   let truncated = false;
   for (const b of blocks) {
@@ -107,7 +116,7 @@ export function buildSegments(
       break;
     }
     charCount += text.length + 2;
-    kept.push({ text, heading: !!b.heading, page: b.page, pageLabel: b.pageLabel });
+    kept.push({ ...b, text, heading: !!b.heading });
   }
   if (kept.length === 0) {
     throw new ExtractionError(truncated ? "too_long" : "empty", truncated ? "Le texte dépasse la longueur autorisée." : "Le texte est vide.");
@@ -131,7 +140,9 @@ export function buildSegments(
       const locator: Locator =
         block.page !== undefined
           ? { kind: "pdf_page", physical_index: block.page, printed_label: block.pageLabel?.slice(0, 20) ?? null }
-          : { kind: "section", heading_path: [...headingPath], paragraph };
+          : block.image
+            ? { kind: "image", region: `paragraphe ${paragraph}` }
+            : { kind: "section", heading_path: [...headingPath], paragraph };
       segments.push({
         id: `seg_${paragraph}`,
         source_id: sourceId,
@@ -139,7 +150,7 @@ export function buildSegments(
         locator,
         text: part,
         content_hash: sha(part),
-        extraction_warnings: [],
+        extraction_warnings: (block.warnings ?? []).slice(0, 20),
       });
     }
   });

@@ -213,12 +213,16 @@ figure.visual figcaption { font-size: 15px; color: var(--gris); margin-top: var(
 figure.visual details { margin-top: var(--s2); font-size: 15px; }
 figure.visual summary { min-height: var(--cible); display: flex; align-items: center; cursor: pointer; }
 
-/* Statique pour l'instant : une barre compacte collante viendra avec les actions réelles. */
+/* Actions du lecteur : nouvelle version, téléchargement du PDF. */
 .reader-actions {
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); margin-top: var(--s5);
   background: var(--ivoire); padding: var(--s2) 0;
 }
-@media (min-width: 768px) { .reader-actions { grid-template-columns: repeat(4, 1fr); } }
+.reader-actions .btn-primary { grid-column: 1 / -1; }
+@media (min-width: 768px) {
+  .reader-actions { grid-template-columns: repeat(3, 1fr); }
+  .reader-actions .btn-primary { grid-column: auto; }
+}
 
 /* Panneau des sources (bas d'écran sur mobile) */
 .sheet[open] {
@@ -255,3 +259,33 @@ figure.visual summary { min-height: var(--cible); display: flex; align-items: ce
 /* Phase 2b : formulaires, zone de suppression, déconnexion */
 select { width: 100%; min-height: var(--cible); margin-bottom: var(--s3); }
 .danger-zone, .logout { margin-top: var(--s6); }
+
+/* Accord avant la lecture OCR (cadrage Q15) */
+.consent { display: flex; gap: var(--s3); align-items: flex-start; text-align: left; font-weight: 500; margin: var(--s4) 0 0; cursor: pointer; }
+.consent input { width: 22px; height: 22px; flex: none; margin: 2px 0 0; accent-color: var(--encre); }
+.consent-actions { display: flex; flex-wrap: wrap; gap: var(--s3); }
+
+/* Quiz de compréhension */
+.quiz { margin-bottom: var(--s4); }
+.quiz-question { font-weight: 600; }
+.quiz-answer { min-height: 110px; margin-bottom: var(--s3); }
+.quiz-result { margin-top: var(--s4); }
+.verdict { display: inline-block; font-weight: 700; padding: var(--s1) var(--s3); border-radius: 999px; margin-bottom: var(--s3); }
+.verdict-ok { background: #dcebe3; color: var(--vert); }
+.verdict-partial { background: var(--jaune-doux); color: var(--encre); }
+.verdict-ko { background: #f4dcd7; color: var(--danger); }
+.quiz-misconception { padding: var(--s3); border-radius: 10px; }
+.quiz-points { padding-left: var(--s5); }
+.quiz-points li { margin-bottom: var(--s2); }
+.point-ok::marker { content: "✓  "; color: var(--vert); font-weight: 700; }
+.point-missing::marker { content: "○  "; color: var(--danger); }
+
+/* Versions d'un rapport */
+.versions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-bottom: var(--s4); }
+.versions .chip {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--s3); border-radius: 999px;
+  border: 1px solid var(--bordure); background: var(--blanc); text-decoration: none; font-size: 15px;
+}
+.versions .chip[aria-current="page"] { background: var(--jaune-doux); border-color: var(--encre); font-weight: 600; }
+.preparing { margin-bottom: var(--s4); }
+.reader-actions-error { grid-column: 1 / -1; margin: 0; }

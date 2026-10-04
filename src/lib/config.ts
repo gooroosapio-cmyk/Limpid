@@ -21,6 +21,9 @@ export const limits = {
   maxExtractedTokens: int("LIMPID_MAX_EXTRACTED_TOKENS", 120_000),
   /** Texte retenu d'un fichier ou d'une page web (≈ 3 caractères par jeton, marge comprise). */
   maxSourceChars: int("LIMPID_MAX_SOURCE_CHARS", 300_000),
+  /** Lecture OCR (vision Gemini) : pages lues au plus et taille maximale du fichier joint. */
+  maxOcrPages: int("LIMPID_MAX_OCR_PAGES", 30),
+  maxOcrBytes: int("LIMPID_MAX_OCR_MB", 14) * 1024 * 1024,
   urlTimeoutMs: int("LIMPID_URL_TIMEOUT_MS", 10_000),
   urlMaxRedirects: int("LIMPID_URL_MAX_REDIRECTS", 3),
 };

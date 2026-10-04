@@ -1,6 +1,6 @@
 /**
- * Extraction du texte d'un PDF (couche texte uniquement ; l'OCR des PDF scannés viendra
- * avec la vision Gemini). Aucun script du PDF n'est exécuté : pdf.js est utilisé sans
+ * Extraction du texte d'un PDF (couche texte uniquement ; les PDF scannés passent par
+ * l'OCR, voir ocr.ts). Aucun script du PDF n'est exécuté : pdf.js est utilisé sans
  * formulaires XFA ni chargement de polices, et seules les pages autorisées sont lues.
  */
 import "server-only";
@@ -74,7 +74,8 @@ export async function extractPdf(data: Uint8Array, opts: { maxPages: number }): 
     if (blocks.length === 0) {
       throw new ExtractionError(
         "scanned",
-        "Ce PDF ne contient pas de texte sélectionnable (document scanné ou composé d'images). La lecture des PDF scannés arrive dans une prochaine version.",
+        "Ce PDF ne contient pas de texte sélectionnable (document scanné ou composé d'images).",
+        pageCount,
       );
     }
     return { blocks, pageCount, pagesRead, emptyPages };

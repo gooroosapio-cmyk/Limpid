@@ -326,14 +326,16 @@ async function explanation(
   input: GenerationInput,
   ko: KnowledgeObject,
   evidence: Evidence[],
+  variation?: { instructions: string; data: { label: string; text: string }[] },
 ) {
-  const instructions = explanationInstructions(input.level, input.goal, input.preferences, input.targetPages);
+  const base = explanationInstructions(input.level, input.goal, input.preferences, input.targetPages);
+  const instructions = variation ? `${base}\n${variation.instructions}` : base;
   const kp = knowledgePayload(ko, evidence);
   const evidenceIds = new Set(evidence.map((e) => e.id));
   let draft: ExplanationDraft | null = null;
   let feedback: string[] = [];
   for (let repair = 0; repair <= MAX_REPAIRS; repair++) {
-    const data = [{ label: "connaissance validee", text: kp }];
+    const data = [{ label: "connaissance validee", text: kp }, ...(variation?.data ?? [])];
     if (draft) {
       data.push({ label: "brouillon precedent", text: JSON.stringify(draft) });
       data.push({ label: "erreurs a corriger", text: feedback.join("\n") });
@@ -375,4 +377,53 @@ export async function generateReport(provider: AIProvider, input: GenerationInpu
     blueprint: exp.blueprint,
     validation: { knowledge: comp.validation, explanation: exp.validation },
   };
+}
+
+/* ---------- Nouvelle version d'une explication ---------- */
+
+export type Variation = "simpler" | "other_example";
+
+const VARIATION_INSTRUCTIONS: Record<Variation, string> = {
+  simpler: `Nouvelle version PLUS SIMPLE que la version précédente (fournie) : phrases plus courtes, moins de termes techniques (chacun défini), une idée par phrase, une analogie quand elle aide. Même contenu factuel, mêmes affirmations sources ; ne retire pas d'information essentielle.`,
+  other_example: `Nouvelle version avec D'AUTRES EXEMPLES : remplace chaque analogie et chaque exemple imaginé de la version précédente (fournie) par un nouveau, clairement différent (autre situation, autre domaine). Garde les mêmes questions de sections et le même niveau ; les blocs factuels peuvent rester identiques.`,
+};
+
+/** Résumé de la version précédente transmis au modèle : questions, analogies, exemples. */
+function previousVersionPayload(prev: ExplanationObject): string {
+  return JSON.stringify(
+    prev.sections.map((s) => ({
+      question: s.question,
+      analogies: s.blocks.filter((b) => b.type === "analogy").map((b) => b.text),
+      exemples: s.blocks.filter((b) => b.type === "fictional_example").map((b) => b.text),
+      faits: s.blocks.filter((b) => b.type === "fact" || b.type === "definition").map((b) => b.text),
+    })),
+  );
+}
+
+/**
+ * Réécrit l'explication à partir de la connaissance déjà validée (aucune nouvelle lecture
+ * de la source) : seule l'étape d'explication est rejouée, avec les mêmes contrôles.
+ */
+export async function regenerateExplanation(
+  provider: AIProvider,
+  input: Omit<GenerationInput, "segments" | "sourceId">,
+  ko: KnowledgeObject,
+  evidence: Evidence[],
+  previous: ExplanationObject,
+  variation: Variation,
+) {
+  const full: GenerationInput = { ...input, sourceId: ko.source_ids[0]!, segments: [] };
+  await input.onStage?.("explication");
+  const exp = await explanation(provider, full, ko, evidence, {
+    instructions: VARIATION_INSTRUCTIONS[variation],
+    data: [{ label: "version precedente", text: previousVersionPayload(previous) }],
+  });
+  await input.onStage?.("verification");
+  return { ...exp, status: exp.validation.blocking_errors.length === 0 ? ("validated" as const) : ("incomplete" as const) };
+}
+
+/** Niveau de la version « plus simple » : un cran plus simple, jusqu'à « ultra simple ». */
+export function simplerLevel(level: Level): Level {
+  const order: Level[] = ["ultra_simple", "grand_public", "etudiant", "professionnel", "expert_presse"];
+  return order[Math.max(0, order.indexOf(level) - 1)]!;
 }

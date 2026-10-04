@@ -74,10 +74,23 @@ export async function extractSource(
     }
   }
 
-  const extracted = buildSegments(blocks, sourceId, { maxChars: opts.maxChars, truncate: true });
+  return { ...assemble(blocks, sourceId, { maxChars: opts.maxChars, pageCount, pagesRead, emptyPages, ocr: false }), title };
+}
+
+/**
+ * Segments et couverture à partir des blocs extraits : pages non lues, troncature, pages
+ * sans texte, lecture OCR. Les remarques sont publiques et affichées avec le rapport.
+ */
+export function assemble(
+  blocks: TextBlock[],
+  sourceId: string,
+  info: { maxChars: number; pageCount: number | null; pagesRead: number | null; emptyPages: number[]; ocr: boolean },
+): Omit<ExtractionResult, "title"> {
+  const extracted = buildSegments(blocks, sourceId, { maxChars: info.maxChars, truncate: true });
   const notes: string[] = [];
-  if (pageCount !== null && pagesRead !== null && pagesRead < pageCount) {
-    notes.push(`Seules les ${pagesRead} premières pages sur ${pageCount} ont été lues.`);
+  if (info.ocr) notes.push("Texte reconnu automatiquement (OCR) : de petites erreurs de lecture sont possibles.");
+  if (info.pageCount !== null && info.pagesRead !== null && info.pagesRead < info.pageCount) {
+    notes.push(`Seules les ${info.pagesRead} premières pages sur ${info.pageCount} ont été lues.`);
   }
   if (extracted.truncated) {
     notes.push(
@@ -86,19 +99,19 @@ export async function extractSource(
         : "Le document est trop long : seule sa première partie a été analysée.",
     );
   }
-  const unreadable = emptyPages.filter((p) => extracted.lastPage === null || p <= extracted.lastPage);
+  const unreadable = info.emptyPages.filter((p) => extracted.lastPage === null || p <= extracted.lastPage);
   if (unreadable.length) notes.push(`Pages sans texte lisible (scannées ou images) : ${pageList(unreadable)}.`);
 
   return {
     extracted,
-    pageCount,
+    pageCount: info.pageCount,
     coverage: {
       segments_total: extracted.segments.length,
       segments_processed: extracted.segments.length,
-      partial: notes.length > 0,
+      // La lecture OCR seule n'est pas une couverture partielle : elle est signalée à part.
+      partial: notes.length > (info.ocr ? 1 : 0),
       empty_pages: unreadable.slice(0, 500),
       notes,
     },
-    title,
   };
 }

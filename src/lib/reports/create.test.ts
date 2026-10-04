@@ -24,11 +24,13 @@ describe("requête de création", () => {
 });
 
 describe("fichiers envoyés", () => {
-  it("déduit le type de l'extension et n'accepte que PDF, DOCX et TXT", () => {
+  it("déduit le type de l'extension et n'accepte que les formats prévus", () => {
     expect(kindFromFileName("Cours.PDF")).toBe("pdf");
     expect(kindFromFileName("note.docx")).toBe("docx");
     expect(kindFromFileName("a.txt")).toBe("txt");
-    expect(kindFromFileName("photo.jpg")).toBeNull();
+    expect(kindFromFileName("photo.JPG")).toBe("jpeg");
+    expect(kindFromFileName("scan.webp")).toBe("webp");
+    expect(kindFromFileName("anim.gif")).toBeNull();
     expect(kindFromFileName("macro.docm")).toBeNull();
     expect(kindFromFileName("sans-extension")).toBeNull();
   });

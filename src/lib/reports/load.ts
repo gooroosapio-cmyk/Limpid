@@ -9,7 +9,7 @@ import { Evidence, ExplanationObject, ReportBlueprint, SourceSegment } from "@/l
 import { createUserClient } from "@/lib/supabase/server";
 
 /** Remarques de couverture enregistrées à l'extraction (pages non lues, troncature…). */
-const CoverageNotes = z.object({ notes: z.array(z.string().max(300)).max(10) });
+const CoverageNotes = z.object({ notes: z.array(z.string().max(300)).max(10), partial: z.boolean().optional() });
 
 export interface JobView {
   status: string;
@@ -17,11 +17,21 @@ export interface JobView {
   error_code: string | null;
 }
 
+export interface VersionInfo {
+  number: number;
+  changeReason: string | null;
+  level: string;
+  current: boolean;
+}
+
 export type LoadedReport =
   | { state: "pending"; id: string; title: string; job: JobView }
   | {
       state: "ready";
       id: string;
+      versionId: string;
+      /** Dernière réponse corrigée par question (quiz). */
+      answers: Record<string, { answer: string; feedback: unknown }>;
       title: string;
       explanation: ExplanationObject;
       blueprint: ReportBlueprint;
@@ -31,10 +41,19 @@ export type LoadedReport =
       sourceTitle: string;
       sourceUrl: string | null;
       notes: string[];
+      /** Couverture partielle (sinon les remarques sont informatives, ex. lecture OCR). */
+      partial: boolean;
       createdAt: Date;
+      /** Versions du rapport (la plus récente en dernier) et version affichée. */
+      versions: VersionInfo[];
+      shownVersion: number;
+      isCurrent: boolean;
+      /** Dernière tâche du rapport (nouvelle version en préparation, échec récent…). */
+      latestJob: JobView | null;
     };
 
-export async function loadReport(id: string): Promise<LoadedReport | null> {
+/** `versionNumber` : version à afficher (par défaut la version courante). */
+export async function loadReport(id: string, versionNumber?: number): Promise<LoadedReport | null> {
   if (!z.string().uuid().safeParse(id).success) return null;
   const supabase = await createUserClient();
   const { data: report } = await supabase
@@ -55,25 +74,50 @@ export async function loadReport(id: string): Promise<LoadedReport | null> {
     return { state: "pending", id, title: report.title, job: job ?? { status: "queued", stage: null, error_code: null } };
   }
 
+  const [{ data: list }, { data: latestJob }] = await Promise.all([
+    supabase.from("report_versions").select("id, version_number, change_reason, level").eq("report_id", id).order("version_number"),
+    supabase
+      .from("jobs")
+      .select("status, stage, error_code")
+      .eq("report_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const versions = list ?? [];
+  const shown =
+    (versionNumber !== undefined && versions.find((v) => v.version_number === versionNumber)) ||
+    versions.find((v) => v.id === report.current_version_id);
+  if (!shown) return null;
+
   const { data: version } = await supabase
     .from("report_versions")
     .select("explanation, blueprint, knowledge_id, check_status, created_at")
-    .eq("id", report.current_version_id)
+    .eq("id", shown.id)
     .single();
   if (!version) return null;
-  const [{ data: ev }, { data: segs }] = await Promise.all([
+  const [{ data: ev }, { data: segs }, { data: ans }] = await Promise.all([
     supabase.from("evidence").select("id, segment_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id),
     supabase
       .from("source_segments")
       .select("id, source_version, locator, text, content_hash, extraction_warnings")
       .eq("source_id", report.source_id)
       .order("ordinal"),
+    supabase
+      .from("comprehension_answers")
+      .select("check_id, answer, feedback")
+      .eq("report_version_id", shown.id)
+      .order("created_at", { ascending: true }),
   ]);
+  const answers: Record<string, { answer: string; feedback: unknown }> = {};
+  for (const a of ans ?? []) answers[a.check_id] = { answer: a.answer, feedback: a.feedback };
 
   const source = report.sources as unknown as { title: string; coverage: unknown; original_url: string | null } | null;
   return {
     state: "ready",
     id,
+    versionId: shown.id,
+    answers,
     title: report.title,
     explanation: ExplanationObject.parse(version.explanation),
     blueprint: ReportBlueprint.parse(version.blueprint),
@@ -83,6 +127,16 @@ export async function loadReport(id: string): Promise<LoadedReport | null> {
     sourceTitle: source?.title ?? report.title,
     sourceUrl: source?.original_url ?? null,
     notes: CoverageNotes.safeParse(source?.coverage).data?.notes ?? [],
+    partial: CoverageNotes.safeParse(source?.coverage).data?.partial ?? false,
     createdAt: new Date(version.created_at),
+    versions: versions.map((v) => ({
+      number: v.version_number,
+      changeReason: v.change_reason,
+      level: v.level,
+      current: v.id === report.current_version_id,
+    })),
+    shownVersion: shown.version_number,
+    isCurrent: shown.id === report.current_version_id,
+    latestJob: latestJob ?? null,
   };
 }

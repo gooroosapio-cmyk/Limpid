@@ -18,7 +18,11 @@ const ERRORS: Record<string, string> = {
   provider_refused: "Le fournisseur IA a refusé de traiter ce contenu.",
   provider_unavailable: "Le fournisseur IA est indisponible pour le moment.",
   provider_rate_limited: "Le fournisseur IA limite les demandes. Réessayez dans quelques minutes.",
+  provider_quota_exhausted: "Le quota quotidien gratuit de Gemini est atteint. Réessayez demain (ou activez la facturation Gemini).",
   provider_timeout: "Le fournisseur IA n'a pas répondu à temps.",
+  provider_truncated: "La réponse du fournisseur IA était incomplète (document trop long ?).",
+  ocr_unreadable: "Aucun texte lisible n'a été trouvé dans ce document.",
+  ocr_source_missing: "Le fichier à lire n'est plus disponible. Envoyez-le à nouveau.",
 };
 
 /** Suit la génération (interrogation légère), puis recharge la page quand le rapport est prêt. */
