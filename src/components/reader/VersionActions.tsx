@@ -7,7 +7,16 @@ import { fr } from "@/lib/i18n/fr";
 type Variation = "simpler" | "other_example";
 
 /** « Plus simple » / « Un autre exemple » : demande une nouvelle version du rapport. */
-export function VersionActions({ reportId, disabled }: { reportId: string; disabled: boolean }) {
+export function VersionActions({
+  reportId,
+  disabled,
+  sectionId,
+}: {
+  reportId: string;
+  disabled: boolean;
+  /** Réécrire une seule partie (sinon tout le rapport). */
+  sectionId?: string;
+}) {
   const [pending, setPending] = useState<Variation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const keys = useRef<Partial<Record<Variation, string>>>({});
@@ -21,7 +30,7 @@ export function VersionActions({ reportId, disabled }: { reportId: string; disab
       const res = await fetch(`/api/reports/${reportId}/versions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variation, idempotency_key: keys.current[variation] }),
+        body: JSON.stringify({ variation, idempotency_key: keys.current[variation], ...(sectionId ? { section_id: sectionId } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : fr.versions.failed);

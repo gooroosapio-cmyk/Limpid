@@ -186,10 +186,10 @@ export function validateExplanation(
         }
         for (const cid of b.claim_ids) {
           const status = claims.get(cid)?.support_status;
-          if (status === "unsupported") {
-            v.fail("fact_supported", "reference", [b.id, cid], "affirmation non soutenue présentée comme établie");
-          } else if (status === "ambiguous") {
-            v.fail("fact_ambiguous", "reference", [b.id, cid], "affirmation ambiguë : formulation prudente requise", false);
+          if (status === "unsupported" || status === "contradicted") {
+            v.fail("fact_supported", "reference", [b.id, cid], `affirmation ${status === "contradicted" ? "contredite par la source" : "non soutenue"} présentée comme établie`);
+          } else if (status === "ambiguous" || status === "partial") {
+            v.fail("fact_ambiguous", "reference", [b.id, cid], "affirmation partiellement soutenue ou ambiguë : formulation prudente requise", false);
           }
         }
       }

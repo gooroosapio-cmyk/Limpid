@@ -14,7 +14,7 @@ Légende :
 |---|---|---|
 | Connexion email + mot de passe, comptes existants conservés | **Manquant → traité au lot A** | Seul le lien magique existait (`src/app/connexion`). |
 | Moteur inspecté avant modification | **Existant** | Routes `src/app/api/*`, tâches `src/lib/jobs/worker.ts`, prompts `src/lib/engine/pipeline.ts`, stockage `src/lib/sources/uploads.ts`. |
-| Citations : le passage existe ET soutient l'affirmation | **Partiel** | L'existence est vérifiée : le serveur localise chaque citation mot pour mot (`engine/quotes.ts`) et calcule lui-même les offsets. L'appui sémantique n'est vérifié que par le statut déclaré par le modèle (`support_status`) et par les contrôles de nombres (`contracts/validate.ts`). Il n'y a pas de vérification indépendante « l'extrait soutient-il l'énoncé ». |
+| Citations : le passage existe ET soutient l'affirmation | **Partiel → traité au lot C** | L'existence est vérifiée : le serveur localise chaque citation mot pour mot (`engine/quotes.ts`) et calcule lui-même les offsets. L'appui sémantique n'est vérifié que par le statut déclaré par le modèle (`support_status`) et par les contrôles de nombres (`contracts/validate.ts`). Il n'y a pas de vérification indépendante « l'extrait soutient-il l'énoncé ». Lot C : appel de vérification séparé (extrait + contexte), qui ne peut que rendre un statut plus prudent. |
 | Budget borné côté serveur | **Partiel** | Coupe-circuit mensuel et quotidien vérifié avant chaque étape (`jobs/budget-guard.ts`), journal sans double débit, idempotence par clé. Il n'y a pas de réservation du coût maximal *avant chaque appel* ni de libération de la différence ensuite : le coût est enregistré après l'appel. |
 | Fuite documentaire / accès croisé | **Existant (SQL), non vérifié (prod)** | RLS sur 16 tables, propriétaire forcé par trigger, recette SQL à deux comptes en CI (`supabase/tests/rls.test.sql`). Les routes serveur contrôlent `owner_id`. Aucun test inter-comptes n'a été fait contre la base de production. |
 
@@ -24,13 +24,13 @@ Légende :
 |---|---|---|
 | Cartographier tout le document avant la rédaction | **Partiel** | Tout le texte (jusqu'à 300 000 caractères) est envoyé en un seul appel de compréhension. Il n'y a ni carte des sections, ni synthèse hiérarchique, ni segments de 1 200 jetons avec chevauchement. |
 | PDF déterministe, même JSON que le web | **Existant** | `render/pdf.tsx`, mêmes numéros de sources (`render/sources.ts`), texte sélectionnable (relu par l'extracteur en test). |
-| Réglages essentiels visibles, options secondaires repliées | **Partiel** | Créer : style d'explication et longueur visibles. Il manque les champs présentation, illustrations et template, ainsi que le repli « Options ». |
+| Réglages essentiels visibles, options secondaires repliées | **Partiel (lot C)** | Créer : style d'explication et longueur visibles. Il manque les champs présentation, illustrations et template, ainsi que le repli « Options ». Lot C : écran « Votre rapport » avec style, longueur en boutons, et « Options » repliées (objectif, organisation). Présentation et illustrations : lot D. |
 | Diagnostic page par page (texte / scan / mixte / figure) | **Partiel** | Les pages sans texte sont signalées et les PDF scannés passent par l'OCR. Il n'y a ni classement par page, ni boîtes englobantes, ni légendes. |
 | Vision sélective (pages ou régions utiles seulement) | **Manquant** | L'OCR lit toutes les pages (30 au plus), pas une sélection. |
-| Écran « Vérifier la source » avant la réservation | **Manquant** | L'accord est demandé pour l'OCR, mais il n'y a pas d'aperçu des pages lues avant le lancement. |
-| Cinq niveaux, quatre templates | **Existant** | Les niveaux et templates sont dans `contracts/schemas.ts`. Le template est choisi par le modèle et contraint par le schéma, sans séquence de blocs imposée par template. |
-| Statut « contradicted », « partial » | **Partiel** | Statuts présents : `supported` / `ambiguous` / `unsupported`. Les contradictions sont gérées comme des objets séparés. |
-| Régénération ciblée d'une section avec coût annoncé | **Partiel** | « Plus simple » et « Un autre exemple » régénèrent tout le rapport, sans coût annoncé. |
+| Écran « Vérifier la source » avant la réservation | **Manquant → traité au lot C** | L'accord est demandé pour l'OCR, mais il n'y a pas d'aperçu des pages lues avant le lancement. |
+| Cinq niveaux, quatre templates | **Existant, renforcé au lot C** | Les niveaux et templates sont dans `contracts/schemas.ts`. Le template est choisi par le modèle et contraint par le schéma, sans séquence de blocs imposée par template. Lot C : consigne détaillée par niveau, séquence par template, template imposable par le lecteur. |
+| Statut « contradicted », « partial » | **Partiel → traité au lot C** | Statuts présents : `supported` / `ambiguous` / `unsupported`. Les contradictions sont gérées comme des objets séparés. |
+| Régénération ciblée d'une section avec coût annoncé | **Partiel → traité au lot C** | « Plus simple » et « Un autre exemple » régénèrent tout le rapport, sans coût annoncé. |
 
 ## P2 — optimisation après mesure
 
@@ -77,9 +77,9 @@ Légende :
 | Écran | État |
 |---|---|
 | Connexion (email, mot de passe, oublié, lien) | **Traité au lot A** |
-| Créer (document + dernier rapport) | Partiel : pas de carte « Dernier rapport ». |
-| Vérifier la source (pages lues, aperçu, pages peu lisibles) | Manquant |
-| Votre rapport (niveau, longueur en boutons, présentation, illustrations) | Partiel |
+| Créer (document + dernier rapport) | Traité au lot C |
+| Vérifier la source (pages lues, aperçu, pages peu lisibles) | Traité au lot C |
+| Votre rapport (niveau, longueur en boutons, présentation, illustrations) | Lot C : niveau, longueur, options ; présentation et illustrations au lot D |
 | Votre rapport prend forme (étapes réelles) | Partiel : une seule étape affichée, pas la liste. |
 | Lecteur (Aa, Plus simple, Sources, Exporter) | Partiel : pas de réglage de taille de police. |
 | Source et extrait (page dédiée) | Partiel : panneau bas, pas de page dédiée. |

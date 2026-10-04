@@ -98,6 +98,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot B : tranche compl
       },
       onStage: (stage) => void (stageStart[stage] = Date.now()),
       onUsage: (stage, attempt, u) => void usage.push({ stage, attempt, ...u }),
+      verifyClaims: true,
     });
     timings.generation_ms = t(t0);
 

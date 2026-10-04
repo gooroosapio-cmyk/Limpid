@@ -79,7 +79,12 @@ export const NumberFact = z.strictObject({
   source_form: z.string().min(1).max(120),
 });
 
-export const SupportStatus = z.enum(["supported", "ambiguous", "unsupported"]);
+/**
+ * Appui d'une affirmation par ses extraits (cahier V2, § 5) : soutenue, partiellement
+ * soutenue, ambiguë, non soutenue, contredite. Aucun pourcentage de vérité artificiel.
+ */
+export const SupportStatus = z.enum(["supported", "partial", "ambiguous", "unsupported", "contradicted"]);
+export type SupportStatus = z.infer<typeof SupportStatus>;
 
 export const Claim = z.strictObject({
   id,

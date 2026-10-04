@@ -35,10 +35,13 @@ export async function POST(request: NextRequest) {
         url_disabled: 403,
         ocr_consent: 409,
         limit: 429,
+        rate: 429,
+        source_missing: 410,
+        source_used: 409,
         generation_disabled: 503,
         storage: 500,
       }[e.code];
-      return NextResponse.json({ error: e.code, message: e.message, pages: e.pages }, { status });
+      return NextResponse.json({ error: e.code, message: e.message, pages: e.pages, reportId: e.reportId }, { status });
     }
     console.error("create report", (e as Error).name);
     return NextResponse.json({ error: "interne" }, { status: 500 });

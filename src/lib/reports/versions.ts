@@ -14,6 +14,8 @@ export const MAX_VERSIONS = 10;
 
 export const VersionRequest = z.strictObject({
   variation: z.enum(["simpler", "other_example"]),
+  /** Section à réécrire seule ; absente = tout le rapport. */
+  section_id: z.string().regex(/^[a-z]{1,6}_[A-Za-z0-9_-]{1,64}$/).optional(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/),
 });
 
@@ -60,10 +62,12 @@ export async function requestVersion(userId: string, reportId: string, input: z.
 
   const { data: current } = await db
     .from("report_versions")
-    .select("id, level, goal, target_pages")
+    .select("id, level, goal, target_pages, explanation")
     .eq("id", report.current_version_id)
     .single();
   if (!current) throw new VersionError("not_found", "Version introuvable.");
+  const sections = ((current.explanation as { sections?: { id: string }[] } | null)?.sections ?? []).map((x) => x.id);
+  if (input.section_id && !sections.includes(input.section_id)) throw new VersionError("not_found", "Cette partie n'existe plus dans la version actuelle.");
   const level = Level.parse(current.level);
 
   const job = await db.from("jobs").insert({
@@ -75,7 +79,9 @@ export async function requestVersion(userId: string, reportId: string, input: z.
     params: {
       variation: input.variation,
       base_version_id: current.id,
-      level: input.variation === "simpler" ? simplerLevel(level) : level,
+      // Une section plus simple garde le niveau du rapport ; seule sa rédaction change.
+      level: input.variation === "simpler" && !input.section_id ? simplerLevel(level) : level,
+      ...(input.section_id ? { section_id: input.section_id } : {}),
       goal: current.goal,
       target_pages: current.target_pages,
     },

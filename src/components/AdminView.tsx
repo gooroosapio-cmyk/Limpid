@@ -12,6 +12,7 @@ const STAGES: Record<string, string> = {
   comprehension: "Compréhension",
   explication: "Explication",
   ocr: "Lecture OCR",
+  verification: "Vérification",
   quiz: "Correction de quiz",
 };
 

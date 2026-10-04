@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { drainQueue } from "@/lib/jobs/worker";
-import { purgeDueOriginals } from "@/lib/sources/uploads";
+import { purgeDueOriginals, purgeUnusedSources } from "@/lib/sources/uploads";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 
 export const maxDuration = 300;
@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   if (!isAdminConfigured()) return NextResponse.json({ error: "non_configure" }, { status: 503 });
   // Purge des originaux arrivés à échéance et des envois abandonnés (cadrage Q18).
   const purged = await purgeDueOriginals().catch(() => -1);
+  const unused = await purgeUnusedSources().catch(() => -1);
   const processed = await drainQueue("cron", Date.now() + 270_000);
-  return NextResponse.json({ processed, purged });
+  return NextResponse.json({ processed, purged, unused });
 }

@@ -4,13 +4,16 @@
  * d'erreur ni dans les journaux.
  */
 import "server-only";
+import type { z } from "zod";
 import { limits } from "@/lib/config";
 import {
   Evidence,
   ExplanationObject,
   KnowledgeObject,
   PreferencesSnapshot,
+  ReportBlueprint,
   SourceSegment,
+  TemplateId,
   type Goal,
   type Level,
 } from "@/lib/contracts/schemas";
@@ -18,7 +21,7 @@ import { estimateCents, PRICE_BASIS } from "@/lib/budget";
 import { assertBudget, BudgetError } from "./budget-guard";
 import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getProvider } from "@/lib/engine";
-import { generateReport, PROMPT_VERSION, regenerateExplanation, type Variation } from "@/lib/engine/pipeline";
+import { generateReport, PROMPT_VERSION, regenerateExplanation, regenerateSection, type Variation } from "@/lib/engine/pipeline";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
@@ -39,13 +42,18 @@ interface JobRow {
     goal: Goal;
     target_pages: 5 | 7 | 12;
     ocr?: boolean;
+    /** Organisation imposée par le lecteur. */
+    template?: z.infer<typeof TemplateId>;
     /** Nouvelle version d'un rapport existant. */
     variation?: Variation;
     base_version_id?: string;
+    /** Section à réécrire seule (sinon tout le rapport). */
+    section_id?: string;
   };
 }
 
 const CHANGE_REASON: Record<Variation, string> = { simpler: "plus_simple", other_example: "autre_exemple" };
+const SECTION_CHANGE_REASON: Record<Variation, string> = { simpler: "section_plus_simple", other_example: "section_autre_exemple" };
 
 /** Au-delà de cette durée après la réservation, la génération repart dans une nouvelle invocation. */
 const REQUEUE_AFTER_MS = 120_000;
@@ -255,6 +263,8 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     },
     onStage: (stage) => setStage(job.id, stage),
     onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
+    verifyClaims: process.env.LIMPID_VERIFY_CLAIMS !== "off",
+    template: job.params.template ?? null,
   });
 
   await setStage(job.id, "mise_en_page");
@@ -340,7 +350,7 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
 
   const { data: base } = await db
     .from("report_versions")
-    .select("id, knowledge_id, explanation, template_id")
+    .select("id, knowledge_id, explanation, blueprint, template_id")
     .eq("id", baseId)
     .eq("report_id", job.report_id)
     .single();
@@ -355,26 +365,23 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
   const previous = ExplanationObject.parse(base.explanation);
   const provider = getProvider();
 
-  const out = await regenerateExplanation(
-    provider,
-    {
-      level: job.params.level,
-      goal: job.params.goal,
-      targetPages: job.params.target_pages,
-      preferences: await preferencesOf(job.owner_id),
-      signal: controller.signal,
-      budgets: {
-        comprehension: { tier: "fast", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-        explanation: { tier: "quality", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-      },
-      onStage: (stage) => setStage(job.id, stage),
-      onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
+  const generation = {
+    level: job.params.level,
+    goal: job.params.goal,
+    targetPages: job.params.target_pages,
+    preferences: await preferencesOf(job.owner_id),
+    signal: controller.signal,
+    budgets: {
+      comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      explanation: { tier: "quality" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
     },
-    knowledge,
-    evidence,
-    previous,
-    variation,
-  );
+    onStage: (stage: "comprehension" | "explication" | "verification") => setStage(job.id, stage),
+    onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
+  };
+  const sectionId = job.params.section_id;
+  const out = sectionId
+    ? await regenerateSection(provider, generation, knowledge, evidence, previous, ReportBlueprint.parse(base.blueprint), sectionId, variation)
+    : await regenerateExplanation(provider, generation, knowledge, evidence, previous, variation);
 
   await setStage(job.id, "mise_en_page");
   const { count } = await db.from("report_versions").select("id", { count: "exact", head: true }).eq("report_id", job.report_id);
@@ -395,7 +402,7 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
       blueprint: out.blueprint,
       validation: out.validation,
       check_status: out.status === "validated" ? "validated" : "incomplete",
-      change_reason: CHANGE_REASON[variation],
+      change_reason: (sectionId ? SECTION_CHANGE_REASON : CHANGE_REASON)[variation],
       provider: provider.name,
       model: model ?? null,
       prompt_version: PROMPT_VERSION,
