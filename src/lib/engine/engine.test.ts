@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { segmentText, ExtractionError } from "@/lib/extract/text";
-import { GeminiProvider, retryDelaySeconds, toProviderSchema } from "./gemini";
+import { GeminiProvider, requestParts, retryDelaySeconds, toProviderSchema } from "./gemini";
 import {
   ComprehensionDraft,
   ExplanationDraft,
@@ -461,5 +461,14 @@ describe("modèles de repli déclarés", () => {
   it("sans repli déclaré, l'épuisement remonte tel quel", async () => {
     const p = new Scripted(new Set(["qualite"]), []);
     await expect(p.generateStructured(req)).rejects.toMatchObject({ code: "quota_exhausted" });
+  });
+});
+
+describe("requête sans donnée", () => {
+  it("envoie toujours au moins une partie (le diagnostic n'a que la consigne)", () => {
+    const req = { stage: "diagnostic", untrustedData: [], trustedInstructions: "x" } as unknown as StructuredRequest<z.ZodType>;
+    const parts = requestParts(req, "n0nce");
+    expect(parts.length).toBeGreaterThan(0);
+    expect(parts.every((p) => "text" in p && p.text.length > 0)).toBe(true);
   });
 });
