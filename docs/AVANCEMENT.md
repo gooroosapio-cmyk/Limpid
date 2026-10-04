@@ -1,5 +1,30 @@
 # Avancement
 
+## Phase 8 — Cahier V2, lot C : renforcer le cerveau (4 octobre 2026)
+
+### FAIT
+- **Vérification indépendante des affirmations** : après la compréhension, un appel séparé relit chaque affirmation face à son extrait exact (± 160 caractères de contexte) et rend `supported`, `partial`, `unsupported` ou `contradicted`. Le verdict ne peut que rendre un statut plus prudent. Désactivable avec `LIMPID_VERIFY_CLAIMS=off`.
+- **Statuts `partial` et `contradicted`** dans le contrat. Une affirmation `unsupported` ou `contradicted` utilisée comme fait bloque la publication ; `partial` ou `ambiguous` impose une formulation prudente (avertissement).
+- **Niveaux et organisations** : consigne détaillée pour chacun des 5 niveaux (vocabulaire, analogies contrôlées avec leur limite, exercices qui demandent de reformuler ou d'appliquer) ; séquence de sections par template ; le lecteur peut imposer l'organisation.
+- **Écran « Vérifier la source »** (maquette) : la lecture du document est séparée de la génération. Type, titre, pages lues, aperçu page par page (‹ n/N ›), passages peu lisibles, puis « Continuer ». Aucune requête IA à cette étape ; une source non utilisée est effacée au bout de 24 h.
+- **Écran « Votre rapport »** : style d'explication avec sa description, longueur en boutons (5 / 7 / 12 pages), « Options » repliées (objectif, organisation), coût annoncé.
+- **Créer** : « Un document. Des idées claires. » et carte « Dernier rapport ».
+- **Régénération ciblée d'une section** : « Plus simple » et « Un autre exemple » sous chaque partie, coût annoncé (1 requête). Seule cette section est réécrite ; les autres restent identiques et la numérotation des sources [n] est conservée (les nouvelles sources s'ajoutent à la fin). Nouvelle version avec un motif dédié dans l'historique.
+
+### EN TEST (résultats réels)
+- Gemini réel (`gemini-3.5-flash-lite`, vérification activée) : rapport validé ; citations 11/11 dans source, web et PDF ; nombres 13/13 ; idées essentielles 8/8 ; 6 appels (dont 1 de vérification), ≈ 32 s, ≈ 0,07 €.
+- Régénération réelle d'une section (« Plus simple ») sur ce rapport : validée, une seule section modifiée, chiffres conservés (148 L, 135 L), numérotation des sources inchangée.
+- `npm test` : 121 tests. Typecheck et build OK. axe : 0 violation sur « Vérifier la source », « Votre rapport » et le lecteur avec actions par section, à 360 et 1 440 px.
+
+### NON TESTÉ
+- Parcours complet en production (préparation de la source puis création, régénération d'une section depuis le téléphone).
+
+### REPORTÉ (quota gratuit)
+- **Carte globale des longs documents** (compréhension par morceaux puis synthèse) et **vision sélective** (OCR des seules pages utiles) : ces deux points multiplient les appels et entament vite les 20 requêtes/jour/modèle. À reprendre avec l'offre payante, ou au lot E après mesure.
+
+### PROCHAINE ÉTAPE — Lot D
+Thèmes Éditorial / Essentiel / Visuel, schémas, illustrations (Wikimedia Commons gratuit ; Unsplash et Gemini Image selon décision).
+
 ## Phase 7 — Cahier V2, lot B : tranche complète réelle (4 octobre 2026)
 
 Détail et mesures : `docs/RECETTE_LOT_B.md` ; exemples : `docs/recette/lot-b/`.

@@ -132,3 +132,25 @@ export async function purgeDueOriginals(limit = 200): Promise<number> {
   }
   return n;
 }
+
+/**
+ * Sources préparées puis jamais utilisées (aucun rapport après 24 h) : leur texte extrait
+ * est une donnée du document, il n'est pas gardé (cadrage Q18, cahier V2 § 19).
+ */
+export async function purgeUnusedSources(limit = 100): Promise<number> {
+  const db = adminClient();
+  const before = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data } = await db
+    .from("sources")
+    .select("id, storage_path, reports(id)")
+    .in("status", ["extracted", "partial", "extracting"])
+    .lt("created_at", before)
+    .limit(limit);
+  let n = 0;
+  for (const s of data ?? []) {
+    if ((s.reports as unknown as unknown[] | null)?.length) continue;
+    if (s.storage_path && !(await purgeOriginal(s.id, s.storage_path))) continue;
+    if (!(await db.from("sources").delete().eq("id", s.id)).error) n++;
+  }
+  return n;
+}

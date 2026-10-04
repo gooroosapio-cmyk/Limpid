@@ -6,7 +6,9 @@ import {
   ComprehensionDraft,
   ExplanationDraft,
   generateReport,
+  mostCautious,
   regenerateExplanation,
+  regenerateSection,
   simplerLevel,
   type GenerationInput,
 } from "./pipeline";
@@ -76,7 +78,7 @@ describe("schéma transmis au fournisseur", () => {
 
 /* ---------- Pipeline avec un fournisseur simulé ---------- */
 
-type Draft = z.infer<typeof ComprehensionDraft> | z.infer<typeof ExplanationDraft>;
+type Draft = z.infer<typeof ComprehensionDraft> | z.infer<typeof ExplanationDraft> | Record<string, unknown>;
 
 class FakeProvider implements AIProvider {
   readonly name = "fake";
@@ -260,5 +262,77 @@ describe("réponse hors schéma", () => {
     const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
     const bad = () => new ProviderError("schema_mismatch", "hors schéma", usage, ["x : invalide"]);
     await expect(generateReport(new FakeProvider([bad(), bad(), bad(), goodComp]), input())).rejects.toMatchObject({ code: "schema_mismatch" });
+  });
+});
+
+describe("vérification indépendante des affirmations", () => {
+  it("abaisse un statut quand les extraits ne soutiennent qu'une partie, jamais l'inverse", async () => {
+    const verdicts = {
+      verdicts: [
+        { claim_id: "clm_1", status: "supported", reason: "conforme" },
+        { claim_id: "clm_2", status: "partial", reason: "la réserve « environ » est perdue" },
+      ],
+    };
+    const fake = new FakeProvider([goodComp, verdicts as never, goodExpl]);
+    const out = await generateReport(fake, { ...input(), verifyClaims: true });
+    expect(fake.calls.map((c) => c.stage)).toEqual(["comprehension", "verification", "explication"]);
+    expect(out.knowledge.claims.find((c) => c.id === "clm_2")!.support_status).toBe("partial");
+    expect(out.knowledge.claims.find((c) => c.id === "clm_1")!.support_status).toBe("supported");
+    expect(out.validation.knowledge.warnings.join(" ")).toContain("supported → partial");
+    // Le bloc factuel qui cite clm_2 est signalé (formulation prudente), sans bloquer.
+    expect(out.validation.explanation.warnings.join(" ")).toContain("formulation prudente");
+  });
+
+  it("refuse un fait appuyé sur une affirmation contredite", async () => {
+    const verdicts = { verdicts: [{ claim_id: "clm_2", status: "contradicted", reason: "97 % contre 87 %" }] };
+    const out = await generateReport(new FakeProvider([goodComp, verdicts as never, goodExpl, goodExpl, goodExpl]), { ...input(), verifyClaims: true });
+    expect(out.knowledge.claims.find((c) => c.id === "clm_2")!.support_status).toBe("contradicted");
+    expect(out.status).toBe("incomplete");
+    expect(out.validation.explanation.blocking_errors.join(" ")).toContain("contredite");
+  });
+
+  it("garde le statut le plus prudent", () => {
+    expect(mostCautious("supported", "partial")).toBe("partial");
+    expect(mostCautious("unsupported", "supported")).toBe("unsupported");
+    expect(mostCautious("partial", "contradicted")).toBe("contradicted");
+  });
+});
+
+describe("régénération ciblée d'une section", () => {
+  it("ne réécrit que la section visée et garde la numérotation des sources", async () => {
+    const twoSections = {
+      ...goodExpl,
+      sections: [
+        goodExpl.sections[0]!,
+        {
+          id: "sec_2",
+          question: "Où est l'eau ?",
+          takeaway: "Surtout dans les océans.",
+          blocks: [{ type: "fact" as const, id: "blk_9", text: "Les océans contiennent environ 97 % de l'eau.", claim_ids: ["clm_2"], evidence_ids: ["ev_2"] }],
+        },
+      ],
+    };
+    const first = await generateReport(new FakeProvider([goodComp, twoSections]), input());
+    const rewritten = {
+      section: {
+        id: "sec_autre",
+        question: "Que fait l'eau, simplement ?",
+        takeaway: "Le Soleil la fait monter.",
+        blocks: [
+          { type: "fact" as const, id: "blk_1", text: "Le Soleil fait s'évaporer l'eau.", claim_ids: ["clm_1"], evidence_ids: ["ev_1"] },
+          { type: "analogy" as const, id: "blk_2", text: "Comme une casserole qui chauffe.", limit: "Le Soleil chauffe de loin.", claim_ids: [], evidence_ids: [] },
+        ],
+      },
+    };
+    const fake = new FakeProvider([rewritten]);
+    const { segments: _s, sourceId: _id, ...rest } = input();
+    const out = await regenerateSection(fake, rest, first.knowledge, first.evidence, first.explanation, first.blueprint, "sec_1", "simpler");
+    expect(fake.calls).toHaveLength(1);
+    expect(out.status).toBe("validated");
+    expect(out.explanation.sections.map((x) => x.id)).toEqual(["sec_1", "sec_2"]);
+    expect(out.explanation.sections[0]!.question).toBe("Que fait l'eau, simplement ?");
+    expect(out.explanation.sections[1]).toEqual(first.explanation.sections[1]);
+    expect(out.explanation.sections[0]!.blocks.every((b) => /^blk_[a-z0-9]+_\d+$/.test(b.id))).toBe(true);
+    expect(out.blueprint.source_index.slice(0, first.blueprint.source_index.length)).toEqual(first.blueprint.source_index);
   });
 });

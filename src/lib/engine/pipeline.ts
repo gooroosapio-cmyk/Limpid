@@ -14,6 +14,7 @@ import {
   Relation,
   SCHEMA_VERSION,
   Section,
+  SupportStatus,
   TemplateId,
   type Evidence,
   type ExplanationObject,
@@ -70,34 +71,57 @@ export type ExplanationDraft = z.infer<typeof ExplanationDraft>;
 
 /* ---------- Consignes (fiables, versionnées) ---------- */
 
+/** Règles éditoriales par niveau (cahier V2, § 6) : le niveau change l'effort d'explication, jamais les réserves. */
 const LEVEL_GUIDE: Record<Level, string> = {
-  ultra_simple: "phrases très courtes, vocabulaire courant, un concept à la fois, chaque terme technique expliqué",
-  grand_public: "langage clair, termes techniques définis, exemples concrets",
-  etudiant: "précis et structuré, vocabulaire du domaine défini une fois, liens entre notions",
-  professionnel: "dense et opérationnel, implications pratiques, nuances conservées",
-  expert_presse: "registre expert, nuances, limites et incertitudes explicites",
+  ultra_simple: "une idée à la fois ; mots courants ; tout terme nouveau défini tout de suite ; exemple concret ; analogie si utile",
+  grand_public: "définitions accessibles ; liens essentiels entre les idées ; exemple et limites en langage courant",
+  etudiant: "prérequis rappelés ; définitions précises ; relations entre notions ; glossaire et questions de vérification",
+  professionnel: "fonctionnement ; conséquences pratiques ; conditions d'application ; arbitrages",
+  expert_presse: "texte dense ; hypothèses et chiffres conservés ; synthèse sans étapes élémentaires inutiles",
+};
+
+/** Séquences de sections par template (cahier V2, § 8) : le fond reste stable, l'ordre suit l'intention. */
+const TEMPLATE_GUIDE: Record<z.infer<typeof TemplateId>, string> = {
+  comprendre_sujet: "l'essentiel → les notions → leurs relations → un exemple → les nuances → récapitulatif",
+  expliquer_document: "l'objet du document → ses affirmations → les éléments clés → leur portée → ses limites",
+  comprendre_processus: "le but → les entrées → les étapes → les dépendances → les points de vigilance → le résultat",
+  comparer_options: "la question → des critères identiques pour chaque option → la comparaison → les compromis → les données manquantes",
 };
 
 const COMPREHENSION_INSTRUCTIONS = `Tu es le moteur d'analyse de Limpid. Tu extrais la connaissance d'une source, sans rien inventer.
 Règles :
 - Chaque segment est fourni avec son identifiant (seg_…). Une preuve (ev_1, ev_2…) cite un extrait COPIÉ MOT POUR MOT d'un seul segment, sans reformulation ni coupure au milieu d'un mot ; 1 à 3 phrases maximum.
-- Une affirmation (clm_1…) reformule fidèlement ce que dit la source, avec ses nuances (« environ », « selon », « peut ») dans qualifiers. support_status = "supported" seulement si ses preuves la soutiennent directement ; sinon "ambiguous" ou "unsupported".
+- Une affirmation (clm_1…) reformule fidèlement ce que dit la source, avec ses nuances (« environ », « selon », « peut ») dans qualifiers. support_status = "supported" seulement si ses preuves la soutiennent directement ; "partial" si elles n'en soutiennent qu'une partie ; "ambiguous", "unsupported" ou "contradicted" sinon.
 - Tout nombre d'une affirmation va dans numbers, avec source_form = l'écriture exacte du nombre dans la preuve (ex. « 97 % »). Le nombre doit figurer dans une preuve citée par l'affirmation.
 - Concepts (cpt_…) : notions importantes, définies par des affirmations existantes. Relations (rel_…) entre concepts ou affirmations existants, justifiées par des affirmations existantes.
 - Contradictions (ctr_…) seulement si la source se contredit. missing_information : ce que la source ne dit pas et qu'un lecteur chercherait.
 - N'utilise aucune connaissance extérieure à la source. Langue des textes produits : celle de la source.`;
 
-function explanationInstructions(level: Level, goal: Goal, prefs: PreferencesSnapshot, targetPages: number): string {
+function explanationInstructions(
+  level: Level,
+  goal: Goal,
+  prefs: PreferencesSnapshot,
+  targetPages: number,
+  template: z.infer<typeof TemplateId> | null = null,
+): string {
   const aids = prefs.aids.length ? prefs.aids.join(", ") : "aucune préférence";
-  return `Tu es le rédacteur pédagogique de Limpid (méthode Feynman). À partir d'un objet de connaissance validé, rédige une explication en vouvoyant le lecteur.
-Profil : niveau « ${level} » (${LEVEL_GUIDE[level]}) ; objectif « ${goal} » ; aides préférées : ${aids} ; domaine d'exemples : ${prefs.example_domain ?? "libre"} ; densité : ${prefs.density ?? "équilibrée"} ; environ ${targetPages} pages.
+  const templates = Object.entries(TEMPLATE_GUIDE)
+    .map(([id, seq]) => `  · ${id} : ${seq}`)
+    .join("\n");
+  return `Tu es le rédacteur pédagogique de Limpid (méthode Feynman, sans infantiliser). À partir d'un objet de connaissance validé, rédige une explication en vouvoyant le lecteur, ton impersonnel, adulte et respectueux.
+Profil : niveau « ${level} » (${LEVEL_GUIDE[level]}) ; objectif « ${goal} » ; aides préférées : ${aids} ; domaine d'exemples : ${prefs.example_domain ?? "neutre"} ; densité : ${prefs.density ?? "équilibrée"} ; environ ${targetPages} pages, sources comprises.
 Règles :
+- Le niveau change l'effort d'explication, jamais le sens : garde toutes les réserves, conditions et nombres qui changent la conclusion.
 - Sections (sec_1…) : chacune répond à une question du lecteur et donne un takeaway d'une phrase. Blocs (blk_1…, identifiants uniques dans tout le document).
-- Types de blocs : "fact" et "definition" = uniquement ce que disent des affirmations "supported", citées dans claim_ids avec leurs evidence_ids. "analogy" = comparaison, avec sa limite dans limit. "fictional_example" = exemple inventé, présenté comme tel. "inference" = déduction de votre part, présentée comme telle. "caution" = limite, incertitude ou affirmation ambiguë.
+- Types de blocs : "fact" et "definition" = uniquement des affirmations "supported", citées dans claim_ids avec leurs evidence_ids. Une affirmation "partial" ou "ambiguous" va dans un bloc "caution" (ou une formulation explicitement prudente) ; une affirmation "contradicted" est exposée dans un bloc "caution" qui montre le désaccord ; une affirmation "unsupported" n'est pas utilisée.
+- "analogy" : idée cible, exemple familier, correspondance, puis sa limite dans limit (ce que la comparaison n'implique pas). "fictional_example" = exemple inventé, présenté comme tel. "inference" = déduction, présentée comme telle. "caution" = limite, incertitude ou réserve.
 - N'utilise que les identifiants clm_… et ev_… fournis. Aucun fait nouveau hors des affirmations.
-- glossary : termes clés. checks (chk_…) : 1 à 3 questions de compréhension avec points attendus et evidence_ids.
-- limitations : ce que le rapport ne couvre pas (couverture partielle, informations manquantes).
-- template_id : "comprendre_processus" pour une suite d'étapes, "comparer_options" pour une comparaison, "expliquer_document" pour un document précis, sinon "comprendre_sujet".
+- glossary : termes clés. checks (chk_…) : 1 à 3 questions qui demandent de reformuler le mécanisme ou de l'appliquer (pas seulement de répéter un chiffre), avec points attendus et evidence_ids.
+- limitations : ce que le rapport ne couvre pas (couverture partielle, informations manquantes, limites du document).
+- template_id ${template ? `: "${template}" (imposé par le lecteur)` : "au choix"}, et l'ordre des sections suit sa séquence :
+${templates}
+  Sans indication : "comprendre_processus" pour une suite d'étapes, "comparer_options" pour une comparaison, "expliquer_document" pour un document précis, sinon "comprendre_sujet".
+- Si la source est courte, fais moins de sections plutôt que d'ajouter des faits pour remplir.
 - flow : si la source décrit un processus en étapes, 2 à 8 étapes (label ≤ 40 caractères, claim_id existant) ; sinon null.
 - Langue : celle des affirmations.`;
 }
@@ -117,6 +141,10 @@ export interface GenerationInput {
   onUsage?: (stage: string, attempt: number, usage: UsageReport) => void | Promise<void>;
   /** Appelé au début de chaque étape (progression affichée, heartbeat du worker). */
   onStage?: (stage: "comprehension" | "explication" | "verification") => void | Promise<void>;
+  /** Vérification indépendante des affirmations contre leurs extraits (1 appel rapide). */
+  verifyClaims?: boolean;
+  /** Template imposé par le lecteur (sinon choisi par le rédacteur). */
+  template?: z.infer<typeof TemplateId> | null;
 }
 
 export interface GenerationOutput {
@@ -240,6 +268,93 @@ async function comprehension(provider: AIProvider, input: GenerationInput, segme
   throw new Error("inaccessible");
 }
 
+/* ---------- Vérification indépendante (cahier V2, § 5) ---------- */
+
+export const VerificationDraft = z.strictObject({
+  verdicts: z
+    .array(
+      z.strictObject({
+        claim_id: draftId,
+        status: z.enum(["supported", "partial", "unsupported", "contradicted"]),
+        reason: z.string().trim().max(300),
+      }),
+    )
+    .max(500),
+});
+export type VerificationDraft = z.infer<typeof VerificationDraft>;
+
+const VERIFY_INSTRUCTIONS = `Tu es le vérificateur de Limpid. Pour chaque affirmation, tu juges UNIQUEMENT d'après les extraits de la source qui l'accompagnent, sans connaissance extérieure.
+- "supported" : les extraits disent exactement cela, nombres, unités, périodes et nuances compris.
+- "partial" : les extraits soutiennent une partie seulement, ou l'affirmation généralise, perd une condition ou une réserve.
+- "unsupported" : les extraits ne permettent pas de l'affirmer.
+- "contradicted" : les extraits disent le contraire, ou un nombre, une date ou une unité diffère.
+Un verdict par affirmation, avec une raison courte et factuelle (pas de raisonnement détaillé).`;
+
+/** Ordre de prudence : le statut final est le plus prudent des deux jugements. */
+const CAUTION: Record<SupportStatus, number> = { supported: 0, partial: 1, ambiguous: 2, unsupported: 3, contradicted: 4 };
+
+export function mostCautious(a: SupportStatus, b: SupportStatus): SupportStatus {
+  return CAUTION[a] >= CAUTION[b] ? a : b;
+}
+
+function verificationPayload(ko: KnowledgeObject, evidence: Evidence[], segments: Map<string, SourceSegment>): string {
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  return JSON.stringify(
+    ko.claims.map((c) => ({
+      claim_id: c.id,
+      statement: c.statement,
+      qualifiers: c.qualifiers,
+      numbers: c.numbers.map((n) => n.source_form),
+      extraits: c.evidence_ids.flatMap((id) => {
+        const e = byId.get(id);
+        const seg = e ? segments.get(e.segment_id) : undefined;
+        if (!e || !seg) return [];
+        // Un peu de contexte autour de l'extrait, pour juger les conditions et réserves voisines.
+        const before = seg.text.slice(Math.max(0, e.start_offset - 160), e.start_offset);
+        const after = seg.text.slice(e.end_offset, e.end_offset + 160);
+        return [`…${before}[[${e.quote}]]${after}…`];
+      }),
+    })),
+  );
+}
+
+/**
+ * Confronte chaque affirmation à ses extraits et abaisse son statut si nécessaire (jamais
+ * l'inverse). Les écarts sont consignés ; une affirmation sans verdict garde son statut.
+ */
+async function verifyClaims(
+  provider: AIProvider,
+  input: GenerationInput,
+  ko: KnowledgeObject,
+  evidence: Evidence[],
+  segments: Map<string, SourceSegment>,
+  v: ValidationCollector,
+): Promise<KnowledgeObject> {
+  if (ko.claims.length === 0) return ko;
+  const draft = await callWithRetry(provider, input, "verification", 0, {
+    schema: VerificationDraft,
+    instructions: VERIFY_INSTRUCTIONS,
+    data: [{ label: "affirmations et extraits", text: verificationPayload(ko, evidence, segments) }],
+    budget: input.budgets.comprehension,
+  });
+  const verdicts = new Map(draft.verdicts.map((x) => [x.claim_id, x]));
+  const claims = ko.claims.map((c) => {
+    const verdict = verdicts.get(c.id);
+    if (!verdict) {
+      v.fail("claim_verified", "model_review", [c.id], "affirmation sans verdict du vérificateur", false);
+      return c;
+    }
+    const status = mostCautious(c.support_status, verdict.status);
+    if (status !== c.support_status) {
+      v.fail("claim_verified", "model_review", [c.id], `${c.support_status} → ${status} : ${verdict.reason}`.slice(0, 500), false);
+    } else {
+      v.pass("claim_verified", "model_review", [c.id]);
+    }
+    return { ...c, support_status: status };
+  });
+  return { ...ko, claims };
+}
+
 function buildKnowledge(input: GenerationInput, draft: ComprehensionDraft): KnowledgeObject {
   return {
     schema_version: SCHEMA_VERSION,
@@ -353,7 +468,7 @@ async function explanation(
   evidence: Evidence[],
   variation?: { instructions: string; data: { label: string; text: string }[] },
 ) {
-  const base = explanationInstructions(input.level, input.goal, input.preferences, input.targetPages);
+  const base = explanationInstructions(input.level, input.goal, input.preferences, input.targetPages, input.template ?? null);
   const instructions = variation ? `${base}\n${variation.instructions}` : base;
   const kp = knowledgePayload(ko, evidence);
   const evidenceIds = new Set(evidence.map((e) => e.id));
@@ -372,6 +487,8 @@ async function explanation(
       data,
       budget: input.budgets.explanation,
     });
+    // Un template choisi par le lecteur prime sur celui du rédacteur.
+    if (input.template) draft = { ...draft, template_id: input.template };
     const ex = buildExplanation(input, ko, draft);
     const bp = buildBlueprint(draft, ex, ko, evidence, input.targetPages);
     const v = new ValidationCollector();
@@ -401,18 +518,31 @@ export async function generateReport(provider: AIProvider, input: GenerationInpu
   const segments = new Map(input.segments.map((s) => [s.id, s]));
   await input.onStage?.("comprehension");
   const comp = await comprehension(provider, input, segments);
+  let knowledge = comp.knowledge;
+  let knowledgeValidation = comp.validation;
+  if (input.verifyClaims) {
+    // Vérification indépendante avant la rédaction : l'explication part des statuts vérifiés.
+    await input.onStage?.("verification");
+    const v = new ValidationCollector();
+    knowledge = await verifyClaims(provider, input, comp.knowledge, comp.evidence, segments, v);
+    const r = v.result("verification", 0);
+    knowledgeValidation = {
+      ...comp.validation,
+      checks: [...comp.validation.checks, ...r.checks].slice(0, 500),
+      warnings: [...comp.validation.warnings, ...r.warnings].slice(0, 200),
+    };
+  }
   await input.onStage?.("explication");
   // Seules les preuves localisées et cohérentes passent à la suite.
-  const exp = await explanation(provider, input, comp.knowledge, comp.evidence);
-  await input.onStage?.("verification");
-  const ok = comp.validation.blocking_errors.length === 0 && exp.validation.blocking_errors.length === 0;
+  const exp = await explanation(provider, input, knowledge, comp.evidence);
+  const ok = knowledgeValidation.blocking_errors.length === 0 && exp.validation.blocking_errors.length === 0;
   return {
     status: ok ? "validated" : "incomplete",
-    knowledge: comp.knowledge,
+    knowledge,
     evidence: comp.evidence,
     explanation: exp.explanation,
     blueprint: exp.blueprint,
-    validation: { knowledge: comp.validation, explanation: exp.validation },
+    validation: { knowledge: knowledgeValidation, explanation: exp.validation },
   };
 }
 
@@ -463,4 +593,76 @@ export async function regenerateExplanation(
 export function simplerLevel(level: Level): Level {
   const order: Level[] = ["ultra_simple", "grand_public", "etudiant", "professionnel", "expert_presse"];
   return order[Math.max(0, order.indexOf(level) - 1)]!;
+}
+
+/* ---------- Régénération ciblée d'une section (cahier V2, § 8 et § 20) ---------- */
+
+export const SectionDraft = z.strictObject({ section: Section });
+
+/**
+ * Réécrit une seule section à partir de la connaissance validée ; le reste du rapport est
+ * inchangé. Les blocs reçoivent de nouveaux identifiants, la numérotation des sources déjà
+ * citées est conservée (les nouvelles s'ajoutent à la fin), et le document entier est
+ * revalidé, avec au plus deux corrections.
+ */
+export async function regenerateSection(
+  provider: AIProvider,
+  input: Omit<GenerationInput, "segments" | "sourceId">,
+  ko: KnowledgeObject,
+  evidence: Evidence[],
+  previous: ExplanationObject,
+  previousBlueprint: ReportBlueprint,
+  sectionId: string,
+  variation: Variation,
+) {
+  const target = previous.sections.find((x) => x.id === sectionId);
+  if (!target) throw new Error("Section inconnue.");
+  const full: GenerationInput = { ...input, sourceId: ko.source_ids[0]!, segments: [] };
+  const evidenceIds = new Set(evidence.map((e) => e.id));
+  const stamp = Math.random().toString(36).slice(2, 7);
+  const base = explanationInstructions(input.level, input.goal, input.preferences, previousBlueprint.target_pages, previousBlueprint.template_id);
+  const scope = `Réécris UNIQUEMENT la section « ${target.question} » (fournie), sans toucher au reste du rapport. ${VARIATION_INSTRUCTIONS[variation].replace("la version précédente", "la section précédente")} Garde l'identifiant de section "${sectionId}" et une question proche. Renvoie { "section": … }.`;
+  const data = [
+    { label: "connaissance validee", text: knowledgePayload(ko, evidence) },
+    { label: "section precedente", text: JSON.stringify(target) },
+    { label: "autres sections (contexte)", text: previous.sections.filter((x) => x.id !== sectionId).map((x) => x.question).join("\n") },
+  ];
+
+  await input.onStage?.("explication");
+  let feedback: string[] = [];
+  for (let repair = 0; repair <= MAX_REPAIRS; repair++) {
+    const req = feedback.length ? [...data, { label: "erreurs a corriger", text: feedback.join("\n") }] : data;
+    const draft = await callWithRetry(provider, full, "explication", repair * 10, {
+      schema: SectionDraft,
+      instructions: `${base}\n${scope}${feedback.length ? "\nCorrige les erreurs listées." : ""}`,
+      data: req,
+      budget: input.budgets.explanation,
+    });
+    // Identifiants imposés : même section, blocs neufs et uniques dans tout le document.
+    const section = {
+      ...draft.section,
+      id: sectionId,
+      blocks: draft.section.blocks.map((b, i) => ({ ...b, id: `blk_${stamp}_${i + 1}` })),
+    };
+    const explanation: ExplanationObject = { ...previous, level: input.level, sections: previous.sections.map((x) => (x.id === sectionId ? section : x)) };
+    const used = new Set(explanation.sections.flatMap((x) => x.blocks.flatMap((b) => b.evidence_ids)));
+    // Index conservé tel quel : les numéros [n] déjà lus ne changent pas d'une version à l'autre.
+    const kept = previousBlueprint.source_index;
+    const added = [...used].filter((id) => evidenceIds.has(id) && !kept.includes(id));
+    const blueprint: ReportBlueprint = { ...previousBlueprint, source_index: [...kept, ...added] };
+    const v = new ValidationCollector();
+    validateExplanation(explanation, ko, evidenceIds, v);
+    validateBlueprint(blueprint, explanation, ko, evidenceIds, v);
+    if (v.blocking.length === 0 || repair === MAX_REPAIRS) {
+      await input.onStage?.("verification");
+      return {
+        explanation,
+        blueprint,
+        validation: v.result(`${explanation.id}@${SCHEMA_VERSION}`, repair),
+        status: v.blocking.length === 0 ? ("validated" as const) : ("incomplete" as const),
+      };
+    }
+    feedback = v.blocking;
+  }
+  throw new Error("inaccessible");
 }

@@ -99,6 +99,17 @@ export default async function ReportPage({
         reportId={report.isCurrent ? id : null}
         answers={report.answers}
         actions={<VersionActions reportId={id} disabled={preparing || !report.isCurrent} />}
+        actionsNote={report.isCurrent ? fr.reader.reportCost : null}
+        sectionActions={
+          report.isCurrent && !preparing
+            ? (sectionId) => (
+                <>
+                  <VersionActions reportId={id} disabled={false} sectionId={sectionId} />
+                  <p className="muted small section-cost">{fr.reader.sectionCost}</p>
+                </>
+              )
+            : undefined
+        }
       />
       <DeleteReport reportId={id} />
     </>

@@ -5,7 +5,14 @@ import { CreateRequest } from "./create";
 const params = { level: "grand_public", goal: "comprendre", target_pages: 5, idempotency_key: "cle-de-test-123" };
 
 describe("requête de création", () => {
-  it("accepte les trois sources", () => {
+  it("accepte une source préparée, avec ou sans template", () => {
+    const id = crypto.randomUUID();
+    expect(CreateRequest.safeParse({ source_id: id, ...params }).success).toBe(true);
+    expect(CreateRequest.safeParse({ source_id: id, template: "comparer_options", ...params }).success).toBe(true);
+    expect(CreateRequest.safeParse({ source_id: id, template: "inconnu", ...params }).success).toBe(false);
+  });
+
+  it("accepte encore les trois sources en un seul envoi", () => {
     expect(CreateRequest.safeParse({ source: "text", text: "Bonjour", ...params }).success).toBe(true);
     expect(CreateRequest.safeParse({ source: "upload", upload_id: crypto.randomUUID(), ...params }).success).toBe(true);
     expect(CreateRequest.safeParse({ source: "url", url: "https://exemple.fr/article", ...params }).success).toBe(true);
@@ -13,7 +20,7 @@ describe("requête de création", () => {
 
   it("reste compatible avec l'ancien envoi de texte sans champ source", () => {
     const r = CreateRequest.safeParse({ text: "Bonjour", ...params });
-    expect(r.success && r.data.source).toBe("text");
+    expect(r.success && "source" in r.data && r.data.source).toBe("text");
   });
 
   it("refuse champs inconnus, identifiant d'envoi invalide et clé trop courte", () => {

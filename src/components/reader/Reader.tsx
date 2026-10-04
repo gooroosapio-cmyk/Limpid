@@ -88,6 +88,7 @@ export function Reader({
   answers,
   actions = null,
   actionsNote = null,
+  sectionActions,
 }: {
   blueprint: ReportBlueprint;
   explanation: ExplanationObject;
@@ -105,6 +106,8 @@ export function Reader({
   /** Boutons d'action affichés avant le téléchargement du PDF. */
   actions?: React.ReactNode;
   actionsNote?: string | null;
+  /** Actions propres à une partie (réécriture ciblée), rendues sous chaque section. */
+  sectionActions?: (sectionId: string, question: string) => React.ReactNode;
 }) {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
   const sections = new Map(explanation.sections.map((s) => [s.id, s]));
@@ -144,6 +147,11 @@ export function Reader({
             <section key={s.id} id={s.id} className="reader-section" aria-labelledby={`${s.id}-h`}>
               <h2 id={`${s.id}-h`}>{s.question}</h2>
               {s.blocks.map((b) => <BlockView key={b.id} block={b} numbers={numbers} />)}
+              {sectionActions && (
+                <div className="section-actions" role="group" aria-label={fr.reader.sectionActions(s.question)}>
+                  {sectionActions(s.id, s.question)}
+                </div>
+              )}
               {bs.visual_ids.map((vid) => {
                 const v = visuals.get(vid);
                 if (!v || v.kind !== "flow") return null;
