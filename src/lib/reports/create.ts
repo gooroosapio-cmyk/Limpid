@@ -1,27 +1,45 @@
 /**
- * Création d'un rapport à partir d'un texte collé : source, segments, rapport et tâche,
- * écrits côté serveur pour l'utilisateur authentifié. Idempotent par clé client.
+ * Création d'un rapport : la source (texte collé, fichier envoyé ou page web) est
+ * extraite en segments figés, puis le rapport et sa tâche de génération sont écrits
+ * côté serveur pour l'utilisateur authentifié. Idempotent par clé client.
  */
 import "server-only";
 import { z } from "zod";
-import { limits } from "@/lib/config";
+import { isUrlImportEnabled, limits } from "@/lib/config";
 import { Goal, Level, TargetPages } from "@/lib/contracts/schemas";
-import { segmentText } from "@/lib/extract/text";
+import { extractSource, ExtractionError, type ExtractableKind, type SourceCoverage } from "@/lib/extract";
+import { segmentText, type ExtractedText } from "@/lib/extract/text";
+import { checkUpload, FileRejected } from "@/lib/security/file-type";
+import { parsePublicUrl, safeFetch, UrlRejected } from "@/lib/security/safe-fetch";
+import { BUCKET, purgeOriginal, titleFromFileName } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
 
-export const CreateFromText = z.strictObject({
-  title: z.string().trim().max(200).optional(),
-  text: z.string().min(1).max(limits.maxPastedChars),
+const Params = {
   level: Level,
   goal: Goal,
   target_pages: TargetPages,
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/),
-});
-export type CreateFromText = z.infer<typeof CreateFromText>;
+};
+
+export const CreateRequest = z.preprocess(
+  // Compatibilité : l'ancien formulaire envoyait le texte sans préciser la source.
+  (v) => (v && typeof v === "object" && !("source" in v) && "text" in v ? { ...v, source: "text" } : v),
+  z.discriminatedUnion("source", [
+    z.strictObject({
+      source: z.literal("text"),
+      title: z.string().trim().max(200).optional(),
+      text: z.string().min(1).max(limits.maxPastedChars),
+      ...Params,
+    }),
+    z.strictObject({ source: z.literal("upload"), upload_id: z.string().uuid(), ...Params }),
+    z.strictObject({ source: z.literal("url"), url: z.string().trim().min(1).max(2048), ...Params }),
+  ]),
+);
+export type CreateRequest = z.infer<typeof CreateRequest>;
 
 export class CreateError extends Error {
   constructor(
-    public readonly code: "generation_disabled" | "extraction" | "storage",
+    public readonly code: "generation_disabled" | "extraction" | "upload_missing" | "url_disabled" | "url" | "storage",
     message: string,
   ) {
     super(message);
@@ -33,7 +51,161 @@ function defaultTitle(text: string): string {
   return first.length > 80 ? `${first.slice(0, 77).trimEnd()}…` : first;
 }
 
-export async function createReportFromText(userId: string, input: CreateFromText): Promise<{ reportId: string }> {
+interface PreparedSource {
+  sourceId: string;
+  extracted: ExtractedText;
+  /** Source déjà enregistrée (fichier envoyé) : mise à jour plutôt qu'insertion. */
+  existing: boolean;
+  row: {
+    kind: "paste" | "url" | "pdf" | "docx" | "txt";
+    title: string;
+    byte_size: number;
+    original_url?: string;
+    page_count?: number | null;
+    coverage: SourceCoverage | Record<string, unknown>;
+  };
+}
+
+function extractionMessage(e: unknown): string {
+  if (e instanceof ExtractionError || e instanceof FileRejected || e instanceof UrlRejected) return e.message;
+  return "Le document n'a pas pu être lu.";
+}
+
+async function fromText(input: Extract<CreateRequest, { source: "text" }>): Promise<PreparedSource> {
+  const sourceId = crypto.randomUUID();
+  let extracted: ExtractedText;
+  try {
+    extracted = segmentText(input.text, `src_${sourceId}`, { maxChars: limits.maxPastedChars });
+  } catch (e) {
+    throw new CreateError("extraction", extractionMessage(e));
+  }
+  return {
+    sourceId,
+    extracted,
+    existing: false,
+    row: {
+      kind: "paste",
+      title: (input.title || defaultTitle(input.text)).slice(0, 200),
+      byte_size: Buffer.byteLength(input.text, "utf8"),
+      coverage: { segments_total: extracted.segments.length, segments_processed: extracted.segments.length, partial: false },
+    },
+  };
+}
+
+async function fromUpload(userId: string, uploadId: string): Promise<PreparedSource> {
+  const db = adminClient();
+  // Réservation : un même envoi ne peut servir qu'une fois.
+  const { data: src } = await db
+    .from("sources")
+    .update({ status: "extracting" })
+    .eq("id", uploadId)
+    .eq("owner_id", userId)
+    .eq("status", "uploaded")
+    .is("deleted_at", null)
+    .select("id, kind, title, storage_path")
+    .maybeSingle();
+  if (!src?.storage_path) throw new CreateError("upload_missing", "Ce fichier n'est plus disponible. Envoyez-le à nouveau.");
+
+  // Fichier refusé ou illisible : rien n'est conservé (ni l'original, ni la ligne).
+  const fail = async (code: string, message: string): Promise<never> => {
+    console.error("upload rejected", code);
+    if (await purgeOriginal(src.id, src.storage_path)) await db.from("sources").delete().eq("id", src.id);
+    throw new CreateError("extraction", message);
+  };
+
+  const download = await db.storage.from(BUCKET).download(src.storage_path);
+  if (download.error || !download.data) {
+    return fail("missing", "Le fichier n'est pas arrivé jusqu'au serveur. Envoyez-le à nouveau.");
+  }
+  const buf = new Uint8Array(await download.data.arrayBuffer());
+
+  let kind: ExtractableKind;
+  try {
+    // Signature réelle contre extension déclarée ; le type MIME du navigateur n'est pas fiable.
+    const detected = checkUpload(buf, src.title, "", limits.maxFileBytes);
+    if (detected !== src.kind || !["pdf", "docx", "txt"].includes(detected)) {
+      throw new FileRejected("type_mismatch", "Le contenu du fichier ne correspond pas à son extension.");
+    }
+    kind = detected as ExtractableKind;
+  } catch (e) {
+    return fail(e instanceof FileRejected ? e.code : "type", extractionMessage(e));
+  }
+
+  let result;
+  try {
+    result = await extractSource(kind, buf, `src_${src.id}`, { maxChars: limits.maxSourceChars, maxPages: limits.maxPages });
+  } catch (e) {
+    return fail(e instanceof ExtractionError ? e.code : "extraction", extractionMessage(e));
+  }
+  // Le texte est figé en base : l'original n'est plus nécessaire (cadrage Q18).
+  await purgeOriginal(src.id, src.storage_path);
+
+  return {
+    sourceId: src.id,
+    extracted: result.extracted,
+    existing: true,
+    row: {
+      kind: kind as "pdf" | "docx" | "txt",
+      title: titleFromFileName(src.title),
+      byte_size: buf.length,
+      page_count: result.pageCount,
+      coverage: result.coverage,
+    },
+  };
+}
+
+const URL_TYPES: Record<string, ExtractableKind> = {
+  "text/html": "html",
+  "application/xhtml+xml": "html",
+  "text/plain": "txt",
+  "application/pdf": "pdf",
+};
+
+async function fromUrl(rawUrl: string): Promise<PreparedSource> {
+  if (!isUrlImportEnabled()) throw new CreateError("url_disabled", "L'import par lien est désactivé sur ce serveur.");
+  let page;
+  try {
+    parsePublicUrl(rawUrl);
+    page = await safeFetch(rawUrl, {
+      maxBytes: limits.maxFileBytes,
+      timeoutMs: limits.urlTimeoutMs,
+      maxRedirects: limits.urlMaxRedirects,
+      allowedContentTypes: Object.keys(URL_TYPES),
+    });
+  } catch (e) {
+    throw new CreateError("url", e instanceof UrlRejected ? e.message : "La page n'a pas pu être téléchargée.");
+  }
+
+  const sourceId = crypto.randomUUID();
+  const kind = URL_TYPES[page.contentType]!;
+  let result;
+  try {
+    result = await extractSource(kind, page.body, `src_${sourceId}`, {
+      maxChars: limits.maxSourceChars,
+      maxPages: limits.maxPages,
+      charset: page.charset,
+    });
+  } catch (e) {
+    throw new CreateError("extraction", extractionMessage(e));
+  }
+  const final = new URL(page.finalUrl);
+  const fallbackTitle = `${final.hostname}${final.pathname === "/" ? "" : final.pathname}`;
+  return {
+    sourceId,
+    extracted: result.extracted,
+    existing: false,
+    row: {
+      kind: "url",
+      title: (result.title || fallbackTitle).slice(0, 200),
+      byte_size: page.body.length,
+      original_url: page.finalUrl.slice(0, 2048),
+      page_count: result.pageCount,
+      coverage: result.coverage,
+    },
+  };
+}
+
+export async function createReport(userId: string, input: CreateRequest): Promise<{ reportId: string }> {
   const db = adminClient();
 
   // Double envoi : la même clé renvoie le même rapport, sans nouvelle tâche.
@@ -50,27 +222,26 @@ export async function createReportFromText(userId: string, input: CreateFromText
     throw new CreateError("generation_disabled", "La génération est suspendue par l'administrateur.");
   }
 
-  const sourceId = crypto.randomUUID();
-  let extracted;
-  try {
-    extracted = segmentText(input.text, `src_${sourceId}`, { maxChars: limits.maxPastedChars });
-  } catch (e) {
-    throw new CreateError("extraction", (e as Error).message);
-  }
-  const title = (input.title || defaultTitle(input.text)).slice(0, 200);
+  const prepared =
+    input.source === "text"
+      ? await fromText(input)
+      : input.source === "upload"
+        ? await fromUpload(userId, input.upload_id)
+        : await fromUrl(input.url);
+  const { sourceId, extracted, row } = prepared;
+  const partial = "partial" in row.coverage && row.coverage.partial === true;
 
-  const src = await db.from("sources").insert({
-    id: sourceId,
-    owner_id: userId,
-    kind: "paste",
-    title,
+  const fields = {
+    ...row,
     content_hash: extracted.sourceVersion,
-    byte_size: Buffer.byteLength(input.text, "utf8"),
-    status: "extracted",
-    coverage: { segments_total: extracted.segments.length, segments_processed: extracted.segments.length, partial: false },
-  });
+    status: partial ? "partial" : "extracted",
+  };
+  const src = prepared.existing
+    ? await db.from("sources").update(fields).eq("id", sourceId)
+    : await db.from("sources").insert({ id: sourceId, owner_id: userId, ...fields });
   if (src.error) throw new CreateError("storage", "Enregistrement de la source impossible.");
 
+  const removeSource = () => db.from("sources").delete().eq("id", sourceId);
   const segs = await db.from("source_segments").insert(
     extracted.segments.map((s, i) => ({
       id: s.id,
@@ -85,17 +256,17 @@ export async function createReportFromText(userId: string, input: CreateFromText
     })),
   );
   if (segs.error) {
-    await db.from("sources").delete().eq("id", sourceId);
+    await removeSource();
     throw new CreateError("storage", "Enregistrement du texte impossible.");
   }
 
   const report = await db
     .from("reports")
-    .insert({ owner_id: userId, source_id: sourceId, title })
+    .insert({ owner_id: userId, source_id: sourceId, title: row.title })
     .select("id")
     .single();
   if (report.error || !report.data) {
-    await db.from("sources").delete().eq("id", sourceId);
+    await removeSource();
     throw new CreateError("storage", "Création du rapport impossible.");
   }
 
@@ -108,10 +279,18 @@ export async function createReportFromText(userId: string, input: CreateFromText
     params: { level: input.level, goal: input.goal, target_pages: input.target_pages },
   });
   if (job.error) {
-    // Course entre deux envois simultanés : on garde celui qui a gagné.
-    await db.from("sources").delete().eq("id", sourceId);
+    await removeSource();
     await db.from("reports").delete().eq("id", report.data.id);
-    if (job.error.code === "23505") return createReportFromText(userId, input);
+    // Course entre deux envois simultanés : on renvoie le rapport de celui qui a gagné.
+    if (job.error.code === "23505") {
+      const winner = await db
+        .from("jobs")
+        .select("report_id")
+        .eq("owner_id", userId)
+        .eq("idempotency_key", input.idempotency_key)
+        .maybeSingle();
+      if (winner.data?.report_id) return { reportId: winner.data.report_id };
+    }
     throw new CreateError("storage", "Création de la tâche impossible.");
   }
   return { reportId: report.data.id };
