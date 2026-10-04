@@ -1,5 +1,33 @@
 # Avancement
 
+## Phase 6 — Cahier V2, lot A : audit et sécurisation (4 octobre 2026)
+
+Référence : « Le cerveau de Limpid » (directives V2, 23 pages) et trois planches de maquettes (douze vues mobiles).
+
+### FAIT
+- **Audit** `docs/AUDIT_V2.md` : chaque directive du cahier (P0/P1/P2, architecture, contrats, quotas, sécurité, écrans) classée existant / partiel / manquant / non vérifié, avec les fichiers concernés.
+- **Connexion email + mot de passe** (P0), écran conforme à la maquette : adresse, mot de passe avec « Afficher / Masquer », « Mot de passe oublié ? », « Se connecter », puis « ou Recevoir un lien » (lien magique conservé, comptes existants inchangés).
+  - Réponse identique pour une adresse inconnue, non autorisée ou un mauvais mot de passe.
+  - Essais limités par adresse et par IP (8 par quart d'heure pour la connexion, 3 pour la récupération), clés hachées, sans verrouillage permanent (table `auth_attempts`, migration appliquée).
+  - « Mot de passe oublié » : lien de récupération à usage unique de Supabase ; la session de récupération (revendication `amr`) mène à « Choisir un mot de passe ».
+  - « Définir ou changer mon mot de passe » depuis Préférences pour les comptes créés par lien ; règles (10 caractères, pas uniquement des chiffres, pas l'adresse, pas trop répétitif) ; autres sessions fermées après le changement ; gestionnaires de mots de passe pris en charge (`autocomplete`).
+- **Limites anti-abus** (cahier § 13), configurables : 3 nouveaux rapports par 24 h et 1 tâche active par compte. Le compte se fait dans le journal d'audit, qui survit à la suppression d'un rapport (supprimer puis recréer ne contourne pas la limite). Un échec technique rend le crédit.
+
+### EN TEST (résultats réels)
+- `npm test` : 108 tests (dont règles de mot de passe et lecture de `amr`). Typecheck et build OK.
+- axe-core sur Connexion, Mot de passe oublié et Choisir un mot de passe, à 360 et 1 440 px : deux défauts trouvés (cible « Mot de passe oublié » trop petite, champ mot de passe sans le style commun) et corrigés → 0 violation.
+
+### NON TESTÉ
+- Connexion par mot de passe et récupération contre le vrai Supabase (envoi de l'email de récupération, retour sur `/auth/callback`). À vérifier en production.
+
+### PROCHAINE ÉTAPE — Lot B puis C
+Lot B : tranche complète réelle, vérifiée de bout en bout sur téléphone (PDF natif → rapport Grand public → PDF), avec mesure des durées et des coûts. Lot C : écran « Vérifier la source », couverture globale (carte des sections), contrôle « l'extrait soutient-il l'énoncé », statuts `partial` / `contradicted`, régénération ciblée par section avec coût annoncé.
+
+### DÉCISIONS À PRENDRE
+- Conservation des rapports : 30 jours (cahier § 19) ou jusqu'à suppression manuelle (cadrage Q18, actuel) ?
+- Quotas : le cahier propose 10 crédits/mois et un plafond de 100 USD ; l'alpha est réglée à 10 € avec l'offre gratuite Gemini (20 requêtes/jour/modèle).
+- Lot D (illustrations) : Gemini Image et Unsplash supposent un compte payant ou une clé d'API ; Wikimedia Commons est gratuit.
+
 ## Phase 5 — Administration, suppression de compte, accessibilité (4 octobre 2026)
 
 ### FAIT

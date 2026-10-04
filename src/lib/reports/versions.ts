@@ -7,6 +7,7 @@ import "server-only";
 import { z } from "zod";
 import { Level } from "@/lib/contracts/schemas";
 import { simplerLevel } from "@/lib/engine/pipeline";
+import { assertCanStartJob, LimitError } from "@/lib/jobs/limits";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const MAX_VERSIONS = 10;
@@ -47,6 +48,12 @@ export async function requestVersion(userId: string, reportId: string, input: z.
   if (busy) {
     if (busy.idempotency_key === input.idempotency_key) return;
     throw new VersionError("busy", "Une version est déjà en préparation.");
+  }
+  try {
+    await assertCanStartJob(userId, { newReport: false });
+  } catch (e) {
+    if (e instanceof LimitError) throw new VersionError("busy", e.message);
+    throw e;
   }
   const { count } = await db.from("report_versions").select("id", { count: "exact", head: true }).eq("report_id", reportId);
   if ((count ?? 0) >= MAX_VERSIONS) throw new VersionError("limit", `Ce rapport a atteint ${MAX_VERSIONS} versions.`);

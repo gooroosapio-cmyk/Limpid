@@ -16,6 +16,7 @@ import {
 } from "@/lib/contracts/schemas";
 import { estimateCents, PRICE_BASIS } from "@/lib/budget";
 import { assertBudget, BudgetError } from "./budget-guard";
+import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getProvider } from "@/lib/engine";
 import { generateReport, PROMPT_VERSION, regenerateExplanation, type Variation } from "@/lib/engine/pipeline";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
@@ -448,6 +449,8 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
     const f = failureOf(e);
     console.error("job", job.id, f.code);
     await finish(job.id, f.status, f.code);
+    // Échec technique ou annulation d'un nouveau rapport : le crédit du jour est rendu.
+    if (job.kind === "generate_report" && job.report_id) await recordLimitEvent(job.owner_id, CREDIT_RETURNED, job.report_id);
   }
   return { id: job.id, requeued: false };
 }
