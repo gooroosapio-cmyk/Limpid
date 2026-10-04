@@ -2,15 +2,8 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { fr } from "@/lib/i18n/fr";
+import type { SourceEntry } from "@/lib/render/sources";
 
-export interface SourceEntry {
-  n: number;
-  evidenceId: string;
-  location: string;
-  before: string;
-  quote: string;
-  after: string;
-}
 
 const Ctx = createContext<(evidenceId: string, opener: HTMLElement) => void>(() => {});
 

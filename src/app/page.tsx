@@ -1,7 +1,7 @@
 import { DemoBanner } from "@/components/DemoBanner";
 import { ImportForm } from "@/components/ImportForm";
 import { requireUser } from "@/lib/auth";
-import { isDemoMode } from "@/lib/config";
+import { isDemoMode, isUrlImportEnabled } from "@/lib/config";
 import type { Level } from "@/lib/contracts/schemas";
 import { fr } from "@/lib/i18n/fr";
 import { isAdminConfigured } from "@/lib/supabase/admin";
@@ -20,7 +20,10 @@ export default async function CreatePage() {
       <p className="muted">{fr.create.subtitle}</p>
       <DemoBanner />
       {!enabled && !isDemoMode() && <p className="notice notice-warn">{fr.create.notConfigured}</p>}
-      <ImportForm enabled={enabled} defaultLevel={LEVEL_BY_FAMILIARITY[prefs?.familiarity ?? ""] ?? "grand_public"} />
+      <ImportForm
+        enabled={enabled}
+        urlEnabled={isUrlImportEnabled()}
+        defaultLevel={LEVEL_BY_FAMILIARITY[prefs?.familiarity ?? ""] ?? "grand_public"} />
     </>
   );
 }

@@ -46,6 +46,8 @@ export interface SafeFetchOptions {
 export interface SafeFetchResult {
   finalUrl: string;
   contentType: string;
+  /** Jeu de caractères annoncé par l'en-tête Content-Type, s'il y en a un. */
+  charset: string | null;
   body: Buffer;
 }
 
@@ -106,7 +108,7 @@ function requestOnce(
   url: URL,
   pinned: { address: string; family: number },
   opts: SafeFetchOptions,
-): Promise<{ status: number; location?: string; contentType: string; body: Buffer }> {
+): Promise<{ status: number; location?: string; contentType: string; charset: string | null; body: Buffer }> {
   return new Promise((resolve, reject) => {
     // Le lookup épinglé garantit que la connexion utilise l'adresse validée.
     const lookup: LookupFunction = (_hostname, options, cb) => {
@@ -128,10 +130,12 @@ function requestOnce(
       },
       (res) => {
         const status = res.statusCode ?? 0;
-        const contentType = String(res.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
+        const rawType = String(res.headers["content-type"] ?? "");
+        const contentType = rawType.split(";")[0]!.trim().toLowerCase();
+        const charset = /charset\s*=\s*"?([\w-]+)/i.exec(rawType)?.[1] ?? null;
         if (status >= 300 && status < 400) {
           res.resume();
-          resolve({ status, location: res.headers.location, contentType, body: Buffer.alloc(0) });
+          resolve({ status, location: res.headers.location, contentType, charset, body: Buffer.alloc(0) });
           return;
         }
         const declared = Number(res.headers["content-length"] ?? "0");
@@ -151,7 +155,7 @@ function requestOnce(
           }
           chunks.push(chunk);
         });
-        res.on("end", () => resolve({ status, contentType, body: Buffer.concat(chunks) }));
+        res.on("end", () => resolve({ status, contentType, charset, body: Buffer.concat(chunks) }));
         res.on("error", reject);
       },
     );
@@ -185,7 +189,7 @@ export async function safeFetch(rawUrl: string, opts: SafeFetchOptions): Promise
     if (!opts.allowedContentTypes.includes(res.contentType)) {
       throw new UrlRejected("content_type", "Ce type de contenu n'est pas pris en charge.");
     }
-    return { finalUrl: url.toString(), contentType: res.contentType, body: res.body };
+    return { finalUrl: url.toString(), contentType: res.contentType, charset: res.charset, body: res.body };
   }
   throw new UrlRejected("too_many_redirects", "Trop de redirections.");
 }

@@ -1,5 +1,35 @@
 # Avancement
 
+## Phase 3 — Fichiers, liens et export PDF (4 octobre 2026)
+
+Configuration Vercel / Supabase faite par le propriétaire (variables, URL de redirection, liste blanche). Gemini reste sur l'offre gratuite jusqu'à la fin de l'alpha (décision du propriétaire).
+
+### FAIT
+- **Fichiers PDF (texte), DOCX et TXT.** Le navigateur envoie le fichier directement dans le bucket privé `sources` par une URL signée à usage unique (les fonctions Vercel refusent les corps de plus de 4,5 Mo), avec barre de progression. Le serveur relit le fichier, contrôle sa signature réelle contre l'extension, l'analyse, puis **efface l'original aussitôt** (cadrage Q18). Un fichier refusé ou illisible ne laisse rien en base.
+- **PDF** : texte page par page (pdf.js via unpdf, sans XFA ni polices), césures recollées, localisation par page (avec numéro imprimé quand il diffère). PDF sans couche texte → message clair (« scanné, OCR bientôt »), PDF protégé → message clair. Pages sans texte et pages au-delà de 100 signalées dans la couverture.
+- **DOCX** : archive lue en flux avec bornes (2 000 entrées, 40 Mo décompressés : pas de bombe ZIP), documents à macros refusés, paragraphes et styles de titre (toutes langues) repris comme intertitres ; texte supprimé en révision et codes de champ ignorés.
+- **Lien** : téléchargement avec la protection SSRF existante (DNS épinglé, IP privées refusées, redirections revalidées), pages HTML, texte et PDF en ligne. Zone principale (`article`, `main`…) puis Readability en repli ; menus, notes et encadrés retirés ; tableaux lus ligne par ligne, listes regroupées. Jeu de caractères respecté. Désactivable (`LIMPID_URL_IMPORT=off`).
+- **Couverture** : au-delà de 300 000 caractères ou 100 pages, le document est tronqué proprement et le rapport l'affiche (« ce rapport ne couvre qu'une partie du document »).
+- **Export PDF** : bouton « Télécharger le PDF » actif. Rendu serveur déterministe (aucun appel IA), police Inter intégrée, mêmes numéros de sources que le lecteur, schéma de flux et sa version texte, pied de page avec pagination. Disponible aussi pour la démonstration.
+- **Purge** : le cron quotidien efface aussi les envois abandonnés (3 h après leur préparation), et chaque nouvel envoi déclenche un petit ménage.
+- Formulaire « Créer » : onglets Fichier (par défaut), Lien et Texte actifs ; mention de l'envoi du texte à Gemini.
+
+### EN TEST (résultats réels)
+- `npm test` : 96 tests (dont 15 d'extraction sur des PDF et DOCX fabriqués : pages vides, limite de pages, troncature, PDF scanné ou endommagé, macros, bombe ZIP de 41 Mo, archive non Word ; 2 d'export PDF relu par l'extracteur). Typecheck et build OK.
+- Page Wikipédia réelle (« Cycle de l'eau ») : 63 segments avec intertitres, tableau des réservoirs lu ligne par ligne, liste des langues et notes écartées. PDF en ligne sans texte → refus « scanné ». Adresse 169.254.169.254 → refusée.
+- Serveur de production local : PDF de démonstration téléchargé (200, `application/pdf`, nom de fichier propre) ; export et envoi sans session → 401. Polices bien jointes à la fonction (trace Next).
+- Chromium 360 px : onglets Fichier / Lien, fichier choisi, aucun débordement horizontal ; téléchargement du PDF depuis le lecteur.
+- Bucket `sources` vérifié dans le projet Supabase (privé, 20 Mo).
+
+### NON TESTÉ
+- Envoi réel vers Supabase Storage et parcours complet connecté (fichier → rapport → PDF) : la clé `service_role` n'est pas utilisable depuis cette session. À vérifier sur l'URL Vercel.
+
+### PROCHAINE ÉTAPE — Phase 4
+OCR des images et PDF scannés par la vision Gemini (avec avertissement avant envoi), actions « Plus simple » / « Un autre exemple » et quiz de compréhension corrigé.
+
+### BLOCAGE
+- Aucun. Rappel : offre gratuite Gemini = données potentiellement utilisées par Google ; à éviter pour des documents sensibles.
+
 ## Phase 2b — Parcours dans l'application (4 octobre 2026)
 
 ### FAIT

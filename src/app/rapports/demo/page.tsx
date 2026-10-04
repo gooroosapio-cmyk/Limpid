@@ -18,6 +18,7 @@ export default function DemoReportPage() {
       evidence={demoEvidence}
       segments={demoSegments}
       sourceTitle={DEMO_SOURCE_TITLE}
+      pdfHref="/rapports/demo/pdf"
       isDemo
     />
   );

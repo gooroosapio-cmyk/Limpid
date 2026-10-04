@@ -10,6 +10,7 @@ Alpha privée : une source devient un rapport clair, illustré, sourcé, lisible
 ## Stack
 
 Next.js 16 (App Router) + TypeScript · Supabase (Postgres, Auth, Storage) · Google Gemini via un adaptateur `AIProvider` · Zod pour les contrats · Vitest.
+Extraction : unpdf (pdf.js) pour les PDF, fflate pour les DOCX, linkedom + Readability pour les pages web. Export : @react-pdf/renderer avec la police Inter (OFL) intégrée.
 
 ## Organisation
 
@@ -18,7 +19,10 @@ Next.js 16 (App Router) + TypeScript · Supabase (Postgres, Auth, Storage) · Go
 | `src/app` | Pages : Créer, Mes rapports, Préférences, lecteur |
 | `src/components` | Interface (navigation, import, QCM, lecteur, sources) |
 | `src/lib/contracts` | Schémas versionnés du moteur et contrôles sémantiques |
-| `src/lib/engine` | Interface fournisseur IA, adaptateur Gemini |
+| `src/lib/engine` | Interface fournisseur IA, adaptateur Gemini, pipeline de génération |
+| `src/lib/extract` | Extraction PDF / DOCX / TXT / pages web en segments figés, couverture |
+| `src/lib/render` | Numérotation des sources, export PDF |
+| `src/lib/sources` | Envoi direct des fichiers (URL signée), purge des originaux |
 | `src/lib/security` | Protection SSRF, contrôle des fichiers |
 | `src/lib/jobs` | Machine d'états des tâches |
 | `src/lib/demo` | Rapport de démonstration rédigé à la main |

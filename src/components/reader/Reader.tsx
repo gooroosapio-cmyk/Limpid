@@ -1,36 +1,12 @@
-import type {
-  Evidence,
-  ExplanationObject,
-  Locator,
-  ReportBlueprint,
-  SourceSegment,
-} from "@/lib/contracts/schemas";
+import type { Evidence, ExplanationObject, ReportBlueprint, SourceSegment } from "@/lib/contracts/schemas";
+import { sourceEntries } from "@/lib/render/sources";
 import { FlowData } from "@/lib/render/visuals";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { fr } from "@/lib/i18n/fr";
 import { FlowDiagram } from "./FlowDiagram";
-import { SourceRef, SourcesProvider, type SourceEntry } from "./Sources";
+import { SourceRef, SourcesProvider } from "./Sources";
 
 type Block = ExplanationObject["sections"][number]["blocks"][number];
-
-function describeLocator(l: Locator): string {
-  switch (l.kind) {
-    case "pdf_page":
-      return l.printed_label ? `page ${l.physical_index} (numérotée ${l.printed_label})` : `page ${l.physical_index}`;
-    case "section":
-      return [...l.heading_path, `paragraphe ${l.paragraph}`].join(" › ");
-    case "slide":
-      return `diapositive ${l.index}`;
-    case "image":
-      return l.region ? `image, ${l.region}` : "image";
-  }
-}
-
-function contextOf(seg: SourceSegment, e: Evidence) {
-  const before = seg.text.slice(Math.max(0, e.start_offset - 120), e.start_offset).trim();
-  const after = seg.text.slice(e.end_offset, e.end_offset + 120).trim();
-  return { before, quote: seg.text.slice(e.start_offset, e.end_offset), after };
-}
 
 function Refs({ ids, numbers }: { ids: string[]; numbers: Map<string, number> }) {
   return (
@@ -95,6 +71,8 @@ export function Reader({
   evidence,
   segments,
   sourceTitle,
+  sourceUrl = null,
+  pdfHref,
   isDemo,
 }: {
   blueprint: ReportBlueprint;
@@ -102,16 +80,13 @@ export function Reader({
   evidence: Evidence[];
   segments: SourceSegment[];
   sourceTitle: string;
+  /** Adresse de la page d'origine (import par lien). */
+  sourceUrl?: string | null;
+  /** Lien de téléchargement du PDF. */
+  pdfHref: string;
   isDemo: boolean;
 }) {
-  const numbers = new Map(blueprint.source_index.map((id, i) => [id, i + 1]));
-  const segById = new Map(segments.map((s) => [s.id, s]));
-  const entries: SourceEntry[] = evidence.flatMap((e) => {
-    const seg = segById.get(e.segment_id);
-    const n = numbers.get(e.id);
-    if (!seg || !n) return [];
-    return [{ n, evidenceId: e.id, location: describeLocator(seg.locator), ...contextOf(seg, e) }];
-  });
+  const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
   const sections = new Map(explanation.sections.map((s) => [s.id, s]));
   const visuals = new Map(blueprint.visual_specs.map((v) => [v.id, v]));
   const first = explanation.sections[0];
@@ -208,7 +183,15 @@ export function Reader({
 
         <section className="reader-section" aria-labelledby="sources-h">
           <h2 id="sources-h">{fr.reader.sources}</h2>
-          <p className="muted">{sourceTitle}</p>
+          <p className="muted">
+            {sourceTitle}
+            {sourceUrl && (
+              <>
+                {" — "}
+                <a href={sourceUrl} rel="noopener noreferrer nofollow" target="_blank">{fr.reader.original}</a>
+              </>
+            )}
+          </p>
           <ol>
             {entries.map((e) => (
               <li key={e.evidenceId}>
@@ -222,7 +205,7 @@ export function Reader({
           <button className="btn" disabled>{fr.reader.simpler}</button>
           <button className="btn" disabled>{fr.reader.otherExample}</button>
           <button className="btn" disabled>{fr.reader.check}</button>
-          <button className="btn btn-primary" disabled>{fr.reader.pdf}</button>
+          <a className="btn btn-primary" href={pdfHref} download>{fr.reader.pdf}</a>
         </div>
         <p id="actions-note" className="muted">{fr.reader.actionsDisabled}</p>
       </article>
