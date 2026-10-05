@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
 
 /** « Expliquer mon document » : lancement direct, réglages déduits côté serveur (kit V3, écran 03). */
@@ -29,7 +30,7 @@ export function ExplainDocument({ sourceId }: { sourceId: string }) {
         router.push(`/rapports/${id}`);
         return;
       }
-      throw new Error(typeof data.message === "string" ? data.message : t.added.failed);
+      throw new Error(apiMessage(t, data, t.added.failed));
     } catch (e) {
       setError((e as Error).message || t.added.failed);
       setPending(false);

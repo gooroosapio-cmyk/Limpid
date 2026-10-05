@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { isAllowed, recordAttempt } from "@/lib/auth/password";
+import { getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
 
 export interface LoginState {
@@ -23,12 +24,13 @@ async function siteUrl(): Promise<string> {
 
 /** Envoie un lien magique. Réponse identique que l'adresse soit autorisée ou non (pas d'énumération). */
 export async function sendMagicLink(_prev: LoginState, form: FormData): Promise<LoginState> {
+  const t = (await getT()).auth;
   const parsed = Email.safeParse(form.get("email"));
-  if (!parsed.success) return { status: "error", message: "Adresse email invalide." };
+  if (!parsed.success) return { status: "error", message: t.invalidEmail };
   const email = parsed.data;
   const sent: LoginState = {
     status: "sent",
-    message: "Si cette adresse est autorisée, un lien de connexion vient de lui être envoyé. Il est valable une heure.",
+    message: t.linkSent,
   };
   if (!(await isAllowed(email))) return sent;
 
@@ -39,45 +41,46 @@ export async function sendMagicLink(_prev: LoginState, form: FormData): Promise<
   });
   if (error) {
     console.error("auth.signInWithOtp", error.status, error.code);
-    return { status: "error", message: "L'envoi du lien a échoué. Réessayez dans une minute." };
+    return { status: "error", message: t.sendFailed };
   }
   return sent;
 }
 
-const WRONG = "Adresse ou mot de passe incorrect.";
 
 /**
  * Connexion par mot de passe. Même message d'erreur pour une adresse inconnue, non
  * autorisée ou un mauvais mot de passe ; essais limités par adresse et par IP.
  */
 export async function signInWithPassword(_prev: LoginState, form: FormData): Promise<LoginState> {
+  const t = (await getT()).auth;
   const parsed = Email.safeParse(form.get("email"));
   const password = String(form.get("password") ?? "");
-  if (!parsed.success) return { status: "error", message: "Adresse email invalide." };
-  if (!password) return { status: "error", message: "Saisissez votre mot de passe, ou recevez un lien de connexion." };
+  if (!parsed.success) return { status: "error", message: t.invalidEmail };
+  if (!password) return { status: "error", message: t.passwordMissing };
   const email = parsed.data;
   if (!(await recordAttempt("password", email))) {
-    return { status: "error", message: "Trop d'essais. Réessayez dans un quart d'heure, ou recevez un lien de connexion." };
+    return { status: "error", message: t.tooMany };
   }
-  if (!(await isAllowed(email))) return { status: "error", message: WRONG };
+  if (!(await isAllowed(email))) return { status: "error", message: t.wrong };
 
   const supabase = await createUserClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     if (error.code !== "invalid_credentials") console.error("auth.signInWithPassword", error.status, error.code);
-    return { status: "error", message: WRONG };
+    return { status: "error", message: t.wrong };
   }
   redirect("/");
 }
 
 /** Mot de passe oublié : lien de récupération à usage unique, réponse neutre. */
 export async function requestPasswordReset(_prev: LoginState, form: FormData): Promise<LoginState> {
+  const t = (await getT()).auth;
   const parsed = Email.safeParse(form.get("email"));
-  if (!parsed.success) return { status: "error", message: "Adresse email invalide." };
+  if (!parsed.success) return { status: "error", message: t.invalidEmail };
   const email = parsed.data;
   const sent: LoginState = {
     status: "sent",
-    message: "Si cette adresse est autorisée, un lien pour choisir un mot de passe vient de lui être envoyé. Il est valable une heure.",
+    message: t.resetSent,
   };
   if (!(await recordAttempt("reset", email))) return sent;
   if (!(await isAllowed(email))) return sent;
@@ -85,7 +88,7 @@ export async function requestPasswordReset(_prev: LoginState, form: FormData): P
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${await siteUrl()}/auth/callback` });
   if (error) {
     console.error("auth.resetPasswordForEmail", error.status, error.code);
-    return { status: "error", message: "L'envoi du lien a échoué. Réessayez dans une minute." };
+    return { status: "error", message: t.sendFailed };
   }
   return sent;
 }

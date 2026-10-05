@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { LoaderBook } from "@/components/LoaderBook";
 import type { Exercise } from "@/lib/contracts/schemas";
+import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { ExerciseView, type ExerciseResult } from "./ExerciseView";
 
@@ -86,7 +87,7 @@ export function Bilan({
     try {
       const res = await fetch(`/api/reports/${reportId}/quiz`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: "document" }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !Array.isArray(data.questions)) throw new Error(typeof data.message === "string" ? data.message : "");
+      if (!res.ok || !Array.isArray(data.questions)) throw new Error(apiMessage(t, data, ""));
       setQuestions((data.questions as OldQuestion[]).map(fromOld));
       setPhase("intro");
     } catch (e) {

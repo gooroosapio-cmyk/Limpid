@@ -47,10 +47,9 @@ export default async function AddPage({ searchParams }: { searchParams: Promise<
         <span>{t.add.privacy(Math.round(retention.originalHours / 24), retention.reportDays)}</span>{" "}
         <Link href="/compte/donnees">{t.add.privacyLink}</Link>
       </p>
-      <footer className="add-foot">
+      <div className="add-foot">
         <Link href="/" className="btn btn-block">{t.add.seeMine}</Link>
-        <p className="powered">{t.brand.poweredBy}</p>
-      </footer>
+      </div>
     </Screen>
   );
 }

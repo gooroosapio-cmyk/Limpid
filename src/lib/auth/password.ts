@@ -4,6 +4,8 @@
  * permanent, règles de mot de passe simples et vérifiables.
  */
 import "server-only";
+import type { Dict } from "@/lib/i18n";
+import { fr } from "@/lib/i18n/fr";
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { isEmailAllowed } from "@/lib/config";
@@ -47,13 +49,13 @@ export async function recordAttempt(kind: keyof typeof MAX_ATTEMPTS, email: stri
 }
 
 /** Règles : 10 caractères au moins, pas uniquement des chiffres, différent de l'adresse. */
-export function passwordProblem(password: string, email: string): string | null {
-  if (password.length < 10) return "Le mot de passe doit contenir au moins 10 caractères.";
-  if (password.length > 128) return "Le mot de passe est trop long (128 caractères au plus).";
-  if (/^\d+$/.test(password)) return "Le mot de passe ne doit pas être composé uniquement de chiffres.";
+export function passwordProblem(password: string, email: string, rules: Dict["auth"]["rules"] = fr.auth.rules): string | null {
+  if (password.length < 10) return rules.short;
+  if (password.length > 128) return rules.long;
+  if (/^\d+$/.test(password)) return rules.digits;
   const local = email.split("@")[0]!.toLowerCase();
-  if (local.length >= 4 && password.toLowerCase().includes(local)) return "Le mot de passe ne doit pas reprendre votre adresse.";
-  if (new Set(password).size < 4) return "Le mot de passe est trop répétitif.";
+  if (local.length >= 4 && password.toLowerCase().includes(local)) return rules.email;
+  if (new Set(password).size < 4) return rules.repetitive;
   return null;
 }
 

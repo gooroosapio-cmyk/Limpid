@@ -25,7 +25,7 @@ export function DeleteReport({ reportId }: { reportId: string }) {
 
   return (
     <div className="danger-zone">
-      {error && <p className="notice notice-warn" role="alert">La suppression a échoué. Réessayez.</p>}
+      {error && <p className="notice notice-warn" role="alert">{t.common.deleteFailed}</p>}
       <button type="button" className="btn btn-block" onClick={remove} disabled={pending}>
         {pending ? t.reports.deleting : t.reports.delete}
       </button>

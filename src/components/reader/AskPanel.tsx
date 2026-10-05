@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
 
 interface Answer {
@@ -42,7 +43,7 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
         body: JSON.stringify({ question: q, section_id: scope?.id ?? null, history }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || typeof data.answer !== "string") throw new Error(typeof data.message === "string" ? data.message : L.ask.failed);
+      if (!res.ok || typeof data.answer !== "string") throw new Error(apiMessage(L, data, L.ask.failed));
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a: data as Answer } : x)));
     } catch (e) {
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: (e as Error).message || L.ask.failed } : x)));

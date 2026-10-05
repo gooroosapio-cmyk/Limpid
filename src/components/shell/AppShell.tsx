@@ -25,8 +25,9 @@ function initials(email: string): string {
 }
 
 function Brand() {
+  const t = useT();
   return (
-    <Link href="/" className="brand-link" aria-label="Limpid, bibliothèque">
+    <Link href="/" className="brand-link" aria-label={t.common.brandHome}>
       <span className="brand">
         <LogoMark />
         <b>limpid</b>

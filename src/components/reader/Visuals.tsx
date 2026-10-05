@@ -60,7 +60,7 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
 
 export function Credit({ asset }: { asset: AssetView }) {
   const t = useT();
-  if (asset.provider === "gemini") return <span className="credit">{t.visuals.generated(asset.model)}</span>;
+  if (asset.provider === "gemini") return <span className="credit">{t.visuals.generated}</span>;
   const via = asset.provider === "commons" ? "Wikimedia Commons" : "Unsplash";
   const licenseUrl = safeHref(asset.licenseUrl);
   const sourceUrl = safeHref(asset.sourceUrl);

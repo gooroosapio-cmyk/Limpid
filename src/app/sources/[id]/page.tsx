@@ -6,7 +6,7 @@ import { ExplainDocument } from "@/components/prep/ExplainDocument";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import type { Locator } from "@/lib/contracts/schemas";
-import { getT } from "@/lib/i18n/server";
+import { getLang, getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -31,6 +31,7 @@ function approachKey(familiarity: string | null | undefined, goal: string | null
 /** Document ajouté (kit V3, écran 03) : un seul aperçu de fichier, l'original et le lancement. */
 export default async function SourcePage({ params }: { params: Promise<{ id: string }> }) {
   const t = await getT();
+  const locale = (await getLang()) === "en" ? "en-GB" : "fr-FR";
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   await requireUser();
@@ -70,7 +71,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
   const hasOriginal = isUrl ? !!src.original_url : !!src.storage_path;
   const openLabel = isUrl ? t.added.openLink : src.kind === "pdf" ? t.added.open : t.added.openOriginal;
   const until = src.original_purge_at
-    ? new Date(src.original_purge_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })
+    ? new Date(src.original_purge_at).toLocaleDateString(locale, { day: "numeric", month: "long", timeZone: "Europe/Paris" })
     : null;
 
   return (

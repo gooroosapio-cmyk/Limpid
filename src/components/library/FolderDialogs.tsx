@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { toast } from "@/components/shell/Toasts";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
+import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
 
 function NameDialog({
@@ -86,7 +87,7 @@ export function NewFolder() {
           const res = await fetch("/api/folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
           const body = await res?.json().catch(() => ({}));
           if (!res?.ok) {
-            toast(typeof body?.message === "string" ? body.message : t.library.actionFailed, "error");
+            toast(apiMessage(t, body, t.library.actionFailed), "error");
             return false;
           }
           router.refresh();

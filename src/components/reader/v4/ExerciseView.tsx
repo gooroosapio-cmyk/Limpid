@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { Exercise } from "@/lib/contracts/schemas";
 import { grade, shuffled, type Answer } from "@/lib/exercises/grade";
+import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
 import { parseRich } from "@/lib/reader/rich";
 
@@ -87,7 +88,7 @@ export function ExerciseView({
         body: JSON.stringify({ version_id: versionId, exercise_id: ex.id, answer: text }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : "");
+      if (!res.ok) throw new Error(apiMessage(t, data, ""));
       const covered = Array.isArray(data.points) ? data.points.filter((p: { covered: boolean }) => p.covered).length / Math.max(1, data.points.length) : null;
       const r = { correct: data.verdict === "correct", ratio: covered, feedback: typeof data.feedback === "string" ? data.feedback : undefined };
       setResult(r);

@@ -7,6 +7,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { ComfortSettings } from "@/components/account/DisplaySettings";
 import { MODES, type Mode } from "@/lib/contracts/schemas";
 import type { DisplayPrefs } from "@/lib/display/prefs";
+import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { OfflineSave } from "../OfflineSave";
 
@@ -87,7 +88,7 @@ export function OptionsPanel({
         body: JSON.stringify({ variation: "mode", mode, idempotency_key: crypto.randomUUID() }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof body.message === "string" ? body.message : t.versions.failed);
+      if (!res.ok) throw new Error(apiMessage(t, body, t.versions.failed));
       setMessage(t.lim.requested);
       router.refresh();
     } catch (e) {
@@ -105,7 +106,7 @@ export function OptionsPanel({
       router.push("/");
       router.refresh();
     } else {
-      setError("La suppression a échoué. Réessayez.");
+      setError(t.common.deleteFailed);
       setBusy(false);
     }
   }

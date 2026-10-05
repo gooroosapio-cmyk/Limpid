@@ -6,6 +6,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { ReportLink } from "@/components/ReportLink";
 import { toast } from "@/components/shell/Toasts";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
+import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
 
 export interface RowData {
@@ -63,7 +64,7 @@ export function ReportRow({ row, folders, showFailure = false }: { row: RowData;
     }).catch(() => null);
     const body = await res?.json().catch(() => ({}));
     setBusy(false);
-    if (!res?.ok) return toast(typeof body?.message === "string" ? body.message : t.library.actionFailed, "error");
+    if (!res?.ok) return toast(apiMessage(t, body, t.library.actionFailed), "error");
     toast(t.library.retried);
     router.push(`/rapports/${row.id}`);
   }

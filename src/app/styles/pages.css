@@ -193,3 +193,6 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .lib-failure-body .actions-row .btn { flex: 1 1 130px; min-height: 44px; }
 .lib-failures-intro { margin: 0 0 var(--s3); }
 .lib-extra { margin-top: var(--s5); }
+.app-foot { margin-top: var(--s8); padding-top: var(--s4); border-top: 1px solid var(--line); text-align: center; }
+.app-foot .powered { margin: 0; }
+.with-fab .app-foot { margin-bottom: var(--s4); }

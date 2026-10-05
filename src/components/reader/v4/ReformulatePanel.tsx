@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { REFORMULATE_REASONS, type ReformulateReason } from "@/lib/engine/reasons";
+import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
 
 /**
@@ -32,7 +33,7 @@ export function ReformulatePanel({ reportId, onDone }: { reportId: string | null
         body: JSON.stringify({ variation: "reformulate", reasons, comment: comment.trim() || undefined, idempotency_key: key.current }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : t.versions.failed);
+      if (!res.ok) throw new Error(apiMessage(t, data, t.versions.failed));
       setDone(true);
       router.refresh();
     } catch (err) {

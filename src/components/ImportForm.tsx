@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { MODES, type Mode } from "@/lib/contracts/schemas";
+import type { Dict } from "@/lib/i18n";
+import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
@@ -43,12 +45,12 @@ function formatSize(bytes: number, lang: string): string {
   return `${(bytes / 1024 / 1024).toLocaleString(locale, { maximumFractionDigits: 1 })} ${mb}`;
 }
 
-async function postJson(url: string, body: unknown, fallback: string): Promise<Record<string, unknown>> {
+async function postJson(url: string, body: unknown, fallback: string, t: Dict): Promise<Record<string, unknown>> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new FormError(
-      typeof data.message === "string" ? data.message : fallback,
+      apiMessage(t, data, fallback),
       typeof data.error === "string" ? data.error : undefined,
       typeof data.reportId === "string" ? data.reportId : undefined,
     );
@@ -116,7 +118,7 @@ export function ImportForm({
   }, []);
 
   async function prepare(body: Record<string, unknown>): Promise<Prepared> {
-    const data = await postJson("/api/sources", body, t.add.failed);
+    const data = await postJson("/api/sources", body, t.add.failed, t);
     return {
       sourceId: String(data.sourceId),
       title: typeof data.title === "string" ? data.title : null,
@@ -159,7 +161,7 @@ export function ImportForm({
     if (!enabled) return;
     try {
       setPhase({ step: "upload", percent: 0 });
-      const up = await postJson("/api/uploads", { file_name: f.name, byte_size: f.size }, t.create.uploadFailed);
+      const up = await postJson("/api/uploads", { file_name: f.name, byte_size: f.size }, t.create.uploadFailed, t);
       await putFile(String(up.signedUrl), f, (percent) => setPhase({ step: "upload", percent }), t.create.uploadFailed);
       await readUpload(String(up.uploadId), false);
     } catch (err) {
@@ -194,7 +196,7 @@ export function ImportForm({
         sourceId = (await prepare(tab === "link" ? { source: "url", url: url.trim() } : { source: "text", text })).sourceId;
       }
       setPhase({ step: "creating" });
-      const data = await postJson("/api/reports", { source_id: sourceId, mode, idempotency_key: key.current }, t.add.failed);
+      const data = await postJson("/api/reports", { source_id: sourceId, mode, idempotency_key: key.current }, t.add.failed, t);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
       if (err instanceof FormError && err.reportId) {
