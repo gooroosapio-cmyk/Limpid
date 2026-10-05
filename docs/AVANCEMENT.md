@@ -1,5 +1,28 @@
 # Avancement
 
+## Phase 11.1 — Navigation façon Gemini et lecteur plein écran (5 octobre 2026)
+
+### FAIT
+- **Barre d'en-tête unique** sur une ligne : menu, logo Limpid, Profil, Paramètres. **Plus aucune flèche de retour** : le retour est celui du téléphone ou du navigateur ; seules les croix ferment les volets. Le contenu remonte d'autant.
+- **Menu latéral** (volet depuis la gauche sur téléphone et tablette, barre fixe ≥ 1200 px) : Accueil (ajouter un document), Ajouter un texte, Ajouter un PDF, Ajouter un lien, Paramètres, puis **Bibliothèque** avec la liste des limpid (préparation en cours et échec signalés), profil en pied.
+- **Bibliothèque = page principale** (`/`) avec **bouton flottant** « Expliquer un document » vers l'Accueil (page d'import, onglet présélectionné depuis le menu). `/bibliotheque` redirige.
+- **Profil** (`/compte`) et **Paramètres** (`/parametres` : explications, confort de lecture, mode d'affichage, thème par défaut, installation, données) ; anciennes adresses redirigées.
+- **Présentation en plein écran** : aucune barre de l'application autour d'un limpid ; sur téléphone et tablette, le navigateur passe en plein écran à l'ouverture (refus silencieux s'il ne le permet pas, iPhone compris) et en sort en quittant.
+- **Trois boutons en bas de chaque limpid** :
+  - **Sommaire** : plan avec la position de lecture, options du rapport (export PDF, présentation, source, hors connexion, versions, suppression), retour à la bibliothèque.
+  - **Me tester** : **Interrogation** (3 questions sur la partie en cours) ou **Devoir** (QCM de 5 à 10 questions sur tout le document), rédigés par l'IA à partir des explications du limpid, une question à la fois, correction expliquée pour chaque proposition, bilan limité à la série avec les parties à revoir, « Recommencer » et « D'autres questions ». Tests gardés par version (rouvrir = aucune requête), table `report_quizzes` (RLS lecture propriétaire, écriture serveur, effacée avec le rapport).
+  - **Poser une question** : réponse courte fondée sur les passages du document et la partie lue, **citations vérifiées mot pour mot** (sinon retirées), « Au-delà du document » séparé, suites proposées. Échange non enregistré.
+- Débit et budget : 12 tests et 30 questions par heure et par compte, plafonds de dépense existants, consommation journalisée (`quiz_gen`, `ask`) et visible dans `/admin`.
+
+### EN TEST (résultats réels)
+- `npm test` : 170 tests ; recette SQL OK (isolation et effacement des tests) ; build OK.
+- **Gemini réel (offre gratuite)** : devoir de 5 questions valide (bonne réponse à des positions variées), réponse avec citation vérifiée (`scripts/live-reader-ai.test.ts`, 2 requêtes).
+- Recette visuelle locale : tous les écrans de 320 à 1440 px + nuit : **0 violation axe, 0 débordement** ; menu, QCM (juste, à revoir, bilan) et questions vérifiés à 390 et 1440 px. Captures : `docs/recette/v3-1/captures/`.
+
+### À FAIRE / LIMITES
+- Migrations `20261005000000_v3_themes_originals.sql` et `20261005010000_report_quizzes.sql` : **à appliquer en production à la fusion**.
+- Chaque test nouveau et chaque question consomment une requête Gemini (quota gratuit : 20 par jour et par modèle, avec repli).
+
 ## Phase 11 — Refonte V3 (kit « LIMPID_V3 », 5 octobre 2026)
 
 Cadrage (QCM, 13 réponses) : socle visuel d'abord ; navigation Accueil / Bibliothèque / Compte ; parcours tout automatique ; 5 thèmes du kit ; mode nuit ; polices du kit ; animations expressives (mouvement réduit respecté) ; bureau comme le kit ; original gardé 30 jours ; « Demander » et la nouvelle révision à la passe suivante ; abonnement « bientôt » ; installable et lecture hors connexion.

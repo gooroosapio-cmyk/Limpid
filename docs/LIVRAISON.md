@@ -83,6 +83,7 @@ Script : `scripts/live-corpus.test.ts` ; corpus : `scripts/corpus/` (documents f
 
 ### Refonte V3 (5 octobre 2026)
 - `20261005000000_v3_themes_originals.sql` — cinq thèmes du kit (null = automatique), conversion des anciens thèmes, conservation de l'original 30 jours. **À appliquer à la fusion de la refonte.**
+- `20261005010000_report_quizzes.sql` — tests « Me tester » gardés par version (RLS : lecture propriétaire, écriture serveur). **À appliquer à la fusion.**
 
 ## Configuration (sans secret)
 

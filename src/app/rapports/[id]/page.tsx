@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteReport } from "@/components/DeleteReport";
 import { Icon } from "@/components/Icon";
+import { Immersive } from "@/components/reader/Immersive";
 import { JobProgress } from "@/components/JobProgress";
 import { ThemePicker } from "@/components/ThemePicker";
 import { Reader } from "@/components/reader/Reader";
@@ -20,8 +21,6 @@ import { loadReport } from "@/lib/reports/load";
 
 export const metadata: Metadata = { title: fr.reader.title };
 
-const STAGES_FINAL = new Set(["verification", "illustrations", "mise_en_page"]);
-
 export default async function ReportPage({
   params,
   searchParams,
@@ -38,13 +37,8 @@ export default async function ReportPage({
 
   if (report.state === "pending") {
     const active = report.job.status === "queued" || report.job.status === "running";
-    const title = !active ? report.title : STAGES_FINAL.has(report.job.stage ?? "") ? fr.prep.finalTitle : fr.prep.title;
     return (
-      <Screen
-        title={title}
-        back="/"
-        actions={active ? <Link href="/" className="ib" aria-label={fr.prep.close}><Icon name="close" /></Link> : undefined}
-      >
+      <Screen>
         <JobProgress reportId={id} initial={report.job} />
         {!active && <DeleteReport reportId={id} />}
       </Screen>
@@ -59,26 +53,8 @@ export default async function ReportPage({
   const themeLabel = report.themeChoice ? themeName : `${themeName} · ${fr.options.auto}`;
 
   return (
-    <Screen
-      title={fr.reader.title}
-      back="/bibliotheque"
-      actions={
-        <ReportOptions
-          reportId={id}
-          pdfHref={pdfHref}
-          originalHref={report.originalHref}
-          sourceTitle={report.sourceTitle}
-          themeLabel={themeLabel}
-          themeControl={<ThemePicker initial={report.themeChoice} target={{ reportId: id }} />}
-          offline={report.isCurrent ? <OfflineSave account={offlineKey(user.id)} path={`/rapports/${id}`} title={report.title} /> : undefined}
-          versions={report.versions.map((v) => ({
-            href: v.current ? `/rapports/${id}` : `/rapports/${id}?version=${v.number}`,
-            label: `${v.number} · ${fr.versions.reasons[v.changeReason ?? ""] ?? LEVEL_LABELS[v.level as Level] ?? v.level}`,
-            current: v.number === report.shownVersion,
-          }))}
-        />
-      }
-    >
+    <Immersive>
+      <div className="page page-reader">
       {!report.isCurrent && (
         <p className="notice" role="status">
           {fr.versions.older} <Link href={`/rapports/${id}`}>{fr.versions.backToCurrent}</Link>
@@ -127,6 +103,22 @@ export default async function ReportPage({
               )
             : undefined
         }
+        options={
+          <ReportOptions
+            reportId={id}
+            pdfHref={pdfHref}
+            originalHref={report.originalHref}
+            sourceTitle={report.sourceTitle}
+            themeLabel={themeLabel}
+            themeControl={<ThemePicker initial={report.themeChoice} target={{ reportId: id }} />}
+            versions={report.versions.map((v) => ({
+              href: v.current ? `/rapports/${id}` : `/rapports/${id}?version=${v.number}`,
+              label: `${v.number} · ${fr.versions.reasons[v.changeReason ?? ""] ?? LEVEL_LABELS[v.level as Level] ?? v.level}`,
+              current: v.number === report.shownVersion,
+            }))}
+            offline={report.isCurrent ? <OfflineSave account={offlineKey(user.id)} path={`/rapports/${id}`} title={report.title} /> : undefined}
+          />
+        }
         footer={
           report.expiresAt ? (
             <p className="muted small reader-expiry">
@@ -136,6 +128,7 @@ export default async function ReportPage({
           ) : null
         }
       />
-    </Screen>
+      </div>
+    </Immersive>
   );
 }

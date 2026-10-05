@@ -62,7 +62,10 @@ export function ImportForm({
   urlEnabled,
   maxFileMb = 20,
   maxPages = 100,
+  initialTab = "file",
 }: {
+  /** Onglet ouvert à l'arrivée (menu : Ajouter un texte, un PDF, un lien). */
+  initialTab?: "file" | "link" | "text";
   enabled: boolean;
   urlEnabled: boolean;
   maxFileMb?: number;
@@ -70,7 +73,7 @@ export function ImportForm({
 }) {
   const MAX_FILE_BYTES = maxFileMb * 1024 * 1024;
   const [dragging, setDragging] = useState(false);
-  const [tab, setTab] = useState<Tab>("file");
+  const [tab, setTab] = useState<Tab>(initialTab === "link" && !urlEnabled ? "file" : initialTab);
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);

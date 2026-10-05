@@ -70,7 +70,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
     : null;
 
   return (
-    <Screen title={fr.added.title} back="/ajouter">
+    <Screen>
       <div className="stagger">
         <h1 className="display">{fr.added.heading}</h1>
         <div className="card filecard">

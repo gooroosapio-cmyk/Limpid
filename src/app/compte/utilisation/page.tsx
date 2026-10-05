@@ -18,7 +18,7 @@ export default async function UsagePage() {
   ]);
   const u = fr.compte.usageRows;
   return (
-    <Screen title={fr.compte.usageHeading} back="/compte">
+    <Screen>
       <h1>{fr.compte.usageHeading}</h1>
       <p className="lede">{fr.compte.usageLede}</p>
       {usage && <progress value={usage.used} max={usage.limit} aria-label={fr.compte.usageNote(usage.used, usage.limit)} />}

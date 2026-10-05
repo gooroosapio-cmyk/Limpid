@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: fr.login.forgotTitle };
 
 export default function ForgotPage() {
   return (
-    <Screen title={fr.login.forgotTitle} back="/connexion" className="login-page">
+    <Screen className="login-page">
       <h1>{fr.login.forgotTitle}</h1>
       <p className="lede">{fr.login.forgotIntro}</p>
       <ForgotForm />

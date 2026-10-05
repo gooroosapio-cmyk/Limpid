@@ -11,7 +11,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { message } = await searchParams;
   const [o, perf] = await Promise.all([adminOverview(), performance().catch(() => null)]);
   return (
-    <Screen title="Administration" back="/compte" wide>
+    <Screen wide>
       <AdminView o={o} perf={perf} userEmail={user.email ?? null} message={message} />
     </Screen>
   );

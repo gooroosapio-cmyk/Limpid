@@ -122,3 +122,4 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .install-steps { margin: var(--s2) 0 0; padding-left: var(--s5); }
 .install-steps li { margin: var(--s2) 0; }
 .page-loading { padding-top: calc(var(--header) + var(--s4)); }
+.settings-block { margin-top: var(--s6); }

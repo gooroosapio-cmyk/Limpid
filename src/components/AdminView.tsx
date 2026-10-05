@@ -14,6 +14,8 @@ const STAGES: Record<string, string> = {
   ocr: "Lecture OCR",
   verification: "Vérification",
   quiz: "Correction de quiz",
+  quiz_gen: "Me tester (QCM)",
+  ask: "Questions au document",
 };
 
 /** Tableau de bord d'administration (données chargées par la page, côté serveur). */

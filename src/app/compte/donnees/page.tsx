@@ -13,7 +13,7 @@ export default async function DataPage() {
   const d = fr.compte.dataRows;
   const values: Record<string, number> = { reports: retention.reportDays, originals: retention.originalHours, text: 0, device: 0 };
   return (
-    <Screen title={fr.compte.dataHeading} back="/compte">
+    <Screen>
       <h1>{fr.compte.dataHeading}</h1>
       <p className="lede">{fr.compte.dataLede}</p>
       <dl className="retention-list">

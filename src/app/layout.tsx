@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { Rail, RootNav } from "@/components/shell/Nav";
+import { Suspense } from "react";
+import { AppShell } from "@/components/shell/AppShell";
 import { Pwa } from "@/components/shell/Pwa";
 import { currentUser } from "@/lib/auth";
+import { isUrlImportEnabled } from "@/lib/config";
 import { htmlAttributes, readDisplayPrefs } from "@/lib/display/prefs";
 import { fr } from "@/lib/i18n/fr";
 import { offlineKey } from "@/lib/offline-key";
@@ -44,9 +46,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <a className="skip-link" href="#contenu">{fr.nav.skip}</a>
         <div className="app">
-          {user && <Rail email={user.email ?? ""} />}
+          {user && (
+            <Suspense>
+              <AppShell email={user.email ?? ""} urlEnabled={isUrlImportEnabled()} />
+            </Suspense>
+          )}
           <main id="contenu" className="app-content">{children}</main>
-          {user && <RootNav />}
         </div>
         <Pwa account={user ? offlineKey(user.id) : null} />
       </body>

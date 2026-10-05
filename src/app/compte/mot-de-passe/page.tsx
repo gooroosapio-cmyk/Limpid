@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: fr.login.newTitle };
 export default async function SetPasswordPage() {
   const user = await requireUser();
   return (
-    <Screen title={fr.login.newTitle} back="/compte">
+    <Screen>
       <h1>{fr.login.newTitle}</h1>
       <p className="lede">{fr.login.newIntro}</p>
       <PasswordForm email={user.email ?? ""} />

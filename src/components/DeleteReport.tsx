@@ -14,7 +14,7 @@ export function DeleteReport({ reportId }: { reportId: string }) {
     setPending(true);
     const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" });
     if (res.ok) {
-      router.push("/bibliotheque");
+      router.push("/");
       router.refresh();
     } else {
       setError(true);

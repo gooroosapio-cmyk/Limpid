@@ -45,7 +45,7 @@
   --r-control: 14px; --r-card: 18px; --r-feature: 20px; --r-pill: 999px;
   --rayon: var(--r-card); --marge: var(--pad);
   --cible: 44px; --cible-ideale: 48px;
-  --header: 64px; --rootnav: 80px; --readerbar: 84px; --rail: 84px; --sidebar: 236px;
+  --header: 56px; --rootnav: 84px; --readerbar: 84px; --rail: 84px; --sidebar: 236px;
 
   /* Mouvement (tokens du kit, version expressive) */
   --t-press: 140ms; --t-route: 220ms; --t-panel: 240ms; --t-loop: 1800ms;

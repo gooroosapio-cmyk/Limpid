@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: fr.compte.subscriptionHeading };
 export default async function SubscriptionPage() {
   await requireUser();
   return (
-    <Screen title={fr.compte.subscriptionHeading} back="/compte">
+    <Screen>
       <h1>{fr.compte.subscriptionHeading}</h1>
       <p className="lede">{fr.compte.subscriptionLede}</p>
       <dl className="usage card">

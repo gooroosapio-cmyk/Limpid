@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: fr.pwa.installTitle };
 export default async function InstallPage() {
   await requireUser();
   return (
-    <Screen title={fr.pwa.installTitle} back="/compte">
+    <Screen>
       <img src="/icons/limpid-192.png" alt="" width={88} height={88} className="app-icon" />
       <h1>{fr.pwa.installHeading}</h1>
       <p className="lede">{fr.pwa.installLede}</p>

@@ -113,6 +113,7 @@ export function Reader({
   theme = "sciences",
   assets = {},
   footer = null,
+  options = null,
 }: {
   blueprint: ReportBlueprint;
   explanation: ExplanationObject;
@@ -138,6 +139,8 @@ export function Reader({
   assets?: Record<string, AssetView>;
   /** Mention de fin (conservation). */
   footer?: React.ReactNode;
+  /** Options du rapport (export, présentation, source…), dans le volet Sommaire. */
+  options?: React.ReactNode;
 }) {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
   const originalLink = originalHref ?? safeHref(sourceUrl);
@@ -274,7 +277,7 @@ export function Reader({
         {!actions && actionsNote && <p className="muted small">{actionsNote}</p>}
         {footer}
       </article>
-      <ReaderBar toc={toc} hasChecks={hasChecks} />
+      <ReaderBar toc={toc} hasChecks={hasChecks} reportId={reportId} options={options} />
       </NotionsProvider>
     </SourcesProvider>
   );

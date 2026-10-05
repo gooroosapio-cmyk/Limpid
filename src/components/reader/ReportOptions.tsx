@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
@@ -41,8 +41,8 @@ function Row({ icon, title, sub, href, download, onClick, danger }: {
 }
 
 /**
- * Options du rapport (kit V3, écran 24) : les actions rares, hors du récit. Volet en bas
- * d'écran sur mobile, panneau latéral sur ordinateur.
+ * Options du rapport (kit V3, écran 24), affichées dans le volet Sommaire : les actions rares,
+ * hors du récit. Sous-vues Présentation et Versions dans le même volet.
  */
 export function ReportOptions({
   reportId,
@@ -53,6 +53,7 @@ export function ReportOptions({
   themeControl,
   versions,
   offline,
+  onNavigate,
 }: {
   reportId: string | null;
   pdfHref: string;
@@ -62,8 +63,9 @@ export function ReportOptions({
   themeControl?: React.ReactNode;
   versions?: VersionLink[];
   offline?: React.ReactNode;
+  /** Ferme le volet avant de changer de version. */
+  onNavigate?: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [view, setView] = useState<"menu" | "theme" | "versions">("menu");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(false);
@@ -75,7 +77,7 @@ export function ReportOptions({
     setError(false);
     const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) {
-      router.push("/bibliotheque");
+      router.push("/");
       router.refresh();
     } else {
       setError(true);
@@ -83,65 +85,21 @@ export function ReportOptions({
     }
   }
 
-  const back = (
-    <button type="button" className="ib" aria-label={fr.options.back} onClick={() => setView("menu")}><Icon name="back" /></button>
-  );
-
-  return (
-    <>
-      <button
-        type="button"
-        className="ib"
-        aria-label={fr.options.open}
-        aria-haspopup="dialog"
-        onClick={() => {
-          setView("menu");
-          dialogRef.current?.showModal();
-        }}
-      >
-        <Icon name="more" />
-      </button>
-      <dialog ref={dialogRef} className="sheet side" aria-labelledby="options-title">
-        <div className="sheet-grip" aria-hidden="true" />
-        <div className="sheet-head">
-          {view !== "menu" && back}
-          <h2 id="options-title">{view === "theme" ? fr.options.presentation : view === "versions" ? fr.options.versions : fr.options.open}</h2>
-          <form method="dialog">
-            <button className="ib" aria-label={fr.reader.close}><Icon name="close" /></button>
-          </form>
+  if (view !== "menu")
+    return (
+      <div className="stagger" key={view}>
+        <div className="sheet-sub">
+          <button type="button" className="btn-link" onClick={() => setView("menu")}>
+            <Icon name="back" size={18} /> {fr.options.back}
+          </button>
+          <h3>{view === "theme" ? fr.options.presentation : fr.options.versions}</h3>
         </div>
-
-        {view === "menu" && (
-          <div className="stagger" key="menu">
-            <ul className="rows">
-              <Row icon="download" title={fr.options.export} sub={fr.options.exportSub} href={pdfHref} download />
-              {themeControl && <Row icon="settings" title={fr.options.presentation} sub={themeLabel} onClick={() => setView("theme")} />}
-              {originalHref ? (
-                <Row icon="file" title={fr.options.source} sub={sourceTitle} href={originalHref} />
-              ) : (
-                <li className="row row-static">
-                  <span className="row-icon"><Icon name="file" /></span>
-                  <span className="row-text"><b>{fr.options.sourceMissing}</b><small>{sourceTitle}</small></span>
-                </li>
-              )}
-              {offline}
-              {versions && versions.length > 1 && (
-                <Row icon="clock" title={fr.options.versions} sub={fr.options.versionsSub(versions.length)} onClick={() => setView("versions")} />
-              )}
-              {reportId && (
-                <Row icon="trash" title={deleting ? fr.reports.deleting : fr.options.delete} sub={fr.options.deleteSub} onClick={remove} danger />
-              )}
-            </ul>
-            {error && <p className="notice notice-error" role="alert">La suppression a échoué. Réessayez.</p>}
-            <p className="muted small">{fr.options.retention}</p>
-          </div>
-        )}
-        {view === "theme" && <div className="stagger" key="theme">{themeControl}</div>}
+        {view === "theme" && themeControl}
         {view === "versions" && versions && (
-          <ul className="rows stagger" key="versions">
+          <ul className="rows">
             {versions.map((v) => (
               <li key={v.href}>
-                <Link className="row" href={v.href} aria-current={v.current ? "page" : undefined} onClick={() => dialogRef.current?.close()}>
+                <Link className="row" href={v.href} aria-current={v.current ? "page" : undefined} onClick={onNavigate}>
                   <span className="row-icon"><Icon name={v.current ? "check" : "clock"} /></span>
                   <span className="row-text"><b>{v.label}</b></span>
                   <Icon name="chevron" className="row-chevron" />
@@ -150,7 +108,30 @@ export function ReportOptions({
             ))}
           </ul>
         )}
-      </dialog>
-    </>
+      </div>
+    );
+
+  return (
+    <div>
+      <ul className="rows">
+        <Row icon="download" title={fr.options.export} sub={fr.options.exportSub} href={pdfHref} download />
+        {themeControl && <Row icon="settings" title={fr.options.presentation} sub={themeLabel} onClick={() => setView("theme")} />}
+        {originalHref ? (
+          <Row icon="file" title={fr.options.source} sub={sourceTitle} href={originalHref} />
+        ) : (
+          <li className="row row-static">
+            <span className="row-icon"><Icon name="file" /></span>
+            <span className="row-text"><b>{fr.options.sourceMissing}</b><small>{sourceTitle}</small></span>
+          </li>
+        )}
+        {offline}
+        {versions && versions.length > 1 && (
+          <Row icon="clock" title={fr.options.versions} sub={fr.options.versionsSub(versions.length)} onClick={() => setView("versions")} />
+        )}
+        {reportId && <Row icon="trash" title={deleting ? fr.reports.deleting : fr.options.delete} sub={fr.options.deleteSub} onClick={remove} danger />}
+      </ul>
+      {error && <p className="notice notice-error" role="alert">La suppression a échoué. Réessayez.</p>}
+      <p className="muted small">{fr.options.retention}</p>
+    </div>
   );
 }
