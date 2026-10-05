@@ -6,8 +6,13 @@
  */
 import { z } from "zod";
 
-export const SCHEMA_VERSION = "1.0.0" as const;
-const schemaVersion = z.literal(SCHEMA_VERSION);
+/**
+ * 1.1.0 (refonte V4) : modes, points clés, blocs liste/étapes, formule, complément, variantes
+ * d'exemples, intentions de placement des visuels. Ajouts facultatifs : les objets 1.0.0
+ * enregistrés restent valides et lisibles.
+ */
+export const SCHEMA_VERSION = "1.1.0" as const;
+const schemaVersion = z.enum(["1.0.0", "1.1.0"]);
 
 const id = z.string().regex(/^[a-z]{1,6}_[A-Za-z0-9_-]{1,64}$/, "identifiant invalide");
 const shortText = z.string().trim().min(1).max(500);
@@ -36,8 +41,17 @@ export const VISUAL_MODES = ["auto", "schemas", "web", "gemini", "aucun"] as con
 export const VisualMode = z.enum(VISUAL_MODES);
 export type VisualMode = z.infer<typeof VisualMode>;
 
-export const TARGET_PAGES = [5, 7, 12] as const;
-export const TargetPages = z.union([z.literal(5), z.literal(7), z.literal(12)]);
+/** Pages pédagogiques prévues (plan) : 5 à 18 selon la richesse ; moins si la source est pauvre. */
+export const TargetPages = z.number().int().min(1).max(18);
+export type TargetPages = z.infer<typeof TargetPages>;
+
+/**
+ * Quatre approches choisies à l'import (V4) : très simple, explication claire, résumé fidèle,
+ * révision active. Un seul support est produit par génération.
+ */
+export const MODES = ["tres_simple", "claire", "resume", "revision"] as const;
+export const Mode = z.enum(MODES);
+export type Mode = z.infer<typeof Mode>;
 
 /* ---------- Source et preuves ---------- */
 
@@ -157,13 +171,30 @@ const blockBase = {
   evidence_ids: ids(20),
 };
 
+/** Variante d'un exemple ou d'une analogie, affichée sans nouvel appel IA (« Autre exemple »). */
+export const ExampleVariant = z.strictObject({ text: longText, limit: mediumText.nullable() });
+
+const listItem = z.strictObject({ text: mediumText, claim_ids: ids(10), evidence_ids: ids(10) });
+
 export const Block = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("fact"), ...blockBase }),
+  // emphasis « key » : idée à retenir mise en avant (sans encadré systématique).
+  z.strictObject({ type: z.literal("fact"), emphasis: z.enum(["key"]).optional(), ...blockBase }),
   z.strictObject({ type: z.literal("definition"), term: shortText, ...blockBase }),
-  z.strictObject({ type: z.literal("analogy"), limit: mediumText, ...blockBase }),
-  z.strictObject({ type: z.literal("fictional_example"), ...blockBase }),
+  z.strictObject({ type: z.literal("analogy"), limit: mediumText, variants: z.array(ExampleVariant).max(2).optional(), ...blockBase }),
+  z.strictObject({ type: z.literal("fictional_example"), variants: z.array(ExampleVariant).max(2).optional(), ...blockBase }),
   z.strictObject({ type: z.literal("inference"), ...blockBase }),
   z.strictObject({ type: z.literal("caution"), ...blockBase }),
+  // Liste, liste numérotée ou étapes : text = phrase d'introduction.
+  z.strictObject({ type: z.literal("list"), style: z.enum(["bullets", "numbers", "steps"]), items: z.array(listItem).min(2).max(12), ...blockBase }),
+  // Formule : expression exacte, symboles expliqués, puis text = lecture et application.
+  z.strictObject({
+    type: z.literal("formula"),
+    expression: shortText,
+    symbols: z.array(z.strictObject({ symbol: z.string().trim().min(1).max(40), meaning: shortText })).max(12),
+    ...blockBase,
+  }),
+  // Complément absent de la source : signalé « Complément », jamais référencé comme sourcé.
+  z.strictObject({ type: z.literal("complement"), ...blockBase }),
 ]);
 export type Block = z.infer<typeof Block>;
 
@@ -203,6 +234,12 @@ export const ExplanationObject = z.strictObject({
   knowledge_id: id,
   level: Level,
   goal: Goal,
+  /** Approche choisie (absente : générations antérieures à V4). */
+  mode: Mode.optional(),
+  /** 3 à 5 points clés affichés sous le titre. */
+  key_points: z.array(shortText).max(5).optional(),
+  /** Source trop pauvre pour un rapport complet : résultat court annoncé comme tel. */
+  short_result: z.boolean().optional(),
   preferences_snapshot: PreferencesSnapshot,
   sections: z.array(Section).min(1).max(20),
   glossary: z.array(GlossaryEntry).max(60),
@@ -226,13 +263,16 @@ export const VisualSpec = z.strictObject({
   alt_text: mediumText,
   caption: shortText,
   illustrative_only: z.boolean(),
+  /** Intentions de composition traduites par le moteur en dispositions adaptatives. */
+  size: z.enum(["thumb", "compact", "wide"]).optional(),
+  placement: z.enum(["center", "before", "after", "margin"]).optional(),
 });
 export type VisualSpec = z.infer<typeof VisualSpec>;
 
 export const BlueprintSection = z.strictObject({
   section_id: id,
   visual_ids: ids(5),
-  page_hint: z.number().int().min(1).max(12).nullable(),
+  page_hint: z.number().int().min(1).max(18).nullable(),
 });
 
 export const ReportBlueprint = z.strictObject({
@@ -267,3 +307,57 @@ export const ValidationResult = z.strictObject({
   repair_count: z.number().int().min(0).max(2),
 });
 export type ValidationResult = z.infer<typeof ValidationResult>;
+
+/* ---------- Exercices (V4) : points de contrôle et bilan de compréhension ---------- */
+
+export const EXERCISE_KINDS = ["single", "multiple", "truefalse", "order", "match", "cloze", "short"] as const;
+export const ExerciseKind = z.enum(EXERCISE_KINDS);
+export type ExerciseKind = z.infer<typeof ExerciseKind>;
+
+/**
+ * Une question : objectif, notion ciblée, références, réponse attendue et correction. Les
+ * corrections objectives sont faites par le code ; « short » est évaluée avec une grille.
+ */
+export const Exercise = z.strictObject({
+  id,
+  kind: ExerciseKind,
+  prompt: mediumText,
+  objective: shortText,
+  notion: shortText.nullable(),
+  section_id: id,
+  evidence_ids: ids(10),
+  /** single / multiple : propositions et justification de chacune. */
+  options: z.array(z.strictObject({ text: shortText, correct: z.boolean(), why: mediumText })).max(6),
+  /** truefalse : valeur de l'affirmation. */
+  truth: z.boolean().nullable(),
+  /** order : éléments dans le bon ordre. */
+  items: z.array(shortText).max(8),
+  /** match : paires à associer. */
+  pairs: z.array(z.strictObject({ left: shortText, right: shortText })).max(6),
+  /** cloze : réponses acceptées pour chaque « ___ » du prompt. */
+  blanks: z.array(z.array(z.string().trim().min(1).max(80)).min(1).max(5)).max(4),
+  /** short : réponse attendue et grille d'évaluation. */
+  expected: mediumText.nullable(),
+  rubric: z.array(shortText).max(6),
+  explanation: mediumText,
+});
+export type Exercise = z.infer<typeof Exercise>;
+
+export const ExerciseSet = z.strictObject({
+  schema_version: schemaVersion,
+  checkpoints: z.array(z.strictObject({ section_id: id, exercises: z.array(Exercise).min(1).max(3) })).max(20),
+  bilan: z.array(Exercise).max(25),
+  /** Source insuffisante pour un bilan complet : annoncé au lecteur. */
+  insufficient: z.boolean(),
+});
+export type ExerciseSet = z.infer<typeof ExerciseSet>;
+
+/** Toutes les affirmations citées par un bloc (y compris les éléments d'une liste). */
+export function blockClaimIds(b: Block): string[] {
+  return b.type === "list" ? [...b.claim_ids, ...b.items.flatMap((i) => i.claim_ids)] : b.claim_ids;
+}
+
+/** Toutes les preuves citées par un bloc (y compris les éléments d'une liste). */
+export function blockEvidenceIds(b: Block): string[] {
+  return b.type === "list" ? [...b.evidence_ids, ...b.items.flatMap((i) => i.evidence_ids)] : b.evidence_ids;
+}

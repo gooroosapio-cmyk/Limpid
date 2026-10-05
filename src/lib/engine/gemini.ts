@@ -30,8 +30,10 @@ export interface GeminiConfig {
 
 export function geminiConfigFromEnv(): GeminiConfig {
   const apiKey = process.env.GEMINI_API_KEY;
-  const modelFast = process.env.LIMPID_MODEL_FAST;
-  const modelQuality = process.env.LIMPID_MODEL_QUALITY;
+  // Rôles (V4) : AI_REPORT_MODEL rédige les rapports, AI_CHAT_MODEL (plus léger) répond aux
+  // discussions et corrections courtes ; les anciens réglages restent pris en compte.
+  const modelFast = process.env.AI_CHAT_MODEL || process.env.LIMPID_MODEL_FAST;
+  const modelQuality = process.env.AI_REPORT_MODEL || process.env.LIMPID_MODEL_QUALITY;
   if (!apiKey || !modelFast || !modelQuality) {
     throw new ProviderError("not_configured", "Gemini n'est pas configuré (clé ou modèles manquants).");
   }

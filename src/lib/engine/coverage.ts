@@ -99,13 +99,17 @@ const digits = (t: string) => t.replace(/[\s  ]/g, "").replace(/\./g, ",");
  * mais le chiffre a disparu du texte lu (au plus `max`).
  */
 export function blocksMissingNumbers(
-  sections: { blocks: { id: string; type: string; text: string; claim_ids: string[] }[] }[],
+  sections: { blocks: { id: string; type: string; text: string; claim_ids: string[]; items?: { text: string; claim_ids: string[] }[] }[] }[],
   claims: { id: string; numbers: { source_form: string }[] }[],
   max = 8,
 ): { block_id: string; numbers: string[] }[] {
   const byId = new Map(claims.map((c) => [c.id, c]));
   const out: { block_id: string; numbers: string[] }[] = [];
-  for (const b of sections.flatMap((s) => s.blocks)) {
+  // Les éléments d'une liste sont contrôlés comme des blocs (leurs chiffres dans leur propre texte).
+  const units = sections.flatMap((s) =>
+    s.blocks.flatMap((b) => (b.type === "list" && b.items ? b.items.map((it, i) => ({ id: `${b.id}#${i + 1}`, type: "fact", text: it.text, claim_ids: it.claim_ids })) : [b])),
+  );
+  for (const b of units) {
     if (b.type !== "fact" && b.type !== "caution" && b.type !== "definition") continue;
     const text = digits(b.text);
     const missing = b.claim_ids
