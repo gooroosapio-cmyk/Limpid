@@ -1000,8 +1000,12 @@ export const fr = {
     blocks: {
       credits: (needed: number, available: number) =>
         `Il vous manque ${Math.max(0, needed - available)} crédit${needed - available > 1 ? "s" : ""}. Cette action utilise ${needed} crédits ; vous en avez ${available} disponible${available > 1 ? "s" : ""}. Vos rapports existants restent accessibles.`,
-      weekly: (limit: number, date: string | null) =>
-        `Limite de ${limit} rapports cette semaine atteinte (offre gratuite).${date ? ` Prochain rapport possible le ${date}.` : ""} Une offre payante lève cette limite.`,
+      quota: (dayLimit: number | null, weekLimit: number | null, date: string | null) =>
+        dayLimit !== null && weekLimit !== null
+          ? `Vous avez atteint la limite de ${dayLimit} rapports aujourd'hui et de ${weekLimit} rapports cette semaine.${date ? ` Prochaine disponibilité : ${date}.` : ""} Vos crédits restants sont conservés jusqu'à leur échéance habituelle.`
+          : dayLimit !== null
+            ? `Vous avez atteint la limite de ${dayLimit} rapports aujourd'hui.${date ? ` Vous pourrez en créer de nouveaux le ${date}.` : ""} Vos crédits restants sont conservés jusqu'à leur échéance habituelle.`
+            : `Vous avez atteint la limite de ${weekLimit ?? 0} rapports cette semaine.${date ? ` Prochaine disponibilité : ${date}.` : ""}`,
       planReports: (limit: number) =>
         `Votre offre conserve ${limit} Limpid générés au plus. Supprimez un Limpid ou choisissez une offre plus grande : une recharge ne change pas cette limite.`,
       planSources: (limit: number) =>
@@ -1025,7 +1029,8 @@ export const fr = {
       perYear: "/an",
       yearlyEquiv: (n: string) => `soit environ ${n} par mois, payé en une fois`,
       creditsPerMonth: (n: number) => `${n.toLocaleString("fr-FR")} crédits par mois`,
-      freeWeekly: "2 rapports par semaine au plus",
+      perDayWeek: (day: number, week: number) => `${day} rapports par jour · ${week} par semaine au plus`,
+      capsNote: "Les plafonds de rapports s'appliquent en plus des crédits disponibles.",
       recommended: "Recommandé",
       current: "Offre actuelle",
       continueFree: "Continuer gratuitement",
@@ -1039,7 +1044,7 @@ export const fr = {
       } as Record<string, string>,
       features: {
         free: ["Rapports clairs et sourcés, quiz, Discuter", "1 document par Limpid", "3 Limpid conservés", "PDF avec filigrane discret"],
-        essential: ["Plusieurs documents par Limpid (jusqu'à 5)", "30 Limpid conservés", "PDF sans filigrane", "Pas de limite hebdomadaire"],
+        essential: ["Plusieurs documents par Limpid (jusqu'à 5)", "30 Limpid conservés", "PDF sans filigrane"],
         plus: ["Tout Essentiel", "100 Limpid conservés", "2 préparations en même temps"],
         pro: ["Tout Plus", "300 Limpid conservés", "3 préparations en même temps"],
       } as Record<string, string[]>,
@@ -1055,7 +1060,8 @@ export const fr = {
         yearly: "Prix annuel",
         credits: "Crédits par mois",
         reports: "Équivalent en rapports standard",
-        weekly: "Rapports par semaine",
+        daily: "Rapports par jour (au plus)",
+        weekly: "Rapports par semaine (au plus)",
         kept: "Limpid conservés",
         sources: "Documents par Limpid",
         concurrent: "Préparations simultanées",
@@ -1063,7 +1069,6 @@ export const fr = {
         yes: "Oui",
         no: "Non",
         none: "—",
-        noLimit: "Sans limite hebdomadaire",
       },
       actionsTitle: "Prix des actions",
       actions: {
@@ -1141,8 +1146,9 @@ export const fr = {
       topupMode: "Vous utilisez Limpid avec une recharge, sans abonnement actif.",
       accessEnds: (date: string) => `Accès payé jusqu'au ${date}`,
       nextGrant: (n: number, date: string) => `Prochains crédits : ${n}, le ${date}`,
-      weekly: (used: number, limit: number) => `Rapports cette semaine : ${used} sur ${limit}`,
-      weeklyNext: (date: string) => `Prochain rapport possible le ${date}`,
+      today: (used: number, limit: number) => `Rapports aujourd'hui : ${used}/${limit}`,
+      thisWeek: (used: number, limit: number) => `Rapports cette semaine : ${used}/${limit}`,
+      resetAt: (date: string) => `nouvelle place le ${date}`,
       monthlyNoCarry: "Les crédits mensuels ne se cumulent pas.",
       lots: "Lots de crédits",
       origins: { free_cycle: "Bonus gratuit du mois", subscription: "Allocation d'abonnement", topup: "Recharge", compensation: "Compensation", migration: "Reprise" } as Record<string, string>,

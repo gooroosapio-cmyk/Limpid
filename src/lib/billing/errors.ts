@@ -6,15 +6,17 @@ import "server-only";
 import { NextResponse } from "next/server";
 import type { Dict } from "@/lib/i18n";
 
-export type BillingBlock = "credits" | "weekly" | "plan_reports" | "plan_sources";
+export type BillingBlock = "credits" | "quota" | "plan_reports" | "plan_sources";
 export interface BlockDetail {
   needed?: number;
   available?: number;
   nextAt?: string | null;
   limit?: number;
+  dayLimit?: number;
+  weekLimit?: number;
 }
 
-export const BILLING_STATUS: Record<BillingBlock, number> = { credits: 402, weekly: 429, plan_reports: 403, plan_sources: 403 };
+export const BILLING_STATUS: Record<BillingBlock, number> = { credits: 402, quota: 429, plan_reports: 403, plan_sources: 403 };
 
 export function billingMessage(t: Dict, code: BillingBlock, d: BlockDetail, lang: "fr" | "en"): string {
   const b = t.billing.blocks;
@@ -24,8 +26,8 @@ export function billingMessage(t: Dict, code: BillingBlock, d: BlockDetail, lang
   switch (code) {
     case "credits":
       return b.credits(d.needed ?? 0, d.available ?? 0);
-    case "weekly":
-      return b.weekly(d.limit ?? 2, date);
+    case "quota":
+      return b.quota(d.dayLimit ?? null, d.weekLimit ?? null, date);
     case "plan_reports":
       return b.planReports(d.limit ?? 0);
     case "plan_sources":

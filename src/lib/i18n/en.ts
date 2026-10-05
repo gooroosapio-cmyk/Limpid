@@ -1029,8 +1029,12 @@ export const en: Dict = {
     blocks: {
       credits: (needed: number, available: number) =>
         `You need ${Math.max(0, needed - available)} more credit${needed - available > 1 ? "s" : ""}. This action uses ${needed} credits; you have ${available} available. Your existing reports stay accessible.`,
-      weekly: (limit: number, date: string | null) =>
-        `You have reached the limit of ${limit} reports this week (free plan).${date ? ` Next report possible on ${date}.` : ""} A paid plan removes this limit.`,
+      quota: (dayLimit: number | null, weekLimit: number | null, date: string | null) =>
+        dayLimit !== null && weekLimit !== null
+          ? `You have reached the limit of ${dayLimit} reports today and ${weekLimit} reports this week.${date ? ` Next availability: ${date}.` : ""} Your remaining credits are kept until their usual expiry.`
+          : dayLimit !== null
+            ? `You have reached the limit of ${dayLimit} reports today.${date ? ` You can create new ones on ${date}.` : ""} Your remaining credits are kept until their usual expiry.`
+            : `You have reached the limit of ${weekLimit ?? 0} reports this week.${date ? ` Next availability: ${date}.` : ""}`,
       planReports: (limit: number) =>
         `Your plan keeps up to ${limit} generated Limpids. Delete a Limpid or choose a bigger plan: a top-up does not change this limit.`,
       planSources: (limit: number) =>
@@ -1054,7 +1058,8 @@ export const en: Dict = {
       perYear: "/year",
       yearlyEquiv: (n: string) => `about ${n} per month, paid at once`,
       creditsPerMonth: (n: number) => `${n.toLocaleString("en-US")} credits per month`,
-      freeWeekly: "Up to 2 reports per week",
+      perDayWeek: (day: number, week: number) => `Up to ${day} reports per day · ${week} per week`,
+      capsNote: "Report limits apply in addition to available credits.",
       recommended: "Recommended",
       current: "Current plan",
       continueFree: "Continue for free",
@@ -1068,7 +1073,7 @@ export const en: Dict = {
       } as Record<string, string>,
       features: {
         free: ["Clear, sourced reports, quizzes, Chat", "1 document per Limpid", "3 Limpids kept", "PDF with a discreet watermark"],
-        essential: ["Several documents per Limpid (up to 5)", "30 Limpids kept", "PDF without watermark", "No weekly limit"],
+        essential: ["Several documents per Limpid (up to 5)", "30 Limpids kept", "PDF without watermark"],
         plus: ["Everything in Essential", "100 Limpids kept", "2 preparations at once"],
         pro: ["Everything in Plus", "300 Limpids kept", "3 preparations at once"],
       } as Record<string, string[]>,
@@ -1084,7 +1089,8 @@ export const en: Dict = {
         yearly: "Yearly price",
         credits: "Credits per month",
         reports: "Standard report equivalent",
-        weekly: "Reports per week",
+        daily: "Reports per day (max)",
+        weekly: "Reports per week (max)",
         kept: "Limpids kept",
         sources: "Documents per Limpid",
         concurrent: "Simultaneous preparations",
@@ -1092,7 +1098,6 @@ export const en: Dict = {
         yes: "Yes",
         no: "No",
         none: "—",
-        noLimit: "No weekly limit",
       },
       actionsTitle: "Action prices",
       actions: {
@@ -1170,8 +1175,9 @@ export const en: Dict = {
       topupMode: "You are using Limpid with a top-up, without an active subscription.",
       accessEnds: (date: string) => `Paid access until ${date}`,
       nextGrant: (n: number, date: string) => `Next credits: ${n}, on ${date}`,
-      weekly: (used: number, limit: number) => `Reports this week: ${used} of ${limit}`,
-      weeklyNext: (date: string) => `Next report possible on ${date}`,
+      today: (used: number, limit: number) => `Reports today: ${used}/${limit}`,
+      thisWeek: (used: number, limit: number) => `Reports this week: ${used}/${limit}`,
+      resetAt: (date: string) => `new slot on ${date}`,
       monthlyNoCarry: "Monthly credits do not add up.",
       lots: "Credit lots",
       origins: { free_cycle: "Monthly free bonus", subscription: "Subscription allocation", topup: "Top-up", compensation: "Compensation", migration: "Carry-over" } as Record<string, string>,

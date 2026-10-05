@@ -21,8 +21,9 @@ export interface PlanDef {
     keptReports: number;
     sourcesPerReport: number;
     concurrentJobs: number;
-    /** Nouveaux rapports par semaine glissante ; null : pas de limite hebdomadaire. */
-    weeklyReports: number | null;
+    /** Plafonds de rythme (V2, § 15) : rapports par jour (UTC) et par semaine (lundi, UTC). */
+    dailyReports: number;
+    weeklyReports: number;
   };
   watermark: boolean;
 }
@@ -33,7 +34,7 @@ export const PLANS: Record<PlanCode, PlanDef> = {
     monthlyXof: 0,
     yearlyXof: 0,
     monthlyCredits: 80,
-    limits: { keptReports: 3, sourcesPerReport: 1, concurrentJobs: 1, weeklyReports: 2 },
+    limits: { keptReports: 3, sourcesPerReport: 1, concurrentJobs: 1, dailyReports: 2, weeklyReports: 5 },
     watermark: true,
   },
   essential: {
@@ -41,7 +42,7 @@ export const PLANS: Record<PlanCode, PlanDef> = {
     monthlyXof: 2_900,
     yearlyXof: 29_000,
     monthlyCredits: 240,
-    limits: { keptReports: 30, sourcesPerReport: 5, concurrentJobs: 1, weeklyReports: null },
+    limits: { keptReports: 30, sourcesPerReport: 5, concurrentJobs: 1, dailyReports: 5, weeklyReports: 20 },
     watermark: false,
   },
   plus: {
@@ -49,7 +50,7 @@ export const PLANS: Record<PlanCode, PlanDef> = {
     monthlyXof: 5_900,
     yearlyXof: 59_000,
     monthlyCredits: 600,
-    limits: { keptReports: 100, sourcesPerReport: 5, concurrentJobs: 2, weeklyReports: null },
+    limits: { keptReports: 100, sourcesPerReport: 5, concurrentJobs: 2, dailyReports: 10, weeklyReports: 50 },
     watermark: false,
   },
   pro: {
@@ -57,7 +58,7 @@ export const PLANS: Record<PlanCode, PlanDef> = {
     monthlyXof: 11_900,
     yearlyXof: 119_000,
     monthlyCredits: 1_500,
-    limits: { keptReports: 300, sourcesPerReport: 5, concurrentJobs: 3, weeklyReports: null },
+    limits: { keptReports: 300, sourcesPerReport: 5, concurrentJobs: 3, dailyReports: 20, weeklyReports: 100 },
     watermark: false,
   },
 };
@@ -121,6 +122,18 @@ export const ACTION_PRICES = {
 } as const;
 export type Action = keyof typeof ACTION_PRICES;
 export type ReportAction = "report_short" | "report_standard" | "report_long";
+/** Actions qui comptent pour une « unité rapport » dans les plafonds jour/semaine. */
+export const REPORT_UNIT_ACTIONS: Action[] = ["report_short", "report_standard", "report_long", "report_version"];
+
+/** Fenêtres des plafonds : jour calendaire UTC, semaine du lundi 00:00 UTC (V2, § 15). */
+export function quotaWindows(now = new Date()) {
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dayEnd = new Date(dayStart.getTime() + 24 * 3600_000);
+  const sinceMonday = (now.getUTCDay() + 6) % 7;
+  const weekStart = new Date(dayStart.getTime() - sinceMonday * 24 * 3600_000);
+  const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3600_000);
+  return { dayStart, dayEnd, weekStart, weekEnd };
+}
 
 /** Taille du texte lu (en caractères) au-delà de laquelle un rapport n'est plus court / devient long. */
 export const SHORT_MAX_CHARS = 6_000;

@@ -3,7 +3,7 @@
 
 Version proposée : 5 octobre 2026, révision tarifaire. Ce document est une spécification à implémenter, pas une attestation de déploiement ni de tests réalisés sur Limpid.
 
-Révision tarifaire : Gratuit, bonus mensuel de 80 crédits (4 rapports) avec au plus 2 rapports par semaine ; Essentiel 2 900 FCFA (12 rapports) ; Plus 5 900 FCFA (30 rapports) ; Pro 11 900 FCFA (75 rapports) ; annuel au prix de dix mensualités ; recharges de 1 000, 2 500 et 5 000 FCFA (3, 9 et 25 rapports). Un « rapport » s'entend d'un rapport standard à 20 crédits : les allocations sont donc 80, 240, 600 et 1 500 crédits par mois.
+Révision tarifaire : Gratuit, bonus mensuel de 80 crédits (4 rapports) ; Essentiel 2 900 FCFA (12 rapports) ; Plus 5 900 FCFA (30 rapports) ; Pro 11 900 FCFA (75 rapports) ; annuel au prix de dix mensualités ; recharges de 1 000, 2 500 et 5 000 FCFA (3, 9 et 25 rapports). Un « rapport » s'entend d'un rapport standard à 20 crédits : les allocations sont donc 80, 240, 600 et 1 500 crédits par mois.
 
 ## 0. Mission et règles de priorité
 
@@ -19,6 +19,8 @@ Limpid reste mobile-first, pensé pour une administration depuis un téléphone.
 
 Les montants et paramètres ci-dessous sont des décisions proposées pour le produit. Les budgets moteur sont des hypothèses de calibration à vérifier par tests, pas des performances déjà mesurées. Vérifie les contrats actuels des API dans les sources officielles référencées en fin de document. N’invente aucun événement, champ, identifiant de produit ou mode de paiement.
 
+Plafonds de rythme (V2, § 15) : en plus des crédits, au plus 2 / 5 / 10 / 20 rapports par jour (UTC) et 5 / 20 / 50 / 100 par semaine (lundi UTC) en Gratuit / Essentiel / Plus / Pro ; le mode Recharge suit Essentiel. Une création ou une nouvelle version complète compte pour un rapport ; un échec rendu ne compte pas.
+
 ## 1. Monnaie utilisateur et tarifs
 
 Utilise partout « crédits Limpid », puis « crédits » lorsque le contexte est évident. Ne mélange pas « jetons », « tokens », dollars API et crédits dans le parcours client. Un crédit Limpid n’équivaut pas à un nombre fixe de tokens Gemini et n’est pas une somme remboursable en espèces.
@@ -29,7 +31,7 @@ N’expose jamais au client les tokens d’entrée, de sortie, de raisonnement, 
 
 | Code interne | Nom public | Mensuel | Annuel | Allocation |
 |---|---|---:|---:|---|
-| free | Découverte — Gratuit | 0 FCFA | — | Bonus de 80 crédits par cycle mensuel (4 rapports standard), le premier cycle étant ouvert après vérification du compte ; au plus 2 rapports par semaine glissante |
+| free | Découverte — Gratuit | 0 FCFA | — | Bonus de 80 crédits par cycle mensuel (4 rapports standard), le premier cycle étant ouvert après vérification du compte ; au plus 2 rapports par jour et 5 par semaine |
 | essential | Essentiel | 2 900 FCFA | 29 000 FCFA | 240 crédits par mois (12 rapports standard) |
 | plus | Plus | 5 900 FCFA | 59 000 FCFA | 600 crédits par mois (30 rapports standard) |
 | pro | Pro | 11 900 FCFA | 119 000 FCFA | 1 500 crédits par mois (75 rapports standard) |
@@ -38,7 +40,7 @@ Devise commerciale : XOF, affichée « FCFA ». Les prix sont les totaux catalog
 
 L’annuel couvre douze mois pour le prix de dix mensualités : 29 000, 59 000 et 119 000 FCFA. L’allocation reste mensuelle : 240, 600 ou 1 500 crédits, jamais douze fois cette quantité au paiement. Afficher le total annuel payé en une fois. Les équivalents mensuels facultatifs sont environ 2 417, 4 917 et 9 917 FCFA, explicitement présentés comme des équivalents et non comme un paiement mensuel.
 
-Le nombre de rapports annoncé est un équivalent, pas un compteur séparé : un forfait utilisé uniquement pour des rapports standard à 20 crédits donne exactement 4 rapports en Découverte (2 par semaine au plus), 12 en Essentiel, 30 en Plus et 75 en Pro. Une utilisation mixte (questions, QCM, images, rapports longs) réduit ce nombre ; des rapports courts à 8 crédits l’augmentent. Formulation publique : « l’équivalent de 12 rapports standard par mois », jamais « 12 rapports + questions illimitées ». Ne pas additionner plusieurs maxima marketing comme s’ils étaient tous inclus séparément.
+Le nombre de rapports annoncé est un équivalent, pas un compteur séparé : un forfait utilisé uniquement pour des rapports standard à 20 crédits donne exactement 4 rapports en Découverte (2 par jour et 5 par semaine au plus), 12 en Essentiel, 30 en Plus et 75 en Pro. Une utilisation mixte (questions, QCM, images, rapports longs) réduit ce nombre ; des rapports courts à 8 crédits l’augmentent. Formulation publique : « l’équivalent de 12 rapports standard par mois », jamais « 12 rapports + questions illimitées ». Ne pas additionner plusieurs maxima marketing comme s’ils étaient tous inclus séparément.
 
 ### Recharges ponctuelles
 
@@ -57,7 +59,8 @@ Une recharge ne renouvelle pas l’abonnement et ne transforme pas un compte en 
 | Limite | Découverte | Essentiel | Plus | Pro |
 |---|---:|---:|---:|---:|
 | Limpid générés conservés (documents produits, hors sources) | 3 | 30 | 100 | 300 |
-| Nouveaux rapports par semaine glissante | 2 | — | — | — |
+| Rapports par jour (UTC), au plus | 2 | 5 | 10 | 20 |
+| Rapports par semaine (lundi UTC), au plus | 5 | 20 | 50 | 100 |
 | Sources par rapport | 1 | 5 | 10 | 20 |
 | Pages sources cumulées par rapport | 20 | 100 | 300 | 1 000 |
 | Taille maximale par fichier | 10 Mo | 25 Mo | 40 Mo | 50 Mo |
@@ -288,14 +291,14 @@ Afficher un délai de renvoi réel et contrôlé côté serveur ; ne pas le conf
 
 Badge : « Découverte · Gratuit ».
 Titre : « Votre espace est prêt ».
-Texte : « Vous disposez de 80 crédits, soit 4 rapports, à utiliser à raison de 2 rapports par semaine au plus. Un nouveau bonus de 80 crédits arrive à chaque cycle mensuel. »
+Texte : « Vous disposez de 80 crédits, soit 4 rapports, à raison de 2 rapports par jour et 5 par semaine au plus. Un nouveau bonus de 80 crédits arrive à chaque cycle mensuel. »
 Détail : « Les crédits mensuels ne se cumulent pas. »
 Actions : « Importer mon premier document » et lien discret « Voir les offres ».
 
 ### En-tête et Compte
 
 Badge permanent mais discret « Gratuit », « Essentiel », « Plus » ou « Pro ».
-Pour le gratuit : « 32 crédits disponibles » ; « Prochains crédits : 80, le [date] » ; si la limite hebdomadaire est atteinte : « Limite de 2 rapports cette semaine atteinte. Prochain rapport possible le [date]. » (pas de recharge proposée comme solution à cette limite, seulement les offres) ; bouton « Découvrir Premium ».
+Pour le gratuit : « 32 crédits disponibles » ; « Prochains crédits : 80, le [date] » ; si un plafond est atteint : « Vous avez atteint la limite de 2 rapports aujourd’hui. Vous pourrez en créer de nouveaux le [date]. » (pas de recharge proposée comme solution à cette limite, seulement les offres) ; bouton « Découvrir Premium ».
 Pour le payant : allocation, solde disponible/réservé, date de fin d’accès et prochaine attribution distinctes. Dans l’annuel, ne pas confondre la prochaine allocation mensuelle et la fin des douze mois.
 
 ### Solde insuffisant
@@ -317,7 +320,7 @@ Titre : « Choisissez votre rythme avec Limpid ».
 Sous-titre : « Plus de crédits pour comprendre, réviser et créer vos supports. »
 Sélecteur Mensuel / Annuel ; mention « 2 mois offerts » pour l’annuel, avec total annuel clairement visible : 29 000, 59 000 et 119 000 FCFA.
 
-Découverte : « Pour essayer Limpid à votre rythme. » Prix 0 FCFA. Mention « 80 crédits par mois · l’équivalent de 4 rapports · 2 par semaine au plus ». Bouton « Continuer gratuitement » ou « Offre actuelle ».
+Découverte : « Pour essayer Limpid à votre rythme. » Prix 0 FCFA. Mention « 80 crédits par mois · l’équivalent de 4 rapports · 2 rapports par jour et 5 par semaine au plus ». Bouton « Continuer gratuitement » ou « Offre actuelle ».
 
 Essentiel : « Pour comprendre vos documents régulièrement. » 2 900 FCFA/mois, 240 crédits/mois, l’équivalent de 12 rapports. Mettre en avant PDF sans filigrane, plusieurs sources et accès aux images à la demande. Bouton « Choisir Essentiel ».
 
@@ -557,7 +560,7 @@ T22. Le dernier crédit d’une recharge ne casse pas la livraison déjà autori
 
 ### Cycles et offres
 
-T23a. Un compte gratuit ne peut lancer un troisième rapport dans la même semaine glissante, même avec des crédits disponibles ; le message donne la date du prochain rapport possible.
+T23a. Un compte gratuit ne peut lancer un troisième rapport le même jour UTC ni un sixième la même semaine, même avec des crédits disponibles ; le message donne la date à laquelle toutes les limites sont levées.
 T23. L’allocation du premier cycle gratuit n’est versée qu’une fois et ne se cumule avec aucune autre allocation gratuite du même cycle.
 T24. Une allocation gratuite n’est pas ajoutée au cycle premium.
 T25. L’achat annuel crée douze allocations, pas une allocation douze fois plus grande.

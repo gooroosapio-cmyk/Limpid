@@ -55,7 +55,11 @@ export default async function AccountPage() {
             <p className="big">{b.available(wallet.available)}</p>
             {wallet.reserved > 0 && <p className="muted small">{b.availableReserved(wallet.available, wallet.reserved)}</p>}
             {wallet.nextGrant && <p className="muted small">{b.wallet.nextGrant(wallet.nextGrant.credits, day(wallet.nextGrant.at))}</p>}
-            {wallet.weekly && <p className="muted small">{b.wallet.weekly(wallet.weekly.used, wallet.weekly.limit)}</p>}
+            {wallet.quotas && (
+              <p className="muted small">
+                {b.wallet.today(wallet.quotas.day.used, wallet.quotas.day.limit)} · {b.wallet.thisWeek(wallet.quotas.week.used, wallet.quotas.week.limit)}
+              </p>
+            )}
             <div className="actions-row">
               <Link href="/compte/credits" className="btn">{b.wallet.title}</Link>
               {wallet.mode !== "subscription" && <Link href="/offres" className="btn btn-primary">{b.wallet.discover}</Link>}

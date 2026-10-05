@@ -11,9 +11,9 @@ import { adminClient } from "@/lib/supabase/admin";
 
 export class RetryError extends Error {
   constructor(
-    readonly code: "not_found" | "not_failed" | "limit" | "disabled" | "storage" | "credits" | "weekly",
+    readonly code: "not_found" | "not_failed" | "limit" | "disabled" | "storage" | "credits" | "quota",
     message: string,
-    readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number } = {},
+    readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number; dayLimit?: number; weekLimit?: number } = {},
   ) {
     super(message);
   }
@@ -55,8 +55,8 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
   try {
     ({ reservationId } = await reserveCredits(userId, action, `report:${idempotencyKey}`, { reportId }, { wallet: ent.wallet }));
   } catch (e) {
-    if (e instanceof CreditError && (e.code === "insufficient" || e.code === "weekly")) {
-      throw new RetryError(e.code === "insufficient" ? "credits" : "weekly", e.message, e.detail);
+    if (e instanceof CreditError && (e.code === "insufficient" || e.code === "quota")) {
+      throw new RetryError(e.code === "insufficient" ? "credits" : "quota", e.message, e.detail);
     }
     throw e;
   }

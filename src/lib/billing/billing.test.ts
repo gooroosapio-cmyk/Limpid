@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/admin", () => ({ adminClient: () => ({}) }));
 
-import { ACTION_PRICES, PLANS, PRODUCT_CODES, product, reportAction, reportsFor, TOPUPS } from "./catalog";
-import { resolvePlan, weeklyState } from "./wallet";
+import { ACTION_PRICES, PLANS, PRODUCT_CODES, product, quotaWindows, reportAction, reportsFor, TOPUPS } from "./catalog";
+import { quotaBlock, quotaState, resolvePlan } from "./wallet";
 
 describe("catalogue (révision tarifaire)", () => {
   it("offres : prix, crédits mensuels et équivalents en rapports standard", () => {
@@ -11,7 +11,13 @@ describe("catalogue (révision tarifaire)", () => {
     expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => reportsFor(p.monthlyCredits))).toEqual([4, 12, 30, 75]);
     // Annuel : douze mois pour le prix de dix.
     for (const p of [PLANS.essential, PLANS.plus, PLANS.pro]) expect(p.yearlyXof).toBe(p.monthlyXof * 10);
-    expect(PLANS.free.limits.weeklyReports).toBe(2);
+    // Plafonds V2 : jour / semaine.
+    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => [p.limits.dailyReports, p.limits.weeklyReports])).toEqual([
+      [2, 5],
+      [5, 20],
+      [10, 50],
+      [20, 100],
+    ]);
   });
   it("recharges : pas en dessous de 1 000 FCFA, 25 rapports pour 5 000", () => {
     expect(Object.values(TOPUPS).map((t) => t.xof)).toEqual([1_000, 2_500, 5_000]);
@@ -53,14 +59,28 @@ describe("offre active", () => {
   });
 });
 
-describe("limite hebdomadaire du gratuit", () => {
-  const now = new Date("2026-10-10T12:00:00Z");
-  it("compte les rapports des 7 derniers jours et donne la date du prochain possible", () => {
-    const w = weeklyState(["2026-10-04T13:00:00Z", "2026-10-08T09:00:00Z", "2026-10-01T09:00:00Z"], 2, now);
-    expect(w.used).toBe(2);
-    expect(w.nextAt).toBe("2026-10-11T13:00:00.000Z");
+describe("plafonds jour et semaine (UTC)", () => {
+  it("jour calendaire UTC, semaine du lundi 00:00 UTC", () => {
+    const w = quotaWindows(new Date("2026-10-07T23:30:00Z")); // mercredi
+    expect(w.dayStart.toISOString()).toBe("2026-10-07T00:00:00.000Z");
+    expect(w.dayEnd.toISOString()).toBe("2026-10-08T00:00:00.000Z");
+    expect(w.weekStart.toISOString()).toBe("2026-10-05T00:00:00.000Z");
+    expect(w.weekEnd.toISOString()).toBe("2026-10-12T00:00:00.000Z");
+    // Dimanche : encore la semaine commencée le lundi précédent.
+    expect(quotaWindows(new Date("2026-10-11T12:00:00Z")).weekStart.toISOString()).toBe("2026-10-05T00:00:00.000Z");
   });
-  it("sous la limite : pas de date d'attente", () => {
-    expect(weeklyState(["2026-10-08T09:00:00Z"], 2, now)).toEqual({ used: 1, limit: 2, nextAt: null });
+  it("compte les rapports du jour et de la semaine", () => {
+    const now = new Date("2026-10-07T12:00:00Z");
+    const q = quotaState(["2026-10-07T08:00:00Z", "2026-10-06T08:00:00Z", "2026-10-04T08:00:00Z"], { day: 2, week: 5 }, now);
+    expect(q.day).toMatchObject({ used: 1, limit: 2 });
+    expect(q.week).toMatchObject({ used: 2, limit: 5 });
+  });
+  it("limite atteinte : la date donnée est celle où toutes les limites sont levées", () => {
+    const now = new Date("2026-10-07T12:00:00Z");
+    const dayOnly = quotaBlock(quotaState(["2026-10-07T08:00:00Z", "2026-10-07T09:00:00Z"], { day: 2, week: 5 }, now))!;
+    expect(dayOnly).toMatchObject({ dayLimit: 2, weekLimit: undefined, nextAt: "2026-10-08T00:00:00.000Z" });
+    const both = quotaBlock(quotaState(["2026-10-07T08:00:00Z", "2026-10-07T09:00:00Z"], { day: 2, week: 2 }, now))!;
+    expect(both).toMatchObject({ dayLimit: 2, weekLimit: 2, nextAt: "2026-10-12T00:00:00.000Z" });
+    expect(quotaBlock(quotaState([], { day: 2, week: 5 }, now))).toBeNull();
   });
 });

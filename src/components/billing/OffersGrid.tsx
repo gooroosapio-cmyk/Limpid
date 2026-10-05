@@ -44,7 +44,8 @@ export function OffersGrid({
           <p className="muted">{o.taglines.free}</p>
           <p className="offer-price">0 FCFA</p>
           <p className="offer-credits">{o.creditsPerMonth(PLANS.free.monthlyCredits)}</p>
-          <p className="muted small">{t.billing.reports(reportsFor(PLANS.free.monthlyCredits))} · {o.freeWeekly}</p>
+          <p className="muted small">{t.billing.reports(reportsFor(PLANS.free.monthlyCredits))}</p>
+          <p className="muted small">{o.perDayWeek(PLANS.free.limits.dailyReports, PLANS.free.limits.weeklyReports)}</p>
           <ul className="offer-features">{o.features.free!.map((f) => <li key={f}>{f}</li>)}</ul>
           {current?.mode === "free" ? (
             <span className="btn btn-block" aria-disabled="true">{o.current}</span>
@@ -69,6 +70,7 @@ export function OffersGrid({
               {period === "yearly" && <p className="muted small">{o.yearlyEquiv(formatXof(Math.round(plan.yearlyXof / 12), lang))}</p>}
               <p className="offer-credits">{o.creditsPerMonth(plan.monthlyCredits)}</p>
               <p className="muted small">{t.billing.reports(reportsFor(plan.monthlyCredits))}</p>
+              <p className="muted small">{o.perDayWeek(plan.limits.dailyReports, plan.limits.weeklyReports)}</p>
               <ul className="offer-features">{o.features[code]!.map((f) => <li key={f}>{f}</li>)}</ul>
               <Link href={`/offres/paiement?produit=${code}_${period}`} className={`btn btn-block${code === "plus" ? " btn-primary" : ""}`}>
                 {day ? o.schedule(name, day) : isCurrent ? o.current : o.choose(name)}

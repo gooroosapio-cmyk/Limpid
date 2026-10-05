@@ -4,7 +4,7 @@
  * écritures passent par les fonctions SQL transactionnelles (verrou par compte).
  */
 import "server-only";
-import { ACTION_PRICES, PLANS, type Action, type PlanCode } from "./catalog";
+import { ACTION_PRICES, PLANS, quotaWindows, REPORT_UNIT_ACTIONS, type Action, type PlanCode } from "./catalog";
 import { adminClient } from "@/lib/supabase/admin";
 
 export type WalletMode = "free" | "topup" | "subscription";
@@ -20,8 +20,13 @@ export interface Wallet {
   accessEndsAt: string | null;
   /** Prochaine allocation mensuelle (gratuite ou d'abonnement) et sa quantité. */
   nextGrant: { at: string; credits: number } | null;
-  /** Limite hebdomadaire de l'offre gratuite. */
-  weekly: { used: number; limit: number; nextAt: string | null } | null;
+  /** Plafonds de rapports (jour UTC, semaine du lundi) ; null : administrateur, sans plafond. */
+  quotas: Quotas | null;
+}
+
+export interface Quotas {
+  day: { used: number; limit: number; resetAt: string };
+  week: { used: number; limit: number; resetAt: string };
 }
 
 interface LotRow {
@@ -40,16 +45,24 @@ interface SubRow {
 
 export class CreditError extends Error {
   constructor(
-    public readonly code: "insufficient" | "weekly" | "key_reused" | "storage",
+    public readonly code: "insufficient" | "quota" | "key_reused" | "storage",
     message: string,
-    public readonly detail: { needed?: number; available?: number; nextAt?: string | null } = {},
+    public readonly detail: QuotaDetail = {},
   ) {
     super(message);
   }
 }
 
-const WEEK_MS = 7 * 24 * 3600_000;
-const REPORT_ACTIONS = ["report_short", "report_standard", "report_long"];
+export interface QuotaDetail {
+  needed?: number;
+  available?: number;
+  dayUsed?: number;
+  dayLimit?: number;
+  weekUsed?: number;
+  weekLimit?: number;
+  /** Date à laquelle toutes les limites atteintes sont levées. */
+  nextAt?: string | null;
+}
 
 /** Offre et mode à partir des abonnements (dates) et des lots (recharge valide). */
 export function resolvePlan(subs: SubRow[], lots: LotRow[], now = new Date()): { plan: PlanCode; mode: WalletMode; active: SubRow | null } {
@@ -60,13 +73,31 @@ export function resolvePlan(subs: SubRow[], lots: LotRow[], now = new Date()): {
   return { plan: topup ? "essential" : "free", mode: topup ? "topup" : "free", active: null };
 }
 
-/** Limite hebdomadaire : rapports réservés ou livrés sur 7 jours glissants (les échecs ne comptent pas). */
-export function weeklyState(starts: string[], limit: number, now = new Date()): { used: number; limit: number; nextAt: string | null } {
-  const recent = starts.map((s) => new Date(s).getTime()).filter((t) => now.getTime() - t < WEEK_MS).sort((a, b) => a - b);
-  const used = recent.length;
-  // Prochain rapport possible : quand le plus ancien rapport de la fenêtre en sort.
-  const nextAt = used >= limit ? new Date(recent[used - limit]! + WEEK_MS).toISOString() : null;
-  return { used, limit, nextAt };
+/**
+ * Plafonds de rythme (V2, § 15) : unités rapport réservées ou livrées dans le jour UTC et la
+ * semaine (lundi UTC) en cours ; une réservation rendue (échec) ne compte pas.
+ */
+export function quotaState(starts: string[], limits: { day: number; week: number }, now = new Date()): Quotas {
+  const w = quotaWindows(now);
+  const times = starts.map((s) => new Date(s).getTime());
+  return {
+    day: { used: times.filter((t) => t >= w.dayStart.getTime()).length, limit: limits.day, resetAt: w.dayEnd.toISOString() },
+    week: { used: times.filter((t) => t >= w.weekStart.getTime()).length, limit: limits.week, resetAt: w.weekEnd.toISOString() },
+  };
+}
+
+/** Limites atteintes et date à laquelle elles sont toutes levées (la plus tardive). */
+export function quotaBlock(q: Quotas): QuotaDetail | null {
+  const dayFull = q.day.used >= q.day.limit;
+  const weekFull = q.week.used >= q.week.limit;
+  if (!dayFull && !weekFull) return null;
+  return {
+    dayUsed: q.day.used,
+    dayLimit: dayFull ? q.day.limit : undefined,
+    weekUsed: q.week.used,
+    weekLimit: weekFull ? q.week.limit : undefined,
+    nextAt: weekFull ? q.week.resetAt : q.day.resetAt,
+  };
 }
 
 export async function ensureAllocations(userId: string) {
@@ -103,16 +134,16 @@ export async function getWallet(userId: string): Promise<Wallet> {
   await sweepReservations(userId);
   const db = adminClient();
   const now = new Date();
-  const [{ data: lots }, { data: subs }, { data: weeklyRows }, { data: user }, { data: profile }] = await Promise.all([
+  const [{ data: lots }, { data: subs }, { data: unitRows }, { data: user }, { data: profile }] = await Promise.all([
     db.from("credit_lots").select("origin, available, reserved, expires_at").eq("owner_id", userId),
     db.from("subscriptions").select("plan, starts_at, ends_at, monthly_credits").eq("owner_id", userId).order("starts_at"),
     db
       .from("credit_reservations")
       .select("created_at")
       .eq("owner_id", userId)
-      .in("action", REPORT_ACTIONS)
+      .in("action", REPORT_UNIT_ACTIONS)
       .neq("status", "released")
-      .gte("created_at", new Date(now.getTime() - WEEK_MS).toISOString()),
+      .gte("created_at", new Date(Math.min(quotaWindows(now).weekStart.getTime(), quotaWindows(now).dayStart.getTime())).toISOString()),
     db.auth.admin.getUserById(userId),
     db.from("profiles").select("role").eq("id", userId).maybeSingle(),
   ]);
@@ -133,8 +164,13 @@ export async function getWallet(userId: string): Promise<Wallet> {
     const cycleEnd = valid.filter((l) => l.origin === "free_cycle").map((l) => l.expires_at).sort().at(-1);
     if (cycleEnd) nextGrant = { at: cycleEnd, credits: PLANS.free.monthlyCredits };
   }
-  // Administrateurs : pas de limite hebdomadaire (les crédits restent dus, jamais illimités).
-  const weeklyLimit = profile?.role === "admin" ? null : PLANS[mode === "free" ? "free" : plan].limits.weeklyReports;
+  // Plafonds de l'offre (le mode Recharge suit ceux d'Essentiel). Administrateurs : sans
+  // plafond de rythme, mais les crédits restent dus (jamais d'accès illimité).
+  const limits = PLANS[mode === "free" ? "free" : plan].limits;
+  const quotas =
+    profile?.role === "admin"
+      ? null
+      : quotaState((unitRows ?? []).map((r) => r.created_at as string), { day: limits.dailyReports, week: limits.weeklyReports }, now);
   return {
     available: valid.reduce((n, l) => n + l.available, 0),
     reserved: lotRows.reduce((n, l) => n + l.reserved, 0),
@@ -143,7 +179,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
     mode,
     accessEndsAt,
     nextGrant,
-    weekly: mode === "free" && weeklyLimit ? weeklyState((weeklyRows ?? []).map((r) => r.created_at as string), weeklyLimit, now) : null,
+    quotas,
   };
 }
 
@@ -155,7 +191,7 @@ export async function getEntitlements(userId: string) {
 
 /**
  * Réserve le prix fixe d'une action avant tout appel IA. Idempotente par clé : un double clic
- * renvoie la même réservation. Lève CreditError si le solde ou la limite hebdomadaire manque.
+ * renvoie la même réservation. Lève CreditError si le solde ou un plafond de rapports manque.
  */
 export async function reserveCredits(
   userId: string,
@@ -172,18 +208,26 @@ export async function reserveCredits(
     return { reservationId: existing.id as string, amount };
   }
   const wallet = opts.wallet ?? (await getWallet(userId));
-  if (REPORT_ACTIONS.includes(action) && wallet.weekly && wallet.weekly.used >= wallet.weekly.limit) {
-    throw new CreditError("weekly", "Limite hebdomadaire atteinte.", { nextAt: wallet.weekly.nextAt });
-  }
-  const { data, error } = await db.rpc("reserve_credits", {
+  // Plafonds revérifiés en base, sous le même verrou que les crédits (dernière place disputée).
+  const { data, error } = await db.rpc("reserve_credits_v2", {
     p_owner: userId,
     p_amount: amount,
     p_action: action,
     p_key: key,
     p_job: refs.jobId ?? null,
     p_report: refs.reportId ?? null,
+    p_day_limit: wallet.quotas?.day.limit ?? null,
+    p_week_limit: wallet.quotas?.week.limit ?? null,
   });
   if (error) {
+    const q = /quota_atteint:(\d+):(-?\d+):(\d+):(-?\d+)/.exec(error.message ?? "");
+    if (q && wallet.quotas) {
+      const detail = quotaBlock({
+        day: { ...wallet.quotas.day, used: Number(q[1]) },
+        week: { ...wallet.quotas.week, used: Number(q[3]) },
+      });
+      throw new CreditError("quota", "Plafond de rapports atteint.", detail ?? {});
+    }
     const m = /credits_insuffisants:(\d+)/.exec(error.message ?? "");
     if (m) throw new CreditError("insufficient", "Crédits insuffisants.", { needed: amount, available: Number(m[1]) });
     if ((error.message ?? "").includes("cle_reutilisee")) throw new CreditError("key_reused", "Cette demande a déjà été utilisée pour une autre action.");

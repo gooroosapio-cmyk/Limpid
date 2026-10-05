@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return NextResponse.json({ status: "queued" }, { status: 202 });
   } catch (e) {
     if (e instanceof VersionError) {
-      if (e.code === "credits") return billingResponse(await getT(), await getLang(), "credits", e.detail);
+      if (e.code === "credits" || e.code === "quota") return billingResponse(await getT(), await getLang(), e.code, e.detail);
       const status = { not_found: 404, busy: 409, limit: 409, storage: 500 }[e.code];
       return NextResponse.json({ error: e.code, message: e.message }, { status });
     }
