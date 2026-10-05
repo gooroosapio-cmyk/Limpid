@@ -526,6 +526,7 @@ export const en: Dict = {
     },
   },
   login: {
+    noAccount: "No account yet?",
     oauth: {
       google: "Continue with Google",
       apple: "Continue with Apple",

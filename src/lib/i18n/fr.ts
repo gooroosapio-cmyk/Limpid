@@ -524,6 +524,7 @@ export const fr = {
     } as Record<string, string>,
   },
   login: {
+    noAccount: "Pas encore de compte ?",
     oauth: {
       google: "Continuer avec Google",
       apple: "Continuer avec Apple",

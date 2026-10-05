@@ -35,11 +35,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       )}
       <OAuthButtons t={t} />
       <LoginForm />
-      {open && (
-        <p className="center">
-          <Link href="/inscription" className="btn btn-block">{t.signup.create}</Link>
-        </p>
-      )}
+      <section className="login-signup" aria-labelledby="signup-h">
+        <h2 id="signup-h" className="small">{t.login.noAccount}</h2>
+        <Link href="/inscription" className="btn btn-block">{t.signup.create}</Link>
+        {!open && <p className="muted small">{t.signup.closed}</p>}
+      </section>
       <p className="center"><Link href="/offres" className="btn-link">{t.billing.seeOffers}</Link></p>
     </div>
   );
