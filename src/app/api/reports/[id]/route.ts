@@ -52,9 +52,9 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
   return NextResponse.json({ status: result });
 }
 
-const ThemeChange = z.strictObject({ theme_id: ThemeId });
+const ThemeChange = z.strictObject({ theme_id: ThemeId.nullable() });
 
-/** Changement de présentation : même contenu validé, nouveau rendu, aucun appel IA. */
+/** Changement de présentation (null = automatique) : même contenu validé, nouveau rendu, aucun appel IA. */
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "non_connecte" }, { status: 401 });

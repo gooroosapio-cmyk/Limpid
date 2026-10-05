@@ -15,6 +15,8 @@ export async function proxy(request: NextRequest) {
     `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' blob: data: https://images.unsplash.com",
     "font-src 'self'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
     `connect-src 'self' ${SUPABASE_URL}`,
     "object-src 'none'",
     "base-uri 'self'",
@@ -56,7 +58,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!_next/static|_next/image|favicon.ico|icon.svg).*)",
+      source: "/((?!_next/static|_next/image|favicon.ico|icon.svg|sw.js|manifest.webmanifest|icons/|fonts/).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

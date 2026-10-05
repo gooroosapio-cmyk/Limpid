@@ -4,6 +4,7 @@ import { pdfHeaders, renderReportPdf, type PdfImage } from "@/lib/render/pdf";
 import { creditText } from "@/lib/visuals/credit";
 import { loadReport } from "@/lib/reports/load";
 import { adminClient } from "@/lib/supabase/admin";
+import { showsIllustrations } from "@/lib/display/themes";
 
 export const maxDuration = 60;
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
   // Illustrations stockées seulement (une image hébergée par un tiers n'est pas embarquée).
   const images: Record<string, PdfImage> = {};
-  if (report.theme !== "essentiel") {
+  if (showsIllustrations(report.theme)) {
     await Promise.all(
       Object.values(report.assets).map(async (a) => {
         if (!a.storagePath || (a.mime !== "image/jpeg" && a.mime !== "image/png")) return;

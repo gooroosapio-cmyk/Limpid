@@ -1,5 +1,53 @@
 # Avancement
 
+## Phase 11.1 — Navigation façon Gemini et lecteur plein écran (5 octobre 2026)
+
+### FAIT
+- **Barre d'en-tête unique** sur une ligne : menu, logo Limpid, Profil, Paramètres. **Plus aucune flèche de retour** : le retour est celui du téléphone ou du navigateur ; seules les croix ferment les volets. Le contenu remonte d'autant.
+- **Menu latéral** (volet depuis la gauche sur téléphone et tablette, barre fixe ≥ 1200 px) : Accueil (ajouter un document), Ajouter un texte, Ajouter un PDF, Ajouter un lien, Paramètres, puis **Bibliothèque** avec la liste des limpid (préparation en cours et échec signalés), profil en pied.
+- **Bibliothèque = page principale** (`/`) avec **bouton flottant** « Expliquer un document » vers l'Accueil (page d'import, onglet présélectionné depuis le menu). `/bibliotheque` redirige.
+- **Profil** (`/compte`) et **Paramètres** (`/parametres` : explications, confort de lecture, mode d'affichage, thème par défaut, installation, données) ; anciennes adresses redirigées.
+- **Présentation en plein écran** : aucune barre de l'application autour d'un limpid ; sur téléphone et tablette, le navigateur passe en plein écran à l'ouverture (refus silencieux s'il ne le permet pas, iPhone compris) et en sort en quittant.
+- **Trois boutons en bas de chaque limpid** :
+  - **Sommaire** : plan avec la position de lecture, options du rapport (export PDF, présentation, source, hors connexion, versions, suppression), retour à la bibliothèque.
+  - **Me tester** : **Interrogation** (3 questions sur la partie en cours) ou **Devoir** (QCM de 5 à 10 questions sur tout le document), rédigés par l'IA à partir des explications du limpid, une question à la fois, correction expliquée pour chaque proposition, bilan limité à la série avec les parties à revoir, « Recommencer » et « D'autres questions ». Tests gardés par version (rouvrir = aucune requête), table `report_quizzes` (RLS lecture propriétaire, écriture serveur, effacée avec le rapport).
+  - **Poser une question** : réponse courte fondée sur les passages du document et la partie lue, **citations vérifiées mot pour mot** (sinon retirées), « Au-delà du document » séparé, suites proposées. Échange non enregistré.
+- Débit et budget : 12 tests et 30 questions par heure et par compte, plafonds de dépense existants, consommation journalisée (`quiz_gen`, `ask`) et visible dans `/admin`.
+
+### EN TEST (résultats réels)
+- `npm test` : 170 tests ; recette SQL OK (isolation et effacement des tests) ; build OK.
+- **Gemini réel (offre gratuite)** : devoir de 5 questions valide (bonne réponse à des positions variées), réponse avec citation vérifiée (`scripts/live-reader-ai.test.ts`, 2 requêtes).
+- Recette visuelle locale : tous les écrans de 320 à 1440 px + nuit : **0 violation axe, 0 débordement** ; menu, QCM (juste, à revoir, bilan) et questions vérifiés à 390 et 1440 px. Captures : `docs/recette/v3-1/captures/`.
+
+### À FAIRE / LIMITES
+- Migrations `20261005000000_v3_themes_originals.sql` et `20261005010000_report_quizzes.sql` : **à appliquer en production à la fusion**.
+- Chaque test nouveau et chaque question consomment une requête Gemini (quota gratuit : 20 par jour et par modèle, avec repli).
+
+## Phase 11 — Refonte V3 (kit « LIMPID_V3 », 5 octobre 2026)
+
+Cadrage (QCM, 13 réponses) : socle visuel d'abord ; navigation Accueil / Bibliothèque / Compte ; parcours tout automatique ; 5 thèmes du kit ; mode nuit ; polices du kit ; animations expressives (mouvement réduit respecté) ; bureau comme le kit ; original gardé 30 jours ; « Demander » et la nouvelle révision à la passe suivante ; abonnement « bientôt » ; installable et lecture hors connexion.
+
+### FAIT
+- **Système visuel** : jetons du kit (ivoire, encre, jaune, vert), polices locales Inter / Source Serif 4 / IBM Plex Mono, logo, 36 icônes, mode clair/sombre/système (le PDF reste clair), taille du texte, contraste renforcé, mouvement réduit (réglage appareil et réglage Limpid). Feuilles de style découpées (`src/app/styles/`).
+- **Animations** : entrée d'écran, apparition en cascade, livre animé de préparation (sans pourcentage), étapes qui se cochent, volets (bas d'écran sur mobile, panneau latéral ≥ 1200 px), squelettes de chargement, bouton occupé, célébration du quiz réussi. Désactivées avec le mouvement réduit.
+- **Coquille responsive** : < 700 px barre du bas ; 700–1199 px rail compact ; ≥ 1200 px barre latérale avec « Ajouter un document ». Barre de lecture fixe dans le rapport. Aucun débordement horizontal de 320 à 1440 px.
+- **Parcours automatique** : Ajouter un document → Document ajouté (un seul aperçu, « Ouvrir le PDF », approche annoncée, note de fidélité) → « Expliquer mon document » sans réglage : niveau et objectif tirés des préférences, longueur selon la taille du texte (≤ 12 000 caractères : 5 pages, ≤ 60 000 : 7, au-delà : 12), thème choisi selon l'organisation du rapport. Préparation : 4 étapes dérivées de l'étape réelle de la tâche, titre qui change, « Revenir à l'accueil ». Erreur : « Lecture à compléter » avec actions.
+- **Lecteur** : en-tête « Votre rapport » et options (export PDF, présentation, source, enregistrement hors connexion, versions, suppression) ; **notions soulignées** (première occurrence) ouvrant « Une notion en clair » (définition, source, « Vérifier si j'ai compris ») ; source citée avec « Ouvrir l'original » ou « Original indisponible » ; barre Sommaire / Me tester / Demander (« bientôt ») ; sommaire « Dans ce rapport » avec la position de lecture ; schémas aux couleurs du thème et du mode nuit.
+- **5 thèmes** (Sciences, Récit, Dossier, Guide, Confort), web et PDF, choix « Automatique » ; anciens thèmes convertis (Essentiel → Dossier, Visuel → Guide, Éditorial → automatique).
+- **Original conservé 30 jours** (`LIMPID_RETENTION_ORIGINAL_HOURS=720`) et servi par `/api/sources/[id]/original` (propriétaire seulement, lien signé de 60 s) ; envoi non utilisé : 24 h ; échec de lecture OCR : effacé.
+- **Bibliothèque** : onglets Rapports / Sources, recherche par titre, filtres effaçables (Tous, Prêts, En préparation, À revoir), états distincts, état vide, exemple ; sources avec original indisponible et réimport.
+- **Compte** : profil, utilisation réelle (rapports sur 24 h, sans tarif), Préférences de lecture directes (familiarité, objectif, explications concrètes, taille, animations, contraste), Apparence (mode + thème par défaut), Abonnement (« bientôt », aucun tarif), Utilisation, Confidentialité et données (durées issues de la configuration, suppression du compte), Installer, Mot de passe, Administration. Anciennes adresses `/rapports` et `/preferences` redirigées.
+- **PWA** : manifeste et icônes, service worker (`public/sw.js`) : fichiers statiques en cache, pages en réseau d'abord, **rapports enregistrés lisibles hors connexion** (cache par compte, effacé à la déconnexion ou au changement de compte), écran « Hors connexion », bandeau réseau, mise à jour proposée. CSP : `worker-src 'self'`, `manifest-src 'self'`.
+
+### EN TEST (résultats réels)
+- `npm test` : 161 tests ; recette SQL OK (avec la migration V3) ; build OK.
+- Recette visuelle locale (données de démonstration, sans réseau) : 18 écrans × 320, 390, 768, 1024, 1440 px + mode nuit à 390 px : **0 violation axe (WCAG 2.2 AA), 0 débordement horizontal**. Volets notion, options, sommaire, source vérifiés (focus rendu au mot). Captures : `docs/recette/v3/captures/`.
+
+### NON TESTÉ / À FAIRE
+- Migration `20261005000000_v3_themes_originals.sql` : **à appliquer en production au moment de la fusion** (l'ancien code écrit encore les anciens thèmes).
+- Service worker et installation : à vérifier sur téléphone après déploiement (actifs en production seulement).
+- Passe suivante : « Demander au document », révision V3 (QCM, relier, ordonner), favoris, renommer, signaler.
+
 ## Correctifs après livraison (4 octobre 2026)
 - **Diagnostic Gemini** : une requête sans donnée était refusée (HTTP 400) ; corrigé (PR #10).
 - **Conservation des rapports : 30 jours** après création (décision du propriétaire), effacement complet par le cron quotidien (`purgeExpiredReports`, journal `report.expired`), date affichée dans le lecteur, durée affichée dans le diagnostic. `LIMPID_RETENTION_REPORT_DAYS=30` par défaut.

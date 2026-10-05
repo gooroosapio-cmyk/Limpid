@@ -40,12 +40,33 @@ export async function clearPreferences(): Promise<{ ok: boolean }> {
 
 /** Présentation par défaut des nouveaux rapports (n'affecte pas les rapports existants). */
 export async function saveTheme(theme: unknown): Promise<{ ok: boolean }> {
-  const parsed = ThemeId.safeParse(theme);
+  const parsed = ThemeId.nullable().safeParse(theme);
   if (!parsed.success) return { ok: false };
   const supabase = await createUserClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false };
   const { error } = await supabase.from("reader_preferences").upsert({ owner_id: auth.user.id, theme_id: parsed.data });
   revalidatePath("/preferences");
+  return { ok: !error };
+}
+
+const Field = z
+  .strictObject({
+    familiarity: z.enum(["aucune", "bases", "maitrise"]).nullable(),
+    goal: z.enum(["comprendre", "reviser", "appliquer", "decider"]).nullable(),
+    example_domain: z.enum(["quotidien", "travail", "sciences", "sans_preference"]).nullable(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length === 1);
+
+/** Réglage direct d'une préférence pédagogique (écran Préférences de lecture). */
+export async function savePreferenceField(input: unknown): Promise<{ ok: boolean }> {
+  const parsed = Field.safeParse(input);
+  if (!parsed.success) return { ok: false };
+  const supabase = await createUserClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false };
+  const { error } = await supabase.from("reader_preferences").upsert({ owner_id: auth.user.id, ...parsed.data });
+  revalidatePath("/compte/preferences");
   return { ok: !error };
 }

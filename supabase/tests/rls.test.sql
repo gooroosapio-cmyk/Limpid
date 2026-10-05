@@ -128,4 +128,40 @@ do $$ begin
 end $$;
 reset role;
 
+-- Tests « Me tester » : lecture par le propriétaire seulement, écriture par le serveur seulement
+insert into public.sources (id, owner_id, kind, title) values
+  ('10000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-00000000000a', 'paste', 'Source A2');
+insert into public.reports (id, owner_id, source_id, title) values
+  ('20000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-0000000000a2', 'Rapport A2');
+insert into public.report_versions (id, report_id, owner_id, version_number, level, goal, template_id, target_pages, provider) values
+  ('30000000-0000-0000-0000-0000000000a2', '20000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-00000000000a', 1, 'grand_public', 'comprendre', 'comprendre_sujet', 5, 'demo'),
+  ('30000000-0000-0000-0000-0000000000b2', '20000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000b', 1, 'grand_public', 'comprendre', 'comprendre_sujet', 5, 'demo');
+insert into public.report_quizzes (owner_id, report_version_id, scope_key, questions) values
+  ('00000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-0000000000a2', 'document', '[]'),
+  ('00000000-0000-0000-0000-00000000000b', '30000000-0000-0000-0000-0000000000b2', 'section:sec_1', '[]');
+do $$ begin
+  insert into public.report_quizzes (owner_id, report_version_id, scope_key, questions)
+    values ('00000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-0000000000a2', 'document', '[]');
+  raise exception 'ECHEC : deux tests identiques pour une version';
+exception when unique_violation then null;
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$ begin
+  if (select count(*) from public.report_quizzes) <> 1 then raise exception 'ECHEC : A voit % tests', (select count(*) from public.report_quizzes); end if;
+end $$;
+do $$ begin
+  insert into public.report_quizzes (owner_id, report_version_id, scope_key, questions)
+    values ('00000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-0000000000a2', 'section:sec_2', '[]');
+  raise exception 'ECHEC : test écrit par le client';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+delete from public.reports where id = '20000000-0000-0000-0000-0000000000a2';
+do $$ begin
+  if exists (select 1 from public.report_quizzes where owner_id = '00000000-0000-0000-0000-00000000000a') then
+    raise exception 'ECHEC : test conservé après suppression du rapport';
+  end if;
+end $$;
+
 select 'RECETTE SQL : OK' as resultat;

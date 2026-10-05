@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import type { AssetView } from "@/lib/render/visuals";
 import { reportExpiresAt } from "./retention";
+import { autoTheme } from "@/lib/display/themes";
 import { createUserClient } from "@/lib/supabase/server";
 
 /** Remarques de couverture enregistrées à l'extraction (pages non lues, troncature…). */
@@ -42,6 +43,9 @@ export type LoadedReport =
       checkStatus: string;
       sourceTitle: string;
       sourceUrl: string | null;
+      /** Original consultable (fichier gardé 30 jours ou page d'origine), servi par Limpid après contrôle du propriétaire. */
+      originalHref: string | null;
+      sourceKind: string | null;
       notes: string[];
       /** Couverture partielle (sinon les remarques sont informatives, ex. lecture OCR). */
       partial: boolean;
@@ -52,7 +56,10 @@ export type LoadedReport =
       isCurrent: boolean;
       /** Dernière tâche du rapport (nouvelle version en préparation, échec récent…). */
       latestJob: JobView | null;
+      /** Thème affiché : choix du lecteur, sinon choix automatique selon l'organisation. */
       theme: ThemeId;
+      /** Choix explicite du lecteur (null = automatique). */
+      themeChoice: ThemeId | null;
       visualMode: VisualMode;
       /** Date d'effacement automatique (conservation), ou null si illimitée. */
       expiresAt: Date | null;
@@ -66,7 +73,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   const supabase = await createUserClient();
   const { data: report } = await supabase
     .from("reports")
-    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources(title, coverage, original_url)")
+    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources(title, kind, coverage, original_url, storage_path)")
     .eq("id", id)
     .maybeSingle();
   if (!report) return null;
@@ -145,7 +152,14 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   const answers: Record<string, { answer: string; feedback: unknown }> = {};
   for (const a of ans ?? []) answers[a.check_id] = { answer: a.answer, feedback: a.feedback };
 
-  const source = report.sources as unknown as { title: string; coverage: unknown; original_url: string | null } | null;
+  const source = report.sources as unknown as {
+    title: string;
+    kind: string;
+    coverage: unknown;
+    original_url: string | null;
+    storage_path: string | null;
+  } | null;
+  const hasOriginal = !!source && (source.kind === "url" ? !!source.original_url : !!source.storage_path);
   return {
     state: "ready",
     id,
@@ -159,6 +173,8 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     checkStatus: version.check_status,
     sourceTitle: source?.title ?? report.title,
     sourceUrl: source?.original_url ?? null,
+    originalHref: hasOriginal ? `/api/sources/${report.source_id}/original` : null,
+    sourceKind: source?.kind ?? null,
     notes: CoverageNotes.safeParse(source?.coverage).data?.notes ?? [],
     partial: CoverageNotes.safeParse(source?.coverage).data?.partial ?? false,
     createdAt: new Date(version.created_at),
@@ -171,7 +187,8 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     shownVersion: shown.version_number,
     isCurrent: shown.id === report.current_version_id,
     latestJob: latestJob ?? null,
-    theme: ThemeId.safeParse(report.theme_id).data ?? "editorial",
+    themeChoice: ThemeId.safeParse(report.theme_id).data ?? null,
+    theme: ThemeId.safeParse(report.theme_id).data ?? autoTheme(ReportBlueprint.parse(version.blueprint).template_id),
     visualMode: VisualMode.safeParse(report.visual_mode).data ?? "auto",
     expiresAt: reportExpiresAt(new Date(report.created_at)),
     assets,

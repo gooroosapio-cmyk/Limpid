@@ -5,7 +5,7 @@
  */
 import "server-only";
 import type { z } from "zod";
-import { limits } from "@/lib/config";
+import { limits, retention } from "@/lib/config";
 import {
   Evidence,
   ExplanationObject,
@@ -224,9 +224,15 @@ async function runOcr(job: JobRow, controller: AbortController) {
         coverage: out.coverage,
       })
       .eq("id", sourceId);
-  } finally {
-    // Lu ou non, l'original ne reste pas : en cas d'échec, l'utilisateur l'enverra à nouveau.
+    // Lu : l'original reste consultable pendant la conservation du rapport.
+    await db
+      .from("sources")
+      .update({ original_purge_at: new Date(Date.now() + retention.originalHours * 3600_000).toISOString() })
+      .eq("id", sourceId);
+  } catch (e) {
+    // Échec de lecture : l'original n'est pas gardé, l'utilisateur l'enverra à nouveau.
     await purgeOriginal(sourceId, src.storage_path);
+    throw e;
   }
 }
 

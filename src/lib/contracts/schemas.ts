@@ -26,8 +26,8 @@ export type Goal = z.infer<typeof Goal>;
 export const TEMPLATES = ["comprendre_sujet", "expliquer_document", "comprendre_processus", "comparer_options"] as const;
 export const TemplateId = z.enum(TEMPLATES);
 
-/** Présentation (cahier V2, § 8) : change la composition, jamais le contenu. */
-export const THEMES = ["editorial", "essentiel", "visuel"] as const;
+/** Présentation (kit V3) : change la composition, jamais le contenu ni les faits. */
+export const THEMES = ["sciences", "recit", "dossier", "guide", "confort"] as const;
 export const ThemeId = z.enum(THEMES);
 export type ThemeId = z.infer<typeof ThemeId>;
 

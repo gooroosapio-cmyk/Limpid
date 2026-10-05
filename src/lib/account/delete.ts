@@ -36,7 +36,7 @@ export async function deleteAccount(userId: string): Promise<{ ok: boolean; step
   steps.files_known = known.length === 0 || !(await db.storage.from("sources").remove(known)).error;
   for (const b of BUCKETS) steps[`files_${b}`] = await removePrefix(b, userId);
 
-  for (const table of ["comprehension_answers", "exports", "reports", "sources", "reader_preferences"] as const) {
+  for (const table of ["comprehension_answers", "report_quizzes", "exports", "reports", "sources", "reader_preferences"] as const) {
     steps[`rows_${table}`] = !(await db.from(table).delete().eq("owner_id", userId)).error;
   }
   // Profil, journal de consommation et demandes restantes : supprimés en cascade avec l'utilisateur.

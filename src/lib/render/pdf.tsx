@@ -25,6 +25,14 @@ function registerFonts() {
       { src: path.join(FONT_DIR, "Inter_700Bold.ttf"), fontWeight: 700 },
     ],
   });
+  // Thème Récit : titres en sérif (le corps reste en Inter complète, pour ne perdre aucun symbole).
+  Font.register({
+    family: "Source Serif 4",
+    fonts: [
+      { src: path.join(FONT_DIR, "SourceSerif4_400Regular.ttf"), fontWeight: 400 },
+      { src: path.join(FONT_DIR, "SourceSerif4_700Bold.ttf"), fontWeight: 700 },
+    ],
+  });
   // Pas de césure automatique (règles anglaises par défaut, fausses en français) ; seules les
   // chaînes très longues (adresses, crédits) sont coupées pour ne pas sortir de la page.
   Font.registerHyphenationCallback((word) => (word.length > 40 ? (word.match(/.{1,30}/g) ?? [word]) : [word]));
@@ -65,42 +73,67 @@ const s = StyleSheet.create({
   footer: { position: "absolute", top: 806, left: 52, right: 52, fontSize: 8, color: C.gris },
 });
 
-/** Présentation : couleurs et encadrés seulement ; le texte et l'ordre sont identiques. */
+/** Présentation : couleurs, encadrés et titres ; le texte, l'ordre et les sources sont identiques. */
 type ThemeStyle = {
   page: Style;
   takeaway: Style;
   boxed: Style;
   caution: Style;
   definition: Style;
+  heading: Style;
   bar: string;
   illustrations: boolean;
 };
+const BASE_HEADING: Style = {};
 const THEME_STYLES: Record<ThemeId, ThemeStyle> = {
-  editorial: {
+  sciences: {
     page: { backgroundColor: C.ivoire },
     takeaway: { backgroundColor: C.jauneDoux, borderRadius: 8, padding: 12, marginBottom: 16 },
     boxed: { borderLeftWidth: 3, borderLeftColor: C.jaune, paddingLeft: 8, marginBottom: 8 },
     caution: { borderLeftWidth: 3, borderLeftColor: "#A23B2A", paddingLeft: 8, marginBottom: 8 },
     definition: { marginBottom: 8 },
-    bar: C.encre,
+    heading: BASE_HEADING,
+    bar: C.jaune,
     illustrations: true,
   },
-  essentiel: {
+  recit: {
+    page: { backgroundColor: "#F4F0E6" },
+    takeaway: { borderTopWidth: 3, borderTopColor: "#976544", paddingTop: 10, marginBottom: 16 },
+    boxed: { borderLeftWidth: 3, borderLeftColor: "#976544", paddingLeft: 8, marginBottom: 8 },
+    caution: { borderLeftWidth: 3, borderLeftColor: C.encre, paddingLeft: 8, marginBottom: 8 },
+    definition: { marginBottom: 8 },
+    heading: { fontFamily: "Source Serif 4" },
+    bar: "#976544",
+    illustrations: true,
+  },
+  dossier: {
     page: { backgroundColor: "#FFFFFF" },
-    takeaway: { borderWidth: 1.5, borderColor: C.encre, borderRadius: 6, padding: 12, marginBottom: 16 },
+    takeaway: { borderWidth: 1, borderColor: C.bordure, borderTopWidth: 3, borderTopColor: C.vert, padding: 12, marginBottom: 16 },
     boxed: { borderLeftWidth: 2, borderLeftColor: C.bordure, paddingLeft: 8, marginBottom: 8 },
     caution: { borderLeftWidth: 2, borderLeftColor: C.encre, paddingLeft: 8, marginBottom: 8 },
     definition: { marginBottom: 8 },
-    bar: C.encre,
+    heading: { color: C.vert },
+    bar: C.vert,
     illustrations: false,
   },
-  visuel: {
+  guide: {
     page: { backgroundColor: "#FFFFFF" },
     takeaway: { backgroundColor: C.jauneDoux, borderRadius: 8, padding: 12, marginBottom: 16 },
     boxed: { backgroundColor: C.jauneDoux, borderRadius: 6, padding: 8, marginBottom: 8 },
-    caution: { backgroundColor: "#FBEAE7", borderLeftWidth: 4, borderLeftColor: "#A23B2A", borderRadius: 6, padding: 8, marginBottom: 8 },
-    definition: { backgroundColor: "#E8EFF6", borderRadius: 6, padding: 8, marginBottom: 8 },
-    bar: C.vert,
+    caution: { backgroundColor: "#E8EFE8", borderLeftWidth: 4, borderLeftColor: C.vert, borderRadius: 6, padding: 8, marginBottom: 8 },
+    definition: { borderLeftWidth: 3, borderLeftColor: C.vert, paddingLeft: 8, marginBottom: 8 },
+    heading: BASE_HEADING,
+    bar: C.encre,
+    illustrations: true,
+  },
+  confort: {
+    page: { backgroundColor: "#FFFFFF", fontSize: 12.5, lineHeight: 1.6 },
+    takeaway: { backgroundColor: C.jauneDoux, borderRadius: 8, padding: 14, marginBottom: 18 },
+    boxed: { borderLeftWidth: 3, borderLeftColor: C.jaune, paddingLeft: 10, marginBottom: 10 },
+    caution: { borderLeftWidth: 3, borderLeftColor: C.encre, paddingLeft: 10, marginBottom: 10 },
+    definition: { marginBottom: 10 },
+    heading: { fontSize: 16 },
+    bar: C.jaune,
     illustrations: true,
   },
 };
@@ -280,7 +313,7 @@ export interface PdfReportInput {
 
 function ReportDocument(input: PdfReportInput) {
   const { blueprint, explanation } = input;
-  const t = THEME_STYLES[input.theme ?? "editorial"];
+  const t = THEME_STYLES[input.theme ?? "sciences"];
   const { numbers, entries } = sourceEntries(blueprint, input.evidence, input.segments);
   const sections = new Map(explanation.sections.map((x) => [x.id, x]));
   const visuals = new Map(blueprint.visual_specs.map((v) => [v.id, v]));
@@ -298,7 +331,7 @@ function ReportDocument(input: PdfReportInput) {
           {input.isDemo && <Text style={s.badgeDemo}>{fr.demo.badge}</Text>}
           <Text style={s.badge}>{LEVEL_LABELS[explanation.level]}</Text>
         </View>
-        <Text style={s.title}>{blueprint.title}</Text>
+        <Text style={[s.title, t.heading]}>{blueprint.title}</Text>
         <Text style={s.meta}>D'après : {input.sourceTitle} · {date}</Text>
 
         {input.notes && input.notes.length > 0 && (
@@ -322,7 +355,7 @@ function ReportDocument(input: PdfReportInput) {
           <View key={sec.id}>
             {/* Le titre reste avec son premier bloc : jamais seul en bas de page. */}
             <View wrap={false}>
-              <Text style={s.h2}>{i + 1}. {sec.question}</Text>
+              <Text style={[s.h2, t.heading]}>{i + 1}. {sec.question}</Text>
               {sec.blocks[0] && <BlockPdf block={sec.blocks[0]} numbers={numbers} t={t} />}
             </View>
             {sec.blocks.slice(1).map((b) => <BlockPdf key={b.id} block={b} numbers={numbers} t={t} />)}
@@ -335,7 +368,7 @@ function ReportDocument(input: PdfReportInput) {
 
         {explanation.glossary.length > 0 && (
           <View>
-            <Text style={s.h2} minPresenceAhead={110}>{fr.reader.glossary}</Text>
+            <Text style={[s.h2, t.heading]} minPresenceAhead={110}>{fr.reader.glossary}</Text>
             {explanation.glossary.map((g) => (
               <Text key={g.term} style={s.p}><Text style={{ fontWeight: 700 }}>{g.term}</Text> — {g.definition}</Text>
             ))}
@@ -344,7 +377,7 @@ function ReportDocument(input: PdfReportInput) {
 
         {explanation.checks.length > 0 && (
           <View>
-            <Text style={s.h2} minPresenceAhead={110}>{fr.reader.check}</Text>
+            <Text style={[s.h2, t.heading]} minPresenceAhead={110}>{fr.reader.check}</Text>
             {explanation.checks.map((c) => (
               <View key={c.id} style={s.check} wrap={false}>
                 <Text style={[s.p, { fontWeight: 700 }]}>{c.question}</Text>
@@ -358,13 +391,13 @@ function ReportDocument(input: PdfReportInput) {
 
         {explanation.limitations.length > 0 && (
           <View>
-            <Text style={s.h2} minPresenceAhead={110}>{fr.reader.limits}</Text>
+            <Text style={[s.h2, t.heading]} minPresenceAhead={110}>{fr.reader.limits}</Text>
             <Bullets items={explanation.limitations} />
           </View>
         )}
 
         <View>
-          <Text style={s.h2} minPresenceAhead={110}>{fr.reader.sources}</Text>
+          <Text style={[s.h2, t.heading]} minPresenceAhead={110}>{fr.reader.sources}</Text>
           <Text style={[s.p, s.muted]}>
             {input.sourceTitle}
             {safeHref(input.sourceUrl) ? <Text> — <Link src={safeHref(input.sourceUrl)!}>{input.sourceUrl}</Link></Text> : null}

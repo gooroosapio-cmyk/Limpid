@@ -4,9 +4,30 @@ import { isDemoMode } from "@/lib/config";
 import { drainQueue } from "@/lib/jobs/worker";
 import { CreateError, CreateRequest, createReport } from "@/lib/reports/create";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { createUserClient } from "@/lib/supabase/server";
 
 // La génération s'exécute après la réponse, dans la même fonction (durée Vercel max.).
 export const maxDuration = 300;
+
+/** Liste courte des rapports du lecteur (menu latéral), via la RLS. */
+export async function GET() {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "non_connecte" }, { status: 401 });
+  const supabase = await createUserClient();
+  const { data } = await supabase
+    .from("reports")
+    .select("id, title, current_version_id, jobs(status, created_at)")
+    .eq("is_demo", false)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const reports = (data ?? []).map((r) => {
+    const job = [...((r.jobs as { status: string; created_at: string }[] | null) ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    const running = !!job && (job.status === "queued" || job.status === "running");
+    const state = r.current_version_id ? (running ? "updating" : "ready") : running ? "preparing" : "failed";
+    return { id: r.id, title: r.title, state };
+  });
+  return NextResponse.json({ reports }, { headers: { "Cache-Control": "no-store" } });
+}
 
 export async function POST(request: NextRequest) {
   const user = await currentUser();

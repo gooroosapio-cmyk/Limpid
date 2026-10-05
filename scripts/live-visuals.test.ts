@@ -100,7 +100,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot D : visuels réel
 
     const pdfTexts: Record<string, string> = {};
     for (const theme of THEMES) {
-      const html = renderToStaticMarkup(h(Reader, { blueprint, explanation: report.explanation, evidence: report.evidence, segments, sourceTitle: EAU_VILLE_TITLE, pdfHref: "#", isDemo: false, theme, assets }));
+      const html = renderToStaticMarkup(h(Reader, { blueprint, explanation: report.explanation, evidence: report.evidence, segments, sourceTitle: EAU_VILLE_TITLE, isDemo: false, theme, assets }));
       writeFileSync(path.join(out, `rapport-${theme}.html`), `<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="globals.css">${html}`);
       const pdf = await renderReportPdf({ blueprint, explanation: report.explanation, evidence: report.evidence, segments, sourceTitle: EAU_VILLE_TITLE, theme, images });
       writeFileSync(path.join(out, `rapport-${theme}.pdf`), pdf);

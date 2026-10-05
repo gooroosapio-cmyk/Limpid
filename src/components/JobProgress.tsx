@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { STAGE_LABELS_FR, type JobStage } from "@/lib/jobs/state";
+import { Icon } from "@/components/Icon";
+import { LoaderBook } from "@/components/LoaderBook";
 import { fr } from "@/lib/i18n/fr";
 
 interface JobView {
@@ -26,18 +27,26 @@ const ERRORS: Record<string, string> = {
   ocr_source_missing: "Le fichier à lire n'est plus disponible. Envoyez-le à nouveau.",
 };
 
-/** Étapes affichées (maquette « Votre rapport prend forme »), dérivées de l'étape réelle de la tâche. */
-const STEPS: { label: string; detail: string; stages: string[] }[] = [
-  { label: "Source vérifiée", detail: "Lecture et contrôle du document.", stages: ["validation", "extraction"] },
-  { label: "Idées structurées", detail: "Repérage des informations et des extraits.", stages: ["comprehension"] },
-  { label: "Sources contrôlées", detail: "Chaque affirmation relue face à son extrait.", stages: ["verification"] },
-  { label: "Explications", detail: "Rédaction au niveau choisi.", stages: ["explication"] },
-  { label: "Illustrations", detail: "Schémas et images libres de droits, si prévus.", stages: ["illustrations"] },
-  { label: "Contrôle et mise en page", detail: "Vérification finale et mise en forme.", stages: ["mise_en_page"] },
-];
+/** Étapes du kit (4), dérivées de l'étape réelle de la tâche : jamais du temps écoulé. */
+const STEP_OF_STAGE: Record<string, number> = {
+  validation: 0,
+  extraction: 0,
+  comprehension: 1,
+  explication: 2,
+  verification: 3,
+  illustrations: 3,
+  mise_en_page: 3,
+};
+
+function currentDetail(step: number, job: JobView): string {
+  if (job.status === "queued") return fr.prep.queued;
+  if (job.stage === "illustrations") return fr.prep.illustrations;
+  if (job.stage === "mise_en_page") return fr.prep.layout;
+  return fr.prep.steps[step]!.current;
+}
 
 /** Suit la génération (interrogation légère), puis recharge la page quand le rapport est prêt. */
-export function JobProgress({ reportId, initial }: { reportId: string; initial: JobView }) {
+export function JobProgress({ reportId, initial, compact = false }: { reportId: string; initial: JobView; compact?: boolean }) {
   const [job, setJob] = useState(initial);
   const router = useRouter();
   const active = job.status === "queued" || job.status === "running";
@@ -54,37 +63,62 @@ export function JobProgress({ reportId, initial }: { reportId: string; initial: 
     return () => clearInterval(t);
   }, [active, reportId, router]);
 
-  if (active) {
-    const current = job.status === "queued" ? -1 : STEPS.findIndex((st) => st.stages.includes(job.stage ?? ""));
-    const label = job.stage ? STAGE_LABELS_FR[job.stage as JobStage] : fr.reports.status.queued;
+  const step = job.status === "queued" ? 0 : (STEP_OF_STAGE[job.stage ?? ""] ?? 0);
+
+  if (active && compact) {
     return (
-      <div className="card progress-card">
-        <p className="progress-title"><strong>{fr.progress.title}</strong></p>
-        <p className="sr-only" role="status" aria-live="polite">{label}</p>
+      <div className="card prep-compact" role="status" aria-live="polite">
+        <span className="loader-inline" aria-hidden="true"><span className="dot" /><span className="dot" /><span className="dot" /></span>
+        <p><b>{fr.prep.newVersion}</b> · {fr.prep.steps[step]!.label}</p>
+      </div>
+    );
+  }
+
+  if (active) {
+    const phase = fr.prep.phases[step <= 0 ? 0 : step <= 2 ? 1 : 2]!;
+    return (
+      <div className="prep">
+        <LoaderBook />
+        <div className="phase" key={phase.heading}>
+          <h1>{phase.heading}</h1>
+          <p className="lede">{phase.lede}</p>
+        </div>
+        <p className="sr-only" role="status" aria-live="polite">{fr.prep.steps[step]!.label} : {currentDetail(step, job)}</p>
         <ol className="steps">
-          {STEPS.map((st, i) => {
-            const state = i < current ? "done" : i === current ? "current" : "todo";
+          {fr.prep.steps.map((st, i) => {
+            const state = i < step ? "done" : i === step ? "current" : "todo";
             return (
               <li key={st.label} className={`step step-${state}`} aria-current={state === "current" ? "step" : undefined}>
-                <span className="step-mark" aria-hidden="true">{state === "done" ? "✓" : ""}</span>
+                <span className="step-mark" aria-hidden="true">{state === "done" ? <Icon name="check" size={16} /> : i + 1}</span>
                 <span>
                   <strong>{st.label}</strong>
-                  <span className="sr-only"> ({fr.progress.states[state]})</span>
-                  <span className="step-detail">{st.detail}</span>
+                  <span className="step-detail">
+                    {state === "done" ? fr.prep.done : state === "current" ? currentDetail(i, job) : fr.prep.todo}
+                  </span>
                 </span>
               </li>
             );
           })}
         </ol>
-        <p className="notice">{fr.progress.leave}</p>
-        <Link href="/rapports" className="btn btn-block">{fr.progress.myReports}</Link>
+        <p className="muted">{fr.prep.later}</p>
+        <Link href="/" className="btn btn-block">{fr.prep.home}</Link>
+        <p className="prepare-foot">{fr.prep.foot}</p>
       </div>
     );
   }
+
+  const message = `${fr.reports.status[job.status] ?? job.status}${job.error_code ? ` : ${ERRORS[job.error_code] ?? "une erreur est survenue."}` : ""}`;
+  if (compact) return <p className="notice notice-error" role="alert">{message}</p>;
   return (
-    <p className="notice notice-warn" role="alert">
-      {fr.reports.status[job.status] ?? job.status}
-      {job.error_code ? ` : ${ERRORS[job.error_code] ?? "une erreur est survenue."}` : ""}
-    </p>
+    <div className="prep prep-error">
+      <span className="icon-badge" aria-hidden="true"><Icon name="alert" size={30} /></span>
+      <h1>{fr.prep.errorTitle}</h1>
+      <p className="notice notice-error" role="alert">{message}</p>
+      <p className="muted">{fr.prep.kept}</p>
+      <div className="actions-row">
+        <Link href="/" className="btn">{fr.prep.library}</Link>
+        <Link href="/ajouter" className="btn btn-primary">{fr.prep.addAgain}</Link>
+      </div>
+    </div>
   );
 }

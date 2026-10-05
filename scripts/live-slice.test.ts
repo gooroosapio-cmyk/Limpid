@@ -111,7 +111,6 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot B : tranche compl
         evidence: report.evidence,
         segments: extraction.extracted.segments,
         sourceTitle: EAU_VILLE_TITLE,
-        pdfHref: "#",
         isDemo: false,
       }),
     );

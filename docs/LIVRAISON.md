@@ -81,6 +81,10 @@ Script : `scripts/live-corpus.test.ts` ; corpus : `scripts/corpus/` (documents f
 4. `20261004030000_auth_attempts.sql` — limites d'essais de connexion.
 5. `20261004040000_themes_visual_assets.sql` — présentations, visuels, `visual_assets`, étape « illustrations ».
 
+### Refonte V3 (5 octobre 2026)
+- `20261005000000_v3_themes_originals.sql` — cinq thèmes du kit (null = automatique), conversion des anciens thèmes, conservation de l'original 30 jours. **À appliquer à la fusion de la refonte.**
+- `20261005010000_report_quizzes.sql` — tests « Me tester » gardés par version (RLS : lecture propriétaire, écriture serveur). **À appliquer à la fusion.**
+
 ## Configuration (sans secret)
 
 Référence complète et commentée : `.env.example`. Secrets à définir uniquement dans Vercel : `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `UNSPLASH_ACCESS_KEY` (facultatif).

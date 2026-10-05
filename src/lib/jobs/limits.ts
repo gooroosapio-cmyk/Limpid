@@ -58,3 +58,14 @@ export async function assertCanStartJob(userId: string, opts: { newReport: boole
     );
   }
 }
+
+/** Rapports lancés sur 24 h glissantes (crédits rendus déduits), pour l'écran Utilisation. */
+export async function usageToday(userId: string): Promise<{ used: number; limit: number }> {
+  const db = adminClient();
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const count = async (action: string) =>
+    (await db.from("audit_log").select("id", { count: "exact", head: true }).eq("actor_id", userId).eq("action", action).gte("created_at", since))
+      .count ?? 0;
+  const used = Math.max(0, (await count(REPORT_CREATED)) - (await count(CREDIT_RETURNED)));
+  return { used, limit: ACCOUNT_LIMITS.dailyReports };
+}

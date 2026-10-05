@@ -1,15 +1,27 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
-import Link from "next/link";
-import { BottomNav, DesktopNav } from "@/components/Nav";
-import { Logo } from "@/components/Logo";
+import { Suspense } from "react";
+import { AppShell } from "@/components/shell/AppShell";
+import { Pwa } from "@/components/shell/Pwa";
+import { currentUser } from "@/lib/auth";
+import { isUrlImportEnabled } from "@/lib/config";
+import { htmlAttributes, readDisplayPrefs } from "@/lib/display/prefs";
 import { fr } from "@/lib/i18n/fr";
-import "./globals.css";
+import { offlineKey } from "@/lib/offline-key";
+import "./styles/base.css";
+import "./styles/shell.css";
+import "./styles/components.css";
+import "./styles/reader.css";
+import "./styles/pages.css";
 
 export const metadata: Metadata = {
   title: { default: "Limpid", template: "%s · Limpid" },
-  description: "Déposez n'importe quoi. Comprenez l'essentiel.",
+  description: "Un document. Une explication qui fait sens.",
   robots: { index: false, follow: false }, // alpha privée
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Limpid", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -17,24 +29,31 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#F7F6F2",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F6F2" },
+    { media: "(prefers-color-scheme: dark)", color: "#171815" },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Rendu dynamique obligatoire : la CSP utilise un nonce par requête.
   await connection();
+  const store = await cookies();
+  const prefs = readDisplayPrefs((n) => store.get(n)?.value);
+  const user = await currentUser();
   return (
-    <html lang="fr">
+    <html lang="fr" {...htmlAttributes(prefs)}>
       <body>
         <a className="skip-link" href="#contenu">{fr.nav.skip}</a>
-        <header className="app-header">
-          <Link href="/" className="logo-link" aria-label="Limpid, accueil">
-            <Logo />
-          </Link>
-          <DesktopNav />
-        </header>
-        <main id="contenu">{children}</main>
-        <BottomNav />
+        <div className="app">
+          {user && (
+            <Suspense>
+              <AppShell email={user.email ?? ""} urlEnabled={isUrlImportEnabled()} />
+            </Suspense>
+          )}
+          <main id="contenu" className="app-content">{children}</main>
+        </div>
+        <Pwa account={user ? offlineKey(user.id) : null} />
       </body>
     </html>
   );
