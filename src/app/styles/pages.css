@@ -275,3 +275,8 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .job-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
 .job-actions form { flex: 1 1 140px; }
 .job-actions .btn { width: 100%; min-height: 44px; }
+
+/* Double authentification de l'administration */
+.mfa-step { display: grid; gap: 12px; }
+.mfa-qr { display: block; width: 200px; height: 200px; max-width: 100%; margin: 0 auto; background: #fff; padding: 8px; border-radius: 8px; }
+.mfa-secret { display: block; margin-top: 8px; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); }
