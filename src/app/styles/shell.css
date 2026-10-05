@@ -77,16 +77,6 @@ dialog.drawer::backdrop { background: var(--backdrop); animation: fade-in var(--
 @keyframes drawer-in { from { transform: translateX(-100%); } to { transform: none; } }
 
 .sidebar { display: none; }
-@media (min-width: 1200px) {
-  .sidebar {
-    position: fixed; inset: 0 auto 0 0; z-index: 25; width: var(--sidebar); display: flex; flex-direction: column;
-    padding-top: env(safe-area-inset-top); background: var(--soft); border-right: 1px solid var(--line);
-  }
-  .app-content { margin-left: var(--sidebar); }
-  .appbar .menu-button, .appbar .brand-link { display: none; }
-  .fab { right: var(--s7); bottom: var(--s7); }
-}
-
 /* Bouton flottant : expliquer un nouveau document */
 .fab {
   position: fixed; right: var(--s4); bottom: calc(var(--s5) + env(safe-area-inset-bottom)); z-index: 20;

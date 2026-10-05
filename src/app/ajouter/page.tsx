@@ -31,7 +31,10 @@ export default async function AddPage({ searchParams }: { searchParams: Promise<
   const tab = TABS[mode as keyof typeof TABS] ?? "file";
   return (
     <Screen className="add-page">
-      <h1>{t.add.heading}</h1>
+      <div className="page-title">
+        <h1>{t.add.heading}</h1>
+        <p>{t.add.v2.lede}</p>
+      </div>
       <DemoBanner />
       {!enabled && <p className="notice notice-warn">{t.create.notConfigured}</p>}
       <ImportForm

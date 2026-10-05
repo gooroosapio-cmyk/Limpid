@@ -230,7 +230,7 @@ export function ReportRow({
           {body}
         </label>
       ) : (
-        <ReportLink href={`/rapports/${row.id}`} className="lesson-hit" immersive={row.state === "ready"}>
+        <ReportLink href={row.state === "ready" ? `/rapports/${row.id}/apercu` : `/rapports/${row.id}`} className="lesson-hit">
           <span className="lesson-hit-inner" onClickCapture={swallowAfterPress}>{body}</span>
         </ReportLink>
       )}
@@ -270,7 +270,7 @@ export function ReportRow({
         </div>
         <ul className="rows">
           <li>
-            <button type="button" className="row" onClick={() => { menu.current?.close(); router.push(`/rapports/${row.id}`); }}>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); router.push(row.state === "ready" ? `/rapports/${row.id}/apercu` : `/rapports/${row.id}`); }}>
               <span className="row-icon"><Icon name="book" /></span>
               <span className="row-text"><b>{t.library.open}</b></span>
             </button>
