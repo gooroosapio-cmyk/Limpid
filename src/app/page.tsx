@@ -5,11 +5,14 @@ import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";
 import { FolderActions, NewFolder } from "@/components/library/FolderDialogs";
 import { LibraryMemory } from "@/components/library/LibraryMemory";
-import { LibraryBrowser } from "@/components/library/LibraryBrowser";
+import { LibraryBrowser, type ResumeItem } from "@/components/library/LibraryBrowser";
+import { Preparations } from "@/components/library/Preparations";
 import { type RowData } from "@/components/library/ReportRow";
+import { Cover } from "@/components/library/Cover";
 import { requireUser } from "@/lib/auth";
 import { demoBlueprint } from "@/lib/demo/cycle-eau";
 import { getLang, getT } from "@/lib/i18n/server";
+import { coverFor, coverView } from "@/lib/library/covers";
 import { loadLibrary, whenLabel, type LibraryItem } from "@/lib/library/load";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -18,10 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.library.title };
 }
 
-const FILTERS = ["tous", "prets", "en_cours", "echecs"] as const;
+const FILTERS = ["tous", "recents", "dossiers", "prets", "favoris"] as const;
 type Filter = (typeof FILTERS)[number];
 const KIND_LABELS: Record<string, string> = { pdf: "PDF", docx: "DOCX", txt: "TXT", paste: "Texte", url: "Lien", png: "Image", jpeg: "Image", webp: "Image" };
-const STATE_OF: Record<Exclude<Filter, "tous">, LibraryItem["state"]> = { prets: "ready", en_cours: "running", echecs: "failed" };
 
 function href(params: { vue?: string; q?: string; filtre?: string; dossier?: string }): string {
   const sp = new URLSearchParams();
@@ -31,8 +33,8 @@ function href(params: { vue?: string; q?: string; filtre?: string; dossier?: str
 }
 
 /**
- * Bibliothèque, page principale (kit V3, écrans 25 à 28) : rapports et sources, recherche et
- * filtres effaçables, bouton flottant pour expliquer un nouveau document.
+ * Bibliothèque, page principale (V2 « galerie ») : recherche, rail de filtres, Reprendre,
+ * collections et leçons ; vue Préparations (en cours, à vérifier) ; documents sources.
  */
 export default async function HomeLibraryPage({
   searchParams,
@@ -42,7 +44,7 @@ export default async function HomeLibraryPage({
   const [t, lang] = await Promise.all([getT(), getLang()]);
   await requireUser();
   const sp = await searchParams;
-  const view = sp.vue === "sources" ? "sources" : "rapports";
+  const view = sp.vue === "sources" ? "sources" : sp.vue === "preparations" ? "preparations" : "rapports";
   const q = (sp.q ?? "").trim().slice(0, 80);
   const filter: Filter = (FILTERS as readonly string[]).includes(sp.filtre ?? "") ? (sp.filtre as Filter) : "tous";
   const supabase = await createUserClient();
@@ -68,7 +70,7 @@ export default async function HomeLibraryPage({
       return { id: s.id, title: s.title, meta, href: report ? `/rapports/${report.id}` : `/sources/${s.id}`, gone: !hasOriginal && s.kind !== "paste", isUrl: s.kind === "url" };
     });
     return (
-      <Screen fab>
+      <Screen>
         <h1>{t.library.documents}</h1>
         <p className="lede">{t.library.sourcesLede}</p>
         {items.length === 0 ? (
@@ -102,6 +104,22 @@ export default async function HomeLibraryPage({
   }
 
   const { folders, items, error } = await loadLibrary();
+  const v = t.library.v2;
+
+  if (view === "preparations") {
+    const running = items.filter((i) => i.state === "running" || i.updating);
+    const failed = items.filter((i) => i.state === "failed");
+    return (
+      <Screen>
+        <Preparations
+          running={running.map((i) => ({ id: i.id, title: i.title, cover: i.cover, sourceCount: i.sourceCount, stage: i.stage }))}
+          failed={failed.map((i) => ({ id: i.id, title: i.title, cover: i.cover, sourceCount: i.sourceCount, reason: t.jobErrors[i.errorCode ?? "unknown"] ?? t.jobErrors.unknown ?? "" }))}
+          initialTab={sp.filtre === "a_verifier" ? "failed" : "running"}
+        />
+      </Screen>
+    );
+  }
+
   const folder = sp.dossier ? (folders.find((f) => f.id === sp.dossier) ?? null) : null;
   const { data: prefs } = await supabase.from("reader_preferences").select("recent_searches").maybeSingle();
   const recent = Array.isArray(prefs?.recent_searches) ? (prefs.recent_searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 5) : [];
@@ -113,79 +131,92 @@ export default async function HomeLibraryPage({
     unread: i.unread,
     folderId: i.folderId,
     folderName: i.folderId ? (folderNames.get(i.folderId) ?? null) : null,
-    sub: [
-      i.state === "failed" ? t.library.failed : i.state === "running" ? t.library.running : i.mode ? (t.add.modes[i.mode]?.title ?? null) : null,
-      whenLabel(i.createdAt, lang, t.library.today, t.library.yesterday),
-      i.sourceCount > 1 ? t.library.sourcesCount(i.sourceCount) : null,
-      i.incomplete ? t.library.incomplete : null,
-    ]
-      .filter(Boolean)
-      .join(" · "),
+    sub: whenLabel(i.createdAt, lang, t.library.today, t.library.yesterday),
     reason: i.state === "failed" ? (t.jobErrors[i.errorCode ?? "unknown"] ?? t.jobErrors.unknown) : undefined,
+    favorite: i.favorite,
+    cover: i.cover,
+    sourceCount: i.sourceCount,
   });
   const scoped = folder ? items.filter((i) => i.folderId === folder.id) : items;
-  const shown = filter === "tous" ? scoped : scoped.filter((i) => i.state === STATE_OF[filter]);
+  // Préparations et échecs vivent dans leur propre vue ; la galerie montre les leçons prêtes.
+  const lessons = scoped.filter((i) => i.state === "ready");
+  const byOpened = (a: LibraryItem, b: LibraryItem) => (b.openedAt ?? b.createdAt).localeCompare(a.openedAt ?? a.createdAt);
+  const shown =
+    filter === "favoris" ? lessons.filter((i) => i.favorite) : filter === "recents" ? [...lessons].sort(byOpened).slice(0, 24) : lessons;
+  const running = scoped.filter((i) => i.state === "running" || i.updating).length;
+  const failed = scoped.filter((i) => i.state === "failed").length;
+  const last = lessons.filter((i) => i.openedAt).sort(byOpened)[0];
+  const resume: ResumeItem | null = last
+    ? { id: last.id, title: last.title, cover: last.cover, sourceCount: last.sourceCount, opened: whenLabel(last.openedAt!, lang, t.library.today, t.library.yesterday).split(" · ")[0]!.toLowerCase() }
+    : null;
   const emptyLibrary = !folder && items.length === 0 && folders.length === 0 && !error;
-  const emptyText =
-    folder && filter === "tous"
-      ? t.library.folderEmpty
-      : filter === "echecs"
-        ? t.library.noFailures
-        : filter === "en_cours"
-          ? t.library.noRunning
-          : filter === "prets"
-            ? t.library.noReady
-            : t.library.noneInFilter;
+  const emptyText = filter === "favoris" ? v.noFavorites : folder ? t.library.folderEmpty : t.library.noneInFilter;
 
   if (emptyLibrary) {
     return (
-      <Screen fab>
+      <Screen>
         <LibraryMemory />
-        <h1>{t.library.title}</h1>
-        <div className="empty lib-empty stagger">
-          <div className="empty-art" aria-hidden="true"><Icon name="book" size={56} /></div>
-          <h2>{t.library.emptyTitle}</h2>
-          <p className="muted">{t.library.empty}</p>
-          <Link href="/ajouter" className="btn btn-primary btn-block"><Icon name="plus" /> {t.library.emptyCta}</Link>
-          <NewFolder />
-          <Link href="/rapports/demo" className="btn-link">{t.library.example}</Link>
+        <div className="page-title">
+          <h1>{t.library.title}</h1>
+          <p>{v.subtitle}</p>
         </div>
+        <section className="lib-empty-v2 stagger">
+          <Cover cover={coverView("lumiere")} className="lib-empty-cover" eager />
+          <h2>{v.emptyTitle}</h2>
+          <p className="muted">{v.emptyText}</p>
+          <Link href="/ajouter" className="btn btn-primary btn-block">{t.library.emptyCta} <Icon name="arrow" /></Link>
+          <NewFolder />
+          <ReportLink href="/rapports/demo" className="btn-link" immersive>{t.library.example}</ReportLink>
+        </section>
       </Screen>
     );
   }
 
+  const railItems: { key: string; href: string; current: boolean }[] = [
+    ...FILTERS.map((f) => ({ key: f, href: href({ dossier: folder?.id, filtre: f === "tous" ? undefined : f }), current: filter === f })),
+    { key: "en_cours", href: href({ vue: "preparations" }), current: false },
+  ];
+  const order = ["tous", "recents", "dossiers", "prets", "en_cours", "favoris"];
+  railItems.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+
   return (
-    <Screen fab>
+    <Screen>
       <LibraryMemory />
       {folder && (
         <nav className="crumbs" aria-label={t.library.folders}>
-          <Link href={href({ filtre: filter === "tous" ? undefined : filter })}>{t.library.backToLibrary}</Link> <span aria-hidden="true">›</span>
+          <Link href="/"><Icon name="back" size={18} /> {t.library.backToLibrary}</Link>
         </nav>
       )}
       <LibraryBrowser
         title={folder ? folder.name : t.library.title}
+        subtitle={folder ? null : v.subtitle}
         folder={folder ? { id: folder.id, name: folder.name } : null}
-        folders={folders}
+        folders={folder ? [] : folders.map((f) => ({ ...f, cover: coverView(coverFor(f.id, null)) }))}
         allFolders={folders.map((f) => ({ id: f.id, name: f.name }))}
         rows={shown.map(toRow)}
         root={!folder}
+        filter={filter}
         initialQuery={q}
         recent={recent}
-        showFailure={filter === "echecs"}
+        resume={resume}
         emptyText={emptyText}
         newFolder={<NewFolder />}
         headerExtra={folder ? <FolderActions id={folder.id} name={folder.name} count={scoped.length} /> : undefined}
-        filters={
-          <>
-            <nav className="filters lib-filters" aria-label={t.library.filters}>
-              {FILTERS.map((f) => (
-                <Link key={f} href={href({ dossier: folder?.id, filtre: f === "tous" ? undefined : f })} className="filterchip" aria-current={filter === f ? "true" : undefined}>
-                  {t.library.filter[f]}
-                </Link>
-              ))}
-            </nav>
-            {filter === "echecs" && <p className="muted small lib-failures-intro">{t.library.failuresIntro}</p>}
-          </>
+        rail={
+          <nav className="utabs lib-rail" aria-label={t.library.filters}>
+            {railItems.map((r) => (
+              <Link key={r.key} href={r.href} aria-current={r.current ? "true" : undefined}>{v.filters[r.key]}</Link>
+            ))}
+          </nav>
+        }
+        preparations={
+          running + failed > 0 ? (
+            <Link href={href({ vue: "preparations", filtre: running ? undefined : "a_verifier" })} className="prep-banner">
+              <Icon name={failed && !running ? "alert" : "hourglass"} />
+              <span><b>{v.prep.title}</b><small>{v.preparationsLink(running, failed)}</small></span>
+              <Icon name="chevron" className="row-chevron" />
+            </Link>
+          ) : null
         }
         footer={
           !folder ? (

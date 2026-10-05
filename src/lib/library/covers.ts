@@ -9,7 +9,7 @@ export type CoverId = (typeof COVERS)[number];
 /** Couvertures dont l'image est présente dans public/covers/<id>.webp (à compléter à la livraison). */
 export const COVER_IMAGES: ReadonlySet<CoverId> = new Set<CoverId>([]);
 
-/** Dégradé de secours (couleurs de la famille, lisibles sous le texte clair). */
+/** Dégradé de secours (couleurs de la famille ; traduit en classes .cover-<id> dans v2.css, la CSP interdisant les styles en ligne). */
 export const COVER_TONES: Record<CoverId, [string, string, string]> = {
   papier: ["#2c3a31", "#1a221d", "#c9c3a8"],
   mineral: ["#3b3125", "#1d1915", "#d8b77a"],
