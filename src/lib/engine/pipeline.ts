@@ -43,7 +43,7 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-04.2";
+export const PROMPT_VERSION = "2026-10-05.1";
 const MAX_REPAIRS = 2;
 
 /* ---------- Brouillons demandés au modèle ---------- */

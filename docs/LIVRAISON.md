@@ -85,19 +85,22 @@ Script : `scripts/live-corpus.test.ts` ; corpus : `scripts/corpus/` (documents f
 - `20261005000000_v3_themes_originals.sql` — cinq thèmes du kit (null = automatique), conversion des anciens thèmes, conservation de l'original 30 jours. **À appliquer à la fusion de la refonte.**
 - `20261005010000_report_quizzes.sql` — tests « Me tester » gardés par version (RLS : lecture propriétaire, écriture serveur). **À appliquer à la fusion.**
 
+### Refonte V4 (5 octobre 2026)
+- `20261006000000_v4_reader_library.sql` — 1 à 18 pages, approche par version et par rapport, approche par défaut et langue des explications, **dossiers** (supprimer un dossier garde ses rapports), **progression et lu / non lu**, **tentatives de quiz conservées**, exercices pré-générés, recherches récentes, offre du compte (filigrane). Ajouts uniquement. **À appliquer à la fusion.**
+
 ## Configuration (sans secret)
 
 Référence complète et commentée : `.env.example`. Secrets à définir uniquement dans Vercel : `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `UNSPLASH_ACCESS_KEY` (facultatif).
 
-- Modèles : `LIMPID_MODEL_FAST`, `LIMPID_MODEL_QUALITY`, **`LIMPID_MODEL_FALLBACKS`** (nouveau), `LIMPID_IMAGE_MODEL`.
+- Modèles : `LIMPID_MODEL_FAST`, `LIMPID_MODEL_QUALITY`, **`LIMPID_MODEL_FALLBACKS`**, `LIMPID_IMAGE_MODEL` ; rôles V4 **`AI_REPORT_MODEL`** (rapports, exercices) et **`AI_CHAT_MODEL`** (Discuter, corrections), prioritaires quand définis.
 - Contrôles : `LIMPID_VERIFY_CLAIMS`, limites de fichiers, d'OCR et de texte.
 - Budgets et limites : `LIMPID_MONTHLY_CAP_CENTS`, `LIMPID_REPORT_CAP_CENTS`, `LIMPID_ACCOUNT_DAILY_CAP_CENTS`, `LIMPID_DAILY_REPORTS`, `LIMPID_ACTIVE_JOBS_PER_ACCOUNT`, `LIMPID_GENERATED_IMAGES_PER_MONTH`.
 - Illustrations : `LIMPID_ILLUSTRATIONS_COMMONS` (actif), `LIMPID_ILLUSTRATIONS_UNSPLASH`, `LIMPID_ILLUSTRATIONS_GEMINI` (coupés).
 
 ## Versions
 
-- Consignes : `PROMPT_VERSION = 2026-10-04.2` (`src/lib/engine/pipeline.ts`), enregistrée avec chaque version de rapport et chaque objet de connaissance.
-- Schémas : `SCHEMA_VERSION = 1.0.0` (`src/lib/contracts/schemas.ts`), schémas Zod stricts (listes bornées, énumérations fermées, champs inconnus refusés).
+- Consignes : `PROMPT_VERSION = 2026-10-05.1` (V4 : approches, pages, exercices, variantes) (`src/lib/engine/pipeline.ts`), enregistrée avec chaque version de rapport et chaque objet de connaissance.
+- Schémas : `SCHEMA_VERSION = 1.1.0` (compatible 1.0.0) (`src/lib/contracts/schemas.ts`), schémas Zod stricts (listes bornées, énumérations fermées, champs inconnus refusés).
 - Modèle de production configuré : `gemini-3.5-flash`. Modèles disponibles constatés le 4 octobre : `gemini-3.6-flash`, `gemini-3.7-flash`, `gemini-3.8-flash`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite` ; `gemini-2.5-*` n'est plus servi aux nouveaux comptes.
 
 ## Captures mobiles (390 px) — `docs/recette/lot-e/captures/`
