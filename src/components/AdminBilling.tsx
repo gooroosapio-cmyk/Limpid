@@ -3,6 +3,12 @@ import { formatXof, PRODUCT_CODES } from "@/lib/billing/catalog";
 import { chariowConfigured, productIds } from "@/lib/billing/chariow";
 import { adminClient } from "@/lib/supabase/admin";
 
+/** Adresse masquée (a•••@domaine) : assez pour aider un client, sans l'exposer en entier. */
+function maskEmail(e: string): string {
+  const [local, domain] = e.split("@");
+  return `${(local ?? "").slice(0, 1)}•••@${domain ?? ""}`;
+}
+
 /**
  * Administration des paiements et des crédits (§ 20) : inscriptions, configuration Chariow,
  * commandes récentes, réceptions de webhooks, ajout de crédits motivé. Aucun document client.
@@ -10,12 +16,13 @@ import { adminClient } from "@/lib/supabase/admin";
 export async function AdminBilling({ siteUrl }: { siteUrl: string }) {
   const db = adminClient();
   const month = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
-  const [{ data: settings }, { data: orders }, { data: inbox }, { data: paid }, { data: lots }] = await Promise.all([
+  const [{ data: settings }, { data: orders }, { data: inbox }, { data: paid }, { data: lots }, { data: store }] = await Promise.all([
     db.from("app_settings").select("signup_open").single(),
     db.from("payment_intents").select("order_ref, product_code, amount_xof, status, review_reason, created_at").order("created_at", { ascending: false }).limit(15),
     db.from("webhook_inbox").select("event, status, is_test, received_at").order("received_at", { ascending: false }).limit(10),
     db.from("payment_intents").select("amount_xof").eq("status", "succeeded").gte("created_at", month),
     db.from("credit_lots").select("origin, quantity, available, reserved, consumed").gte("created_at", month),
+    db.from("store_purchases").select("sale_id, product_code, amount_xof, email, status, review_reason, created_at").in("status", ["unclaimed", "review"]).order("created_at", { ascending: false }).limit(20),
   ]);
   const ids = productIds();
   const mapped = PRODUCT_CODES.filter((c) => ids[c]).length;
@@ -77,6 +84,23 @@ export async function AdminBilling({ siteUrl }: { siteUrl: string }) {
       <form action={reconcileOrdersAction}>
         <button type="submit" className="btn">Rapprocher les commandes en attente</button>
       </form>
+
+      <h3>Achats boutique non rattachés</h3>
+      <p className="muted small">Payés sur la boutique sans compte confirmé à cette adresse (rattachés automatiquement dès confirmation), ou mis en vérification.</p>
+      {(store ?? []).length === 0 ? (
+        <p className="muted">Aucun.</p>
+      ) : (
+        <ul className="rows">
+          {(store ?? []).map((p) => (
+            <li key={p.sale_id as string} className="row row-static">
+              <span className="row-text">
+                <b>{p.product_code as string} · {formatXof(p.amount_xof as number)} · {p.status === "review" ? "à vérifier" : "en attente de compte"}</b>
+                <small>{maskEmail(p.email as string)} · {p.sale_id as string} · {when(p.created_at as string)}{p.review_reason ? ` · ${p.review_reason}` : ""}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h3>Webhooks reçus</h3>
       {(inbox ?? []).length === 0 ? (

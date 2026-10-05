@@ -1128,6 +1128,9 @@ export const en: Dict = {
       ] as [string, string][],
     },
     checkout: {
+      copyEmail: "Copy address",
+      copied: "Copied",
+      emailNotice: "In the Chariow payment details, enter the email address of the Limpid account to activate. Use exactly the address shown above. Your plan or credits will be added to this account once the payment is verified.",
       title: "Summary",
       offer: "Plan",
       duration: "Duration",
@@ -1207,6 +1210,16 @@ export const en: Dict = {
         quiz: "New test",
       } as Record<string, string>,
       discover: "See plans",
+      recover: {
+        title: "I've already paid",
+        lede: (email: string) => `Paid directly on the Chariow store? Purchases made with ${email} are linked to this account once the payment is verified.`,
+        button: "Check my payments",
+        result: {
+          ok: "Payment found: your account is up to date.",
+          rien: "No new payment found for this address. A payment made with another address cannot be linked automatically: contact us with your receipt.",
+          erreur: "The check could not be completed. Try again in a few minutes.",
+        },
+      },
       orders: "Purchases",
       orderStatus: { created: "created", pending: "pending", succeeded: "paid", failed: "not confirmed", review: "under review", uncertain: "to check" } as Record<string, string>,
       verify: "Confirm your email address to activate your free credits.",

@@ -8,6 +8,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { product, type Product } from "./catalog";
 import { ChariowError, checkSale, getSale, initCheckout, productIds } from "./chariow";
+import { recordStorePurchase } from "./store";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const CheckoutRequest = z.strictObject({
@@ -31,6 +32,7 @@ export class PurchaseError extends Error {
 
 export interface IntentRow {
   id: string;
+  origin?: "checkout" | "store";
   owner_id: string;
   order_ref: string;
   product_code: string;
@@ -43,7 +45,7 @@ export interface IntentRow {
   fulfilled_at: string | null;
 }
 
-const INTENT_COLUMNS = "id, owner_id, order_ref, product_code, amount_xof, status, provider_product_id, sale_id, checkout_url, created_at, fulfilled_at";
+const INTENT_COLUMNS = "id, origin, owner_id, order_ref, product_code, amount_xof, status, provider_product_id, sale_id, checkout_url, created_at, fulfilled_at";
 
 /** Référence opaque de commande (aucune donnée devinable). */
 export function newOrderRef(): string {
@@ -142,6 +144,17 @@ export async function reconcileIntent(intent: IntentRow, saleIdHint?: string | n
     }
     return status;
   }
+  // CAS A : payé avec une autre adresse que celle du compte → vérification, rien d'attribué.
+  const paidWith = sale.customer?.email?.trim().toLowerCase();
+  if (paidWith && intent.origin !== "store") {
+    const { data: owner } = await db.auth.admin.getUserById(intent.owner_id);
+    const accountEmail = owner?.user?.email?.toLowerCase();
+    if (accountEmail && accountEmail !== paidWith) {
+      await db.from("payment_intents").update({ status: "review", review_reason: "adresse de paiement différente du compte", sale_id: saleId }).eq("id", intent.id).neq("status", "succeeded");
+      await db.from("audit_log").insert({ actor_id: intent.owner_id, action: "billing.review", target_kind: "order", target_id: intent.order_ref, meta: { reason: "email" } });
+      return "review";
+    }
+  }
   const { data, error } = await db.rpc("fulfill_purchase", {
     p_intent: intent.id,
     p_sale: saleId,
@@ -179,9 +192,11 @@ export async function handlePulse(event: string, saleId: string | null, orderRef
     }
   }
   if (!intent) {
-    // Vente sans commande connue : rien n'est attribué (ni compte créé) ; trace pour rapprochement.
-    if (saleId) await db.from("audit_log").insert({ action: "billing.unmatched_sale", target_kind: "sale", target_id: saleId, meta: { event } });
-    return "ignored";
+    // Vente sans commande Limpid (achat direct sur la boutique) : conservée et rattachée par
+    // l'adresse confirmée ; jamais de compte créé automatiquement.
+    if (!saleId || event !== "successful.sale") return "ignored";
+    const r = await recordStorePurchase(saleId);
+    return r === "ignored" ? "ignored" : "processed";
   }
   await reconcileIntent(intent, saleId);
   return "processed";
@@ -205,6 +220,24 @@ export async function reconcilePending(limit = 25): Promise<number> {
       else await db.from("payment_intents").update({ updated_at: new Date().toISOString() }).eq("id", i.id);
     } catch (e) {
       console.error("reconcile", (e as Error).name);
+    }
+  }
+  // Pulses non aboutis (panne, paiement pas encore confirmé) : rejoués pendant 7 jours.
+  const { data: failed } = await db
+    .from("webhook_inbox")
+    .select("id, event, sale_id, order_ref, attempts")
+    .eq("status", "failed")
+    .eq("is_test", false)
+    .lt("attempts", 20)
+    .gt("received_at", new Date(Date.now() - 7 * 24 * 3600_000).toISOString())
+    .order("received_at")
+    .limit(limit);
+  for (const w of failed ?? []) {
+    try {
+      const outcome = await handlePulse(w.event as string, w.sale_id as string | null, w.order_ref as string | null);
+      await db.from("webhook_inbox").update({ status: outcome, processed_at: new Date().toISOString(), attempts: (w.attempts as number) + 1 }).eq("id", w.id);
+    } catch (e) {
+      await db.from("webhook_inbox").update({ attempts: (w.attempts as number) + 1, last_error: (e as Error).name.slice(0, 100) }).eq("id", w.id);
     }
   }
   // Commandes jamais transmises à Chariow depuis plus d'un jour : closes.

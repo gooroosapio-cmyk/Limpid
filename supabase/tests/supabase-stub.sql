@@ -17,3 +17,4 @@ alter default privileges in schema public grant execute on functions to anon, au
 -- Colonnes d'auth.users lues par la migration des crédits.
 alter table auth.users add column if not exists email_confirmed_at timestamptz default now();
 alter table auth.users add column if not exists created_at timestamptz not null default now();
+alter table auth.users add column if not exists deleted_at timestamptz;

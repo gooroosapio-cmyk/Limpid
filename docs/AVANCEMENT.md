@@ -1,5 +1,14 @@
 # Avancement
 
+## Phase 15 — Chariow V2 : plafonds, sessions, Google/Apple, achats boutique (5 octobre 2026)
+
+- **Lot A** : plafonds de rapports par jour et par semaine (UTC), contrôlés dans la réservation de crédits.
+- **Lot C** : sessions d'appareil (7 jours d'inactivité, 90 jours au plus ; admin 30 min / 12 h), page « Appareils connectés ».
+- **Lot D** : connexion Google et Apple (Supabase OAuth, PKCE), boutons seulement si `LIMPID_AUTH_GOOGLE` / `LIMPID_AUTH_APPLE` = `on`. Guide : `docs/CONNEXION_GOOGLE_APPLE.md`.
+- **Lot B** : achats faits directement sur la boutique conservés (`store_purchases`) et rattachés à l'adresse confirmée ; paiement via Limpid avec une autre adresse → vérification ; bouton « J'ai déjà payé » ; adresse à copier sur le récapitulatif ; Pulses en échec rejoués 7 jours.
+- **Licences** : non activées par Limpid (lien licence ↔ vente non prouvable via l'API) ; l'accès dépend de la vente vérifiée.
+- Migrations appliquées en production : `report_quotas`, `device_sessions`, `store_purchases`.
+
 ## Phase 14 — Comptes, crédits et paiements Chariow (5 octobre 2026)
 
 Spécification : `docs/SPEC_COMPTES_CREDITS_CHARIOW.md` (révision tarifaire). Mise en service : `docs/PAIEMENTS_CHARIOW.md`.

@@ -1099,6 +1099,9 @@ export const fr = {
       ] as [string, string][],
     },
     checkout: {
+      copyEmail: "Copier l'adresse",
+      copied: "Copiée",
+      emailNotice: "Dans les informations de paiement Chariow, renseignez l'adresse email du compte Limpid à activer. Utilisez exactement l'adresse affichée ci-dessus. Votre abonnement ou vos crédits seront attribués à ce compte après vérification du paiement.",
       title: "Récapitulatif",
       offer: "Offre",
       duration: "Durée",
@@ -1178,6 +1181,16 @@ export const fr = {
         quiz: "Nouveau test",
       } as Record<string, string>,
       discover: "Découvrir les offres",
+      recover: {
+        title: "J'ai déjà payé",
+        lede: (email: string) => `Vous avez payé directement sur la boutique Chariow ? Les achats faits avec l'adresse ${email} sont rattachés à ce compte après vérification du paiement.`,
+        button: "Vérifier mes paiements",
+        result: {
+          ok: "Paiement retrouvé : votre compte est à jour.",
+          rien: "Aucun nouveau paiement trouvé pour cette adresse. Un paiement fait avec une autre adresse ne peut pas être rattaché automatiquement : écrivez-nous avec votre reçu.",
+          erreur: "La vérification n'a pas pu se faire. Réessayez dans quelques minutes.",
+        },
+      },
       orders: "Achats",
       orderStatus: { created: "créé", pending: "en attente", succeeded: "payé", failed: "non confirmé", review: "en vérification", uncertain: "à vérifier" } as Record<string, string>,
       verify: "Confirmez votre adresse email pour activer vos crédits gratuits.",
