@@ -6,6 +6,7 @@ import { formatXof } from "@/lib/billing/catalog";
 import { getWallet } from "@/lib/billing/wallet";
 import { getLang, getT } from "@/lib/i18n/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { recoverPayments } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -13,7 +14,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /** Mes crédits (§ 8, 11) : solde, lots et expirations, historique, achats. */
-export default async function CreditsPage() {
+export default async function CreditsPage({ searchParams }: { searchParams: Promise<{ recuperation?: string }> }) {
+  const { recuperation } = await searchParams;
   const [t, lang, user] = await Promise.all([getT(), getLang(), requireUser()]);
   const w = t.billing.wallet;
   const wallet = await getWallet(user.id);
@@ -60,6 +62,17 @@ export default async function CreditsPage() {
           <Link href="/offres" className="btn btn-primary">{w.discover}</Link>
           <Link href="/offres#recharges" className="btn">{t.billing.topup}</Link>
         </div>
+      </section>
+
+      <section className="card" aria-labelledby="paid-h">
+        <h2 id="paid-h" className="small">{w.recover.title}</h2>
+        <p className="muted small">{w.recover.lede(user.email ?? "")}</p>
+        {recuperation && recuperation in w.recover.result && (
+          <p className="notice" role="status">{w.recover.result[recuperation as keyof typeof w.recover.result]}</p>
+        )}
+        <form action={recoverPayments}>
+          <button type="submit" className="btn">{w.recover.button}</button>
+        </form>
       </section>
 
       <h2>{w.lots}</h2>

@@ -1,0 +1,96 @@
+/**
+ * Achats faits directement sur la boutique Chariow (V2, rattachement par email) :
+ *  - CAS B : un compte a confirmé cette adresse → rattaché tout de suite ;
+ *  - CAS C : aucun compte (ou adresse pas encore confirmée) → conservé, puis rattaché dès
+ *    que l'adresse est confirmée (retour de lien, connexion, « J'ai déjà payé ») ;
+ *  - CAS D : vente non conforme (produit, montant, boutique) → mise en vérification, rien n'est attribué.
+ * L'avantage reste attribué par fulfill_purchase, une seule fois par vente.
+ */
+import "server-only";
+import { product } from "./catalog";
+import { checkSale, getSale, productCodeFor, productIds } from "./chariow";
+import { newOrderRef, reconcileIntent, type IntentRow } from "./purchase";
+import { adminClient } from "@/lib/supabase/admin";
+
+export const normalizeEmail = (e: string) => e.trim().toLowerCase();
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export class StorePending extends Error {}
+
+/** Vente sans commande Limpid : relue, vérifiée, conservée, puis rattachée si possible. */
+export async function recordStorePurchase(saleId: string): Promise<"claimed" | "unclaimed" | "review" | "ignored"> {
+  const db = adminClient();
+  const sale = await getSale(saleId);
+  if (!sale) return "ignored";
+  const code = sale.product?.id ? productCodeFor(sale.product.id) : null;
+  const p = code ? product(code) : null;
+  if (!code || !p) {
+    // Produit d'une autre offre de la boutique : rien pour Limpid.
+    await db.from("audit_log").insert({ action: "billing.unmatched_sale", target_kind: "sale", target_id: saleId, meta: { reason: "produit hors catalogue" } });
+    return "ignored";
+  }
+  const verdict = checkSale(sale, { productId: productIds()[code]!, amountXof: p.xof, storeId: process.env.CHARIOW_STORE_ID || null });
+  // Paiement pas encore confirmé : réessayé par le rapprochement périodique.
+  if (!verdict.ok && verdict.state === "pending") throw new StorePending(verdict.reason);
+  if (!verdict.ok && verdict.state === "failed") return "ignored";
+  const raw = sale.customer?.email ?? "";
+  const email = normalizeEmail(raw);
+  const review = !verdict.ok ? verdict.reason : !EMAIL.test(email) ? "adresse de paiement absente" : null;
+  const { error } = await db.from("store_purchases").insert({
+    sale_id: saleId,
+    product_code: code,
+    amount_xof: p.xof,
+    email: EMAIL.test(email) ? email : `inconnue+${saleId.toLowerCase().replace(/[^a-z0-9]/g, "")}@invalid`,
+    status: review ? "review" : "unclaimed",
+    review_reason: review,
+  });
+  if (error && error.code !== "23505") throw new Error(`store_purchases ${error.code}`);
+  if (review) {
+    await db.from("audit_log").insert({ action: "billing.review", target_kind: "sale", target_id: saleId, meta: { reason: review } });
+    return "review";
+  }
+  const { data: owner } = await db.rpc("user_by_verified_email", { p_email: email });
+  if (!owner) return "unclaimed";
+  const n = await claimStorePurchases({ id: owner as string, email, emailConfirmed: true });
+  return n > 0 ? "claimed" : "unclaimed";
+}
+
+/**
+ * Rattache au compte les achats conservés pour son adresse confirmée. Sans danger à appeler
+ * souvent : la réservation est atomique et l'attribution unique par vente.
+ */
+export async function claimStorePurchases(user: { id: string; email: string | null; emailConfirmed: boolean }): Promise<number> {
+  if (!user.email || !user.emailConfirmed) return 0;
+  const db = adminClient();
+  const { data: rows, error } = await db.rpc("claim_store_purchases", { p_owner: user.id, p_email: normalizeEmail(user.email) });
+  if (error) throw new Error(`claim_store_purchases ${error.code}`);
+  let n = 0;
+  for (const r of (rows ?? []) as { sale_id: string; product_code: string; amount_xof: number }[]) {
+    const providerId = productIds()[r.product_code as keyof ReturnType<typeof productIds>];
+    if (!providerId) continue;
+    const { data: intent, error: e } = await db
+      .from("payment_intents")
+      .insert({
+        owner_id: user.id,
+        order_ref: newOrderRef(),
+        product_code: r.product_code,
+        amount_xof: r.amount_xof,
+        provider_product_id: providerId,
+        idempotency_key: `store_${r.sale_id}`.slice(0, 100),
+        sale_id: r.sale_id,
+        status: "pending",
+        origin: "store",
+      })
+      .select("id, owner_id, order_ref, product_code, amount_xof, status, provider_product_id, sale_id, checkout_url, created_at, fulfilled_at")
+      .single();
+    if (e || !intent) {
+      // Vente déjà rattachée à une commande (23505) : rien à faire de plus.
+      if (e?.code !== "23505") console.error("store intent", e?.code);
+      continue;
+    }
+    await db.from("store_purchases").update({ intent_id: intent.id }).eq("sale_id", r.sale_id);
+    await db.from("audit_log").insert({ actor_id: user.id, action: "billing.store_claimed", target_kind: "sale", target_id: r.sale_id, meta: { product: r.product_code } });
+    if ((await reconcileIntent(intent as IntentRow)) === "succeeded") n++;
+  }
+  return n;
+}

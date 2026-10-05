@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckoutForm } from "@/components/billing/CheckoutForm";
+import { CopyEmail } from "@/components/billing/CopyEmail";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import { formatXof, product } from "@/lib/billing/catalog";
@@ -50,7 +51,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
         <dt>{c.allocation}</dt>
         <dd>{p.kind === "subscription" ? c.allocationMonthly(p.monthlyCredits) : c.allocationTopup(p.credits)}</dd>
         <dt>{c.account}</dt>
-        <dd>{user.email}</dd>
+        <dd>{user.email && <CopyEmail email={user.email} label={c.copyEmail} done={c.copied} />}</dd>
         {p.kind === "subscription" && (
           <>
             <dt>{c.starts}</dt>
@@ -60,6 +61,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
         <dt>{c.total}</dt>
         <dd className="recap-total">{amount}</dd>
       </dl>
+      <p className="notice" role="note">{c.emailNotice}</p>
       <p className="muted small">{p.kind === "topup" ? c.topupNote : c.rules}</p>
       {!user.email_confirmed_at ? (
         <p className="notice notice-warn">{c.verifyFirst}</p>

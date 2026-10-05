@@ -9,12 +9,12 @@ Ce document reprend les fiches de `LIMPID_Produits_Chariow_A_Creer.md`, corrigé
 | Type | **Licence** (le seul type qui accepte les achats répétés : renouvellements et recharges) |
 | Paiement | Unique, prix fixe en **XOF** (pas de prix libre, pas de coupon non répertorié) |
 | Génération de la clé | Automatique |
-| Activation | **Requise** (`requires_activation`), faite par le serveur Limpid, jamais par le client |
-| Activations maximales | **1** (une clé = un compte Limpid) |
+| Activation | **Non requise** : Limpid n'utilise pas l'activation de licence (voir plus bas) |
+| Activations maximales | **1** |
 | Expédition | Aucune |
 | Durée de validité | Voir chaque produit. Si la boutique ne propose que des jours, **ne publiez pas** l'offre avec un libellé « mois » : signalez-le, on aligne d'abord les textes. |
 
-Pourquoi l'activation est contrôlée par Limpid : un renouvellement acheté en avance ne doit commencer qu'à la fin de la période déjà payée. Avec une activation automatique, la validité démarrerait dès l'achat et l'acheteur perdrait des jours.
+**Licences et renouvellements.** La clé de licence n'est qu'une preuve d'achat : l'accès est calculé par Limpid à partir de la vente vérifiée (`GET /v1/sales/{id}`), pas de la licence. Un renouvellement acheté en avance commence donc à la fin de la période déjà payée, quelle que soit la date d'activation de la clé côté Chariow. L'API Chariow ne permet pas aujourd'hui de relier de façon prouvée une licence à sa vente (son `sale_id` est un entier interne) : Limpid n'active donc aucune licence, et la durée de validité de la licence Chariow n'a pas d'effet sur l'accès.
 
 ## Tableau de configuration
 
@@ -153,3 +153,13 @@ Ajoutez 500 crédits à votre compte Limpid (l'équivalent de 25 rapports standa
 | `topup_500` | À RENSEIGNER | À RENSEIGNER |
 
 Les identifiants vont dans la variable Vercel `CHARIOW_PRODUCTS`. Les liens publics servent aux achats directs depuis la boutique : ils sont rattachés au compte dont l'adresse confirmée correspond à celle du paiement.
+
+## Achats faits directement sur la boutique
+
+| Situation | Ce que fait Limpid |
+|---|---|
+| Un compte a confirmé l'adresse du paiement | Rattaché dès le Pulse `successful.sale`, après relecture de la vente |
+| Aucun compte, ou adresse pas encore confirmée | Achat conservé ; rattaché dès que l'adresse est confirmée (lien email, Google/Apple, ou bouton « J'ai déjà payé » dans Mes crédits) |
+| Produit, montant ou boutique inattendus, ou adresse absente | Mis en vérification (visible dans /admin), rien n'est attribué |
+| Payé via Limpid mais avec une autre adresse que celle du compte | Commande mise en vérification, rien n'est attribué |
+| Payé avec une autre adresse sur la boutique | Pas de rattachement automatique : traiter à la main depuis /admin (« Ajouter des crédits », motif journalisé) |

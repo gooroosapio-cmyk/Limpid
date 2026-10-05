@@ -1,4 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
+import { claimStorePurchases } from "@/lib/billing/store";
+import { isAdminConfigured } from "@/lib/supabase/admin";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { sessionMethods } from "@/lib/auth/password";
 import { createUserClient } from "@/lib/supabase/server";
@@ -30,6 +32,15 @@ export async function GET(request: NextRequest) {
     const r = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     ok = !r.error;
     token = r.data.session?.access_token ?? undefined;
+  }
+
+  // Adresse confirmée (inscription, lien, Google/Apple) : rattache les achats faits sur la boutique.
+  if (ok && isAdminConfigured()) {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      const u = data.user;
+      after(() => claimStorePurchases({ id: u.id, email: u.email ?? null, emailConfirmed: !!u.email_confirmed_at }).catch((e) => console.error("claim", (e as Error).message)));
+    }
   }
 
   // Redirections fixes : aucun paramètre « next » contrôlé par l'URL.

@@ -8,7 +8,7 @@
  *  - Pulse : HMAC-SHA256 du corps brut, en-tête x-chariow-signature « sha256=<hex> »,
  *    x-pulse-delivery-id (absent pour un test), événement dans le corps (« event ») ;
  *  - GET https://api.chariow.com/v1/sales/{id} : data.status, data.payment.status,
- *    data.amount { value, currency }, data.product.id, data.store.id.
+ *    data.amount { value, currency }, data.product.id, data.store.id, data.customer.email.
  */
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -25,6 +25,12 @@ export class ChariowError extends Error {
   ) {
     super(message);
   }
+}
+
+/** Code Limpid d'un produit Chariow (réciproque de CHARIOW_PRODUCTS), ou null. */
+export function productCodeFor(providerProductId: string, env: Record<string, string | undefined> = process.env): ProductCode | null {
+  const ids = productIds(env);
+  return (PRODUCT_CODES.find((c) => ids[c] === providerProductId) as ProductCode | undefined) ?? null;
 }
 
 /** Produits Chariow : CHARIOW_PRODUCTS = {"essential_monthly":"prd_…", …} (identifiants réels de la boutique). */
@@ -154,6 +160,8 @@ const SaleResponse = z.object({
     payment: z.object({ status: z.string().nullable().optional() }).nullable().optional(),
     product: z.object({ id: z.string() }).nullable().optional(),
     store: z.object({ id: z.string() }).nullable().optional(),
+    // Adresse saisie au paiement : seule clé de rattachement d'un achat fait sur la boutique.
+    customer: z.object({ email: z.string().nullable().optional() }).nullable().optional(),
   }),
 });
 export type Sale = z.infer<typeof SaleResponse>["data"];
