@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
@@ -77,4 +78,35 @@ export async function runDiagnosticAction(_prev: DiagnosticState, form: FormData
   const checks = await runDiagnostic({ gemini });
   await audit(user.id, "admin.diagnostic", null, { gemini, ok: checks.every((c) => c.ok) });
   return { checks, at: new Date().toISOString() };
+}
+
+const JobId = z.string().uuid();
+
+/** Reprise ciblée d'une tâche en échec (aucune donnée privée journalisée). */
+export async function retryJobAction(form: FormData) {
+  const user = await requireAdmin();
+  const id = JobId.safeParse(form.get("job_id"));
+  if (!id.success) done("Tâche invalide.");
+  const { data: settings } = await adminClient().from("app_settings").select("generation_enabled").single();
+  if (!settings?.generation_enabled) done("La génération est suspendue : réactivez-la avant de reprendre une tâche.");
+  const { requeueJob } = await import("@/lib/admin-jobs");
+  const ok = await requeueJob(id.data);
+  if (!ok) done("Cette tâche ne peut pas être reprise (elle n'est plus en échec).");
+  await audit(user.id, "job.retry", id.data);
+  const { drainQueue } = await import("@/lib/jobs/worker");
+  const started = Date.now();
+  after(() => drainQueue(`admin-${crypto.randomUUID().slice(0, 8)}`, started + 270_000));
+  done("Tâche relancée : elle reprend à sa dernière étape réussie.");
+}
+
+/** Annulation ciblée d'une tâche en cours ou en attente. */
+export async function cancelJobAction(form: FormData) {
+  const user = await requireAdmin();
+  const id = JobId.safeParse(form.get("job_id"));
+  if (!id.success) done("Tâche invalide.");
+  const { cancelJob } = await import("@/lib/admin-jobs");
+  const r = await cancelJob(id.data);
+  if (r === "none") done("Cette tâche est déjà terminée.");
+  await audit(user.id, "job.cancel", id.data, { immediate: r === "cancelled" });
+  done(r === "cancelled" ? "Tâche annulée." : "Annulation demandée : la tâche s'arrêtera à sa prochaine étape.");
 }

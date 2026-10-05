@@ -98,27 +98,32 @@ export function NewFolder() {
   );
 }
 
-/** Actions d'un dossier ouvert : renommer, supprimer (ses Limpid sont conservés). */
-export function FolderActions({ id, name }: { id: string; name: string }) {
+/** Actions d'un dossier ouvert : renommer, supprimer (ses Limpid gardés par défaut). */
+export function FolderActions({ id, name, count }: { id: string; name: string; count: number }) {
   const t = useT();
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
+  const del = useRef<HTMLDialogElement>(null);
+  useDialogHistory(del);
+  const [busy, setBusy] = useState(false);
+
+  async function remove(withReports: boolean) {
+    if (withReports && !window.confirm(t.library.deleteAllConfirm(count))) return;
+    setBusy(true);
+    const res = await fetch(`/api/folders/${id}${withReports ? "?avec_limpid=1" : ""}`, { method: "DELETE" }).catch(() => null);
+    setBusy(false);
+    if (!res?.ok) return toast(t.library.actionFailed, "error");
+    del.current?.close();
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <div className="folder-actions">
       <button type="button" className="btn-link" aria-haspopup="dialog" onClick={() => ref.current?.showModal()}>
         {t.library.rename}
       </button>
-      <button
-        type="button"
-        className="btn-link danger"
-        onClick={async () => {
-          if (!window.confirm(t.library.deleteFolderConfirm)) return;
-          const res = await fetch(`/api/folders/${id}`, { method: "DELETE" }).catch(() => null);
-          if (!res?.ok) return toast(t.library.actionFailed, "error");
-          router.push("/");
-          router.refresh();
-        }}
-      >
+      <button type="button" className="btn-link danger" aria-haspopup="dialog" onClick={() => del.current?.showModal()}>
         {t.library.deleteFolder}
       </button>
       <NameDialog
@@ -136,6 +141,31 @@ export function FolderActions({ id, name }: { id: string; name: string }) {
           return true;
         }}
       />
+      <dialog ref={del} className="sheet side" aria-labelledby="folder-del-h">
+        <div className="sheet-grip" aria-hidden="true" />
+        <div className="sheet-head">
+          <h2 id="folder-del-h">{t.library.deleteFolderTitle}</h2>
+          <button type="button" className="ib" aria-label={t.reader.close} onClick={() => del.current?.close()}>
+            <Icon name="close" />
+          </button>
+        </div>
+        <ul className="rows">
+          <li>
+            <button type="button" className="row" disabled={busy} onClick={() => remove(false)}>
+              <span className="row-icon"><Icon name="folder" /></span>
+              <span className="row-text"><b>{t.library.deleteFolderKeep}</b><small>{t.library.deleteFolderKeepSub}</small></span>
+            </button>
+          </li>
+          {count > 0 && (
+            <li>
+              <button type="button" className="row row-danger" disabled={busy} onClick={() => remove(true)}>
+                <span className="row-icon"><Icon name="trash" /></span>
+                <span className="row-text"><b>{t.library.deleteFolderAll(count)}</b><small>{t.library.deleteFolderAllSub}</small></span>
+              </button>
+            </li>
+          )}
+        </ul>
+      </dialog>
     </div>
   );
 }

@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
+import { termAnchor } from "@/lib/render/anchors";
+import { pieceOf, useAnnex } from "./annex-link";
 import { SourceRef } from "./Sources";
 
 export interface Notion {
@@ -23,6 +25,7 @@ const Ctx = createContext<{ open: (term: string, opener: HTMLElement) => void; c
  */
 export function NotionsProvider({ notions, checkHref, children }: { notions: Notion[]; checkHref: string | null; children: React.ReactNode }) {
   const t = useT();
+  const annex = useAnnex();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
@@ -63,6 +66,19 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
                 <Icon name="file" /> {t.reader.source}
                 {notion.refs.map((r) => <SourceRef key={r.evidenceId} n={r.n} evidenceId={r.evidenceId} />)}
               </p>
+            )}
+            {annex && (
+              <a
+                className="btn-link notion-glossary"
+                href={annex.href(termAnchor(notion.term))}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                  e.preventDefault();
+                  annex.open(termAnchor(notion.term), pieceOf(openerRef.current));
+                }}
+              >
+                <Icon name="book" size={16} /> {t.reader.inGlossary}
+              </a>
             )}
             {checkHref && (
               <form method="dialog">

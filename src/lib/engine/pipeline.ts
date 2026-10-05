@@ -154,6 +154,8 @@ Règles :
 - Tout nombre d'une affirmation va dans numbers, avec source_form = l'écriture exacte du nombre dans la preuve (ex. « 97 % »). Le nombre doit figurer dans une preuve citée par l'affirmation.
 - Concepts (cpt_…) : notions importantes, définies par des affirmations existantes. Relations (rel_…) entre concepts ou affirmations existants, justifiées par des affirmations existantes.
 - Contradictions (ctr_…) seulement si la source se contredit. missing_information : ce que la source ne dit pas et qu'un lecteur chercherait.
+- Plusieurs documents (identifiants seg_d1-…, seg_d2-… : un préfixe par document) : chaque affirmation cite les segments du document qui la porte. Si deux documents divergent, crée une contradiction (ctr_…) qui expose les deux versions : ne fusionne pas en une seule vérité, et ne donne pas d'autorité particulière au premier document.
+- Une ligne qui commence par « [Figure : » est une description de figure produite par la lecture du document, pas son texte : elle peut servir à comprendre un schéma, mais une affirmation qui en découle est au plus "partial" et le dit (« d'après la figure »). « [illisible] » marque une zone illisible : n'en déduis rien.
 - N'utilise aucune connaissance extérieure à la source. Langue des textes produits : celle de la source.`;
 
 /** Les quatre approches (V4) : ce qui change dans la rédaction, jamais dans les faits. */
@@ -225,6 +227,8 @@ ${templates}
 
 export interface GenerationInput {
   sourceId: string;
+  /** Limpid commun : tous les documents (identifiants du moteur), le premier valant sourceId. */
+  sourceIds?: string[];
   segments: SourceSegment[];
   level: Level;
   goal: Goal;
@@ -468,7 +472,7 @@ function buildKnowledge(input: GenerationInput, draft: ComprehensionDraft): Know
   return {
     schema_version: SCHEMA_VERSION,
     id: `ko_${input.segments[0]!.source_version.slice(0, 16)}`,
-    source_ids: [input.sourceId],
+    source_ids: input.sourceIds?.length ? input.sourceIds.slice(0, 10) : [input.sourceId],
     concepts: draft.concepts,
     claims: draft.claims,
     relations: draft.relations,

@@ -16,24 +16,47 @@ export interface RowData {
   state: "ready" | "running" | "failed";
   unread: boolean;
   folderId: string | null;
+  /** Nom du dossier (résultats de recherche dans toute la bibliothèque). */
+  folderName?: string | null;
   /** Explication de l'échec (filtre Échecs). */
   reason?: string;
 }
 
 const LONG_PRESS = 500;
+/** Déplacement du doigt au-delà duquel l'appui long est annulé (défilement). */
+const MOVE_TOLERANCE = 10;
 
 /**
- * Un Limpid de la bibliothèque. Appui long (ou bouton ⋯) : Ouvrir, Déplacer vers…, Supprimer.
+ * Un Limpid de la bibliothèque. Appui long : mode sélection. Bouton ⋯ : Ouvrir, Sélectionner,
+ * Déplacer vers…, Supprimer. En sélection, toucher la ligne la coche au lieu de l'ouvrir.
  * En échec : explication, Réessayer et Supprimer.
  */
-export function ReportRow({ row, folders, showFailure = false }: { row: RowData; folders: { id: string; name: string }[]; showFailure?: boolean }) {
+export function ReportRow({
+  row,
+  showFailure = false,
+  selecting = false,
+  selected = false,
+  onToggle,
+  onStartSelect,
+  onMove,
+  onOpen,
+}: {
+  row: RowData;
+  showFailure?: boolean;
+  selecting?: boolean;
+  selected?: boolean;
+  onToggle?: (id: string) => void;
+  onStartSelect?: (id: string) => void;
+  onMove?: (id: string) => void;
+  /** Ouverture d'un résultat (mémorise la recherche utilisée). */
+  onOpen?: () => void;
+}) {
   const t = useT();
   const router = useRouter();
   const menu = useRef<HTMLDialogElement>(null);
-  const move = useRef<HTMLDialogElement>(null);
   useDialogHistory(menu);
-  useDialogHistory(move);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const origin = useRef<{ x: number; y: number } | null>(null);
   const pressed = useRef(false);
   const [busy, setBusy] = useState(false);
   const icon: IconName = row.state === "failed" ? "alert" : row.state === "running" ? "hourglass" : "book";
@@ -44,14 +67,6 @@ export function ReportRow({ row, folders, showFailure = false }: { row: RowData;
     if (!window.confirm(t.library.deleteConfirm)) return;
     const res = await fetch(`/api/reports/${row.id}`, { method: "DELETE" }).catch(() => null);
     if (!res?.ok) return toast(t.library.actionFailed, "error");
-    router.refresh();
-  }
-
-  async function moveTo(folderId: string | null, name: string) {
-    move.current?.close();
-    const res = await fetch(`/api/reports/${row.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_id: folderId }) }).catch(() => null);
-    if (!res?.ok) return toast(t.library.actionFailed, "error");
-    toast(t.library.moved(name));
     router.refresh();
   }
 
@@ -69,74 +84,98 @@ export function ReportRow({ row, folders, showFailure = false }: { row: RowData;
     router.push(`/rapports/${row.id}`);
   }
 
-  const startPress = (e: React.PointerEvent) => {
-    if (e.pointerType === "mouse") return;
-    pressed.current = false;
-    timer.current = setTimeout(() => {
-      pressed.current = true;
-      navigator.vibrate?.(10);
-      menu.current?.showModal();
-    }, LONG_PRESS);
-  };
   const cancelPress = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    origin.current = null;
+  };
+  const press = {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse" || selecting) return;
+      pressed.current = false;
+      origin.current = { x: e.clientX, y: e.clientY };
+      timer.current = setTimeout(() => {
+        pressed.current = true;
+        navigator.vibrate?.(10);
+        // Le relâchement du doigt produit un clic : il ne doit rien ouvrir.
+        const swallow = (ev: Event) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+        };
+        document.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 800);
+        onStartSelect?.(row.id);
+      }, LONG_PRESS);
+    },
+    // Le défilement annule l'appui long avant son déclenchement.
+    onPointerMove: (e: React.PointerEvent) => {
+      if (origin.current && Math.hypot(e.clientX - origin.current.x, e.clientY - origin.current.y) > MOVE_TOLERANCE) cancelPress();
+    },
+    onPointerUp: cancelPress,
+    onPointerLeave: cancelPress,
+    onPointerCancel: cancelPress,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
 
-  const sheetHead = (id: string, title: string, ref: React.RefObject<HTMLDialogElement | null>) => (
-    <>
-      <div className="sheet-grip" aria-hidden="true" />
-      <div className="sheet-head">
-        <h2 id={id}>{title}</h2>
-        <button type="button" className="ib" aria-label={t.reader.close} onClick={() => ref.current?.close()}>
-          <Icon name="close" />
-        </button>
-      </div>
-    </>
+  const text = (
+    <span className="row-text">
+      <b>
+        {row.title}
+        {row.unread && <span className="unread-dot" role="img" aria-label={t.library.unread} />}
+      </b>
+      <small>
+        {row.sub}
+        {row.folderName ? ` · ${t.library.inFolder(row.folderName)}` : ""}
+      </small>
+    </span>
   );
 
   return (
-    <li className={showFailure ? "lib-row lib-failure" : "lib-row"}>
-      <div className="lib-row-main">
-        <ReportLink href={`/rapports/${row.id}`} className={cls} immersive={row.state === "ready"}>
-          <span
-            className="row-icon"
-            onPointerDown={startPress}
-            onPointerUp={cancelPress}
-            onPointerLeave={cancelPress}
-            onPointerCancel={cancelPress}
-          >
-            <Icon name={icon} />
-          </span>
-          <span
-            className="row-text"
-            onPointerDown={startPress}
-            onPointerUp={cancelPress}
-            onPointerLeave={cancelPress}
-            onPointerCancel={cancelPress}
-            onClickCapture={(e) => {
-              if (pressed.current) {
-                e.preventDefault();
-                e.stopPropagation();
-                pressed.current = false;
-              }
-            }}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <b>
-              {row.title}
-              {row.unread && (
-                <span className="unread-dot" role="img" aria-label={t.library.unread} />
-              )}
-            </b>
-            <small>{row.sub}</small>
-          </span>
-        </ReportLink>
-        <button type="button" className="ib lib-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(row.title)} onClick={() => menu.current?.showModal()}>
-          <Icon name="more" />
-        </button>
+    <li className={`lib-row${showFailure ? " lib-failure" : ""}${selected ? " is-selected" : ""}`}>
+      <div className="lib-row-main" {...press}>
+        {selecting ? (
+          <label className={`${cls} lib-select`}>
+            <input type="checkbox" checked={selected} onChange={() => onToggle?.(row.id)} aria-label={t.library.selectItem(row.title)} />
+            <span className="row-icon" aria-hidden="true"><Icon name={selected ? "check" : icon} /></span>
+            {text}
+          </label>
+        ) : (
+          <ReportLink href={`/rapports/${row.id}`} className={cls} immersive={row.state === "ready"}>
+            <span
+              className="row-icon"
+              onClickCapture={(e) => {
+                if (pressed.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  pressed.current = false;
+                }
+              }}
+            >
+              <Icon name={icon} />
+            </span>
+            <span
+              className="lib-row-hit"
+              onClickCapture={(e) => {
+                if (pressed.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  pressed.current = false;
+                  return;
+                }
+                onOpen?.();
+              }}
+            >
+              {text}
+            </span>
+          </ReportLink>
+        )}
+        {!selecting && (
+          <button type="button" className="ib lib-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(row.title)} onClick={() => menu.current?.showModal()}>
+            <Icon name="more" />
+          </button>
+        )}
       </div>
-      {showFailure && (
+      {showFailure && !selecting && (
         <div className="lib-failure-body">
           {row.reason && <p className="muted small">{row.reason}</p>}
           <div className="actions-row">
@@ -151,7 +190,13 @@ export function ReportRow({ row, folders, showFailure = false }: { row: RowData;
       )}
 
       <dialog ref={menu} className="sheet side" aria-labelledby={`m-${row.id}`}>
-        {sheetHead(`m-${row.id}`, row.title, menu)}
+        <div className="sheet-grip" aria-hidden="true" />
+        <div className="sheet-head">
+          <h2 id={`m-${row.id}`}>{row.title}</h2>
+          <button type="button" className="ib" aria-label={t.reader.close} onClick={() => menu.current?.close()}>
+            <Icon name="close" />
+          </button>
+        </div>
         <ul className="rows">
           <li>
             <button type="button" className="row" onClick={() => { menu.current?.close(); router.push(`/rapports/${row.id}`); }}>
@@ -160,7 +205,13 @@ export function ReportRow({ row, folders, showFailure = false }: { row: RowData;
             </button>
           </li>
           <li>
-            <button type="button" className="row" onClick={() => { menu.current?.close(); move.current?.showModal(); }}>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); onStartSelect?.(row.id); }}>
+              <span className="row-icon"><Icon name="check" /></span>
+              <span className="row-text"><b>{t.library.select}</b></span>
+            </button>
+          </li>
+          <li>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); onMove?.(row.id); }}>
               <span className="row-icon"><Icon name="move" /></span>
               <span className="row-text"><b>{t.library.moveTo}</b></span>
               <Icon name="chevron" className="row-chevron" />
@@ -180,26 +231,6 @@ export function ReportRow({ row, folders, showFailure = false }: { row: RowData;
               <span className="row-text"><b>{t.library.delete}</b></span>
             </button>
           </li>
-        </ul>
-      </dialog>
-
-      <dialog ref={move} className="sheet side" aria-labelledby={`mv-${row.id}`}>
-        {sheetHead(`mv-${row.id}`, t.library.moveTitle, move)}
-        <ul className="rows">
-          <li>
-            <button type="button" className="row" aria-current={row.folderId === null ? "true" : undefined} onClick={() => moveTo(null, t.library.backToLibrary)}>
-              <span className="row-icon"><Icon name={row.folderId === null ? "check" : "home"} /></span>
-              <span className="row-text"><b>{t.library.noFolder}</b></span>
-            </button>
-          </li>
-          {folders.map((f) => (
-            <li key={f.id}>
-              <button type="button" className="row" aria-current={row.folderId === f.id ? "true" : undefined} onClick={() => moveTo(f.id, f.name)}>
-                <span className="row-icon"><Icon name={row.folderId === f.id ? "check" : "folder"} /></span>
-                <span className="row-text"><b>{f.name}</b></span>
-              </button>
-            </li>
-          ))}
         </ul>
       </dialog>
     </li>

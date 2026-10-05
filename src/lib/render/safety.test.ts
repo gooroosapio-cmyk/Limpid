@@ -2,6 +2,7 @@ import { parseHTML } from "linkedom";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { AnnexesView } from "@/components/reader/AnnexesView";
 import { composeLimpid } from "@/components/reader/v4/Pieces";
 import { dictFor } from "@/lib/i18n";
 import { DEMO_SOURCE_TITLE, demoBlueprint, demoEvidence, demoExplanation, demoSegments } from "@/lib/demo/cycle-eau";
@@ -49,7 +50,6 @@ describe("rendu face à un contenu hostile (XSS)", () => {
           exercises: null,
           modeLabel: null,
           canReformulate: true,
-          expiry: `Expire ${HOSTILE}`,
           assets: {
             "00000000-0000-4000-8000-000000000001": {
               id: "a",
@@ -75,6 +75,31 @@ describe("rendu face à un contenu hostile (XSS)", () => {
     expect([...document.querySelectorAll("a[href]")].map((a) => a.getAttribute("href")).filter((x) => !/^(https?:|#|\/)/.test(x ?? ""))).toEqual([]);
     // Le texte hostile reste lisible, comme du texte.
     expect(document.body.textContent).toContain("<script>alert(1)</script>");
+  });
+
+  it("échappe aussi la page Annexes", () => {
+    const { explanation, blueprint } = hostileReport();
+    explanation.glossary = [{ term: `Terme ${HOSTILE}`, definition: `Déf ${HOSTILE}`, claim_ids: [] }];
+    const html = renderToStaticMarkup(
+      h(AnnexesView, {
+        t: dictFor("fr"),
+        title: blueprint.title,
+        backHref: "/rapports/x?a=lim_cover",
+        blueprint,
+        explanation,
+        evidence: demoEvidence,
+        segments: demoSegments,
+        documents: [{ sourceId: "x", title: `Doc ${HOSTILE}`, originalHref: null }],
+        notes: [`Note ${HOSTILE}`],
+        expiry: `Expire ${HOSTILE}`,
+      }),
+    );
+    const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
+    expect(document.querySelectorAll("script")).toHaveLength(0);
+    const all = [...document.querySelectorAll("*")];
+    expect(all.flatMap((el) => [...el.attributes].map((a) => a.name)).filter((n) => n.startsWith("on"))).toEqual([]);
+    expect([...document.querySelectorAll("a[href]")].map((a) => a.getAttribute("href")).filter((x) => !/^(https?:|#|\/)/.test(x ?? ""))).toEqual([]);
+    expect(document.body.textContent).toContain("Expire <script>");
   });
 
   it("n'accepte que des liens http(s)", () => {

@@ -20,12 +20,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "requete_invalide" }, { status: 400 });
 
   try {
-    const { sourceId, pendingOcr } = await prepareSource(user.id, parsed.data);
+    const { sourceId, pendingOcr, duplicate } = await prepareSource(user.id, parsed.data);
     after(() => purgeUnusedSources(20).catch(() => undefined));
     // Ligne compacte de l'import : titre, taille et pages détectées.
     const { data: src } = await adminClient().from("sources").select("title, page_count, byte_size").eq("id", sourceId).maybeSingle();
     return NextResponse.json(
-      { sourceId, pendingOcr, title: src?.title ?? null, pageCount: src?.page_count ?? null, byteSize: src?.byte_size ?? null },
+      { sourceId, pendingOcr, duplicate, title: src?.title ?? null, pageCount: src?.page_count ?? null, byteSize: src?.byte_size ?? null },
       { status: 201 },
     );
   } catch (e) {

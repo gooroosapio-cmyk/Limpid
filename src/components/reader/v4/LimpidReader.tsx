@@ -7,6 +7,7 @@ import type { Exercise } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
 import { paginate, viewOf, type View } from "@/lib/reader/paginate";
 import { AskPanel } from "../AskPanel";
+import { ANCHOR_RE, progressKey, useAnnex } from "../annex-link";
 import { Bilan } from "./Bilan";
 import { ReaderCtx, type ReaderApi } from "./context";
 import { OptionsPanel, type OptionsData } from "./OptionsPanel";
@@ -14,7 +15,6 @@ import { ReformulatePanel } from "./ReformulatePanel";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 
 const CONTINUOUS_KEY = "limpid-continuous";
-const progressKey = (id: string) => `limpid-progress-${id}`;
 
 export interface Chapter {
   id: string;
@@ -47,6 +47,7 @@ export function LimpidReader({
 }) {
   const t = useT();
   const router = useRouter();
+  const annex = useAnnex();
   const deckRef = useRef<HTMLDivElement>(null);
   const viewsRef = useRef<View[]>([]);
   const piecesRef = useRef<HTMLElement[]>([]);
@@ -71,6 +72,10 @@ export function LimpidReader({
   useDialogHistory(dialogs.reform);
   const markedRead = useRef(false);
   const anchorRef = useRef<string | null>(initialAnchor);
+  /** Ancre de retour d'annexe (`?a=`) : undefined = pas encore lue. */
+  const backAnchor = useRef<string | null | undefined>(undefined);
+  /** Première composition faite : avant, une position de défilement n'est pas une lecture. */
+  const laidOut = useRef(false);
   const titles = useMemo(() => Object.fromEntries(chapters.map((c) => [c.id, c.title])), [chapters]);
 
   useEffect(() => {
@@ -152,11 +157,27 @@ export function LimpidReader({
     try {
       saved = localStorage.getItem(progressKey(reportId ?? "demo")) ?? initialAnchor;
     } catch {}
+    // Retour d'annexe : l'adresse porte l'ancre exacte de lecture (`?a=`), lue une seule fois
+    // puis retirée de l'adresse une fois la vue rétablie.
+    if (backAnchor.current === undefined) {
+      const back = new URL(window.location.href).searchParams.get("a");
+      backAnchor.current = back && ANCHOR_RE.test(back) ? back : null;
+    }
+    if (backAnchor.current) {
+      saved = backAnchor.current;
+      anchorRef.current = backAnchor.current;
+    }
     let cancelled = false;
     void document.fonts.ready.then(() => {
       if (cancelled) return;
       sizeRef.current = { w: deck.clientWidth, h: deck.clientHeight };
       layout(saved);
+      laidOut.current = true;
+      if (backAnchor.current) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("a");
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
     });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const relayout = () => {
@@ -203,6 +224,7 @@ export function LimpidReader({
         const y = deck.scrollTop + deck.clientHeight * 0.35;
         let idx = 0;
         for (let i = 0; i < views.length; i++) if ((pieces[views[i]!.start]?.offsetTop ?? 0) <= y) idx = i;
+        if (!laidOut.current) return;
         setCurrent(idx);
         const start = pieces[views[idx]!.start];
         anchorRef.current = start?.id ?? null;
@@ -364,7 +386,14 @@ export function LimpidReader({
 
       <dialog ref={dialogs.options} className="sheet side" aria-labelledby="opt-h">
         {head("opt-h", t.lim.options, dialogs.options)}
-        <OptionsPanel data={options} continuous={continuous} onContinuous={toggleContinuous} onNavigate={() => dialogs.options.current?.close()} />
+        <OptionsPanel
+          data={options}
+          continuous={continuous}
+          onContinuous={toggleContinuous}
+          onNavigate={() => dialogs.options.current?.close()}
+          annexHref={(hash) => annex?.href(hash, anchorRef.current) ?? `#${hash}`}
+          onAnnex={(hash) => annex?.open(hash, anchorRef.current)}
+        />
       </dialog>
 
       <dialog ref={dialogs.ask} className="sheet side ask-sheet" aria-labelledby="ask-h">

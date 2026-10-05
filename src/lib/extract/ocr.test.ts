@@ -37,6 +37,14 @@ const input = (over: Partial<Parameters<typeof ocrDocument>[1]> = {}) => ({
   ...over,
 });
 
+describe("lots de pages", () => {
+  it("regroupe les pages consécutives par 8 au plus, sans doublon", async () => {
+    const { pageRuns } = await import("./ocr");
+    expect(pageRuns([5, 2, 3, 3, 9, 10, 11])).toEqual([[2, 3], [5, 5], [9, 11]]);
+    expect(pageRuns(Array.from({ length: 10 }, (_, i) => i + 1))).toEqual([[1, 8], [9, 10]]);
+  });
+});
+
 describe("lecture OCR", () => {
   it("lit un PDF scanné par lots de 8 pages, joint le fichier et localise par page", async () => {
     const fake = new FakeOcr((p) => ({ legible: p !== 5, text: p === 5 ? "" : PAGE(p) }), true);

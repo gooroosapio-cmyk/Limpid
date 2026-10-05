@@ -33,15 +33,14 @@ export default async function DemoReportPage() {
       initialAnchor={null}
       bilan={null}
       insufficient={false}
+      annexBase="/rapports/demo/annexes"
+      originalHref={null}
       options={{
         reportId: null,
         title: demoBlueprint.title,
         pdfHref: "/rapports/demo/pdf",
         hasExercises: false,
         sourceTitle: DEMO_SOURCE_TITLE,
-        originalHref: null,
-        sources: doc.entries.map((e) => ({ n: e.n, location: e.location, quote: e.quote })),
-        glossary: demoExplanation.glossary.map((g) => ({ term: g.term, definition: g.definition })),
         mode: "claire",
         versions: [],
         offlineAccount: null,

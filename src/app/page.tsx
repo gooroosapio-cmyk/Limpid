@@ -6,8 +6,8 @@ import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";
 import { FolderActions, NewFolder } from "@/components/library/FolderDialogs";
 import { LibraryMemory } from "@/components/library/LibraryMemory";
-import { LibrarySearch } from "@/components/library/LibrarySearch";
-import { ReportRow, type RowData } from "@/components/library/ReportRow";
+import { LibraryBrowser } from "@/components/library/LibraryBrowser";
+import { type RowData } from "@/components/library/ReportRow";
 import { requireUser } from "@/lib/auth";
 import { demoBlueprint } from "@/lib/demo/cycle-eau";
 import { getLang, getT } from "@/lib/i18n/server";
@@ -103,47 +103,47 @@ export default async function HomeLibraryPage({
     );
   }
 
-  const { folders, items, error } = await loadLibrary({ q: q || undefined });
+  const { folders, items, error } = await loadLibrary();
   const folder = sp.dossier ? (folders.find((f) => f.id === sp.dossier) ?? null) : null;
-  const [{ data: prefs }] = await Promise.all([supabase.from("reader_preferences").select("recent_searches").maybeSingle()]);
+  const { data: prefs } = await supabase.from("reader_preferences").select("recent_searches").maybeSingle();
   const recent = Array.isArray(prefs?.recent_searches) ? (prefs.recent_searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 5) : [];
+  const folderNames = new Map(folders.map((f) => [f.id, f.name]));
   const toRow = (i: LibraryItem): RowData => ({
     id: i.id,
     title: i.title,
     state: i.state,
     unread: i.unread,
     folderId: i.folderId,
+    folderName: i.folderId ? (folderNames.get(i.folderId) ?? null) : null,
     sub: [
       i.state === "failed" ? t.library.failed : i.state === "running" ? t.library.running : i.mode ? (t.add.modes[i.mode]?.title ?? null) : null,
       whenLabel(i.createdAt, lang, t.library.today, t.library.yesterday),
+      i.sourceCount > 1 ? t.library.sourcesCount(i.sourceCount) : null,
       i.incomplete ? t.library.incomplete : null,
     ]
       .filter(Boolean)
       .join(" · "),
     reason: i.state === "failed" ? (t.jobErrors[i.errorCode ?? "unknown"] ?? t.jobErrors.unknown) : undefined,
   });
-  // Racine sans recherche ni filtre : dossiers d'abord, puis les Limpid hors dossier.
-  const root = !folder && !q && filter === "tous";
-  const scoped = folder ? items.filter((i) => i.folderId === folder.id) : root ? items.filter((i) => !i.folderId) : items;
+  const scoped = folder ? items.filter((i) => i.folderId === folder.id) : items;
   const shown = filter === "tous" ? scoped : scoped.filter((i) => i.state === STATE_OF[filter]);
-  const emptyLibrary = !q && !folder && items.length === 0 && folders.length === 0 && !error;
-  const folderList = folders.map((f) => ({ id: f.id, name: f.name }));
-  const base = { filtre: filter === "tous" ? undefined : filter, dossier: folder?.id };
+  const emptyLibrary = !folder && items.length === 0 && folders.length === 0 && !error;
+  const emptyText =
+    folder && filter === "tous"
+      ? t.library.folderEmpty
+      : filter === "echecs"
+        ? t.library.noFailures
+        : filter === "en_cours"
+          ? t.library.noRunning
+          : filter === "prets"
+            ? t.library.noReady
+            : t.library.noneInFilter;
 
-  return (
-    <Screen fab>
-      <LibraryMemory />
-      {folder && (
-        <nav className="crumbs" aria-label={t.library.folders}>
-          <Link href={href({ filtre: base.filtre })}>{t.library.backToLibrary}</Link> <span aria-hidden="true">›</span>
-        </nav>
-      )}
-      <div className="lib-head">
-        <h1>{folder ? folder.name : t.library.title}</h1>
-        {!emptyLibrary && <LibrarySearch q={q} recent={recent} base={base} />}
-      </div>
-      {folder && <FolderActions id={folder.id} name={folder.name} />}
-      {emptyLibrary ? (
+  if (emptyLibrary) {
+    return (
+      <Screen fab>
+        <LibraryMemory />
+        <h1>{t.library.title}</h1>
         <div className="empty lib-empty stagger">
           <div className="empty-art" aria-hidden="true"><Icon name="book" size={56} /></div>
           <h2>{t.library.emptyTitle}</h2>
@@ -152,61 +152,46 @@ export default async function HomeLibraryPage({
           <NewFolder />
           <Link href="/rapports/demo" className="btn-link">{t.library.example}</Link>
         </div>
-      ) : (
-        <>
-          {q && (
-            <p className="active-search" role="status">
-              <span>{t.library.results(shown.length, q)}</span>
-              <Link href={href(base)} className="chip">
-                <Icon name="close" size={14} /> {t.library.clear}
-              </Link>
-            </p>
-          )}
-          <nav className="filters lib-filters" aria-label={t.library.filters}>
-            {FILTERS.map((f) => (
-              <Link key={f} href={href({ q: q || undefined, dossier: folder?.id, filtre: f === "tous" ? undefined : f })} className="filterchip" aria-current={filter === f ? "true" : undefined}>
-                {t.library.filter[f]}
-              </Link>
-            ))}
-          </nav>
-          {filter === "echecs" && <p className="muted small lib-failures-intro">{t.library.failuresIntro}</p>}
+        <Fab />
+      </Screen>
+    );
+  }
 
-          {root && (
-            <section aria-labelledby="folders-h" className="lib-folders">
-              <div className="lib-section-head">
-                <h2 id="folders-h" className="eyebrow">{t.library.folders}</h2>
-                <NewFolder />
-              </div>
-              {folders.length > 0 && (
-                <ul className="rows">
-                  {folders.map((f) => (
-                    <li key={f.id}>
-                      <Link href={href({ dossier: f.id })} className="row">
-                        <span className="row-icon"><Icon name="folder" /></span>
-                        <span className="row-text"><b>{f.name}</b><small>{t.library.folderCount(f.count)}</small></span>
-                        <Icon name="chevron" className="row-chevron" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          )}
-
-          <section aria-labelledby="limpids-h">
-            <h2 id="limpids-h" className="eyebrow">{t.library.limpids}</h2>
-            {shown.length === 0 ? (
-              <p className="muted">{q ? t.library.noResult : folder && filter === "tous" ? t.library.folderEmpty : t.library.noneInFilter}</p>
-            ) : (
-              <ul className="rows lib-rows">
-                {shown.map((i) => (
-                  <ReportRow key={i.id} row={toRow(i)} folders={folderList} showFailure={filter === "echecs"} />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {root && (
+  return (
+    <Screen fab>
+      <LibraryMemory />
+      {folder && (
+        <nav className="crumbs" aria-label={t.library.folders}>
+          <Link href={href({ filtre: filter === "tous" ? undefined : filter })}>{t.library.backToLibrary}</Link> <span aria-hidden="true">›</span>
+        </nav>
+      )}
+      <LibraryBrowser
+        title={folder ? folder.name : t.library.title}
+        folder={folder ? { id: folder.id, name: folder.name } : null}
+        folders={folders}
+        allFolders={folders.map((f) => ({ id: f.id, name: f.name }))}
+        rows={shown.map(toRow)}
+        root={!folder}
+        initialQuery={q}
+        recent={recent}
+        showFailure={filter === "echecs"}
+        emptyText={emptyText}
+        newFolder={<NewFolder />}
+        headerExtra={folder ? <FolderActions id={folder.id} name={folder.name} count={scoped.length} /> : undefined}
+        filters={
+          <>
+            <nav className="filters lib-filters" aria-label={t.library.filters}>
+              {FILTERS.map((f) => (
+                <Link key={f} href={href({ dossier: folder?.id, filtre: f === "tous" ? undefined : f })} className="filterchip" aria-current={filter === f ? "true" : undefined}>
+                  {t.library.filter[f]}
+                </Link>
+              ))}
+            </nav>
+            {filter === "echecs" && <p className="muted small lib-failures-intro">{t.library.failuresIntro}</p>}
+          </>
+        }
+        footer={
+          !folder ? (
             <ul className="rows lib-extra">
               <li>
                 <ReportLink href="/rapports/demo" className="row" immersive>
@@ -223,9 +208,9 @@ export default async function HomeLibraryPage({
                 </Link>
               </li>
             </ul>
-          )}
-        </>
-      )}
+          ) : undefined
+        }
+      />
       <Fab />
     </Screen>
   );

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useRef, useState } from "react"
 import { Icon } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
 import type { SourceEntry } from "@/lib/render/sources";
+import { pieceOf, useAnnex } from "./annex-link";
 
 
 const Ctx = createContext<(evidenceId: string, opener: HTMLElement) => void>(() => {});
@@ -77,9 +78,29 @@ export function SourcesProvider({
   );
 }
 
+/**
+ * Indice de référence discret (V5, § 14) : dans le lecteur, il ouvre la page Annexes à la
+ * source citée (document, page, extrait, original) ; ailleurs, le panneau des sources.
+ */
 export function SourceRef({ n, evidenceId }: { n: number; evidenceId: string }) {
   const t = useT();
   const open = useContext(Ctx);
+  const annex = useAnnex();
+  if (annex)
+    return (
+      <a
+        className="ref"
+        href={annex.href(`src-${n}`)}
+        aria-label={t.reader.seeSource(n)}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+          e.preventDefault();
+          annex.open(`src-${n}`, pieceOf(e.currentTarget));
+        }}
+      >
+        {n}
+      </a>
+    );
   return (
     <button
       type="button"

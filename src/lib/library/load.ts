@@ -20,6 +20,8 @@ export interface LibraryItem {
   unread: boolean;
   incomplete: boolean;
   errorCode: string | null;
+  /** Documents utilisés par le Limpid (plusieurs : Limpid commun). */
+  sourceCount: number;
 }
 
 export interface LibraryFolder {
@@ -33,7 +35,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
   let query = supabase
     .from("reports")
     .select(
-      "id, title, created_at, mode, folder_id, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(status, error_code, created_at), report_progress(read_at)",
+      "id, title, created_at, mode, folder_id, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(status, error_code, created_at), report_progress(read_at), report_sources(source_id)",
     )
     .eq("is_demo", false)
     .order("created_at", { ascending: false })
@@ -62,6 +64,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
       unread: ready && !readAt,
       incomplete: version?.check_status === "incomplete",
       errorCode: !ready && !running ? (job?.error_code ?? null) : null,
+      sourceCount: Math.max(1, ((r.report_sources as unknown as unknown[] | null) ?? []).length),
     };
   });
   const counts = new Map<string, number>();

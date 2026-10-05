@@ -1,5 +1,24 @@
 # Avancement
 
+## Phase 13 — V5 « Améliorer l'existant » (5 octobre 2026)
+
+Détail, preuves, migration et retour arrière : `docs/LIVRAISON_V5.md` ; audit initial : `docs/AUDIT_V5.md`.
+
+### FAIT
+- Import de plusieurs documents (liste compacte, états par fichier, réessayer / remplacer / retirer), Limpid commun ou un Limpid par document, quatre approches en cartes 2 × 2.
+- Limpid commun dans le moteur (`report_sources`, identifiants préfixés par document), OCR automatique page par page, figures décrites, doublons signalés dans le compte.
+- Annexes sur une page continue hors du carrousel, retour à la vue exacte, indices de référence discrets, brouillons d'exercices conservés.
+- Recherche instantanée sans réseau, sélection multiple, déplacement groupé avec Annuler, suppression de dossier explicite.
+- Paramètres : une entrée « Préférences ». Schémas : libellés coupés sans débordement.
+- Administration : traitements lisibles, reprise et annulation ciblées.
+
+### EN TEST
+- Recette locale R01–R28 (320, 360, 390, 430 px, tablette, bureau, paysage) : voir `docs/LIVRAISON_V5.md`.
+
+### À FAIRE / LIMITES
+- Appliquer la migration `20261007000000_v5_multi_sources.sql` avant le déploiement.
+- Rejouer R07/R12 avec le fichier « Mwat Mwat » quand il sera fourni ; générer un Limpid commun réel (quota Gemini).
+
 ## Phase 12.1 — Illustrations incrustées et pages plus denses (5 octobre 2026)
 
 ### FAIT

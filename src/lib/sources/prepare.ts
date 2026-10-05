@@ -5,6 +5,7 @@
  * Les images et PDF scannés restent en attente de lecture OCR, avec accord explicite.
  */
 import "server-only";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { isUrlImportEnabled, limits, retention } from "@/lib/config";
 import { extractSource, ExtractionError, type ExtractableKind, type SourceCoverage } from "@/lib/extract";
@@ -62,7 +63,10 @@ interface PreparedSource {
     original_url?: string;
     page_count?: number | null;
     coverage: SourceCoverage | Record<string, unknown>;
+    file_sha256?: string;
   };
+  /** Document mixte : pages sans texte natif à lire par OCR dans la tâche. */
+  ocrPages?: number[];
 }
 
 function extractionMessage(e: unknown): string {
@@ -122,6 +126,7 @@ async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): 
     return fail("missing", "Le fichier n'est pas arrivé jusqu'au serveur. Envoyez-le à nouveau.");
   }
   const buf = new Uint8Array(await download.data.arrayBuffer());
+  const fileSha = createHash("sha256").update(buf).digest("hex");
 
   let kind: "pdf" | "docx" | "txt" | ImageKind;
   try {
@@ -151,6 +156,7 @@ async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): 
         byte_size: buf.length,
         page_count: kind === "pdf" ? pages : null,
         coverage: { pending_ocr: true },
+        file_sha256: fileSha,
       },
     };
   };
@@ -166,6 +172,9 @@ async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): 
   // Le texte est figé en base ; l'original reste consultable (« Ouvrir le PDF ») pendant la
   // conservation du rapport, puis il est effacé (voir prepareSource et la purge quotidienne).
 
+  // Document mixte : les pages sans texte natif seront lues par OCR (dans les limites).
+  const empty = kind === "pdf" ? (((result.coverage as { empty_pages?: number[] }).empty_pages ?? []) as number[]) : [];
+  const ocrPages = allowOcr && buf.length <= limits.maxOcrBytes ? empty.slice(0, limits.maxOcrPages) : [];
   return {
     sourceId: src.id,
     extracted: result.extracted,
@@ -176,7 +185,9 @@ async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): 
       byte_size: buf.length,
       page_count: result.pageCount,
       coverage: result.coverage,
+      file_sha256: fileSha,
     },
+    ocrPages,
   };
 }
 
@@ -239,7 +250,7 @@ async function fromUrl(rawUrl: string): Promise<PreparedSource> {
  * Prépare et enregistre la source et ses segments. Renvoie son identifiant ; une source en
  * attente d'OCR n'a pas encore de segments (le fichier est gardé au plus 24 h).
  */
-export async function prepareSource(userId: string, input: PrepareRequest): Promise<{ sourceId: string; pendingOcr: boolean }> {
+export async function prepareSource(userId: string, input: PrepareRequest): Promise<{ sourceId: string; pendingOcr: boolean; duplicate: boolean }> {
   const db = adminClient();
   const { count } = await db
     .from("sources")
@@ -255,9 +266,14 @@ export async function prepareSource(userId: string, input: PrepareRequest): Prom
     input.source === "text"
       ? await fromText(input)
       : input.source === "upload"
-        ? await fromUpload(userId, input.upload_id, input.allow_ocr === true)
+        ? // OCR automatique (V5) : le contenu est de toute façon traité par le service d'IA ;
+          // allow_ocr: false reste possible pour refuser explicitement la lecture d'images.
+          await fromUpload(userId, input.upload_id, input.allow_ocr !== false)
         : await fromUrl(input.url);
-  const { sourceId, extracted, row } = prepared;
+  const { sourceId, extracted } = prepared;
+  // Pages sans texte natif (schémas, pages scannées) : lues par OCR au lancement, sans
+  // bloquer le texte natif déjà extrait.
+  const row = prepared.ocrPages?.length ? { ...prepared.row, coverage: { ...prepared.row.coverage, pending_ocr_pages: prepared.ocrPages } } : prepared.row;
   const partial = "partial" in row.coverage && row.coverage.partial === true;
 
   // Lecture OCR à venir : l'original reste au plus 24 h (cadrage Q18), la tâche le lira avant.
@@ -295,5 +311,20 @@ export async function prepareSource(userId: string, input: PrepareRequest): Prom
       throw new PrepareError("storage", "Enregistrement du texte impossible.");
     }
   }
-  return { sourceId, pendingOcr: !extracted };
+  // Doublon exact dans le même compte (empreinte du fichier) : signalé, jamais bloquant ; les
+  // fichiers d'un autre compte ne sont jamais comparés.
+  let duplicate = false;
+  if (row.file_sha256) {
+    const { data: same } = await db
+      .from("sources")
+      .select("id")
+      .eq("owner_id", userId)
+      .eq("file_sha256", row.file_sha256)
+      .neq("id", sourceId)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    duplicate = !!same;
+  }
+  return { sourceId, pendingOcr: !extracted || !!prepared.ocrPages?.length, duplicate };
 }

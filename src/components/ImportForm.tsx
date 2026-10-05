@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { ModeIcon } from "@/components/ModeIcon";
+import { toast } from "@/components/shell/Toasts";
 import { MODES, type Mode } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
 import { apiMessage } from "@/lib/i18n/api";
@@ -10,20 +12,30 @@ import { useLang, useT } from "@/lib/i18n/client";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
 type Tab = "file" | "link" | "text";
-type Phase =
-  | { step: "idle" }
-  | { step: "upload"; percent: number }
-  | { step: "reading" }
-  // Image ou PDF scanné : l'envoi est fait, l'accord pour la lecture par l'IA est demandé.
-  | { step: "consent"; uploadId: string; message: string }
-  | { step: "creating" };
+type Phase = { step: "idle" } | { step: "reading" } | { step: "creating" };
+type Output = "common" | "each";
 
 interface Prepared {
   sourceId: string;
   title: string | null;
   pageCount: number | null;
   byteSize: number | null;
+  pendingOcr: boolean;
+  duplicate: boolean;
 }
+
+/** Un document de la sélection, avec son propre état (envoi, lecture, prêt, échec). */
+interface Item {
+  key: string;
+  file: File;
+  status: "waiting" | "upload" | "reading" | "ready" | "error";
+  percent: number;
+  prepared?: Prepared;
+  error?: string;
+}
+
+/** Envois et lectures simultanés au plus (le reste attend son tour). */
+const CONCURRENCY = 2;
 
 const MAX_PASTED = 50_000;
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
@@ -74,15 +86,17 @@ function putFile(url: string, file: File, onProgress: (percent: number) => void,
 }
 
 /**
- * Nouveau Limpid (V4) : Fichier, Lien ou Texte, puis une approche parmi quatre, puis
- * « Créer mon Limpid ». Un fichier choisi est envoyé et lu aussitôt (pages détectées) ;
- * la génération ne part qu'à la création.
+ * Nouveau Limpid (V5) : Fichier(s), Lien ou Texte, puis une approche parmi quatre (cartes 2 × 2),
+ * puis « Créer mon Limpid ». Chaque fichier est envoyé et lu aussitôt, avec son état ; plusieurs
+ * documents donnent un Limpid commun (par défaut) ou un Limpid par document. Aucun document en
+ * échec n'est ignoré sans décision explicite (le réessayer, le remplacer ou le retirer).
  */
 export function ImportForm({
   enabled,
   urlEnabled,
   maxFileMb = 20,
   maxPages = 100,
+  maxFiles = 5,
   initialTab = "file",
   defaultMode = "claire",
 }: {
@@ -90,6 +104,7 @@ export function ImportForm({
   urlEnabled: boolean;
   maxFileMb?: number;
   maxPages?: number;
+  maxFiles?: number;
   /** Onglet ouvert à l'arrivée (menu : texte, PDF, lien). */
   initialTab?: Tab;
   /** Dernier choix explicite, sinon Explication claire. */
@@ -100,22 +115,27 @@ export function ImportForm({
   const tabs: Tab[] = urlEnabled ? ["file", "link", "text"] : ["file", "text"];
   const [tab, setTab] = useState<Tab>(tabs.includes(initialTab) ? initialTab : "file");
   const [mode, setMode] = useState<Mode>(defaultMode);
-  const [file, setFile] = useState<File | null>(null);
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [output, setOutput] = useState<Output>("common");
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceRef = useRef<HTMLInputElement>(null);
+  const replacing = useRef<string | null>(null);
+  const running = useRef(new Set<string>());
   const key = useRef("");
   const router = useRouter();
   const base = useId();
-  const busy = phase.step === "upload" || phase.step === "reading" || phase.step === "creating";
+  const busy = phase.step !== "idle";
 
   useEffect(() => {
     key.current = crypto.randomUUID();
   }, []);
+
+  const patch = (k: string, p: Partial<Item>) => setItems((list) => list.map((it) => (it.key === k ? { ...it, ...p } : it)));
 
   async function prepare(body: Record<string, unknown>): Promise<Prepared> {
     const data = await postJson("/api/sources", body, t.add.failed, t);
@@ -124,22 +144,9 @@ export function ImportForm({
       title: typeof data.title === "string" ? data.title : null,
       pageCount: typeof data.pageCount === "number" ? data.pageCount : null,
       byteSize: typeof data.byteSize === "number" ? data.byteSize : null,
+      pendingOcr: data.pendingOcr === true,
+      duplicate: data.duplicate === true,
     };
-  }
-
-  /** Lecture d'un fichier envoyé ; demande l'accord si l'IA doit lire des images. */
-  async function readUpload(uploadId: string, allowOcr: boolean) {
-    setPhase({ step: "reading" });
-    try {
-      setPrepared(await prepare({ source: "upload", upload_id: uploadId, allow_ocr: allowOcr }));
-      setPhase({ step: "idle" });
-    } catch (err) {
-      if (err instanceof FormError && err.code === "ocr_consent") {
-        setPhase({ step: "consent", uploadId, message: err.message });
-        return;
-      }
-      throw err;
-    }
   }
 
   /** Document ajouté mais non expliqué : retiré (original effacé). */
@@ -147,56 +154,112 @@ export function ImportForm({
     void fetch(`/api/sources/${sourceId}`, { method: "DELETE" }).catch(() => undefined);
   }
 
-  async function choose(f: File | null) {
-    setError(null);
-    if (prepared) forget(prepared.sourceId);
-    setPrepared(null);
-    setFile(f);
-    if (!f) return setPhase({ step: "idle" });
-    if (f.size > maxFileMb * 1024 * 1024) {
-      setError(t.create.fileTooLarge.replace("20", String(maxFileMb)));
-      setFile(null);
-      return;
-    }
-    if (!enabled) return;
+  /** Envoi direct au stockage puis lecture (OCR automatique pour les images et scans). */
+  async function process(it: Item) {
+    running.current.add(it.key);
     try {
-      setPhase({ step: "upload", percent: 0 });
-      const up = await postJson("/api/uploads", { file_name: f.name, byte_size: f.size }, t.create.uploadFailed, t);
-      await putFile(String(up.signedUrl), f, (percent) => setPhase({ step: "upload", percent }), t.create.uploadFailed);
-      await readUpload(String(up.uploadId), false);
+      patch(it.key, { status: "upload", percent: 0, error: undefined });
+      const up = await postJson("/api/uploads", { file_name: it.file.name, byte_size: it.file.size }, t.create.uploadFailed, t);
+      await putFile(String(up.signedUrl), it.file, (percent) => patch(it.key, { percent }), t.create.uploadFailed);
+      patch(it.key, { status: "reading" });
+      const prepared = await prepare({ source: "upload", upload_id: String(up.uploadId) });
+      patch(it.key, { status: "ready", prepared });
     } catch (err) {
-      setError(err instanceof FormError ? err.message : t.create.networkError);
-      setPhase({ step: "idle" });
-      setFile(null);
+      patch(it.key, { status: "error", error: err instanceof FormError ? err.message : t.create.networkError });
+    } finally {
+      running.current.delete(it.key);
     }
   }
 
-  function remove() {
-    if (prepared) forget(prepared.sourceId);
-    setPrepared(null);
-    setFile(null);
-    setPhase({ step: "idle" });
+  // File d'attente : deux documents à la fois, dans l'ordre de sélection.
+  useEffect(() => {
+    if (!enabled) return;
+    const free = CONCURRENCY - running.current.size;
+    for (const it of items.filter((x) => x.status === "waiting" && !running.current.has(x.key)).slice(0, Math.max(0, free))) {
+      void process(it);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, enabled]);
+
+  function add(files: FileList | File[] | null) {
+    setError(null);
+    if (!files) return;
+    const list = [...files];
+    const fresh: Item[] = [];
+    for (const f of list) {
+      // Même fichier choisi deux fois dans la sélection : ignoré.
+      if (items.some((x) => x.file.name === f.name && x.file.size === f.size && x.file.lastModified === f.lastModified)) continue;
+      if (f.size > maxFileMb * 1024 * 1024) {
+        setError(t.create.fileTooLarge.replace("20", String(maxFileMb)));
+        continue;
+      }
+      fresh.push({ key: crypto.randomUUID(), file: f, status: "waiting", percent: 0 });
+    }
+    const room = maxFiles - items.length;
+    if (fresh.length > room) setError(t.add.maxFiles(maxFiles));
+    setItems((cur) => [...cur, ...fresh.slice(0, Math.max(0, room))]);
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  function remove(k: string) {
+    const it = items.find((x) => x.key === k);
+    if (it?.prepared) forget(it.prepared.sourceId);
+    setItems((cur) => cur.filter((x) => x.key !== k));
+  }
+
+  function retry(k: string) {
+    patch(k, { status: "waiting", percent: 0, error: undefined, prepared: undefined });
+  }
+
+  function replace(k: string, f: File | null) {
+    if (!f) return;
+    const it = items.find((x) => x.key === k);
+    if (it?.prepared) forget(it.prepared.sourceId);
+    if (f.size > maxFileMb * 1024 * 1024) {
+      patch(k, { status: "error", error: t.create.fileTooLarge.replace("20", String(maxFileMb)) });
+      return;
+    }
+    patch(k, { file: f, status: "waiting", percent: 0, error: undefined, prepared: undefined });
+  }
+
+  const readyItems = items.filter((x) => x.status === "ready" && x.prepared);
+  const pendingItems = items.filter((x) => x.status !== "ready" && x.status !== "error");
+  const failedItems = items.filter((x) => x.status === "error");
+  const many = tab === "file" && items.length > 1;
   const ready =
     enabled &&
     !busy &&
-    phase.step !== "consent" &&
-    (tab === "file" ? !!prepared : tab === "link" ? /^https?:\/\/\S+\.\S+/.test(url.trim()) : text.trim().length >= 20);
+    (tab === "file"
+      ? readyItems.length > 0 && pendingItems.length === 0 && failedItems.length === 0
+      : tab === "link"
+        ? /^https?:\/\/\S+\.\S+/.test(url.trim())
+        : text.trim().length >= 20);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ready) return;
     setError(null);
     try {
-      let sourceId = prepared?.sourceId;
+      if (tab === "file" && many && output === "each") {
+        setPhase({ step: "creating" });
+        const data = await postJson(
+          "/api/reports/batch",
+          { source_ids: readyItems.map((x) => x.prepared!.sourceId), mode, idempotency_key: key.current },
+          t.add.failed,
+          t,
+        );
+        const ids = Array.isArray(data.reportIds) ? data.reportIds : [];
+        toast(t.add.sent(ids.length));
+        router.push("/");
+        return;
+      }
+      let sourceIds = readyItems.map((x) => x.prepared!.sourceId);
       if (tab !== "file") {
         setPhase({ step: "reading" });
-        sourceId = (await prepare(tab === "link" ? { source: "url", url: url.trim() } : { source: "text", text })).sourceId;
+        sourceIds = [(await prepare(tab === "link" ? { source: "url", url: url.trim() } : { source: "text", text })).sourceId];
       }
       setPhase({ step: "creating" });
-      const data = await postJson("/api/reports", { source_id: sourceId, mode, idempotency_key: key.current }, t.add.failed, t);
+      const data = await postJson("/api/reports", { source_ids: sourceIds, mode, idempotency_key: key.current }, t.add.failed, t);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
       if (err instanceof FormError && err.reportId) {
@@ -216,8 +279,21 @@ export function ImportForm({
     document.getElementById(`${base}-tab-${next}`)?.focus();
   }
 
-  const status =
-    phase.step === "upload" ? t.add.uploading(phase.percent) : phase.step === "reading" ? t.add.reading : phase.step === "creating" ? t.add.creating : "";
+  const statusOf = (it: Item) =>
+    it.status === "upload"
+      ? t.add.uploading(it.percent)
+      : it.status === "reading"
+        ? t.add.fileStatus.reading
+        : it.status === "ready"
+          ? it.prepared?.pendingOcr
+            ? t.add.fileStatus.ocr
+            : t.add.fileStatus.ready
+          : it.status === "error"
+            ? t.add.fileStatus.error
+            : t.add.fileStatus.waiting;
+  const kindOf = (name: string) => (name.split(".").pop() ?? "").toUpperCase().slice(0, 5);
+  const count = many && output === "each" ? readyItems.length : 1;
+  const status = phase.step === "reading" ? t.add.reading : phase.step === "creating" ? t.add.creating : "";
 
   return (
     <form onSubmit={submit} aria-busy={busy} className="import">
@@ -247,12 +323,26 @@ export function ImportForm({
               ref={inputRef}
               id={`${base}-file`}
               type="file"
+              multiple
               accept={ACCEPT}
               className="sr-only"
-              disabled={busy || !enabled}
-              onChange={(e) => void choose(e.target.files?.[0] ?? null)}
+              disabled={busy || !enabled || items.length >= maxFiles}
+              onChange={(e) => add(e.target.files)}
             />
-            {!file ? (
+            <input
+              ref={replaceRef}
+              type="file"
+              accept={ACCEPT}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => {
+                if (replacing.current) replace(replacing.current, e.target.files?.[0] ?? null);
+                replacing.current = null;
+                e.target.value = "";
+              }}
+            />
+            {items.length === 0 ? (
               <label
                 htmlFor={`${base}-file`}
                 className={dragging ? "upload dragging" : "upload"}
@@ -264,52 +354,74 @@ export function ImportForm({
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragging(false);
-                  void choose(e.dataTransfer.files?.[0] ?? null);
+                  add(e.dataTransfer.files);
                 }}
               >
                 <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={26} /></span>
                 <span className="upload-title">{t.add.choose}</span>
-                <span className="muted small">{t.add.drop}</span>
                 <span className="muted small">{t.add.formats} · {t.add.limits(maxFileMb, maxPages)}</span>
               </label>
             ) : (
-              <div className="fileline">
-                <span className="fileline-icon" aria-hidden="true"><Icon name="file" /></span>
-                <span className="fileline-text">
-                  <b>{prepared?.title ?? file.name}</b>
-                  <small>
-                    {[formatSize(prepared?.byteSize ?? file.size, lang), prepared?.pageCount ? t.add.pages(prepared.pageCount) : null, status || null]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </small>
-                  {phase.step === "upload" && <progress value={phase.percent} max={100} aria-hidden="true" />}
-                </span>
-                <label htmlFor={`${base}-file`} className="btn-link fileline-replace" aria-disabled={busy}>
-                  {t.add.replace}
-                </label>
-                <button type="button" className="ib" aria-label={t.add.remove} onClick={remove} disabled={busy}>
-                  <Icon name="close" />
-                </button>
-              </div>
+              <>
+                <ul className="filelist" aria-label={t.add.files}>
+                  {items.map((it) => {
+                    const name = it.prepared?.title ?? it.file.name;
+                    return (
+                      <li key={it.key} className={`fileline${it.status === "error" ? " is-error" : ""}`}>
+                        <span className="fileline-icon" aria-hidden="true">
+                          <Icon name={it.status === "error" ? "alert" : it.status === "ready" ? "file" : "hourglass"} />
+                        </span>
+                        <span className="fileline-text">
+                          <b>{name}</b>
+                          <small>
+                            {[
+                              kindOf(it.file.name),
+                              formatSize(it.prepared?.byteSize ?? it.file.size, lang),
+                              it.prepared?.pageCount ? t.add.pages(it.prepared.pageCount) : null,
+                              statusOf(it),
+                              it.prepared?.duplicate ? t.add.duplicate : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </small>
+                          {it.status === "upload" && <progress value={it.percent} max={100} aria-hidden="true" />}
+                          {it.error && <span className="fileline-error" role="alert">{it.error}</span>}
+                        </span>
+                        <span className="fileline-actions">
+                          {it.status === "error" && (
+                            <button type="button" className="ib" aria-label={t.add.retryFile(name)} onClick={() => retry(it.key)} disabled={busy}>
+                              <Icon name="refresh" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="ib"
+                            aria-label={t.add.replaceFile(name)}
+                            disabled={busy || it.status === "upload" || it.status === "reading"}
+                            onClick={() => {
+                              replacing.current = it.key;
+                              replaceRef.current?.click();
+                            }}
+                          >
+                            <Icon name="move" />
+                          </button>
+                          <button type="button" className="ib" aria-label={t.add.removeFile(name)} onClick={() => remove(it.key)} disabled={busy || it.status === "upload" || it.status === "reading"}>
+                            <Icon name="close" />
+                          </button>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {items.length < maxFiles && (
+                  <label htmlFor={`${base}-file`} className="btn btn-block add-more" aria-disabled={busy}>
+                    <Icon name="plus" /> {t.add.addMore}
+                  </label>
+                )}
+                {failedItems.length > 0 && <p className="notice notice-warn small" role="status">{t.add.blockedByError}</p>}
+              </>
             )}
-            {phase.step === "consent" && (
-              <div className="notice" role="alert">
-                <strong>{t.add.ocrTitle}</strong>
-                <p>{phase.message}</p>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() =>
-                    void readUpload(phase.uploadId, true).catch((err) => {
-                      setError(err instanceof FormError ? err.message : t.create.networkError);
-                      setPhase({ step: "idle" });
-                    })
-                  }
-                >
-                  {t.add.ocrAllow}
-                </button>
-              </div>
-            )}
+            <p className="muted small add-limits">{t.add.ocrAuto} {t.add.maxFiles(maxFiles)}</p>
           </>
         )}
         {tab === "link" && (
@@ -335,27 +447,47 @@ export function ImportForm({
         )}
       </div>
 
+      {many && (
+        <fieldset className="choices output-choice" disabled={busy}>
+          <legend>{t.add.outputLegend}</legend>
+          {(["common", "each"] as const).map((o) => {
+            const [title, desc] = o === "common" ? t.add.outputCommon : t.add.outputEach;
+            return (
+              <label key={o} className="choice">
+                <input type="radio" name={`${base}-output`} checked={output === o} onChange={() => setOutput(o)} />
+                <span>
+                  <strong>{title}</strong>
+                  <span className="option-desc">{desc}</span>
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
+
       <fieldset className="modes" disabled={busy}>
         <legend>{t.add.modesLegend}</legend>
-        {MODES.map((m) => (
-          <label key={m} className="option mode-option">
-            <input type="radio" name={`${base}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-            <span>
+        <div className="mode-grid">
+          {MODES.map((m) => (
+            <label key={m} className={`mode-card${mode === m ? " is-selected" : ""}`}>
+              <input type="radio" className="sr-only" name={`${base}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} aria-describedby={`${base}-mode-${m}`} />
+              <ModeIcon mode={m} />
               <strong>{t.add.modes[m]?.title}</strong>
-              <span className="option-desc">{t.add.modes[m]?.desc}</span>
-            </span>
-          </label>
-        ))}
+              <span id={`${base}-mode-${m}`} className="mode-desc">{t.add.modes[m]?.desc}</span>
+              <span className="mode-check" aria-hidden="true"><Icon name="check" size={14} /></span>
+            </label>
+          ))}
+        </div>
       </fieldset>
 
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       <button
         type="submit"
-        className={`btn btn-primary btn-block${phase.step === "creating" || phase.step === "reading" ? " busy" : ""}`}
+        className={`btn btn-primary btn-block${phase.step !== "idle" ? " busy" : ""}`}
         disabled={!ready}
       >
-        {phase.step === "creating" ? t.add.creating : t.add.create} {phase.step !== "creating" && <Icon name="arrow" />}
+        {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : t.add.create} {phase.step !== "creating" && <Icon name="arrow" />}
       </button>
     </form>
   );
