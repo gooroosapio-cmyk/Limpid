@@ -1,5 +1,22 @@
 # Avancement
 
+## Phase 13.1 — Correctifs après audit et mise en production de la V5 (5 octobre 2026)
+
+### FAIT
+- **V5 fusionnée** (PR #14) et déployée ; sa migration était déjà appliquée en production.
+- **Double authentification de l'administration** (écart du cadrage Q8 levé) : `/admin` et ses actions exigent une session aal2. Première visite : QR code ou clé, puis premier code ; ensuite un code par session (`/admin/securite`). Secours : retirer le facteur dans Supabase, ou `LIMPID_ADMIN_MFA=off`. Configuration et validation journalisées.
+- **Moteur** : les 2 échecs `provider_schema_mismatch` de production (réécriture d'une partie, action retirée de l'interface en V4) avaient épuisé leurs corrections sur le même modèle. La dernière correction passe désormais d'abord par le modèle de repli déclaré (rédaction et exercices). Les écarts au schéma (chemins et règles, sans contenu) sont journalisés (`job.schema_mismatch`).
+- **Base** : migration `20261008000000_harden_rpc.sql`. `is_admin()` (inutilisée par les politiques et l'application) et `rls_auto_enable()` (créée par la plateforme) ne sont plus appelables en RPC par les clients. La recette SQL imite désormais les droits par défaut de Supabase et vérifie ce point.
+- **Qualité** : ESLint (configuration Next) en CI, 0 erreur. Les règles du React Compiler, non utilisé, restent en avertissement. Le message « lien plus valable » de la connexion passe par les dictionnaires (il restait en français dans l'interface anglaise). Le graphique en barres ne modifie plus de variable pendant le rendu.
+
+### EN TEST
+- Typecheck, lint, 227 tests, build de production, recette SQL (Postgres 16) : OK. Le test SQL échoue bien sans la migration.
+
+### À FAIRE (hors code)
+- **Supabase → Authentication → Attack Protection** : activer « Leaked password protection » (avis de sécurité ; réglage du tableau de bord, non scriptable depuis le dépôt).
+- **Supabase → Authentication → MFA** : vérifier que TOTP est activé (il l'est par défaut), puis configurer le second facteur à la prochaine visite de `/admin`.
+- Parcours complet en production sur téléphone avec la V5 (aucune génération depuis la V4), sur un quota Gemini disponible.
+
 ## Phase 13 — V5 « Améliorer l'existant » (5 octobre 2026)
 
 Détail, preuves, migration et retour arrière : `docs/LIVRAISON_V5.md` ; audit initial : `docs/AUDIT_V5.md`.
