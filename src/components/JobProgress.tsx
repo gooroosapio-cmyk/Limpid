@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { LoaderBook } from "@/components/LoaderBook";
+import type { Dict } from "@/lib/i18n";
 import { useT } from "@/lib/i18n/client";
 
 interface JobView {
@@ -20,7 +21,7 @@ const ERRORS: Record<string, string> = {
   provider_refused: "Le fournisseur IA a refusé de traiter ce contenu.",
   provider_unavailable: "Le fournisseur IA est indisponible pour le moment.",
   provider_rate_limited: "Le fournisseur IA limite les demandes. Réessayez dans quelques minutes.",
-  provider_quota_exhausted: "Le quota quotidien gratuit de Gemini est atteint. Réessayez demain (ou activez la facturation Gemini).",
+  provider_quota_exhausted: "Le quota quotidien de l'IA est atteint. Réessayez demain.",
   provider_timeout: "Le fournisseur IA n'a pas répondu à temps.",
   provider_truncated: "La réponse du fournisseur IA était incomplète (document trop long ?).",
   ocr_unreadable: "Aucun texte lisible n'a été trouvé dans ce document.",
@@ -28,21 +29,19 @@ const ERRORS: Record<string, string> = {
 };
 
 /** Étapes du kit (4), dérivées de l'étape réelle de la tâche : jamais du temps écoulé. */
+/** Étapes affichées (V4) : lecture, explications, visuels, vérification et mise en page. */
 const STEP_OF_STAGE: Record<string, number> = {
   validation: 0,
   extraction: 0,
   comprehension: 1,
-  explication: 2,
-  verification: 3,
-  illustrations: 3,
+  verification: 1,
+  explication: 1,
+  illustrations: 2,
   mise_en_page: 3,
 };
 
-function currentDetail(step: number, job: JobView): string {
-  const t = useT();
+function currentDetail(step: number, job: JobView, t: Dict): string {
   if (job.status === "queued") return t.prep.queued;
-  if (job.stage === "illustrations") return t.prep.illustrations;
-  if (job.stage === "mise_en_page") return t.prep.layout;
   return t.prep.steps[step]!.current;
 }
 
@@ -77,7 +76,7 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
   }
 
   if (active) {
-    const phase = t.prep.phases[step <= 0 ? 0 : step <= 2 ? 1 : 2]!;
+    const phase = t.prep.phases[step <= 0 ? 0 : step === 1 ? 1 : 2]!;
     return (
       <div className="prep">
         <LoaderBook />
@@ -85,7 +84,7 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
           <h1>{phase.heading}</h1>
           <p className="lede">{phase.lede}</p>
         </div>
-        <p className="sr-only" role="status" aria-live="polite">{t.prep.steps[step]!.label} : {currentDetail(step, job)}</p>
+        <p className="sr-only" role="status" aria-live="polite">{t.prep.steps[step]!.label} : {currentDetail(step, job, t)}</p>
         <ol className="steps">
           {t.prep.steps.map((st, i) => {
             const state = i < step ? "done" : i === step ? "current" : "todo";
@@ -95,7 +94,7 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
                 <span>
                   <strong>{st.label}</strong>
                   <span className="step-detail">
-                    {state === "done" ? t.prep.done : state === "current" ? currentDetail(i, job) : t.prep.todo}
+                    {state === "done" ? t.prep.done : state === "current" ? currentDetail(i, job, t) : t.prep.todo}
                   </span>
                 </span>
               </li>

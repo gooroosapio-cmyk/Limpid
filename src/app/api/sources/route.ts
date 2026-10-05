@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { isDemoMode } from "@/lib/config";
 import { PrepareError, PrepareRequest, prepareSource } from "@/lib/sources/prepare";
 import { purgeUnusedSources } from "@/lib/sources/uploads";
-import { isAdminConfigured } from "@/lib/supabase/admin";
+import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
 
@@ -22,7 +22,12 @@ export async function POST(request: NextRequest) {
   try {
     const { sourceId, pendingOcr } = await prepareSource(user.id, parsed.data);
     after(() => purgeUnusedSources(20).catch(() => undefined));
-    return NextResponse.json({ sourceId, pendingOcr }, { status: 201 });
+    // Ligne compacte de l'import : titre, taille et pages détectées.
+    const { data: src } = await adminClient().from("sources").select("title, page_count, byte_size").eq("id", sourceId).maybeSingle();
+    return NextResponse.json(
+      { sourceId, pendingOcr, title: src?.title ?? null, pageCount: src?.page_count ?? null, byteSize: src?.byte_size ?? null },
+      { status: 201 },
+    );
   } catch (e) {
     if (e instanceof PrepareError) {
       const status = { extraction: 422, url: 422, upload_missing: 410, url_disabled: 403, ocr_consent: 409, rate: 429, storage: 500 }[e.code];
