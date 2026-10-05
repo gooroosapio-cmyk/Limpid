@@ -4,7 +4,8 @@
 -- Une « unité rapport » : création, nouvelle version complète ; les échecs (réservations
 -- rendues) ne comptent pas.
 
-drop function if exists public.reserve_credits(uuid, integer, text, text, uuid, uuid);
+-- Nouvelle fonction à côté de l'ancienne (aucune suppression : l'ancienne reste inutilisée,
+-- ce qui garde le code déjà déployé fonctionnel pendant la mise en production).
 
 create or replace function public.report_units(p_owner uuid, p_since timestamptz)
 returns integer language sql stable set search_path = public as $$
@@ -15,7 +16,7 @@ returns integer language sql stable set search_path = public as $$
      and created_at >= p_since;
 $$;
 
-create or replace function public.reserve_credits(
+create or replace function public.reserve_credits_v2(
   p_owner uuid, p_amount integer, p_action text, p_key text, p_job uuid default null, p_report uuid default null,
   p_day_limit integer default null, p_week_limit integer default null)
 returns uuid language plpgsql security definer set search_path = public as $$
@@ -75,4 +76,4 @@ begin
 end $$;
 
 revoke execute on function public.report_units(uuid, timestamptz) from public, anon, authenticated;
-revoke execute on function public.reserve_credits(uuid, integer, text, text, uuid, uuid, integer, integer) from public, anon, authenticated;
+revoke execute on function public.reserve_credits_v2(uuid, integer, text, text, uuid, uuid, integer, integer) from public, anon, authenticated;

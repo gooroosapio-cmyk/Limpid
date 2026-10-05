@@ -47,22 +47,22 @@ declare
   r1 uuid; r1b uuid; r2 uuid; r3 uuid;
   c uuid := '00000000-0000-0000-0000-0000000000c1';
 begin
-  r1 := public.reserve_credits(c, 20, 'report_standard', 'key-report-0001');
-  r1b := public.reserve_credits(c, 20, 'report_standard', 'key-report-0001');
+  r1 := public.reserve_credits_v2(c, 20, 'report_standard', 'key-report-0001');
+  r1b := public.reserve_credits_v2(c, 20, 'report_standard', 'key-report-0001');
   if r1 <> r1b then raise exception 'ECHEC : double clic = deux réservations'; end if;
   if (select sum(available) from public.credit_lots where owner_id = c) <> 60
      or (select sum(reserved) from public.credit_lots where owner_id = c) <> 20 then
     raise exception 'ECHEC : 80 -> 60 disponibles + 20 réservés attendu';
   end if;
   begin
-    perform public.reserve_credits(c, 8, 'report_short', 'key-report-0001');
+    perform public.reserve_credits_v2(c, 8, 'report_short', 'key-report-0001');
     raise exception 'ECHEC : clé réutilisée pour une autre demande';
   exception when others then
     if sqlerrm like 'ECHEC%' then raise; end if;
     if sqlerrm <> 'cle_reutilisee' then raise; end if;
   end;
   begin
-    perform public.reserve_credits(c, 70, 'report_long', 'key-report-0002');
+    perform public.reserve_credits_v2(c, 70, 'report_long', 'key-report-0002');
     raise exception 'ECHEC : réservation au-delà du solde';
   exception when others then
     if sqlerrm like 'ECHEC%' then raise; end if;
@@ -81,7 +81,7 @@ begin
   end if;
 
   -- Échec : crédits rendus une seule fois.
-  r2 := public.reserve_credits(c, 20, 'report_standard', 'key-report-0003');
+  r2 := public.reserve_credits_v2(c, 20, 'report_standard', 'key-report-0003');
   if not public.release_reservation(r2) then raise exception 'ECHEC : libération refusée'; end if;
   if public.release_reservation(r2) then raise exception 'ECHEC : double restitution'; end if;
   if (select sum(available) from public.credit_lots where owner_id = c) <> 60 then
@@ -89,11 +89,11 @@ begin
   end if;
 
   -- T17 : une réservation engagée reste honorée après l'expiration de son lot.
-  r3 := public.reserve_credits(c, 8, 'report_short', 'key-report-0004');
+  r3 := public.reserve_credits_v2(c, 8, 'report_short', 'key-report-0004');
   update public.credit_lots set expires_at = now() - interval '1 second' where owner_id = c;
   if not public.settle_reservation(r3) then raise exception 'ECHEC : réservation engagée perdue à l''expiration'; end if;
   begin
-    perform public.reserve_credits(c, 1, 'ask', 'key-ask-000001');
+    perform public.reserve_credits_v2(c, 1, 'ask', 'key-ask-000001');
     raise exception 'ECHEC : crédits expirés dépensés';
   exception when others then
     if sqlerrm like 'ECHEC%' then raise; end if;
@@ -110,30 +110,30 @@ declare
   r uuid;
 begin
   perform public.grant_credits(c, 'compensation', 'quota-test', 500, now() + interval '1 day');
-  r := public.reserve_credits(c, 8, 'report_short', 'quota-0000001', null, null, 2, 5);
+  r := public.reserve_credits_v2(c, 8, 'report_short', 'quota-0000001', null, null, 2, 5);
   perform public.settle_reservation(r);
-  r := public.reserve_credits(c, 8, 'report_short', 'quota-0000002', null, null, 2, 5);
+  r := public.reserve_credits_v2(c, 8, 'report_short', 'quota-0000002', null, null, 2, 5);
   perform public.release_reservation(r);
-  r := public.reserve_credits(c, 8, 'report_version', 'quota-0000003', null, null, 2, 5);
+  r := public.reserve_credits_v2(c, 8, 'report_version', 'quota-0000003', null, null, 2, 5);
   begin
-    perform public.reserve_credits(c, 8, 'report_short', 'quota-0000004', null, null, 2, 5);
+    perform public.reserve_credits_v2(c, 8, 'report_short', 'quota-0000004', null, null, 2, 5);
     raise exception 'ECHEC : troisième rapport du jour accepté (limite 2)';
   exception when others then
     if sqlerrm like 'ECHEC%' then raise; end if;
     if sqlerrm not like 'quota_atteint:2:2:%' then raise; end if;
   end;
   -- Une question n'est pas un rapport : pas bloquée par le plafond.
-  perform public.reserve_credits(c, 1, 'ask', 'quota-ask-0001', null, null, 2, 5);
+  perform public.reserve_credits_v2(c, 1, 'ask', 'quota-ask-0001', null, null, 2, 5);
   -- Limite hebdomadaire seule.
   begin
-    perform public.reserve_credits(c, 8, 'report_short', 'quota-0000005', null, null, null, 2);
+    perform public.reserve_credits_v2(c, 8, 'report_short', 'quota-0000005', null, null, null, 2);
     raise exception 'ECHEC : limite hebdomadaire ignorée';
   exception when others then
     if sqlerrm like 'ECHEC%' then raise; end if;
     if sqlerrm not like 'quota_atteint:%:-1:%:2' then raise; end if;
   end;
   -- Sans plafond (administrateur) : seule la limite de crédits s'applique.
-  perform public.reserve_credits(c, 8, 'report_short', 'quota-0000006');
+  perform public.reserve_credits_v2(c, 8, 'report_short', 'quota-0000006');
 end $$;
 
 -- T27 : cycles du 31 janvier et du 29 février sans dérive.
@@ -238,7 +238,7 @@ reset role;
 
 -- Fonctions de crédit : jamais appelables par un client.
 do $$ begin
-  if has_function_privilege('authenticated', 'public.reserve_credits(uuid, integer, text, text, uuid, uuid, integer, integer)', 'execute')
+  if has_function_privilege('authenticated', 'public.reserve_credits_v2(uuid, integer, text, text, uuid, uuid, integer, integer)', 'execute')
      or has_function_privilege('authenticated', 'public.grant_credits(uuid, text, text, integer, timestamptz, text)', 'execute')
      or has_function_privilege('anon', 'public.fulfill_purchase(uuid, text, text, text, text, integer, integer)', 'execute')
      or has_function_privilege('authenticated', 'public.ensure_allocations(uuid, integer)', 'execute') then

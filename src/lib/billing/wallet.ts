@@ -209,7 +209,7 @@ export async function reserveCredits(
   }
   const wallet = opts.wallet ?? (await getWallet(userId));
   // Plafonds revérifiés en base, sous le même verrou que les crédits (dernière place disputée).
-  const { data, error } = await db.rpc("reserve_credits", {
+  const { data, error } = await db.rpc("reserve_credits_v2", {
     p_owner: userId,
     p_amount: amount,
     p_action: action,
