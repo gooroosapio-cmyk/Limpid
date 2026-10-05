@@ -20,7 +20,7 @@ describe("thèmes V3", () => {
 describe("préférences d'affichage", () => {
   it("ignore les valeurs inconnues et garde les défauts", () => {
     const p = readDisplayPrefs((n) => ({ "limpid-mode": "rose", "limpid-text": "geant" })[n]);
-    expect(p).toEqual({ mode: "dark", text: "standard", reduceMotion: false, highContrast: false });
+    expect(p).toEqual({ mode: "system", text: "standard", reduceMotion: false, highContrast: false });
     expect(htmlAttributes(p)).toEqual({ "data-mode": undefined, "data-text": undefined, "data-motion": undefined, "data-contrast": undefined });
   });
 
@@ -28,8 +28,8 @@ describe("préférences d'affichage", () => {
     const p = readDisplayPrefs(
       (n) => ({ "limpid-mode": "light", "limpid-text": "grand", "limpid-motion": "reduit", "limpid-contrast": "fort" })[n],
     );
-    // Galerie sombre par défaut : seul le mode Papier (light) pose un attribut.
     expect(htmlAttributes(p)).toEqual({ "data-mode": "light", "data-text": "grand", "data-motion": "reduit", "data-contrast": "fort" });
-    expect(htmlAttributes({ ...p, mode: "dark" })["data-mode"]).toBeUndefined();
+    // Mode de l'appareil (défaut) : aucun attribut, les feuilles suivent prefers-color-scheme.
+    expect(htmlAttributes({ ...p, mode: "system" })["data-mode"]).toBeUndefined();
   });
 });

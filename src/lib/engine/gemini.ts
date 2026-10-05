@@ -192,7 +192,7 @@ export class GeminiProvider implements AIProvider {
   async generateIllustration(req: {
     model: string;
     prompt: string;
-    aspectRatio: "4:3" | "16:9" | "1:1" | "3:2";
+    aspectRatio: "4:3" | "16:9" | "1:1" | "3:2" | "3:4";
     signal: AbortSignal;
     timeoutMs: number;
   }): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }> {

@@ -7,7 +7,7 @@ import { LogoMark } from "@/components/Logo";
 import { ReportLink } from "@/components/ReportLink";
 import { requireUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/server";
-import { coverFor, coverView } from "@/lib/library/covers";
+import { lessonCover } from "@/lib/library/covers";
 import { loadReport } from "@/lib/reports/load";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -31,8 +31,8 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   if (!report) notFound();
   if (report.state !== "ready") redirect(`/rapports/${id}`);
   const supabase = await createUserClient();
-  const { data: extra } = await supabase.from("reports").select("cover_id").eq("id", id).maybeSingle();
-  const cover = coverView(coverFor(id, (extra?.cover_id as string | null) ?? null));
+  const { data: extra } = await supabase.from("reports").select("cover_id, cover_path").eq("id", id).maybeSingle();
+  const cover = lessonCover(id, (extra?.cover_id as string | null) ?? null, (extra?.cover_path as string | null) ?? null);
   const tab: Tab = (TABS as readonly string[]).includes(onglet ?? "") ? (onglet as Tab) : "apercu";
   const l = t.lesson;
   const ex = report.explanation;

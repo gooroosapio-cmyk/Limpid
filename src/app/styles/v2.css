@@ -91,7 +91,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--yellow); box-sha
 /* ---------- Choix en cartes (approches, offres) ---------- */
 .choice, .option { border-radius: var(--r-control); background: var(--surface); border-color: var(--line); }
 .choice:has(input:checked), .option:has(input:checked) { border: 1px solid var(--sage); background: var(--green-pale); padding: 14px 16px; }
-.modecards { grid-template-columns: repeat(2, 1fr); }
+.modecards { grid-template-columns: repeat(3, 1fr); }
 .modecards label { background: var(--surface); border-radius: var(--r-control); }
 .modecards label:has(input:checked) { box-shadow: inset 0 0 0 2px var(--yellow); }
 

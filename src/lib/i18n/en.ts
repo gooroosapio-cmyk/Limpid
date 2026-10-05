@@ -489,7 +489,7 @@ export const en: Dict = {
     appearanceHeading: "Appearance",
     appearanceLede: "Light, dark, or following your device.",
     mode: "Display mode",
-    modes: { dark: "Dark", light: "Paper" },
+    modes: { system: "Device", light: "Light", dark: "Dark" },
     defaultTheme: "Default theme for new reports",
     themeNote: "Themes change typography, rhythm and layout; never the facts.",
     subscriptionHeading: "Subscription",

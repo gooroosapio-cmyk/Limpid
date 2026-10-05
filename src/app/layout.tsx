@@ -31,7 +31,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#0E110F",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F5F4EC" },
+    { media: "(prefers-color-scheme: dark)", color: "#0E110F" },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

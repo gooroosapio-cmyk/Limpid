@@ -9,6 +9,7 @@ import { z } from "zod";
 import { product, type Product } from "./catalog";
 import { ChariowError, checkSale, getSale, initCheckout, productIds } from "./chariow";
 import { recordStorePurchase, recoverStuckClaims } from "./store";
+import { notify } from "@/lib/notifications";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const CheckoutRequest = z.strictObject({
@@ -174,6 +175,11 @@ export async function fulfillIntent(intent: IntentRow, saleId: string): Promise<
   if (error) {
     console.error("fulfill_purchase", error.code);
     return false;
+  }
+  if (data === "attribue") {
+    await notify(intent.owner_id, p.kind === "topup" ? "credits_added" : "plan_started", `sale:${saleId}`, {
+      data: p.kind === "topup" ? { credits: p.credits } : { plan: p.plan, period: p.period },
+    }).catch(() => undefined);
   }
   return data === "attribue" || data === "deja_attribue";
 }

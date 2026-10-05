@@ -2,7 +2,7 @@
 @font-face { font-family: "Inter"; src: url("/fonts/Inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "IBM Plex Mono"; src: url("/fonts/IBMPlexMono.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 
-/* Limpid V2 « Galerie éditoriale » : sombre par défaut, option Papier (claire), Inter seule. */
+/* Limpid V2 « Galerie éditoriale » : suit le mode de l'appareil (sombre ou clair), choix possible ; Inter seule. */
 :root {
   /* Palette V2 (galerie sombre) */
   --bg: #0e110f;
@@ -59,7 +59,7 @@
 }
 @media (max-width: 359px) { :root { --pad: 16px; } }
 
-/* Papier : option claire (lecture), mêmes composants. */
+/* Clair (« Papier ») : choisi explicitement, ou par défaut si l'appareil est en mode clair. */
 :root[data-mode="light"] {
   --bg: #f5f4ec; --surface: #ffffff; --elevated: #efeee6; --ink: #1b1f1c; --muted: #565c56;
   --yellow: #f1d94e; --yellow-hover: #dac13a; --on-yellow: #15180f;
@@ -69,6 +69,18 @@
   --shadow: 0 12px 32px rgb(27 31 28 / 10%); --shadow-lift: 0 16px 40px rgb(27 31 28 / 16%);
   --halo: radial-gradient(60% 80% at 85% 0%, rgb(241 217 78 / 18%), transparent 70%);
   color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-mode="dark"]):not([data-mode="light"]) {
+    --bg: #f5f4ec; --surface: #ffffff; --elevated: #efeee6; --ink: #1b1f1c; --muted: #565c56;
+    --yellow: #f1d94e; --yellow-hover: #dac13a; --on-yellow: #15180f;
+    --sage: #3f6b55; --danger: #a23b2a; --line: rgb(27 31 28 / 12%); --line-strong: rgb(27 31 28 / 24%);
+    --soft: #ebeae2; --pale: #faefb4; --green-pale: #e3ede6; --danger-pale: #f7e4e0;
+    --glass: rgb(255 255 255 / 92%); --backdrop: rgb(27 31 28 / 42%);
+    --shadow: 0 12px 32px rgb(27 31 28 / 10%); --shadow-lift: 0 16px 40px rgb(27 31 28 / 16%);
+    --halo: radial-gradient(60% 80% at 85% 0%, rgb(241 217 78 / 18%), transparent 70%);
+    color-scheme: light;
+  }
 }
 
 /* Confort de lecture (réglages de l'appareil, sans IA) */

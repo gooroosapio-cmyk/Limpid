@@ -487,7 +487,7 @@ export const fr = {
     appearanceHeading: "Apparence",
     appearanceLede: "Clair, sombre, ou selon votre appareil.",
     mode: "Mode d'affichage",
-    modes: { dark: "Sombre", light: "Papier" } as Record<string, string>,
+    modes: { system: "Appareil", light: "Clair", dark: "Sombre" } as Record<string, string>,
     defaultTheme: "Thème par défaut des nouveaux rapports",
     themeNote: "Les thèmes changent la typographie, le rythme et la composition ; jamais les faits.",
     subscriptionHeading: "Abonnement",

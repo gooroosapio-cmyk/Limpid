@@ -46,3 +46,11 @@ export interface CoverView {
 export function coverView(id: CoverId): CoverView {
   return { id, image: COVER_IMAGES.has(id) ? `/covers/${id}.webp` : null, tones: COVER_TONES[id] };
 }
+
+/** Couverture d'un Limpid : image générée (servie par Limpid) si elle existe, sinon la banque. */
+export function lessonCover(reportId: string, chosen: string | null | undefined, generatedPath: string | null | undefined): CoverView {
+  const base = coverView(coverFor(reportId, chosen));
+  if (!generatedPath || chosen) return base;
+  const key = generatedPath.split("/").pop()!.replace(/\.[a-z]+$/, "").slice(0, 12);
+  return { ...base, image: `/api/reports/${reportId}/cover?k=${key}` };
+}
