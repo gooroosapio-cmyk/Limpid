@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/env";
+import { isInteractive, sessionExempt, sessionIdOf, sessionPolicyOn, type SessionStatus } from "@/lib/auth/sessions";
+import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 
 /**
  * En-têtes de sécurité et CSP stricte avec nonce par requête (payload 1, § 6).
@@ -31,6 +33,8 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", csp);
 
   let response = NextResponse.next({ request: { headers: requestHeaders } });
+  // Cookies posés par Supabase (rafraîchissement, déconnexion), reportés sur la réponse finale.
+  const cookieWrites: { name: string; value: string; options: Parameters<typeof response.cookies.set>[2] }[] = [];
 
   // Rafraîchit la session Supabase (cookies) avant le rendu des pages serveur.
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -40,11 +44,41 @@ export async function proxy(request: NextRequest) {
         for (const { name, value } of list) request.cookies.set(name, value);
         requestHeaders.set("cookie", request.cookies.toString());
         response = NextResponse.next({ request: { headers: requestHeaders } });
-        for (const { name, value, options } of list) response.cookies.set(name, value, options);
+        for (const { name, value, options } of list) {
+          response.cookies.set(name, value, options);
+          cookieWrites.push({ name, value, options });
+        }
       },
     },
   });
-  if (request.cookies.getAll().some((c) => c.name.startsWith("sb-"))) await supabase.auth.getUser();
+  if (request.cookies.getAll().some((c) => c.name.startsWith("sb-"))) {
+    const { data } = await supabase.auth.getUser();
+    const path = request.nextUrl.pathname;
+    // Sessions d'appareil : 7 jours d'inactivité, 90 jours au plus (admin : 30 min, 12 h).
+    if (data.user && sessionPolicyOn() && isAdminConfigured() && !sessionExempt(path)) {
+      const { data: s } = await supabase.auth.getSession();
+      const sid = sessionIdOf(s.session?.access_token);
+      if (sid) {
+        const { data: status, error } = await adminClient().rpc("touch_session", {
+          p_session: sid,
+          p_owner: data.user.id,
+          p_user_agent: (request.headers.get("user-agent") ?? "").slice(0, 200),
+          p_interactive: isInteractive(request.method, request.headers, path),
+        });
+        // Base indisponible : on n'enferme personne dehors (journalisé).
+        if (error) console.error("touch_session", error.code);
+        else if (status !== "ok") {
+          await supabase.auth.signOut({ scope: "local" });
+          const ended = path.startsWith("/api/")
+            ? NextResponse.json({ error: "session_expiree", reason: status as SessionStatus }, { status: 401 })
+            : NextResponse.redirect(new URL(`/connexion?session=${status as SessionStatus}`, request.nextUrl.origin), { status: 303 });
+          for (const c of cookieWrites) ended.cookies.set(c.name, c.value, c.options);
+          ended.headers.set("Cache-Control", "no-store");
+          return ended;
+        }
+      }
+    }
+  }
 
   response.headers.set("Content-Security-Policy", csp);
   response.headers.set("X-Content-Type-Options", "nosniff");

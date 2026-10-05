@@ -7,3 +7,4 @@ psql "$PGURL" -v ON_ERROR_STOP=1 -q -f "$here/supabase-stub.sql"
 for f in "$here"/../migrations/*.sql; do psql "$PGURL" -v ON_ERROR_STOP=1 -q -f "$f"; done
 psql "$PGURL" -v ON_ERROR_STOP=1 -q -f "$here/rls.test.sql"
 psql "$PGURL" -v ON_ERROR_STOP=1 -q -f "$here/credits.test.sql"
+psql "$PGURL" -v ON_ERROR_STOP=1 -q -f "$here/sessions.test.sql"

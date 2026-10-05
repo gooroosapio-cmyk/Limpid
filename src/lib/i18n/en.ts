@@ -1220,4 +1220,21 @@ export const en: Dict = {
     closed: "Sign-ups are not open yet.",
     create: "Create a free account",
   },
+  devices: {
+    title: "Connected devices",
+    lede: "Devices where your account is signed in. A session ends after 7 days without activity, and after 90 days at most.",
+    thisDevice: "this device",
+    lastActive: (d: string) => `Last active: ${d}`,
+    since: (d: string) => `signed in since ${d}`,
+    signOut: "Sign out",
+    signOutOthers: "Sign out other devices",
+    signOutAll: "Sign out all devices",
+    rules: "Your reports stay in your account: signing out deletes nothing.",
+    expired: {
+      inactive: "Your session expired after 7 days of inactivity. Sign in again to find your reports.",
+      inactive_admin: "Administration session closed after 30 minutes of inactivity. Sign in again.",
+      absolute: "Your session reached its maximum length. Sign in again to find your reports.",
+      revoked: "This device was signed out. Sign in again to find your reports.",
+    },
+  },
 };

@@ -74,6 +74,7 @@ export default async function AccountPage() {
           <LinkRow href="/compte/donnees" icon="shield" title={r.data![0]} sub={r.data![1]} />
           <LinkRow href="/compte/installer" icon="download" title={r.install![0]} sub={r.install![1]} />
           <LinkRow href="/compte/mot-de-passe" icon="eye" title={r.password![0]} sub={r.password![1]} />
+          <LinkRow href="/compte/appareils" icon="shield" title={t.devices.title} sub={t.devices.signOutOthers} />
           {admin && <LinkRow href="/admin" icon="shield" title={r.admin![0]} sub={r.admin![1]} />}
         </ul>
         <form action="/auth/deconnexion" method="post" className="logout-form">
