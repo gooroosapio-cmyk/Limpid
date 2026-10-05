@@ -72,6 +72,11 @@ export interface StructuredRequest<T extends z.ZodType> {
   media?: UntrustedMedia[];
   budget: StageBudget;
   signal: AbortSignal;
+  /**
+   * Dernière correction de schéma : le fournisseur essaie d'abord son modèle de repli déclaré
+   * (un autre modèle ne refait pas la même erreur), puis le modèle principal.
+   */
+  preferFallback?: boolean;
 }
 
 export interface StructuredResponse<T> {

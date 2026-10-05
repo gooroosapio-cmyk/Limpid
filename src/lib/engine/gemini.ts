@@ -101,7 +101,8 @@ export class GeminiProvider implements AIProvider {
 
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>> {
     const primary = req.budget.tier === "fast" ? this.config.modelFast : this.config.modelQuality;
-    const models = [primary, ...(this.config.fallbackModels ?? []).filter((m) => m !== primary)];
+    const fallbacks = (this.config.fallbackModels ?? []).filter((m) => m !== primary);
+    const models = req.preferFallback && fallbacks.length ? [...fallbacks, primary] : [primary, ...fallbacks];
     for (let i = 0; ; i++) {
       try {
         return await this.generateWith(models[i]!, req);
