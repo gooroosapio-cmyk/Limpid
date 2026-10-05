@@ -5,6 +5,8 @@ import { drainQueue } from "@/lib/jobs/worker";
 import { CreateError, CreateRequest, createReport } from "@/lib/reports/create";
 import { loadLibrary } from "@/lib/library/load";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { billingResponse, isBillingBlock } from "@/lib/billing/errors";
+import { getLang, getT } from "@/lib/i18n/server";
 
 // La génération s'exécute après la réponse, dans la même fonction (durée Vercel max.).
 export const maxDuration = 300;
@@ -40,6 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ reportId }, { status: 201 });
   } catch (e) {
     if (e instanceof CreateError) {
+      if (isBillingBlock(e.code)) return billingResponse(await getT(), await getLang(), e.code, e.detail);
       const status = {
         extraction: 422,
         url: 422,

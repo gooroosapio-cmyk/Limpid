@@ -1,5 +1,6 @@
 "use client";
 
+import { walletChanged } from "@/components/billing/wallet-store";
 import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { REFORMULATE_REASONS, type ReformulateReason } from "@/lib/engine/reasons";
@@ -33,6 +34,7 @@ export function ReformulatePanel({ reportId, onDone }: { reportId: string | null
         body: JSON.stringify({ variation: "reformulate", reasons, comment: comment.trim() || undefined, idempotency_key: key.current }),
       });
       const data = await res.json().catch(() => ({}));
+      walletChanged();
       if (!res.ok) throw new Error(apiMessage(t, data, t.versions.failed));
       setDone(true);
       router.refresh();

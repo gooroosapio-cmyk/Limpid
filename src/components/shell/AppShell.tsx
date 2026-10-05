@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 import { LogoMark } from "@/components/Logo";
+import { WalletChip } from "@/components/billing/WalletChip";
 import { useT } from "@/lib/i18n/client";
 
 interface DrawerReport {
@@ -162,6 +163,7 @@ export function AppShell({ email }: { email: string }) {
         </button>
         <Brand />
         <div className="appbar-end">
+          <WalletChip />
           <Link href="/compte" className="ib" aria-label={t.nav.profile} aria-current={pathname === "/compte" ? "page" : undefined}>
             <span className="avatar" aria-hidden="true">{initials(email)}</span>
           </Link>

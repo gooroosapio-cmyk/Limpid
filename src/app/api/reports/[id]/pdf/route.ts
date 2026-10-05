@@ -1,3 +1,4 @@
+import { getEntitlements } from "@/lib/billing/wallet";
 import { NextResponse, type NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { pdfHeaders, renderReportPdf, type PdfImage } from "@/lib/render/pdf";
@@ -27,9 +28,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const images: Record<string, PdfImage> = {};
   const sp = req.nextUrl.searchParams;
   const variant = sp.get("corrige") === "1" ? "key" : sp.get("exercices") === "1" ? "exercises" : "content";
-  const [{ data: profile }, lang] = await Promise.all([
+  const [{ data: profile }, lang, ent] = await Promise.all([
     adminClient().from("profiles").select("plan").eq("id", user.id).maybeSingle(),
     getLang(),
+    getEntitlements(user.id),
   ]);
   if (variant !== "key") {
     await Promise.all(
@@ -61,7 +63,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     lang,
     variant,
     exercises: report.exercises,
-    watermark: profile?.plan !== "premium",
+    // Filigrane décidé côté serveur par l'offre active (« premium » : ancien accès manuel).
+    watermark: ent.watermark && profile?.plan !== "premium",
     documents: report.documentTitles,
   });
   const suffix = variant === "key" ? ` (${dictFor(lang).pdf.answerKey})` : "";

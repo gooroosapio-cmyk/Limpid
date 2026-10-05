@@ -3,6 +3,8 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { drainQueue } from "@/lib/jobs/worker";
 import { RetryError, retryReport } from "@/lib/reports/retry";
+import { billingResponse } from "@/lib/billing/errors";
+import { getLang, getT } from "@/lib/i18n/server";
 
 export const maxDuration = 300;
 
@@ -21,7 +23,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     await retryReport(user.id, id, body.data.idempotency_key);
   } catch (e) {
     if (e instanceof RetryError) {
-      const status = { not_found: 404, not_failed: 409, limit: 429, disabled: 503, storage: 500 }[e.code];
+      if (e.code === "credits" || e.code === "weekly") return billingResponse(await getT(), await getLang(), e.code, e.detail);
+      const status = { not_found: 404, not_failed: 409, limit: 429, disabled: 503, storage: 500, credits: 402, weekly: 429 }[e.code];
       return NextResponse.json({ error: e.code, message: e.message }, { status });
     }
     throw e;

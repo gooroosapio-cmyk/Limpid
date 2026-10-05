@@ -4,6 +4,8 @@ import { isDemoMode } from "@/lib/config";
 import { READER_AI_STATUS, ReaderAIError } from "@/lib/reports/ai-call";
 import { askDocument, AskRequest } from "@/lib/reports/ask";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { billingResponse } from "@/lib/billing/errors";
+import { getLang, getT } from "@/lib/i18n/server";
 
 export const maxDuration = 75;
 
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const result = await askDocument(user.id, id, parsed.data);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
+    if (e instanceof ReaderAIError && e.code === "credits") return billingResponse(await getT(), await getLang(), "credits", e.detail);
     if (e instanceof ReaderAIError) return NextResponse.json({ error: e.code, message: e.message }, { status: READER_AI_STATUS[e.code] });
     console.error("ask", (e as Error).name);
     return NextResponse.json({ error: "interne", message: "Une erreur est survenue. Réessayez." }, { status: 500 });

@@ -7,11 +7,14 @@ import { estimateCents, PRICE_BASIS } from "@/lib/budget";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { assertBudget, BudgetError } from "@/lib/jobs/budget-guard";
 import { adminClient } from "@/lib/supabase/admin";
+import type { Action } from "@/lib/billing/catalog";
+import { CreditError, releaseReservation, reserveCredits, settleReservation } from "@/lib/billing/wallet";
 
 export class ReaderAIError extends Error {
   constructor(
-    public readonly code: "not_found" | "not_ready" | "rate" | "budget" | "provider" | "invalid",
+    public readonly code: "not_found" | "not_ready" | "rate" | "budget" | "provider" | "invalid" | "credits",
     message: string,
+    public readonly detail: { needed?: number; available?: number } = {},
   ) {
     super(message);
   }
@@ -24,7 +27,30 @@ export const READER_AI_STATUS: Record<ReaderAIError["code"], number> = {
   budget: 402,
   provider: 502,
   invalid: 422,
+  credits: 402,
 };
+
+/**
+ * Action payante du lecteur (question, nouveau test) : prix fixe réservé avant l'appel IA,
+ * consommé si la réponse est livrée, rendu sinon. Renvoie le résultat de `run`.
+ */
+export async function withCredits<T>(userId: string, action: Action, reportId: string, run: () => Promise<T>): Promise<T> {
+  let reservationId: string;
+  try {
+    ({ reservationId } = await reserveCredits(userId, action, `${action}:${crypto.randomUUID()}`, { reportId }));
+  } catch (e) {
+    if (e instanceof CreditError && e.code === "insufficient") throw new ReaderAIError("credits", e.message, e.detail);
+    throw e;
+  }
+  try {
+    const out = await run();
+    await settleReservation(reservationId);
+    return out;
+  } catch (e) {
+    await releaseReservation(reservationId);
+    throw e;
+  }
+}
 
 const BUDGET_MESSAGES: Record<string, string> = {
   generation_disabled: "La génération est suspendue par l'administrateur.",

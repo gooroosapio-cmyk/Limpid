@@ -110,3 +110,44 @@ export async function cancelJobAction(form: FormData) {
   await audit(user.id, "job.cancel", id.data, { immediate: r === "cancelled" });
   done(r === "cancelled" ? "Tâche annulée." : "Annulation demandée : la tâche s'arrêtera à sa prochaine étape.");
 }
+
+/** Inscriptions publiques (offre gratuite) : ouverture ou fermeture, journalisée. */
+export async function setSignupOpen(form: FormData) {
+  const user = await requireAdmin();
+  const open = form.get("open") === "on";
+  const { error } = await adminClient().from("app_settings").update({ signup_open: open, updated_at: new Date().toISOString() }).eq("id", true);
+  if (error) done("La modification n'a pas été enregistrée.");
+  await audit(user.id, open ? "signup.open" : "signup.close", null);
+  done(open ? "Inscriptions ouvertes : chaque nouveau compte reçoit l'offre gratuite." : "Inscriptions fermées : seules les adresses autorisées peuvent se connecter.");
+}
+
+/**
+ * Crédits ajoutés à la main (§ 20) : motif obligatoire, plafond, lot « compensation » de
+ * 12 mois, journal avec opérateur et référence. Jamais une modification directe du solde.
+ */
+export async function grantCreditsAction(form: FormData) {
+  const user = await requireAdmin();
+  const email = Email.safeParse(form.get("email"));
+  const credits = z.coerce.number().int().min(1).max(2_000).safeParse(form.get("credits"));
+  const reason = z.string().trim().min(5).max(200).safeParse(form.get("reason"));
+  if (!email.success || !credits.success || !reason.success) done("Adresse, nombre de crédits (1 à 2 000) ou motif (5 caractères au moins) invalide.");
+  const db = adminClient();
+  const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const target = list?.users.find((u) => u.email?.toLowerCase() === email.data);
+  if (!target) done("Aucun compte avec cette adresse.");
+  const ref = `admin:${crypto.randomUUID()}`;
+  const expires = new Date(Date.now() + 365 * 24 * 3600_000).toISOString();
+  const { error } = await db.rpc("grant_credits", { p_owner: target.id, p_origin: "compensation", p_ref: ref, p_qty: credits.data, p_expires: expires, p_note: reason.data });
+  if (error) done("Les crédits n'ont pas été ajoutés.");
+  await audit(user.id, "credits.grant", target.id, { credits: credits.data, reason: reason.data, ref });
+  done(`${credits.data} crédits ajoutés à ${email.data} (valables 12 mois).`);
+}
+
+/** Rapprochement immédiat des commandes en attente (sans attendre le cron). */
+export async function reconcileOrdersAction() {
+  const user = await requireAdmin();
+  const { reconcilePending } = await import("@/lib/billing/purchase");
+  const n = await reconcilePending(50).catch(() => -1);
+  await audit(user.id, "billing.reconcile", null, { changed: n });
+  done(n < 0 ? "Le rapprochement a échoué." : `Rapprochement terminé : ${n} commande(s) mise(s) à jour.`);
+}

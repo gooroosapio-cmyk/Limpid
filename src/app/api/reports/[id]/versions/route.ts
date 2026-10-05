@@ -4,6 +4,8 @@ import { isDemoMode } from "@/lib/config";
 import { drainQueue } from "@/lib/jobs/worker";
 import { requestVersion, VersionError, VersionRequest } from "@/lib/reports/versions";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { billingResponse } from "@/lib/billing/errors";
+import { getLang, getT } from "@/lib/i18n/server";
 
 export const maxDuration = 300;
 
@@ -27,6 +29,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return NextResponse.json({ status: "queued" }, { status: 202 });
   } catch (e) {
     if (e instanceof VersionError) {
+      if (e.code === "credits") return billingResponse(await getT(), await getLang(), "credits", e.detail);
       const status = { not_found: 404, busy: 409, limit: 409, storage: 500 }[e.code];
       return NextResponse.json({ error: e.code, message: e.message }, { status });
     }

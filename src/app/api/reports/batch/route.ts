@@ -4,6 +4,8 @@ import { isDemoMode } from "@/lib/config";
 import { drainQueue } from "@/lib/jobs/worker";
 import { BatchRequest, createBatch, CreateError } from "@/lib/reports/create";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { billingResponse, isBillingBlock } from "@/lib/billing/errors";
+import { getLang, getT } from "@/lib/i18n/server";
 
 export const maxDuration = 300;
 
@@ -25,6 +27,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ reportIds }, { status: 201 });
   } catch (e) {
     if (e instanceof CreateError) {
+      if (isBillingBlock(e.code)) return billingResponse(await getT(), await getLang(), e.code, e.detail);
       const status = { limit: 429, rate: 429, source_missing: 410, source_used: 409, generation_disabled: 503, storage: 500 }[e.code as string] ?? 422;
       return NextResponse.json({ error: e.code, message: e.message, reportId: e.reportId }, { status });
     }

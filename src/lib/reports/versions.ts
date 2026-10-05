@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Level, Mode } from "@/lib/contracts/schemas";
 import { REFORMULATE_REASONS, simplerLevel } from "@/lib/engine/pipeline";
 import { levelFor } from "./create";
-import { assertCanStartJob, LimitError } from "@/lib/jobs/limits";
+import { accountUsage, attachReservation, CreditError, getEntitlements, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const MAX_VERSIONS = 20;
@@ -27,8 +27,9 @@ export const VersionRequest = z.strictObject({
 
 export class VersionError extends Error {
   constructor(
-    public readonly code: "not_found" | "busy" | "limit" | "storage",
+    public readonly code: "not_found" | "busy" | "limit" | "storage" | "credits",
     message: string,
+    public readonly detail: { needed?: number; available?: number } = {},
   ) {
     super(message);
   }
@@ -57,11 +58,9 @@ export async function requestVersion(userId: string, reportId: string, input: z.
     if (busy.idempotency_key === input.idempotency_key) return;
     throw new VersionError("busy", "Une version est déjà en préparation.");
   }
-  try {
-    await assertCanStartJob(userId, { newReport: false });
-  } catch (e) {
-    if (e instanceof LimitError) throw new VersionError("busy", e.message);
-    throw e;
+  const ent = await getEntitlements(userId);
+  if ((await accountUsage(userId)).active >= ent.limits.concurrentJobs) {
+    throw new VersionError("busy", "Un rapport est déjà en préparation. Attendez qu'il soit prêt pour en lancer un autre.");
   }
   const { count } = await db.from("report_versions").select("id", { count: "exact", head: true }).eq("report_id", reportId);
   if ((count ?? 0) >= MAX_VERSIONS) throw new VersionError("limit", `Ce rapport a atteint ${MAX_VERSIONS} versions.`);
@@ -79,6 +78,14 @@ export async function requestVersion(userId: string, reportId: string, input: z.
   const mode = input.variation === "mode" ? input.mode! : (Mode.safeParse(current.mode).data ?? "claire");
   const { data: prefs } = await db.from("reader_preferences").select("familiarity, explanation_lang").eq("owner_id", userId).maybeSingle();
 
+  // Nouvelle version : prix fixe réservé avant la mise en file, rendu en cas d'échec.
+  let reservationId: string;
+  try {
+    ({ reservationId } = await reserveCredits(userId, "report_version", `version:${input.idempotency_key}`, { reportId }, { wallet: ent.wallet }));
+  } catch (e) {
+    if (e instanceof CreditError && e.code === "insufficient") throw new VersionError("credits", e.message, e.detail);
+    throw e;
+  }
   const job = await db.from("jobs").insert({
     owner_id: userId,
     report_id: reportId,
@@ -102,6 +109,11 @@ export async function requestVersion(userId: string, reportId: string, input: z.
       goal: mode === "revision" ? "reviser" : current.goal === "reviser" && input.variation === "mode" ? "comprendre" : current.goal,
       target_pages: current.target_pages,
     },
-  });
-  if (job.error && job.error.code !== "23505") throw new VersionError("storage", "La demande n'a pas pu être enregistrée.");
+  }).select("id").single();
+  if (job.error) {
+    if (job.error.code === "23505") return;
+    await releaseReservation(reservationId);
+    throw new VersionError("storage", "La demande n'a pas pu être enregistrée.");
+  }
+  await attachReservation(reservationId, { jobId: job.data.id as string });
 }
