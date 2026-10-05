@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       {compte === "supprime" && <p className="notice" role="status">{t.account.deleted}</p>}
       {erreur && (
         <p className="notice notice-warn" role="alert">
-          Ce lien n'est plus valable. Demandez-en un nouveau.
+          {t.login.linkInvalid}
         </p>
       )}
       <LoginForm />

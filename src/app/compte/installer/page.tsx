@@ -16,6 +16,7 @@ export default async function InstallPage() {
   await requireUser();
   return (
     <Screen>
+      {/* eslint-disable-next-line @next/next/no-img-element -- icône statique déjà à la bonne taille */}
       <img src="/icons/limpid-192.png" alt="" width={88} height={88} className="app-icon" />
       <h1>{t.pwa.installHeading}</h1>
       <p className="lede">{t.pwa.installLede}</p>

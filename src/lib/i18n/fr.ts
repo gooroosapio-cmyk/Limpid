@@ -530,6 +530,7 @@ export const fr = {
     } as Record<string, string>,
   },
   login: {
+    linkInvalid: "Ce lien n'est plus valable. Demandez-en un nouveau.",
     title: "Connexion",
     subtitle: "Retrouvez vos rapports.",
     alpha: "Alpha privée : seules les adresses invitées peuvent se connecter.",

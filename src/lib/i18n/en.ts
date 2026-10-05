@@ -532,6 +532,7 @@ export const en: Dict = {
     },
   },
   login: {
+    linkInvalid: "This link is no longer valid. Request a new one.",
     title: "Sign in",
     subtitle: "Find your reports.",
     alpha: "Private alpha: only invited addresses can sign in.",
