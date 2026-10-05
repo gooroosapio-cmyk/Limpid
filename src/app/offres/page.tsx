@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { OffersGrid } from "@/components/billing/OffersGrid";
-import { LinkRow } from "@/components/LinkRow";
+import { OffersView } from "@/components/billing/OffersView";
+import { Icon } from "@/components/Icon";
+import { Illustration } from "@/components/Illustration";
+import { LogoMark } from "@/components/Logo";
 import { Screen } from "@/components/shell/Screen";
 import { currentUser } from "@/lib/auth";
 import { ACTION_PRICES, formatXof, PAID_PLANS, PLANS, reportsFor, TOPUPS, type PlanCode } from "@/lib/billing/catalog";
 import { getWallet } from "@/lib/billing/wallet";
 import { getLang, getT } from "@/lib/i18n/server";
-import { isAdminConfigured } from "@/lib/supabase/admin";
+import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -20,16 +22,33 @@ export default async function OffersPage() {
   const o = t.billing.offers;
   const wallet = user && isAdminConfigured() ? await getWallet(user.id).catch(() => null) : null;
   const scheduleFrom = wallet?.mode === "subscription" ? wallet.accessEndsAt : null;
+  // Période de l'abonnement en cours (mensuel / annuel), pour afficher son prix.
+  const { data: current } = user && wallet?.mode === "subscription" && isAdminConfigured()
+    ? await adminClient().from("subscriptions").select("period").eq("owner_id", user.id).lte("starts_at", new Date().toISOString()).gt("ends_at", new Date().toISOString()).order("starts_at", { ascending: false }).limit(1).maybeSingle()
+    : { data: null as { period: "monthly" | "yearly" } | null };
   const all: PlanCode[] = ["free", ...PAID_PLANS];
   const c = o.compare;
 
   return (
-    <Screen wide>
+    <Screen className="offers-page">
+      <div className="offers-bar">
+        <Link href={user ? "/compte" : "/connexion"} className="ib lesson-bar-btn" aria-label={t.nav.back}><Icon name="back" size={26} /></Link>
+        <Link href="/" className="brand offers-brand" aria-label={t.common.brandHome}><LogoMark /><b>limpid</b></Link>
+        <a href="#details" className="ib lesson-bar-btn" aria-label={o.v2.detailsTitle}><Icon name="kebab" size={26} /></a>
+      </div>
+      <Illustration name="offres" fallback="ambre" className="offers-hero-art" eager />
       <div className="page-title offers-title">
         <h1>{o.title}</h1>
-        <p>{o.lede}</p>
+        <p>{o.v2.lede}</p>
       </div>
-      <OffersGrid lang={lang} current={wallet ? { plan: wallet.plan, mode: wallet.mode } : null} scheduleFrom={scheduleFrom} />
+      <OffersView
+        lang={lang}
+        current={wallet ? { plan: wallet.plan, mode: wallet.mode, period: wallet.mode === "subscription" ? (current?.period ?? null) : null } : null}
+        scheduleFrom={scheduleFrom}
+        keyHref={user ? "/compte/credits#paid-h" : "/connexion"}
+        currentArt={<Illustration name="offres-actuelle" fallback="verre" className="plan-art" />}
+        furtherArt={<Illustration name="offres-plus" fallback="lumiere" className="plan-art" />}
+      />
       <p className="muted">{o.note}</p>
       <p className="muted">{o.capsNote}</p>
       <p className="muted">{o.prepaid}</p>
@@ -79,10 +98,6 @@ export default async function OffersPage() {
         <h3>{o.expiryTitle}</h3>
         <p>{o.expiry}</p>
       </details>
-
-      <ul className="rows">
-        <LinkRow href={user ? "/compte/credits#paid-h" : "/connexion"} icon="key" title={o.alreadyPaid[0]} sub={o.alreadyPaid[1]} />
-      </ul>
 
       <section aria-labelledby="faq-h">
         <h2 id="faq-h">{o.faqTitle}</h2>

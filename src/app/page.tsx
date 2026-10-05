@@ -189,7 +189,7 @@ export default async function HomeLibraryPage({
       )}
       <LibraryBrowser
         title={folder ? folder.name : t.library.title}
-        subtitle={folder ? null : v.subtitle}
+        subtitle={folder || filter !== "tous" ? null : v.subtitle}
         folder={folder ? { id: folder.id, name: folder.name } : null}
         folders={folder ? [] : folders.map((f) => ({ ...f, cover: coverView(coverFor(f.id, null)) }))}
         allFolders={folders.map((f) => ({ id: f.id, name: f.name }))}

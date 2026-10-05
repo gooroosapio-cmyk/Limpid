@@ -38,16 +38,17 @@ async function patch(id: string, body: Record<string, unknown>): Promise<boolean
 }
 
 /** Statut toujours accompagné d'une icône et d'un libellé (jamais la couleur seule). */
-export function StatusLabel({ state, sources }: { state: RowData["state"]; sources: number }) {
+export function StatusLabel({ state, sources, sourcesFirst = false }: { state: RowData["state"]; sources: number; sourcesFirst?: boolean }) {
   const t = useT();
   const icon: IconName = state === "failed" ? "alert" : state === "running" ? "hourglass" : "check";
   const label = state === "failed" ? t.library.v2.interrupted : state === "running" ? t.library.v2.preparing : t.library.v2.ready;
+  const count = t.library.v2.sources(sources);
   return (
     <span className={`status status-${state}`}>
       <Icon name={icon} />
-      <span>{label}</span>
+      <span>{sourcesFirst ? count : label}</span>
       <span aria-hidden="true">·</span>
-      <span>{t.library.v2.sources(sources)}</span>
+      <span>{sourcesFirst ? label.toLowerCase() : count}</span>
     </span>
   );
 }
@@ -60,6 +61,8 @@ export function StatusLabel({ state, sources }: { state: RowData["state"]; sourc
 export function ReportRow({
   row,
   variant = "grid",
+  showFavorite = true,
+  sourcesFirst = false,
   showFailure = false,
   selecting = false,
   selected = false,
@@ -70,6 +73,10 @@ export function ReportRow({
 }: {
   row: RowData;
   variant?: "grid" | "list";
+  /** Cœur visible sur la carte (vue Prêts / Favoris), absent sur l'accueil. */
+  showFavorite?: boolean;
+  /** « 5 sources · prêt » (accueil) au lieu de « Prêt · 5 sources ». */
+  sourcesFirst?: boolean;
   showFailure?: boolean;
   selecting?: boolean;
   selected?: boolean;
@@ -137,6 +144,16 @@ export function ReportRow({
       setCover(prev);
       toast(t.library.actionFailed, "error");
     }
+  }
+
+  async function generate() {
+    toast(v.generating);
+    const res = await fetch(`/api/reports/${row.id}/cover`, { method: "POST" }).catch(() => null);
+    if (!res?.ok) return toast(res?.status === 429 ? v.generateTooSoon : v.generateFailed, "error");
+    // Une couverture choisie dans la banque masquerait l'image générée : on revient à l'automatique.
+    await patch(row.id, { cover_id: null });
+    toast(v.generated);
+    router.refresh();
   }
 
   async function saveTitle(e: React.FormEvent<HTMLFormElement>) {
@@ -215,7 +232,8 @@ export function ReportRow({
           {title}
           {row.unread && <span className="unread-dot" role="img" aria-label={t.library.unread} />}
         </b>
-        <StatusLabel state={row.state} sources={row.sourceCount} />
+        <StatusLabel state={row.state} sources={row.sourceCount} sourcesFirst={sourcesFirst} />
+        <small className="lesson-date">{row.sub}</small>
         {row.folderName && <small className="lesson-folder">{t.library.inFolder(row.folderName)}</small>}
       </span>
     </>
@@ -236,7 +254,7 @@ export function ReportRow({
       )}
       {!selecting && (
         <div className="lesson-actions">
-          {row.state === "ready" && (
+          {row.state === "ready" && showFavorite && (
             <button type="button" className="ib ib-round lesson-fav" aria-pressed={favorite} aria-label={favorite ? v.unfavorite(title) : v.favorite(title)} onClick={toggleFavorite}>
               <Icon name="heart" size={22} className={favorite ? "is-on" : undefined} />
             </button>
@@ -289,6 +307,14 @@ export function ReportRow({
               <span className="row-text"><b>{v.rename}</b></span>
             </button>
           </li>
+          {row.state === "ready" && (
+            <li>
+              <button type="button" className="row" onClick={() => { menu.current?.close(); void generate(); }}>
+                <span className="row-icon"><Icon name="spark" /></span>
+                <span className="row-text"><b>{v.generateCover}</b><small>{v.generateNote}</small></span>
+              </button>
+            </li>
+          )}
           <li>
             <button type="button" className="row" onClick={() => { menu.current?.close(); covers.current?.showModal(); }}>
               <span className="row-icon"><Icon name="grid" /></span>

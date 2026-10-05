@@ -13,30 +13,34 @@ export function OffersGrid({
   lang,
   current,
   scheduleFrom,
+  period: controlled,
 }: {
   lang: "fr" | "en";
   /** Offre active (null : visiteur non connecté). */
   current: { plan: string; mode: "free" | "topup" | "subscription" } | null;
   /** Fin de l'accès payé en cours : un nouvel achat est programmé à cette date. */
   scheduleFrom: string | null;
+  /** Période choisie plus haut sur la page (sélecteur partagé) ; sinon sélecteur propre. */
+  period?: Period;
 }) {
   const t = useT();
   const o = t.billing.offers;
-  const [period, setPeriod] = useState<Period>("monthly");
+  const [own, setPeriod] = useState<Period>("monthly");
+  const period = controlled ?? own;
   const day = scheduleFrom
     ? new Date(scheduleFrom).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", timeZone: "Africa/Abidjan" })
     : null;
 
   return (
     <>
-      <div className="seg period-switch" role="radiogroup" aria-label={`${o.monthly} / ${o.yearly}`}>
+      {!controlled && <div className="seg period-switch" role="radiogroup" aria-label={`${o.monthly} / ${o.yearly}`}>
         {(["monthly", "yearly"] as const).map((p) => (
           <button key={p} type="button" role="radio" aria-checked={period === p} className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>
             {p === "monthly" ? o.monthly : o.yearly}
             {p === "yearly" && <span className="badge-soft">{o.twoMonths}</span>}
           </button>
         ))}
-      </div>
+      </div>}
 
       <ul className="offers">
         <li className={`offer${current?.mode === "free" ? " is-current" : ""}`}>

@@ -2,7 +2,17 @@ import { Cover } from "@/components/library/Cover";
 import { coverView, type CoverId } from "@/lib/library/covers";
 
 /** Illustrations décoratives d'écran (public/illustrations/<nom>.webp), à activer une fois livrées. */
-export const ILLUSTRATIONS = ["connexion", "bibliotheque-vide", "import", "offres", "profil-offre"] as const;
+export const ILLUSTRATIONS = [
+  "connexion",
+  "bibliotheque-vide",
+  "import",
+  "offres",
+  "offres-actuelle",
+  "offres-plus",
+  "profil-offre",
+  "lecon-presentation",
+  "lecon-quiz",
+] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
 const READY: ReadonlySet<IllustrationName> = new Set<IllustrationName>([]);
 

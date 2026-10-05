@@ -26,7 +26,8 @@ export const en: Dict = {
     essential: "Key points",
     idea: "One idea to remember",
     further: "Go further",
-    presentation: ["Presentation", "The full lesson, clear and illustrated."] as [string, string],
+    presentation: ["Presentation", "A clear, illustrated summary."] as [string, string],
+    askSend: "Ask the question",
     quiz: ["Quiz", "Test your knowledge."] as [string, string],
     annexes: ["Annexes", "Glossary, detailed sources and extras."] as [string, string],
     pdf: ["Download the PDF", "To read or print outside Limpid."] as [string, string],
@@ -129,6 +130,12 @@ export const en: Dict = {
   },
   add: {
     v2: {
+      addDocuments: "Add documents",
+      formats: "PDF, Word, images",
+      approach: "Your approach",
+      modeShort: { tres_simple: "Clear basics", claire: "Well-connected ideas", resume: "The essentials, organised", revision: "Questions to remember" } as Record<string, string>,
+      continue: "Continue",
+      cost: (n: number) => `This lesson will use ${n} credits.`,
       lede: "Gather your sources. Limpid connects the dots.",
       levelLength: ["Level and length", "Suited to your goals"] as [string, string],
       needFile: "Add at least one document to continue.",
@@ -303,6 +310,13 @@ export const en: Dict = {
   },
   library: {
     v2: {
+      count: (n: number) => (n > 1 ? `${n} lessons` : n === 1 ? "1 lesson" : "No lesson"),
+      generateCover: "Generate a cover",
+      generateNote: "Decorative image made by AI, no credits used.",
+      generating: "Creating the cover…",
+      generated: "New cover ready.",
+      generateFailed: "The cover could not be created. Try again later.",
+      generateTooSoon: "A cover was just created: try again in a few minutes.",
       subtitle: "Your next idea starts here.",
       ready: "Ready",
       preparing: "Preparing",
@@ -1169,6 +1183,16 @@ export const en: Dict = {
     quizCost: "New test: 3 credits",
     versionCost: "New version: 8 credits",
     offers: {
+      taglinesShort: { free: "To discover Limpid", essential: "To learn regularly", plus: "To go further every week", pro: "For intensive use" } as Record<string, string>,
+      v2: {
+        lede: "Choose the space for your ideas.",
+        furtherEyebrow: "Go further",
+        furtherTitle: "More possibilities for your lessons.",
+        furtherPoints: ["Compare credits", "Explore the features", "Pick the right plan"],
+        seeDetails: "See details",
+        accessKey: "I have an access key",
+        detailsTitle: "All plans",
+      },
       title: "At your own pace.",
       lede: "Choose the space for your ideas. Prices in FCFA, prepaid access, no automatic renewal.",
       yourPlan: "Your plan",

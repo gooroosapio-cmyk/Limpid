@@ -123,6 +123,9 @@ const PATHS = {
   "trash": (
     <><path d="M3 6h18M6 6l1 15h10l1-15M9 6V3h6v3M10 10v7M14 10v7" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
   ),
+  "kebab": (
+    <><path d="M12 5h.01M12 12h.01M12 19h.01" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
   "aa": (
     <><text x="1" y="18" fontSize="17" fontFamily="Inter, system-ui, sans-serif" fontWeight="400" fill="currentColor">Aa</text></>
   ),

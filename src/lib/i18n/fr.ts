@@ -22,7 +22,8 @@ export const fr = {
     essential: "L'essentiel",
     idea: "Une idée à retenir",
     further: "Pour aller plus loin",
-    presentation: ["Présentation", "La leçon complète, claire et illustrée."] as [string, string],
+    presentation: ["Présentation", "Un résumé clair et illustré."] as [string, string],
+    askSend: "Poser la question",
     quiz: ["Quiz", "Testez vos connaissances."] as [string, string],
     annexes: ["Annexes", "Glossaire, sources détaillées et compléments."] as [string, string],
     pdf: ["Télécharger le PDF", "Pour lire ou imprimer hors de Limpid."] as [string, string],
@@ -127,6 +128,12 @@ export const fr = {
   },
   add: {
     v2: {
+      addDocuments: "Ajouter des documents",
+      formats: "PDF, Word, images",
+      approach: "Votre approche",
+      modeShort: { tres_simple: "Des bases claires", claire: "Des notions bien liées", resume: "L'essentiel organisé", revision: "Des questions pour retenir" } as Record<string, string>,
+      continue: "Continuer",
+      cost: (n: number) => `Cette leçon utilisera ${n} crédits.`,
       lede: "Rassemblez vos sources. Limpid fait le lien.",
       levelLength: ["Niveau et longueur", "Adaptés à vos objectifs"] as [string, string],
       needFile: "Ajoutez au moins un document pour continuer.",
@@ -301,6 +308,13 @@ export const fr = {
   },
   library: {
     v2: {
+      count: (n: number) => (n > 1 ? `${n} leçons` : n === 1 ? "1 leçon" : "Aucune leçon"),
+      generateCover: "Générer une couverture",
+      generateNote: "Image décorative créée par l'IA, sans crédit.",
+      generating: "Création de la couverture…",
+      generated: "Nouvelle couverture prête.",
+      generateFailed: "La couverture n'a pas pu être créée. Réessayez plus tard.",
+      generateTooSoon: "Une couverture vient d'être créée : réessayez dans quelques minutes.",
       subtitle: "Votre prochaine idée commence ici.",
       ready: "Prêt",
       preparing: "En préparation",
@@ -1140,6 +1154,16 @@ export const fr = {
     quizCost: "Nouveau test : 3 crédits",
     versionCost: "Nouvelle version : 8 crédits",
     offers: {
+      taglinesShort: { free: "Pour découvrir Limpid", essential: "Pour apprendre régulièrement", plus: "Pour aller plus loin chaque semaine", pro: "Pour un usage intensif" } as Record<string, string>,
+      v2: {
+        lede: "Choisissez l'espace pour vos idées.",
+        furtherEyebrow: "Pour aller plus loin",
+        furtherTitle: "Plus de possibilités pour vos leçons.",
+        furtherPoints: ["Comparer les crédits", "Explorer les fonctionnalités", "Choisir la bonne formule"],
+        seeDetails: "Voir les détails",
+        accessKey: "J'ai une clé d'accès",
+        detailsTitle: "Toutes les offres",
+      },
       title: "À votre rythme.",
       lede: "Choisissez l'espace pour vos idées. Prix en FCFA, accès prépayé, sans renouvellement automatique.",
       yourPlan: "Votre offre",
