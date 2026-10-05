@@ -732,6 +732,22 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
   return out.status === "validated" ? "succeeded" : "incomplete_check";
 }
 
+/**
+ * Écarts au schéma de la dernière réponse (chemins et règles, jamais le contenu) : seule trace
+ * permettant de comprendre un échec « hors schéma » après coup. Lisible dans l'administration.
+ */
+async function recordSchemaIssues(job: JobRow, e: ProviderError) {
+  await adminClient()
+    .from("audit_log")
+    .insert({
+      actor_id: job.owner_id,
+      action: "job.schema_mismatch",
+      target_kind: "job",
+      target_id: job.id,
+      meta: { kind: job.kind, model: e.usage?.model ?? null, issues: e.issues.slice(0, 10).map((x) => x.slice(0, 160)) },
+    });
+}
+
 function failureOf(e: unknown): JobFailure {
   if (e instanceof JobFailure) return e;
   if (e instanceof ProviderError) {
@@ -769,6 +785,7 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
     const f = failureOf(e);
     console.error("job", job.id, f.code);
     await finish(job.id, f.status, f.code);
+    if (e instanceof ProviderError && e.issues.length) await recordSchemaIssues(job, e);
     // Échec technique ou annulation d'un nouveau rapport : le crédit du jour est rendu.
     if (job.kind === "generate_report" && job.report_id) await recordLimitEvent(job.owner_id, CREDIT_RETURNED, job.report_id);
   }

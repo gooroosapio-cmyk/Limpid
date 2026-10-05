@@ -312,6 +312,7 @@ async function callWithRetry<T extends z.ZodType>(
         untrustedData: req.data,
         budget: req.budget,
         signal: input.signal,
+        preferFallback: fixes === MAX_SCHEMA_FIXES,
       });
       await input.onUsage?.(stage, attemptBase + i, res.usage);
       return res.value;

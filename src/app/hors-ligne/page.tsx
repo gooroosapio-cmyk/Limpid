@@ -18,6 +18,8 @@ export default async function OfflinePage() {
       <p className="lede">{t.pwa.offlineLede}</p>
       <h2 className="eyebrow">{t.pwa.saved}</h2>
       <OfflineList />
+      {/* Rechargement complet voulu : la page hors connexion doit retenter le réseau. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a href="/" className="btn btn-block">{t.pwa.retry}</a>
     </div>
   );

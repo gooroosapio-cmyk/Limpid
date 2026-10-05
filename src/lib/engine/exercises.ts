@@ -208,6 +208,8 @@ export async function generateExercises(
         untrustedData: [{ label: "explication du support", text: explanationPayload(input.explanation) }],
         budget: input.budget,
         signal: input.signal,
+        // Dernier essai après une réponse hors schéma : modèle de repli d'abord.
+        preferFallback: i === delays.length,
       });
       break;
     } catch (e) {

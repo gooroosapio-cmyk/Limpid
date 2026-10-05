@@ -317,6 +317,7 @@ function VisualPdf({ v, numbers, d, images }: { v: VisualSpec; numbers: Map<stri
     const width = 200;
     return (
       <View wrap={false} style={{ alignItems: "center", marginVertical: 8 }}>
+        {/* eslint-disable-next-line jsx-a11y/alt-text -- Image de @react-pdf (PDF), sans attribut alt ; légende juste en dessous */}
         <Image src={{ data: img.data, format: img.format }} style={{ width, height: Math.round((width * img.height) / img.width) }} />
         <Text style={s.caption}>{d.visuals.illustration} : {v.caption}</Text>
         <Text style={[s.caption, { fontSize: 7.5 }]}>{img.credit}</Text>

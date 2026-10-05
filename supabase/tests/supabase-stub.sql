@@ -12,3 +12,5 @@ create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint);
 grant usage on schema public, auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to authenticated, anon;
+-- Comme Supabase : toute nouvelle fonction du schéma public est exécutable par les rôles de l'API.
+alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;

@@ -4,10 +4,12 @@
  * comptes. Aucun contenu de document n'est exposé : seulement des compteurs et des codes.
  */
 import "server-only";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { adminMfaRequired, mfaStep } from "@/lib/auth/mfa";
 import { budget } from "@/lib/config";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
+import { createUserClient } from "@/lib/supabase/server";
 
 export async function isAdmin(userId: string): Promise<boolean> {
   if (!isAdminConfigured()) return false;
@@ -15,9 +17,25 @@ export async function isAdmin(userId: string): Promise<boolean> {
   return data?.role === "admin";
 }
 
-export async function requireAdmin() {
+/** Rôle admin seulement (sans exiger le second facteur) : écran de double authentification. */
+export async function requireAdminRole() {
   const user = await requireUser();
   if (!(await isAdmin(user.id))) notFound();
+  return user;
+}
+
+/** Étape de double authentification de la session courante. */
+export async function adminMfaStep() {
+  const required = adminMfaRequired();
+  if (!required) return "ok" as const;
+  const { data } = await (await createUserClient()).auth.mfa.getAuthenticatorAssuranceLevel();
+  return mfaStep(data, required);
+}
+
+/** Rôle admin vérifié en base, puis session aal2 (code TOTP) exigée. */
+export async function requireAdmin() {
+  const user = await requireAdminRole();
+  if ((await adminMfaStep()) !== "ok") redirect("/admin/securite");
   return user;
 }
 

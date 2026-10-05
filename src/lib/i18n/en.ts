@@ -532,6 +532,7 @@ export const en: Dict = {
     },
   },
   login: {
+    linkInvalid: "This link is no longer valid. Request a new one.",
     title: "Sign in",
     subtitle: "Find your reports.",
     alpha: "Private alpha: only invited addresses can sign in.",
@@ -722,6 +723,24 @@ export const en: Dict = {
     perfTable: "Duration and cost per stage",
     calls: "Calls",
     avgCost: "Average cost",
+    mfaTitle: "Two-factor authentication",
+    mfaIntroEnroll:
+      "Administration requires a second factor. Set up an authenticator app (Google Authenticator, 1Password, Authy…): it will give you a 6-digit code each time.",
+    mfaIntroVerify: "Enter the 6-digit code shown by your authenticator app.",
+    mfaStart: "Set up my app",
+    mfaStarting: "Preparing…",
+    mfaScan: "Scan this QR code with your app, then enter the code it shows.",
+    mfaQrAlt: "Two-factor authentication setup QR code",
+    mfaSecretLabel: "Can't scan? Show the key",
+    mfaCode: "6-digit code",
+    mfaVerify: "Confirm",
+    mfaVerifying: "Checking…",
+    mfaInvalid: "Wrong or expired code. Enter the current code.",
+    mfaTooMany: "Too many attempts. Wait a minute and try again.",
+    mfaFailed: "No factor to verify. Reload the page.",
+    mfaUnavailable: "Two-factor authentication could not be set up (check that TOTP is enabled in Supabase → Authentication → MFA).",
+    mfaRecovery:
+      "Lost your app? Remove the factor in Supabase (Authentication → Users), or set LIMPID_ADMIN_MFA=off in Vercel while you set it up again.",
   },
   versions: {
     label: "Versions",

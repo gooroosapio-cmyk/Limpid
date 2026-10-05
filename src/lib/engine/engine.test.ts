@@ -458,6 +458,29 @@ describe("modèles de repli déclarés", () => {
     await expect(p.generateStructured(req)).rejects.toMatchObject({ code: "refused" });
     expect(p.tried).toEqual(["qualite"]);
   });
+  it("dernière correction de schéma : le modèle de repli passe en premier, le principal reste en secours", async () => {
+    const p = new Scripted(new Set(["secours-1"]), ["secours-1", "secours-2"]);
+    const r = await p.generateStructured({ ...req, preferFallback: true });
+    expect(p.tried).toEqual(["secours-1", "secours-2"]);
+    expect(r.usage.model).toBe("secours-2");
+    const q = new Scripted(new Set(), []);
+    await q.generateStructured({ ...req, preferFallback: true });
+    expect(q.tried).toEqual(["qualite"]);
+  });
+  it("le pipeline ne demande le repli qu'à la dernière correction de schéma", async () => {
+    const seen: (boolean | undefined)[] = [];
+    const bad = new ProviderError("schema_mismatch", "hors schéma", undefined, ["x : invalide"]);
+    const provider: AIProvider = {
+      name: "fake",
+      isDemo: false,
+      async generateStructured(r) {
+        seen.push(r.preferFallback);
+        throw bad;
+      },
+    };
+    await expect(generateReport(provider, input())).rejects.toMatchObject({ code: "schema_mismatch" });
+    expect(seen).toEqual([false, false, true]);
+  });
   it("sans repli déclaré, l'épuisement remonte tel quel", async () => {
     const p = new Scripted(new Set(["qualite"]), []);
     await expect(p.generateStructured(req)).rejects.toMatchObject({ code: "quota_exhausted" });

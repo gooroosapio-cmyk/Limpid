@@ -26,12 +26,12 @@ function BarChart({ data, labelledBy }: { data: ChartData; labelledBy: string })
     return { b, w, label, value, labelH, valueH, h: labelH + Math.max(26, valueH + 6) + 14 };
   });
   const height = rows.reduce((sum, r) => sum + r.h, 0);
-  let y = 0;
+  // Haut de chaque ligne : somme des hauteurs précédentes (calculée avant le rendu).
+  const tops = rows.map((_, i) => rows.slice(0, i).reduce((sum, r) => sum + r.h, 0));
   return (
     <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={labelledBy}>
       {rows.map((r, i) => {
-        const top = y;
-        y += r.h;
+        const top = tops[i]!;
         const lh = Math.round(r.label.size * 1.25);
         const vh = Math.round(r.value.size * 1.2);
         const barY = top + r.labelH + 4;
