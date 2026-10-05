@@ -90,8 +90,10 @@ export async function retryJobAction(form: FormData) {
   const { data: settings } = await adminClient().from("app_settings").select("generation_enabled").single();
   if (!settings?.generation_enabled) done("La génération est suspendue : réactivez-la avant de reprendre une tâche.");
   const { requeueJob } = await import("@/lib/admin-jobs");
-  const ok = await requeueJob(id.data);
-  if (!ok) done("Cette tâche ne peut pas être reprise (elle n'est plus en échec).");
+  const r = await requeueJob(id.data);
+  if (r === "not_retryable") done("Cette tâche ne peut pas être reprise (elle n'est plus en échec).");
+  if (r === "credits") done("Le compte n'a plus assez de crédits pour relancer cette tâche (ajoutez-en d'abord, motif journalisé).");
+  if (r === "quota") done("Le compte a atteint son plafond de rapports : réessayez après sa remise à zéro.");
   await audit(user.id, "job.retry", id.data);
   const { drainQueue } = await import("@/lib/jobs/worker");
   const started = Date.now();
@@ -150,4 +152,36 @@ export async function reconcileOrdersAction() {
   const n = await reconcilePending(50).catch(() => -1);
   await audit(user.id, "billing.reconcile", null, { changed: n });
   done(n < 0 ? "Le rapprochement a échoué." : `Rapprochement terminé : ${n} commande(s) mise(s) à jour.`);
+}
+
+/** Commande « à vérifier » : validée (si la vente est payée chez Chariow) ou refusée. Journalisé. */
+export async function decideOrderAction(form: FormData) {
+  const user = await requireAdmin();
+  const ref = z.string().regex(/^lmp_[a-z0-9]{20,40}$/).safeParse(form.get("order_ref"));
+  const approve = form.get("decision") === "approve";
+  if (!ref.success) done("Commande invalide.");
+  const { adminDecideIntent } = await import("@/lib/billing/purchase");
+  const r = await adminDecideIntent(ref.data, approve);
+  await audit(user.id, approve ? "billing.order_approve" : "billing.order_reject", ref.data, { outcome: r });
+  done({ approved: "Commande validée : l'avantage est attribué.", rejected: "Commande refusée.", not_paid: "La vente n'est pas payée chez Chariow : rien n'est attribué.", not_found: "Commande introuvable ou déjà traitée." }[r]);
+}
+
+/** Achat boutique non rattaché ou à vérifier : rattaché à un compte confirmé, ou refusé. Journalisé. */
+export async function decideStorePurchaseAction(form: FormData) {
+  const user = await requireAdmin();
+  const sale = z.string().regex(/^[A-Za-z0-9_-]{3,100}$/).safeParse(form.get("sale_id"));
+  if (!sale.success) done("Vente invalide.");
+  const reject = form.get("decision") === "reject";
+  const email = reject ? null : Email.safeParse(form.get("email"));
+  if (email && !email.success) done("Adresse du compte invalide.");
+  const { adminDecideStorePurchase } = await import("@/lib/billing/store");
+  const r = await adminDecideStorePurchase(sale.data, email?.success ? email.data : null);
+  await audit(user.id, reject ? "billing.store_reject" : "billing.store_attach", sale.data, { outcome: r });
+  done({
+    approved: "Achat rattaché : l'avantage est attribué.",
+    rejected: "Achat refusé.",
+    no_account: "Aucun compte confirmé avec cette adresse.",
+    not_paid: "La vente n'est pas payée chez Chariow : rien n'est attribué.",
+    not_found: "Achat introuvable ou déjà traité.",
+  }[r]);
 }

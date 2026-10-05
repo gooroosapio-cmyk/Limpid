@@ -126,7 +126,8 @@ export function ImportForm({
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
   const [error, setError] = useState<string | null>(null);
   const [billing, setBilling] = useState<{ code: string; topup: string | null } | null>(null);
-  const [quote, setQuote] = useState<number | null>(null);
+  // Devis reçu pour un jeu de documents donné (clé) : affiché seulement s'il correspond encore.
+  const [quoted, setQuoted] = useState<{ key: string; credits: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
@@ -231,13 +232,13 @@ export function ImportForm({
   const readyItems = items.filter((x) => x.status === "ready" && x.prepared);
   // Devis fixe dès que les documents sont lus (Limpid commun) : affiché sur le bouton.
   const quoteKey = tab === "file" && !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
+  const quote = quoted && quoted.key === quoteKey ? quoted.credits : null;
   useEffect(() => {
-    setQuote(null);
     if (!quoteKey) return;
     let live = true;
     fetch("/api/billing/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_ids: quoteKey.split(",") }) })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { credits?: number } | null) => live && setQuote(typeof d?.credits === "number" ? d.credits : null))
+      .then((d: { credits?: number } | null) => live && setQuoted(typeof d?.credits === "number" ? { key: quoteKey, credits: d.credits } : null))
       .catch(() => undefined);
     return () => {
       live = false;

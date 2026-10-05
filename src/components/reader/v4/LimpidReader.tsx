@@ -58,18 +58,17 @@ export function LimpidReader({
   const [suspended, setSuspended] = useState(false);
   const [chapter, setChapter] = useState<Chapter | null>(chapters[0] ?? null);
   const [askOpened, setAskOpened] = useState(false);
-  const dialogs = {
-    toc: useRef<HTMLDialogElement>(null),
-    options: useRef<HTMLDialogElement>(null),
-    ask: useRef<HTMLDialogElement>(null),
-    bilan: useRef<HTMLDialogElement>(null),
-    reform: useRef<HTMLDialogElement>(null),
-  };
-  useDialogHistory(dialogs.toc);
-  useDialogHistory(dialogs.options);
-  useDialogHistory(dialogs.ask);
-  useDialogHistory(dialogs.bilan);
-  useDialogHistory(dialogs.reform);
+  // Une référence par boîte de dialogue (et non un objet de références, illisible pour React).
+  const tocDialog = useRef<HTMLDialogElement>(null);
+  const optionsDialog = useRef<HTMLDialogElement>(null);
+  const askDialog = useRef<HTMLDialogElement>(null);
+  const bilanDialog = useRef<HTMLDialogElement>(null);
+  const reformDialog = useRef<HTMLDialogElement>(null);
+  useDialogHistory(tocDialog);
+  useDialogHistory(optionsDialog);
+  useDialogHistory(askDialog);
+  useDialogHistory(bilanDialog);
+  useDialogHistory(reformDialog);
   const markedRead = useRef(false);
   const anchorRef = useRef<string | null>(initialAnchor);
   /** Ancre de retour d'annexe (`?a=`) : undefined = pas encore lue. */
@@ -80,17 +79,14 @@ export function LimpidReader({
 
   useEffect(() => {
     try {
+      // Préférence de l'appareil, lue après l'hydratation (le serveur ne la connaît pas).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setContinuous(localStorage.getItem(CONTINUOUS_KEY) === "1");
     } catch {}
   }, []);
 
   const pieceIndex = useCallback((id: string) => piecesRef.current.findIndex((p) => p.id === id), []);
 
-  /** Ancre courante : première pièce de la vue affichée. */
-  const anchorNow = useCallback(() => {
-    const v = viewsRef.current[current];
-    return v ? (piecesRef.current[v.start]?.id ?? null) : null;
-  }, [current]);
 
   const scrollToPiece = useCallback((index: number, smooth = false) => {
     const deck = deckRef.current;
@@ -282,13 +278,12 @@ export function LimpidReader({
         scrollToPiece(next ? next.start : i, true);
       },
       goTo: (id) => {
-        Object.values(dialogs).forEach((d) => d.current?.close());
+        [tocDialog, optionsDialog, askDialog, bilanDialog, reformDialog].forEach((d) => d.current?.close());
         scrollToPiece(pieceIndex(id), true);
       },
-      openBilan: () => dialogs.bilan.current?.showModal(),
-      openReformulate: () => dialogs.reform.current?.showModal(),
+      openBilan: () => bilanDialog.current?.showModal(),
+      openReformulate: () => reformDialog.current?.showModal(),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [reportId, versionId, pieceIndex, scrollToPiece],
   );
 
@@ -341,12 +336,12 @@ export function LimpidReader({
         <div className="deck-col">{children}</div>
       </div>
 
-      <button type="button" className="discuss" aria-label={t.lim.discussLabel} aria-haspopup="dialog" onClick={() => { setAskOpened(true); dialogs.ask.current?.showModal(); }}>
+      <button type="button" className="discuss" aria-label={t.lim.discussLabel} aria-haspopup="dialog" onClick={() => { setAskOpened(true); askDialog.current?.showModal(); }}>
         <Icon name="chat" /> <span>{t.lim.discuss}</span>
       </button>
 
       <nav className="rbar" aria-label={t.lim.toc}>
-        <button type="button" className="rb" aria-haspopup="dialog" onClick={() => dialogs.toc.current?.showModal()}>
+        <button type="button" className="rb" aria-haspopup="dialog" onClick={() => tocDialog.current?.showModal()}>
           <Icon name="list" /> <span>{t.lim.toc}</span>
         </button>
         <div
@@ -361,13 +356,13 @@ export function LimpidReader({
           <span className="rprogress-n" aria-hidden="true">{current + 1} / {total}</span>
           <span className="rprogress-bar" aria-hidden="true"><i ref={(el) => { if (el) el.style.width = `${((current + 1) / total) * 100}%`; }} /></span>
         </div>
-        <button type="button" className="rb" aria-haspopup="dialog" onClick={() => dialogs.options.current?.showModal()}>
+        <button type="button" className="rb" aria-haspopup="dialog" onClick={() => optionsDialog.current?.showModal()}>
           <Icon name="more" /> <span>{t.lim.options}</span>
         </button>
       </nav>
 
-      <dialog ref={dialogs.toc} className="sheet side" aria-labelledby="toc-h">
-        {head("toc-h", t.reader.inThisReport, dialogs.toc)}
+      <dialog ref={tocDialog} className="sheet side" aria-labelledby="toc-h">
+        {head("toc-h", t.reader.inThisReport, tocDialog)}
         <nav className="toc" aria-labelledby="toc-h">
           <ol>
             {chapters.map((c) => (
@@ -384,39 +379,39 @@ export function LimpidReader({
         </nav>
       </dialog>
 
-      <dialog ref={dialogs.options} className="sheet side" aria-labelledby="opt-h">
-        {head("opt-h", t.lim.options, dialogs.options)}
+      <dialog ref={optionsDialog} className="sheet side" aria-labelledby="opt-h">
+        {head("opt-h", t.lim.options, optionsDialog)}
         <OptionsPanel
           data={options}
           continuous={continuous}
           onContinuous={toggleContinuous}
-          onNavigate={() => dialogs.options.current?.close()}
+          onNavigate={() => optionsDialog.current?.close()}
           annexHref={(hash) => annex?.href(hash, anchorRef.current) ?? `#${hash}`}
           onAnnex={(hash) => annex?.open(hash, anchorRef.current)}
         />
       </dialog>
 
-      <dialog ref={dialogs.ask} className="sheet side ask-sheet" aria-labelledby="ask-h">
-        {head("ask-h", t.lim.discussLabel, dialogs.ask)}
+      <dialog ref={askDialog} className="sheet side ask-sheet" aria-labelledby="ask-h">
+        {head("ask-h", t.lim.discussLabel, askDialog)}
         {!reportId ? <p className="notice">{t.ask.unavailable}</p> : askOpened && <AskPanel reportId={reportId} section={chapter ? { id: chapter.id, title: chapter.title } : null} />}
       </dialog>
 
-      <dialog ref={dialogs.bilan} className="sheet side quiz-sheet" aria-labelledby="bilan-h">
-        {head("bilan-h", t.lim.bilanTitle, dialogs.bilan)}
+      <dialog ref={bilanDialog} className="sheet side quiz-sheet" aria-labelledby="bilan-h">
+        {head("bilan-h", t.lim.bilanTitle, bilanDialog)}
         <Bilan
           initial={bilan}
           insufficient={insufficient}
           reportId={reportId}
           versionId={versionId}
           titles={titles}
-          onClose={() => dialogs.bilan.current?.close()}
+          onClose={() => bilanDialog.current?.close()}
           onGoTo={(id) => api.goTo(id)}
         />
       </dialog>
 
-      <dialog ref={dialogs.reform} className="sheet side" aria-labelledby="ref-h">
-        {head("ref-h", t.lim.reformulate, dialogs.reform)}
-        <ReformulatePanel reportId={reportId} onDone={() => dialogs.reform.current?.close()} />
+      <dialog ref={reformDialog} className="sheet side" aria-labelledby="ref-h">
+        {head("ref-h", t.lim.reformulate, reformDialog)}
+        <ReformulatePanel reportId={reportId} onDone={() => reformDialog.current?.close()} />
       </dialog>
     </ReaderCtx.Provider>
   );

@@ -12,6 +12,7 @@ export function useDraft<T>(key: string, initial: T): [T, (v: T | ((prev: T) => 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(key);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- stockage de l'onglet, lu après l'hydratation
       if (raw !== null) setValue(JSON.parse(raw) as T);
     } catch {}
   }, [key]);

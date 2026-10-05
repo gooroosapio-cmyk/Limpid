@@ -8,6 +8,7 @@ import { formatXof, product } from "@/lib/billing/catalog";
 import { productIds } from "@/lib/billing/chariow";
 import { nextSubscriptionStart } from "@/lib/billing/purchase";
 import { getLang, getT } from "@/lib/i18n/server";
+import { nowMs } from "@/lib/time";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -31,7 +32,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   }
   const day = (d: Date) => d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Abidjan" });
   const start = p.kind === "subscription" ? await nextSubscriptionStart(user.id) : null;
-  const later = !!start && start.getTime() > Date.now() + 60_000;
+  const later = !!start && start.getTime() > nowMs() + 60_000;
   const configured = !!productIds()[p.code] && !!process.env.CHARIOW_API_KEY;
   const name = p.kind === "subscription" ? t.billing.planNames[p.plan]! : t.billing.offers.topupsTitle;
   const amount = formatXof(p.xof, lang);

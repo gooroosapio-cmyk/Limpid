@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { product, type Product } from "./catalog";
 import { ChariowError, checkSale, getSale, initCheckout, productIds } from "./chariow";
-import { recordStorePurchase } from "./store";
+import { recordStorePurchase, recoverStuckClaims } from "./store";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const CheckoutRequest = z.strictObject({
@@ -23,7 +23,7 @@ export type CheckoutRequest = z.infer<typeof CheckoutRequest>;
 
 export class PurchaseError extends Error {
   constructor(
-    public readonly code: "unknown_product" | "not_configured" | "unverified" | "already_purchased" | "rejected" | "failed",
+    public readonly code: "unknown_product" | "not_configured" | "unverified" | "already_purchased" | "rejected" | "failed" | "busy",
     message: string,
   ) {
     super(message);
@@ -53,7 +53,7 @@ export function newOrderRef(): string {
 }
 
 function siteUrl(): string {
-  return (process.env.LIMPID_SITE_URL ?? process.env.APP_BASE_URL ?? "https://limpidgooroo.vercel.app").replace(/\/$/, "");
+  return (process.env.LIMPID_SITE_URL ?? "https://limpidgooroo.vercel.app").replace(/\/$/, "");
 }
 
 /** Crée (ou retrouve, double clic) la commande et renvoie l'adresse de paiement Chariow. */
@@ -71,6 +71,8 @@ export async function startCheckout(
   const db = adminClient();
   const { data: existing } = await db.from("payment_intents").select(INTENT_COLUMNS).eq("owner_id", user.id).eq("idempotency_key", input.idempotency_key).maybeSingle();
   if (existing?.checkout_url && existing.status === "pending") return { checkoutUrl: existing.checkout_url as string, orderRef: existing.order_ref as string };
+  // Double clic : la première demande prépare encore le paiement chez Chariow.
+  if (existing?.status === "created") throw new PurchaseError("busy", "Paiement en cours de préparation.");
   if (existing) throw new PurchaseError("failed", "Cette demande de paiement est déjà traitée.");
 
   const orderRef = newOrderRef();
@@ -127,7 +129,6 @@ export async function reconcileIntent(intent: IntentRow, saleIdHint?: string | n
   if (intent.status === "succeeded") return "succeeded";
   const saleId = intent.sale_id ?? saleIdHint ?? null;
   if (!saleId) return intent.status;
-  const p = product(intent.product_code) as Product;
   const db = adminClient();
   const sale = await getSale(saleId);
   if (!sale) return intent.status;
@@ -155,7 +156,13 @@ export async function reconcileIntent(intent: IntentRow, saleIdHint?: string | n
       return "review";
     }
   }
-  const { data, error } = await db.rpc("fulfill_purchase", {
+  return (await fulfillIntent(intent, saleId)) ? "succeeded" : intent.status;
+}
+
+/** Attribution unique (fulfill_purchase) d'une commande dont la vente est vérifiée. */
+export async function fulfillIntent(intent: IntentRow, saleId: string): Promise<boolean> {
+  const p = product(intent.product_code) as Product;
+  const { data, error } = await adminClient().rpc("fulfill_purchase", {
     p_intent: intent.id,
     p_sale: saleId,
     p_benefit: p.kind,
@@ -166,9 +173,29 @@ export async function reconcileIntent(intent: IntentRow, saleIdHint?: string | n
   });
   if (error) {
     console.error("fulfill_purchase", error.code);
-    return intent.status;
+    return false;
   }
-  return data === "attribue" || data === "deja_attribue" ? "succeeded" : intent.status;
+  return data === "attribue" || data === "deja_attribue";
+}
+
+/**
+ * Décision de l'administrateur sur une commande « à vérifier » (adresse différente, montant
+ * ou produit inattendus) : validée seulement si la vente est réellement payée chez Chariow.
+ */
+export async function adminDecideIntent(orderRef: string, approve: boolean): Promise<"approved" | "rejected" | "not_paid" | "not_found"> {
+  const db = adminClient();
+  const { data } = await db.from("payment_intents").select(INTENT_COLUMNS).eq("order_ref", orderRef).in("status", ["review", "uncertain", "pending", "failed"]).maybeSingle();
+  const intent = data as IntentRow | null;
+  if (!intent) return "not_found";
+  if (!approve) {
+    await db.from("payment_intents").update({ status: "failed", review_reason: "refusé par l'administrateur" }).eq("id", intent.id).neq("status", "succeeded");
+    return "rejected";
+  }
+  if (!intent.sale_id) return "not_paid";
+  const sale = await getSale(intent.sale_id);
+  const paid = !!sale && (sale.status === "completed" || sale.status === "settled") && sale.payment?.status === "success";
+  if (!paid) return "not_paid";
+  return (await fulfillIntent(intent, intent.sale_id)) ? "approved" : "not_found";
 }
 
 export async function intentByRef(ownerId: string, orderRef: string): Promise<IntentRow | null> {
@@ -202,50 +229,68 @@ export async function handlePulse(event: string, saleId: string | null, orderRef
   return "processed";
 }
 
-/** Rapprochement périodique des commandes en attente (webhooks perdus, onglet fermé). */
+/**
+ * Rapprochement périodique (webhooks perdus, onglet fermé) : les commandes les moins
+ * récemment relues d'abord, pour qu'aucune commande ne bloque la file ; les Pulses
+ * interrompus ou en échec sont rejoués ; les attentes sans issue sont closes.
+ */
 export async function reconcilePending(limit = 25): Promise<number> {
   const db = adminClient();
-  const before = new Date(Date.now() - 2 * 60_000).toISOString();
+  const now = Date.now();
+  const before = new Date(now - 2 * 60_000).toISOString();
   const { data } = await db
     .from("payment_intents")
     .select(INTENT_COLUMNS)
     .in("status", ["pending", "uncertain"])
     .lt("updated_at", before)
-    .order("created_at")
+    .order("updated_at")
     .limit(limit);
   let n = 0;
   for (const i of (data ?? []) as IntentRow[]) {
     try {
-      if ((await reconcileIntent(i)) !== i.status) n++;
-      else await db.from("payment_intents").update({ updated_at: new Date().toISOString() }).eq("id", i.id);
+      const status = await reconcileIntent(i);
+      if (status !== i.status) {
+        n++;
+        continue;
+      }
+      // Toujours sans paiement confirmé après 7 jours (ou sans vente connue après 2 jours) :
+      // close. Un Pulse tardif la rouvre encore (retrouvée par sa vente ou sa référence).
+      const age = now - new Date(i.created_at).getTime();
+      const stale = (i.status === "pending" && age > 7 * 24 * 3600_000) || (i.status === "uncertain" && !i.sale_id && age > 2 * 24 * 3600_000);
+      await db
+        .from("payment_intents")
+        .update(stale ? { status: "failed", review_reason: "paiement non confirmé" } : { updated_at: new Date().toISOString() })
+        .eq("id", i.id)
+        .eq("status", i.status);
     } catch (e) {
       console.error("reconcile", (e as Error).name);
     }
   }
-  // Pulses non aboutis (panne, paiement pas encore confirmé) : rejoués pendant 7 jours.
-  const { data: failed } = await db
+  // Pulses en échec, ou restés « reçus » (traitement interrompu) : rejoués pendant 7 jours.
+  const { data: pulses } = await db
     .from("webhook_inbox")
-    .select("id, event, sale_id, order_ref, attempts")
-    .eq("status", "failed")
+    .select("id, event, sale_id, order_ref, attempts, status, received_at")
     .eq("is_test", false)
+    .or(`status.eq.failed,and(status.eq.received,received_at.lt.${new Date(now - 10 * 60_000).toISOString()})`)
     .lt("attempts", 20)
-    .gt("received_at", new Date(Date.now() - 7 * 24 * 3600_000).toISOString())
+    .gt("received_at", new Date(now - 7 * 24 * 3600_000).toISOString())
     .order("received_at")
     .limit(limit);
-  for (const w of failed ?? []) {
+  for (const w of pulses ?? []) {
     try {
       const outcome = await handlePulse(w.event as string, w.sale_id as string | null, w.order_ref as string | null);
       await db.from("webhook_inbox").update({ status: outcome, processed_at: new Date().toISOString(), attempts: (w.attempts as number) + 1 }).eq("id", w.id);
     } catch (e) {
-      await db.from("webhook_inbox").update({ attempts: (w.attempts as number) + 1, last_error: (e as Error).name.slice(0, 100) }).eq("id", w.id);
+      await db.from("webhook_inbox").update({ status: "failed", attempts: (w.attempts as number) + 1, last_error: (e as Error).name.slice(0, 100) }).eq("id", w.id);
     }
   }
+  await recoverStuckClaims();
   // Commandes jamais transmises à Chariow depuis plus d'un jour : closes.
   await db
     .from("payment_intents")
     .update({ status: "failed", review_reason: "paiement non commencé" })
     .eq("status", "created")
-    .lt("created_at", new Date(Date.now() - 24 * 3600_000).toISOString());
+    .lt("created_at", new Date(now - 24 * 3600_000).toISOString());
   return n;
 }
 

@@ -4,6 +4,7 @@ import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
 import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, setGeneration, setMonthlyCap } from "@/app/admin/actions";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
+import { nowMs } from "@/lib/time";
 
 const euros = (cents: number) => `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const when = (iso: string) =>
@@ -190,7 +191,7 @@ export async function AdminView({
                     <div><dt>{t.admin.phase}</dt><dd>{j.stage ? (t.admin.stages[j.stage] ?? j.stage) : "—"}</dd></div>
                     <div><dt>{t.admin.documents}</dt><dd>{j.sources}</dd></div>
                     <div><dt>{t.admin.pages}</dt><dd>{t.admin.pagesSplit(j.nativePages, j.ocrPages)}</dd></div>
-                    <div><dt>{t.admin.duration}</dt><dd>{start ? duration((end ?? Date.now()) - start) : "—"}{start && !end ? ` ${t.admin.ongoing}` : ""}</dd></div>
+                    <div><dt>{t.admin.duration}</dt><dd>{start ? duration((end ?? nowMs()) - start) : "—"}{start && !end ? ` ${t.admin.ongoing}` : ""}</dd></div>
                     <div><dt>{t.admin.aiTime}</dt><dd>{j.calls ? `${duration(j.aiMs)} · ${t.admin.callCount(j.calls)}` : "—"}</dd></div>
                     <div><dt>{t.admin.attempts}</dt><dd>{j.attempt}</dd></div>
                     <div><dt>{t.admin.cost}</dt><dd>{euros(j.costCents)}</dd></div>

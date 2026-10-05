@@ -57,7 +57,12 @@ export function MovePanel({
   const same = new Set(currentFolderIds);
   const current = same.size === 1 ? [...same][0] : undefined;
 
-  useEffect(() => setList(folders), [folders]);
+  // Nouvelle liste reçue du serveur : remplace la liste locale (ajustement pendant le rendu).
+  const [seen, setSeen] = useState(folders);
+  if (seen !== folders) {
+    setSeen(folders);
+    setList(folders);
+  }
   useEffect(() => {
     const d = ref.current;
     if (!d) return;

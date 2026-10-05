@@ -20,6 +20,9 @@ export async function revokeDevice(form: FormData) {
   if (!id.success) return;
   const db = adminClient();
   await db.from("user_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: "revoked" }).eq("session_id", id.data).eq("owner_id", user.id).is("revoked_at", null);
+  // La session Supabase elle-même est supprimée : son jeton de rafraîchissement ne vaut plus rien.
+  const { error } = await db.rpc("revoke_auth_session", { p_session: id.data, p_owner: user.id });
+  if (error) console.error("revoke_auth_session", error.code);
   await db.from("audit_log").insert({ actor_id: user.id, action: "session.revoke", target_kind: "session", target_id: id.data });
   if (id.data === (await currentSessionId())) {
     await (await createUserClient()).auth.signOut({ scope: "local" });

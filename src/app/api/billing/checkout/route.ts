@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
         already_purchased: [409, t.alreadyPurchased],
         rejected: [422, t.invalid],
         failed: [502, t.failed],
+        busy: [409, t.busy],
       } as const;
       const [status, message] = map[e.code];
       return NextResponse.json({ error: e.code, message }, { status });

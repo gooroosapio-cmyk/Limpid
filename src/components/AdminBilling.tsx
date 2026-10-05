@@ -1,4 +1,4 @@
-import { grantCreditsAction, reconcileOrdersAction, setSignupOpen } from "@/app/admin/actions";
+import { decideOrderAction, decideStorePurchaseAction, grantCreditsAction, reconcileOrdersAction, setSignupOpen } from "@/app/admin/actions";
 import { formatXof, PRODUCT_CODES } from "@/lib/billing/catalog";
 import { chariowConfigured, productIds } from "@/lib/billing/chariow";
 import { adminClient } from "@/lib/supabase/admin";
@@ -37,7 +37,7 @@ export async function AdminBilling({ siteUrl }: { siteUrl: string }) {
       <form action={setSignupOpen} className="stack-form">
         <label className="check">
           <input type="checkbox" name="open" defaultChecked={settings?.signup_open === true} />
-          Inscriptions publiques ouvertes (offre gratuite : 80 crédits par mois, 2 rapports par semaine)
+          Inscriptions publiques ouvertes (offre gratuite : 80 crédits par mois, 2 rapports par jour et 5 par semaine)
         </label>
         <button type="submit" className="btn">Enregistrer</button>
       </form>
@@ -76,6 +76,13 @@ export async function AdminBilling({ siteUrl }: { siteUrl: string }) {
               <span className="row-text">
                 <b>{o.product_code as string} · {formatXof(o.amount_xof as number)} · {o.status as string}</b>
                 <small>{o.order_ref as string} · {when(o.created_at as string)}{o.review_reason ? ` · ${o.review_reason}` : ""}</small>
+                {o.status === "review" && (
+                  <form action={decideOrderAction} className="actions-row">
+                    <input type="hidden" name="order_ref" value={o.order_ref as string} />
+                    <button type="submit" name="decision" value="approve" className="btn btn-primary">Valider (si payée)</button>
+                    <button type="submit" name="decision" value="reject" className="btn">Refuser</button>
+                  </form>
+                )}
               </span>
             </li>
           ))}
@@ -96,6 +103,13 @@ export async function AdminBilling({ siteUrl }: { siteUrl: string }) {
               <span className="row-text">
                 <b>{p.product_code as string} · {formatXof(p.amount_xof as number)} · {p.status === "review" ? "à vérifier" : "en attente de compte"}</b>
                 <small>{maskEmail(p.email as string)} · {p.sale_id as string} · {when(p.created_at as string)}{p.review_reason ? ` · ${p.review_reason}` : ""}</small>
+                <form action={decideStorePurchaseAction} className="actions-row">
+                  <input type="hidden" name="sale_id" value={p.sale_id as string} />
+                  <label className="sr-only" htmlFor={`attach-${p.sale_id}`}>Adresse confirmée du compte</label>
+                  <input id={`attach-${p.sale_id}`} name="email" type="email" placeholder="Adresse confirmée du compte" />
+                  <button type="submit" name="decision" value="attach" className="btn btn-primary">Rattacher (si payée)</button>
+                  <button type="submit" name="decision" value="reject" className="btn">Refuser</button>
+                </form>
               </span>
             </li>
           ))}

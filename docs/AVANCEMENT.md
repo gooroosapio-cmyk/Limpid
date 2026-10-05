@@ -1,5 +1,14 @@
 # Avancement
 
+## Phase 15.1 — Corrections de l'audit complet (5 octobre 2026)
+
+- **Crédits** : une réservation rendue ou consommée n'est plus jamais réutilisée (supprimer puis recréer un rapport débite à nouveau) ; lien réservation ↔ tâche réessayé et retrouvé par sa clé ; suppression d'un rapport en file sans course avec le worker ; relance admin d'une tâche = nouvelle réservation.
+- **Paiements** : rapprochement par ancienneté de relecture (aucune commande ne bloque la file), attentes sans issue closes, Pulses interrompus ou en échec rejoués, chaque Pulse relance le rapprochement ; décisions admin « Valider / Refuser » pour les commandes à vérifier et « Rattacher / Refuser » pour les achats boutique ; rattachement boutique jamais marqué sans commande interne ; double clic sur « Payer » sans fausse erreur.
+- **Sécurité** : contrôle des sessions appliqué aussi aux requêtes « préchargement » ; « Déconnecter cet appareil » supprime la session Supabase ; liens magiques limités ; compte jamais confirmé effacé avant l'envoi d'un lien ; adresses admin sans inscription par mot de passe et rôle admin seulement après confirmation ; changement de mot de passe et suppression de compte exigent une connexion de moins de 15 minutes ; lien email jamais construit depuis l'en-tête Host en production ; coupe-circuits signalés dans les journaux.
+- **Base** : 24 index de clés étrangères, 27 règles d'accès optimisées (`(select auth.uid())`).
+- **Qualité** : code mort retiré (anciennes limites, libellés, fournisseur OpenAI factice, textes « alpha »), 0 avertissement de lint, `.env.example` et documentation alignés.
+- Recettes SQL : nouvelle recette `audit.test.sql`. Migration `20261013000000_audit_fixes.sql` appliquée en production.
+
 ## Phase 15 — Chariow V2 : plafonds, sessions, Google/Apple, achats boutique (5 octobre 2026)
 
 - **Lot A** : plafonds de rapports par jour et par semaine (UTC), contrôlés dans la réservation de crédits.
@@ -14,7 +23,7 @@
 Spécification : `docs/SPEC_COMPTES_CREDITS_CHARIOW.md` (révision tarifaire). Mise en service : `docs/PAIEMENTS_CHARIOW.md`.
 
 ### FAIT
-- **Offres** : Gratuit (bonus de 80 crédits par cycle mensuel, 2 rapports par semaine au plus), Essentiel 2 900 FCFA (240 crédits, 12 rapports), Plus 5 900 FCFA (600, 30), Pro 11 900 FCFA (1 500, 75) ; annuel au prix de dix mois avec allocation mensuelle ; recharges de 1 000 FCFA (70 crédits), 2 500 FCFA (180) et 5 000 FCFA (500, 25 rapports), valables 12 mois.
+- **Offres** : Gratuit (bonus de 80 crédits par cycle mensuel, 2 rapports par jour et 5 par semaine au plus), Essentiel 2 900 FCFA (240 crédits, 12 rapports), Plus 5 900 FCFA (600, 30), Pro 11 900 FCFA (1 500, 75) ; annuel au prix de dix mois avec allocation mensuelle ; recharges de 1 000 FCFA (70 crédits), 2 500 FCFA (180) et 5 000 FCFA (500, 25 rapports), valables 12 mois.
 - **Moteur de crédits** (migration `20261009000000_credits_billing.sql`) : lots datés, réservation idempotente sous verrou par compte, consommation à la livraison, restitution à l'échec ou à l'annulation, une seule fois ; journal append-only ; cycles ancrés sans dérive (31 janvier, 29 février) ; rattrapage des réservations orphelines.
 - **Prix fixes** : rapport court, standard ou long (8, 20 ou 40, selon la taille réelle du texte lu) ; nouvelle version 8 ; question 1 ; nouveau test 3 ; lecture, PDF, exercices déjà prêts : 0. Le prix s'affiche sur le bouton de création.
 - **Droits par offre** : Limpid conservés (3 / 30 / 100 / 300), documents par Limpid (1 en gratuit), préparations simultanées (1 / 1 / 2 / 3), filigrane du PDF en gratuit. La limite « 3 rapports par 24 h » de l'alpha est remplacée par les crédits. Les blocages expliquent la limite exacte et proposent la bonne action.
@@ -24,7 +33,7 @@ Spécification : `docs/SPEC_COMPTES_CREDITS_CHARIOW.md` (révision tarifaire). M
 
 ### EN TEST
 - Recette SQL des crédits (`supabase/tests/credits.test.sql`) : allocation unique, solde insuffisant sans effet partiel, clé réutilisée refusée, double livraison/restitution sans effet, réservation honorée après expiration, annuel = allocation mensuelle, renouvellement anticipé différé, recharge unique, journal non modifiable, isolation entre comptes, fonctions non appelables par les clients, suppression de compte.
-- Vitest : 252 tests, dont signature sur octets bruts, contrôle des ventes, webhook (signature invalide, dix livraisons identiques, test sans livraison, base indisponible).
+- Vitest : 252 tests (phase 14 ; 264 après la phase 15.1, plus 11 recettes Gemini réelles sautées par défaut), dont signature sur octets bruts, contrôle des ventes, webhook (signature invalide, dix livraisons identiques, test sans livraison, base indisponible).
 - Recette visuelle : page Offres à 412 px, clair et sombre, sans débordement.
 
 ### À FAIRE (hors code)

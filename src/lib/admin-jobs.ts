@@ -4,6 +4,8 @@
  * donnée privée : ni titre, ni texte, ni adresse ; des nombres et des codes.
  */
 import "server-only";
+import { ACTION_PRICES, type Action } from "@/lib/billing/catalog";
+import { CreditError, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { adminClient } from "@/lib/supabase/admin";
 
 export interface AdminJob {
@@ -110,9 +112,27 @@ export async function adminJobs(limit = 30): Promise<AdminJob[]> {
   });
 }
 
-/** Reprise ciblée : une tâche en échec repart de son dernier point de reprise. */
-export async function requeueJob(jobId: string): Promise<boolean> {
+/**
+ * Reprise ciblée : une tâche en échec repart de son dernier point de reprise. Ses crédits ont
+ * été rendus à l'échec : ils sont réservés à nouveau (prix et plafonds du compte), sinon la
+ * régénération serait gratuite.
+ */
+export async function requeueJob(jobId: string): Promise<"ok" | "not_retryable" | "credits" | "quota"> {
   const db = adminClient();
+  const { data: job } = await db.from("jobs").select("owner_id, kind, idempotency_key, params, report_id, status").eq("id", jobId).maybeSingle();
+  if (!job || !(RETRYABLE as readonly string[]).includes(job.status as string)) return "not_retryable";
+  const credits = (job.params as { credits?: { action?: string } } | null)?.credits;
+  const action = job.kind === "reexplain_section" ? "report_version" : credits?.action;
+  let reservationId: string | null = null;
+  if (action && action in ACTION_PRICES) {
+    const prefix = job.kind === "reexplain_section" ? "version" : "report";
+    try {
+      ({ reservationId } = await reserveCredits(job.owner_id as string, action as Action, `${prefix}:${job.idempotency_key}`, { jobId, reportId: (job.report_id as string | null) ?? undefined }));
+    } catch (e) {
+      if (e instanceof CreditError && (e.code === "insufficient" || e.code === "quota")) return e.code === "insufficient" ? "credits" : "quota";
+      throw e;
+    }
+  }
   const { data } = await db
     .from("jobs")
     .update({ status: "queued", error_code: null, stage_attempt: 0, cancel_requested: false, finished_at: null, lease_owner: null, lease_expires_at: null })
@@ -120,7 +140,11 @@ export async function requeueJob(jobId: string): Promise<boolean> {
     .in("status", RETRYABLE)
     .select("id")
     .maybeSingle();
-  return !!data;
+  if (!data) {
+    if (reservationId) await releaseReservation(reservationId);
+    return "not_retryable";
+  }
+  return "ok";
 }
 
 /** Annulation ciblée : immédiate hors exécution, sinon demandée au worker (point de contrôle suivant). */

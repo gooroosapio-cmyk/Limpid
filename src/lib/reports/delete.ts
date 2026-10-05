@@ -27,7 +27,14 @@ export async function deleteReport(ownerId: string, reportId: string): Promise<"
   await db.from("jobs").update({ cancel_requested: true }).eq("report_id", reportId);
   // Préparation pas encore démarrée : ses crédits sont rendus tout de suite (une tâche en
   // cours les rend elle-même en s'arrêtant).
-  const { data: queued } = await db.from("jobs").select("id").eq("report_id", reportId).eq("status", "queued");
+  // Annulation conditionnelle : si le worker a pris la tâche entre-temps, elle n'est plus
+  // « en file » et c'est lui qui règle ses crédits (jamais un rapport livré sans débit).
+  const { data: queued } = await db
+    .from("jobs")
+    .update({ status: "cancelled", finished_at: new Date().toISOString() })
+    .eq("report_id", reportId)
+    .eq("status", "queued")
+    .select("id");
   for (const j of queued ?? []) await finishJobReservation(j.id as string, false);
 
   const steps: Record<string, boolean> = {};

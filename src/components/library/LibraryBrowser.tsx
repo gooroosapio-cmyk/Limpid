@@ -99,6 +99,7 @@ export function LibraryBrowser({
   const [moveIds, setMoveIds] = useState<string[] | null>(null);
   // Sections repliées (Dossiers, Limpid) : préférence de l'appareil, relue après l'hydratation.
   const [collapsed, setCollapsed] = useState<Set<Section>>(new Set());
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- stockage de l'appareil, lu après l'hydratation
   useEffect(() => setCollapsed(readCollapsed()), []);
   const toggleSection = (s: Section) =>
     setCollapsed((prev) => {

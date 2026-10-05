@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Icon, type IconName } from "@/components/Icon";
+import { Icon } from "@/components/Icon";
 import { Fab } from "@/components/shell/AppShell";
 import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";

@@ -6,6 +6,7 @@ do $$ begin
 end $$;
 create schema auth;
 create table auth.users (id uuid primary key, email text);
+create table auth.sessions (id uuid primary key, user_id uuid not null);
 create function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 create schema storage;

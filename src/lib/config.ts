@@ -48,14 +48,13 @@ export const budget = {
   perAccountDailyCapCents: int("LIMPID_ACCOUNT_DAILY_CAP_CENTS", 200),
 };
 
-export type ProviderName = "gemini" | "openai" | "demo";
+export type ProviderName = "gemini" | "demo";
 
 export function activeProvider(): ProviderName {
   const p = (process.env.LIMPID_AI_PROVIDER ?? "gemini").toLowerCase();
-  if (p !== "gemini" && p !== "openai" && p !== "demo") throw new Error("LIMPID_AI_PROVIDER invalide");
+  if (p !== "gemini" && p !== "demo") throw new Error("LIMPID_AI_PROVIDER invalide");
   // Sans clé, le seul mode possible est la démo, affichée comme telle.
   if (p === "gemini" && !process.env.GEMINI_API_KEY) return "demo";
-  if (p === "openai" && !process.env.OPENAI_API_KEY) return "demo";
   return p;
 }
 

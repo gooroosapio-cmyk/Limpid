@@ -207,8 +207,9 @@ export async function createReport(
         .eq("owner_id", userId)
         .eq("idempotency_key", input.idempotency_key)
         .maybeSingle();
-      // Même clé : la réservation est celle du gagnant, elle n'est pas rendue.
+      // Même clé : la réservation est celle du gagnant, elle n'est jamais rendue ici.
       if (winner.data?.report_id) return { reportId: winner.data.report_id };
+      throw new CreateError("storage", "Création de la tâche impossible.");
     }
     await releaseReservation(reservationId);
     throw new CreateError("storage", "Création de la tâche impossible.");

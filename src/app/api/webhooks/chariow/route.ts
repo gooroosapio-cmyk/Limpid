@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { after, NextResponse, type NextRequest } from "next/server";
 import { chariowConfigured, parsePulse, pulseSecrets, verifySignature } from "@/lib/billing/chariow";
-import { handlePulse } from "@/lib/billing/purchase";
+import { handlePulse, reconcilePending } from "@/lib/billing/purchase";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
         // Rattrapé par le rapprochement périodique des commandes en attente.
         await db.from("webhook_inbox").update({ status: "failed", attempts: 1, last_error: (e as Error).name.slice(0, 100) }).eq("id", row.id);
       }
+      // Chaque Pulse relance aussi le rapprochement : le cron Vercel ne passe qu'une fois par jour.
+      await reconcilePending(10).catch((e) => console.error("reconcile", (e as Error).name));
     });
   }
   return NextResponse.json({ status: "received" });

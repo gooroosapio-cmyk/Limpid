@@ -13,7 +13,7 @@ import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 
 /** Fenêtre et nombre d'essais autorisés (par adresse et par IP). */
 export const ATTEMPT_WINDOW_MINUTES = 15;
-export const MAX_ATTEMPTS = { password: 8, reset: 3, signup: 5 } as const;
+export const MAX_ATTEMPTS = { password: 8, reset: 3, signup: 5, magic: 5 } as const;
 
 export async function isAllowed(email: string): Promise<boolean> {
   if (isEmailAllowed(email)) return true;
@@ -67,6 +67,45 @@ export function passwordProblem(password: string, email: string, rules: Dict["au
 }
 
 /** Méthodes d'authentification de la session (jeton Supabase, revendication « amr »). */
+/**
+ * Compte créé mais jamais confirmé pour cette adresse : effacé avant l'envoi d'un lien. Sans
+ * cela, quelqu'un qui s'est inscrit avec l'adresse d'un autre garderait son mot de passe une
+ * fois l'adresse confirmée par son vrai titulaire. Un compte non confirmé n'a aucun contenu.
+ */
+export async function dropUnconfirmedAccount(email: string): Promise<void> {
+  if (!isAdminConfigured()) return;
+  const db = adminClient();
+  const { data: id } = await db.rpc("unconfirmed_user_by_email", { p_email: email });
+  if (!id) return;
+  const { error } = await db.auth.admin.deleteUser(id as string);
+  if (error) console.error("drop_unconfirmed", error.status);
+  else await db.from("audit_log").insert({ action: "auth.drop_unconfirmed", target_kind: "user", target_id: id as string });
+}
+
+/** Adresse réservée à un administrateur (liste blanche) : pas d'inscription par mot de passe. */
+export async function isAdminAddress(email: string): Promise<boolean> {
+  if (!isAdminConfigured()) return false;
+  const { data } = await adminClient().from("allowed_emails").select("role").eq("email", email).maybeSingle();
+  return data?.role === "admin";
+}
+
+/** Dernière authentification réelle de la session (claim amr), en secondes depuis l'époque. */
+export function lastAuthAt(accessToken: string | undefined): number | null {
+  try {
+    const payload = JSON.parse(Buffer.from(accessToken!.split(".")[1]!, "base64url").toString("utf8"));
+    const times = Array.isArray(payload.amr) ? payload.amr.map((a: { timestamp?: unknown }) => Number(a.timestamp)).filter(Number.isFinite) : [];
+    return times.length ? Math.max(...times) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Authentification de moins de `maxAgeSec` (opérations sensibles : mot de passe, suppression). */
+export function recentlyAuthenticated(accessToken: string | undefined, maxAgeSec = 15 * 60, now = Date.now()): boolean {
+  const at = lastAuthAt(accessToken);
+  return at !== null && now / 1000 - at <= maxAgeSec;
+}
+
 export function sessionMethods(accessToken: string | undefined): string[] {
   try {
     const payload = JSON.parse(Buffer.from(accessToken!.split(".")[1]!, "base64url").toString("utf8"));
