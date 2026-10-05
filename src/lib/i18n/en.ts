@@ -1011,4 +1011,9 @@ export const en: Dict = {
     back: "Back to options",
     retention: "See how long this Limpid is kept in Privacy and data.",
   },
+  notFound: {
+    title: "Page not found",
+    text: "This Limpid or page doesn't exist, or is no longer available.",
+    back: "Back to the library",
+  },
 };

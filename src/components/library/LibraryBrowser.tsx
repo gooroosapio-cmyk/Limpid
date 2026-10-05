@@ -8,6 +8,39 @@ import { keyboardLikelyOpen, matchesQuery, shouldCollapse } from "@/lib/library/
 import { MovePanel } from "./MovePanel";
 import { ReportRow, type RowData } from "./ReportRow";
 
+type Section = "folders" | "limpids";
+const COLLAPSE_KEY = "limpid-library-collapsed";
+
+function readCollapsed(): Set<Section> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? "[]") as unknown;
+    return new Set((Array.isArray(raw) ? raw : []).filter((s): s is Section => s === "folders" || s === "limpids"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCollapsed(s: Set<Section>) {
+  try {
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...s]));
+  } catch {
+    // Stockage indisponible (navigation privée) : le repli vaut pour la visite.
+  }
+}
+
+/** Titre de section repliable : le nombre d'éléments reste visible une fois replié. */
+function SectionToggle({ id, label, count, open, onToggle }: { id: string; label: string; count: number; open: boolean; onToggle: () => void }) {
+  return (
+    <h2 id={id} className="eyebrow lib-section-title">
+      <button type="button" className="lib-toggle" aria-expanded={open} aria-controls={`${id}-list`} onClick={onToggle}>
+        <Icon name="chevron" size={16} className="lib-toggle-chevron" />
+        <span>{label}</span>
+        <span className="lib-toggle-count">{count}</span>
+      </button>
+    </h2>
+  );
+}
+
 export interface FolderItem {
   id: string;
   name: string;
@@ -64,6 +97,17 @@ export function LibraryBrowser({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
   const [moveIds, setMoveIds] = useState<string[] | null>(null);
+  // Sections repliées (Dossiers, Limpid) : préférence de l'appareil, relue après l'hydratation.
+  const [collapsed, setCollapsed] = useState<Set<Section>>(new Set());
+  useEffect(() => setCollapsed(readCollapsed()), []);
+  const toggleSection = (s: Section) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      writeCollapsed(next);
+      return next;
+    });
   const inputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const saved = useRef<string>("");
@@ -291,11 +335,11 @@ export function LibraryBrowser({
       {root && !searching && (
         <section aria-labelledby="folders-h" className="lib-folders">
           <div className="lib-section-head">
-            <h2 id="folders-h" className="eyebrow">{t.library.folders}</h2>
+            <SectionToggle id="folders-h" label={t.library.folders} count={shownFolders.length} open={!collapsed.has("folders")} onToggle={() => toggleSection("folders")} />
             {newFolder}
           </div>
-          {shownFolders.length > 0 && (
-            <ul className="rows">
+          {shownFolders.length > 0 && !collapsed.has("folders") && (
+            <ul className="rows" id="folders-h-list">
               {shownFolders.map((f) => (
                 <li key={f.id}>
                   <Link href={`/?dossier=${f.id}`} className="row">
@@ -324,11 +368,15 @@ export function LibraryBrowser({
       )}
 
       <section aria-labelledby="limpids-h">
-        <h2 id="limpids-h" className="eyebrow">{t.library.limpids}</h2>
-        {visible.length === 0 ? (
+        {searching || selecting ? (
+          <h2 id="limpids-h" className="eyebrow">{t.library.limpids}</h2>
+        ) : (
+          <SectionToggle id="limpids-h" label={t.library.limpids} count={visible.length} open={!collapsed.has("limpids")} onToggle={() => toggleSection("limpids")} />
+        )}
+        {!searching && !selecting && collapsed.has("limpids") ? null : visible.length === 0 ? (
           <p className="muted">{searching ? t.library.noResult : emptyText}</p>
         ) : (
-          <ul className="rows lib-rows">
+          <ul className="rows lib-rows" id="limpids-h-list">
             {visible.map((r) => (
               <ReportRow
                 key={r.id}
