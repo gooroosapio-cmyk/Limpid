@@ -35,7 +35,8 @@ export function isUrlImportEnabled(): boolean {
 
 export const retention = {
   /** Purge du fichier original après extraction (payload 1 § 6 ; cadrage Q18). */
-  originalHours: int("LIMPID_RETENTION_ORIGINAL_HOURS", 24),
+  /** Original conservé comme le rapport (30 jours) pour « Ouvrir le PDF » ; envois non utilisés : 24 h. */
+  originalHours: int("LIMPID_RETENTION_ORIGINAL_HOURS", 720),
   /** Rapports effacés N jours après leur création (décision du 4 octobre 2026 : 30) ; 0 = illimité. */
   reportDays: int("LIMPID_RETENTION_REPORT_DAYS", 30),
 };

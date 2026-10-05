@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { Icon } from "@/components/Icon";
 import { fr } from "@/lib/i18n/fr";
 import type { SourceEntry } from "@/lib/render/sources";
 
@@ -11,10 +12,13 @@ const Ctx = createContext<(evidenceId: string, opener: HTMLElement) => void>(() 
 export function SourcesProvider({
   entries,
   sourceTitle,
+  originalHref = null,
   children,
 }: {
   entries: SourceEntry[];
   sourceTitle: string;
+  /** Original consultable ; absent = « Original indisponible » (jamais de faux lien). */
+  originalHref?: string | null;
   children: React.ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -35,14 +39,21 @@ export function SourcesProvider({
       {children}
       <dialog
         ref={dialogRef}
-        className="sheet"
+        className="sheet side"
         aria-labelledby="source-title"
         onClose={() => openerRef.current?.focus()}
       >
+        <div className="sheet-grip" aria-hidden="true" />
+        <div className="sheet-head">
+          <h2>{fr.reader.source}</h2>
+          <form method="dialog">
+            <button className="ib" aria-label={fr.reader.close}><Icon name="close" /></button>
+          </form>
+        </div>
         {current && (
-          <>
+          <div className="stagger" key={current.evidenceId}>
             <p className="eyebrow">{fr.reader.sources} · [{current.n}]</p>
-            <h2 id="source-title">{sourceTitle}</h2>
+            <h3 id="source-title" className="source-sheet-title">{sourceTitle}</h3>
             <p className="muted">
               {fr.reader.location} : {current.location}
             </p>
@@ -51,13 +62,15 @@ export function SourcesProvider({
               <mark>{current.quote}</mark>
               {current.after && <span className="muted"> {current.after} …</span>}
             </blockquote>
-          </>
+            {originalHref ? (
+              <a className="btn btn-block" href={originalHref} target="_blank" rel="noopener noreferrer nofollow">
+                <Icon name="file" /> {fr.reader.openOriginal}
+              </a>
+            ) : (
+              <p className="notice">{fr.reader.originalMissing}</p>
+            )}
+          </div>
         )}
-        <form method="dialog">
-          <button className="btn btn-block" autoFocus>
-            {fr.reader.close}
-          </button>
-        </form>
       </dialog>
     </Ctx.Provider>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminView } from "@/components/AdminView";
+import { Screen } from "@/components/shell/Screen";
 import { adminOverview, requireAdmin } from "@/lib/admin";
 import { performance } from "@/lib/diagnostic";
 
@@ -9,5 +10,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const user = await requireAdmin();
   const { message } = await searchParams;
   const [o, perf] = await Promise.all([adminOverview(), performance().catch(() => null)]);
-  return <AdminView o={o} perf={perf} userEmail={user.email ?? null} message={message} />;
+  return (
+    <Screen title="Administration" back="/compte" wide>
+      <AdminView o={o} perf={perf} userEmail={user.email ?? null} message={message} />
+    </Screen>
+  );
 }

@@ -43,7 +43,6 @@ describe("rendu face à un contenu hostile (XSS)", () => {
         segments: demoSegments,
         sourceTitle: `${DEMO_SOURCE_TITLE} ${HOSTILE}`,
         sourceUrl: "javascript:alert(4)",
-        pdfHref: "#",
         isDemo: false,
         assets: {
           "00000000-0000-4000-8000-000000000001": {

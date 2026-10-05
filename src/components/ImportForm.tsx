@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/Icon";
 import { fr } from "@/lib/i18n/fr";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
@@ -14,7 +15,6 @@ type Phase =
   | { step: "consent"; uploadId: string; message: string };
 
 const MAX_PASTED = 50_000;
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
 const IMAGE = /\.(jpe?g|png|webp)$/i;
 
@@ -57,7 +57,19 @@ function putFile(url: string, file: File, onProgress: (percent: number) => void)
 }
 
 /** Formulaire d'import (PDF p. 5) : fichier, lien ou texte collé. */
-export function ImportForm({ enabled, urlEnabled }: { enabled: boolean; urlEnabled: boolean }) {
+export function ImportForm({
+  enabled,
+  urlEnabled,
+  maxFileMb = 20,
+  maxPages = 100,
+}: {
+  enabled: boolean;
+  urlEnabled: boolean;
+  maxFileMb?: number;
+  maxPages?: number;
+}) {
+  const MAX_FILE_BYTES = maxFileMb * 1024 * 1024;
+  const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>("file");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
@@ -73,7 +85,7 @@ export function ImportForm({ enabled, urlEnabled }: { enabled: boolean; urlEnabl
   const content =
     tab === "text" ? text.trim() : tab === "link" ? url.trim() : file ? `${file.name}:${file.size}:${file.lastModified}` : "";
   const fileError =
-    tab === "file" && file && file.size > MAX_FILE_BYTES ? fr.create.fileTooLarge : null;
+    tab === "file" && file && file.size > MAX_FILE_BYTES ? `Ce fichier dépasse ${maxFileMb} Mo.` : null;
   const canSubmit =
     enabled && !pending && phase.step !== "consent" && !!content && !fileError && (tab !== "link" || urlEnabled) && (!isImage || imageConsent);
 
@@ -145,7 +157,7 @@ export function ImportForm({ enabled, urlEnabled }: { enabled: boolean; urlEnabl
   }
 
   return (
-    <form className="card" onSubmit={submit} aria-busy={pending}>
+    <form onSubmit={submit} aria-busy={pending} className="stagger">
       <div className="tabs" role="tablist" aria-label="Type de source">
         {tabs.map((t, i) => (
           <button
@@ -166,15 +178,29 @@ export function ImportForm({ enabled, urlEnabled }: { enabled: boolean; urlEnabl
       </div>
 
       {tab === "file" && (
-        <div role="tabpanel" id={`${base}-panel-file`} aria-labelledby={`${base}-tab-file`} className="dropzone">
-          <h2>{fr.create.fileTitle}</h2>
-          <p className="muted">
-            {fr.create.fileFormats}
-            <br />
-            {fr.create.fileLimits}
-          </p>
-          <label className="btn" htmlFor={`${base}-file`}>
-            {file ? fr.create.changeFile : fr.create.chooseFile}
+        <div role="tabpanel" id={`${base}-panel-file`} aria-labelledby={`${base}-tab-file`}>
+          <label
+            htmlFor={`${base}-file`}
+            className={dragging ? "upload dragging" : "upload"}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const dropped = e.dataTransfer.files?.[0];
+              if (dropped && !pending) {
+                setFile(dropped);
+                setImageConsent(false);
+              }
+            }}
+          >
+            <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={26} /></span>
+            <h2>{file ? fr.create.changeFile : fr.add.choose}</h2>
+            <p>{fr.add.formats}</p>
+            <p className="micro">{fr.add.limits(maxFileMb, maxPages)}</p>
           </label>
           <input
             id={`${base}-file`}
@@ -190,7 +216,7 @@ export function ImportForm({ enabled, urlEnabled }: { enabled: boolean; urlEnabl
           />
           {file && (
             <p className="file-name" aria-live="polite">
-              {file.name} · {formatSize(file.size)}
+              <Icon name="file" size={18} /> {file.name} · {formatSize(file.size)}
             </p>
           )}
           {fileError && <p className="notice notice-warn" role="alert">{fileError}</p>}
@@ -260,8 +286,12 @@ export function ImportForm({ enabled, urlEnabled }: { enabled: boolean; urlEnabl
           )}
         </div>
       )}
-      <button type="submit" className="btn btn-primary btn-block" disabled={!canSubmit} aria-disabled={!canSubmit}>
-        {pending ? fr.create.reading : `${fr.create.next} →`}
+      <div className="note">
+        <b>{fr.add.nothingTitle}</b>
+        <p>{fr.add.nothing}</p>
+      </div>
+      <button type="submit" className={pending ? "btn btn-primary btn-block busy" : "btn btn-primary btn-block"} disabled={!canSubmit} aria-disabled={!canSubmit}>
+        {pending ? fr.create.reading : <>{fr.create.next} <Icon name="arrow" size={20} /></>}
       </button>
       <p className="muted small">{fr.create.privacy}</p>
     </form>

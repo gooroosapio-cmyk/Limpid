@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { kindFromFileName, titleFromFileName } from "@/lib/sources/uploads";
-import { CreateRequest } from "./create";
+import { CreateRequest, pagesForLength } from "./create";
 
 const params = { level: "grand_public", goal: "comprendre", target_pages: 5, idempotency_key: "cle-de-test-123" };
+
+describe("parcours V3 : réglages automatiques", () => {
+  it("accepte une source seule, sans niveau, longueur ni modèle", () => {
+    expect(CreateRequest.safeParse({ source_id: crypto.randomUUID(), idempotency_key: "cle-de-test-123" }).success).toBe(true);
+  });
+
+  it("déduit la longueur du rapport de la taille du texte lu", () => {
+    expect(pagesForLength(0)).toBe(5);
+    expect(pagesForLength(12_000)).toBe(5);
+    expect(pagesForLength(12_001)).toBe(7);
+    expect(pagesForLength(60_000)).toBe(7);
+    expect(pagesForLength(60_001)).toBe(12);
+  });
+});
 
 describe("requête de création", () => {
   it("accepte une source préparée, avec ou sans template", () => {

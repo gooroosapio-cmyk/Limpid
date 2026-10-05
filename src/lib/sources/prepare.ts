@@ -6,7 +6,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import { isUrlImportEnabled, limits } from "@/lib/config";
+import { isUrlImportEnabled, limits, retention } from "@/lib/config";
 import { extractSource, ExtractionError, type ExtractableKind, type SourceCoverage } from "@/lib/extract";
 import { segmentText, type ExtractedText } from "@/lib/extract/text";
 import { checkUpload, FileRejected } from "@/lib/security/file-type";
@@ -163,8 +163,8 @@ async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): 
     if (e instanceof ExtractionError && e.code === "scanned" && kind === "pdf" && e.pageCount) return ocr(e.pageCount);
     return fail(e instanceof ExtractionError ? e.code : "extraction", extractionMessage(e));
   }
-  // Le texte est figé en base : l'original n'est plus nécessaire (cadrage Q18).
-  await purgeOriginal(src.id, src.storage_path);
+  // Le texte est figé en base ; l'original reste consultable (« Ouvrir le PDF ») pendant la
+  // conservation du rapport, puis il est effacé (voir prepareSource et la purge quotidienne).
 
   return {
     sourceId: src.id,
@@ -261,8 +261,15 @@ export async function prepareSource(userId: string, input: PrepareRequest): Prom
   const partial = "partial" in row.coverage && row.coverage.partial === true;
 
   // Lecture OCR à venir : l'original reste au plus 24 h (cadrage Q18), la tâche le lira avant.
+  const keepUntil = new Date(Date.now() + retention.originalHours * 3600_000).toISOString();
   const fields = extracted
-    ? { ...row, content_hash: extracted.sourceVersion, status: partial ? "partial" : "extracted" }
+    ? {
+        ...row,
+        content_hash: extracted.sourceVersion,
+        status: partial ? "partial" : "extracted",
+        // Fichier envoyé : conservé comme le rapport ; une source jamais utilisée part à 24 h.
+        ...(prepared.existing ? { original_purge_at: keepUntil } : {}),
+      }
     : { ...row, status: "extracting", original_purge_at: new Date(Date.now() + 24 * 3600_000).toISOString() };
   const src = prepared.existing
     ? await db.from("sources").update(fields).eq("id", sourceId)

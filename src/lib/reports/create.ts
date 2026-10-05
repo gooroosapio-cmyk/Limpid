@@ -12,9 +12,10 @@ import { adminClient } from "@/lib/supabase/admin";
 import { effectiveVisualMode } from "@/lib/visuals/config";
 
 const Settings = {
-  level: Level,
-  goal: Goal,
-  target_pages: TargetPages,
+  /** Absents (parcours V3) : déduits des préférences et de la taille du document. */
+  level: Level.optional(),
+  goal: Goal.optional(),
+  target_pages: TargetPages.optional(),
   /** Organisation imposée par le lecteur ; absente = choisie par le rédacteur. */
   template: TemplateId.nullable().optional(),
   /** Présentation (modifiable ensuite sans appel IA) et visuels permis. */
@@ -109,10 +110,15 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   const { data: used } = await db.from("reports").select("id").eq("source_id", sourceId).is("deleted_at", null).limit(1).maybeSingle();
   if (used) throw new CreateError("source_used", "Ce document a déjà son rapport.", undefined, used.id);
 
+  const auto = await automaticSettings(userId, sourceId);
+  const level = input.level ?? auto.level;
+  const goal = input.goal ?? auto.goal;
+  const targetPages = input.target_pages ?? auto.targetPages;
+  const theme = input.theme ?? auto.theme;
   const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
   const report = await db
     .from("reports")
-    .insert({ owner_id: userId, source_id: sourceId, title: src.title, theme_id: input.theme ?? "editorial", visual_mode: visualMode })
+    .insert({ owner_id: userId, source_id: sourceId, title: src.title, theme_id: theme, visual_mode: visualMode })
     .select("id")
     .single();
   if (report.error || !report.data) throw new CreateError("storage", "Création du rapport impossible.");
@@ -124,9 +130,9 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     kind: "generate_report",
     idempotency_key: input.idempotency_key,
     params: {
-      level: input.level,
-      goal: input.goal,
-      target_pages: input.target_pages,
+      level,
+      goal,
+      target_pages: targetPages,
       ...(input.template ? { template: input.template } : {}),
       visual_mode: visualMode,
       ...(pendingOcr ? { ocr: true } : {}),
@@ -148,4 +154,33 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   }
   await recordLimitEvent(userId, REPORT_CREATED, report.data.id);
   return { reportId: report.data.id };
+}
+
+const LEVEL_BY_FAMILIARITY: Record<string, z.infer<typeof Level>> = { aucune: "grand_public", bases: "grand_public", maitrise: "etudiant" };
+
+/**
+ * Réglages automatiques (kit V3 : aucun choix de longueur ni de modèle à l'import) : niveau selon
+ * la familiarité déclarée, objectif selon les préférences, longueur selon la taille du document,
+ * thème par défaut du lecteur (null = choisi selon l'organisation du rapport).
+ */
+export async function automaticSettings(userId: string, sourceId: string) {
+  const db = adminClient();
+  const [{ data: prefs }, { data: segs }] = await Promise.all([
+    db.from("reader_preferences").select("familiarity, goal, theme_id").eq("owner_id", userId).maybeSingle(),
+    db.from("source_segments").select("text").eq("source_id", sourceId).limit(3_000),
+  ]);
+  const chars = (segs ?? []).reduce((n, x) => n + (x.text as string).length, 0);
+  return {
+    level: LEVEL_BY_FAMILIARITY[prefs?.familiarity ?? ""] ?? "grand_public",
+    goal: Goal.safeParse(prefs?.goal).data ?? "comprendre",
+    targetPages: pagesForLength(chars),
+    theme: ThemeId.safeParse(prefs?.theme_id).data ?? null,
+  } as const;
+}
+
+/** Longueur du rapport selon le texte lu (OCR en attente : longueur standard). */
+export function pagesForLength(chars: number): 5 | 7 | 12 {
+  if (chars === 0 || chars <= 12_000) return 5;
+  if (chars <= 60_000) return 7;
+  return 12;
 }

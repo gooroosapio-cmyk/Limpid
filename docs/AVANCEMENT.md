@@ -1,5 +1,30 @@
 # Avancement
 
+## Phase 11 — Refonte V3 (kit « LIMPID_V3 », 5 octobre 2026)
+
+Cadrage (QCM, 13 réponses) : socle visuel d'abord ; navigation Accueil / Bibliothèque / Compte ; parcours tout automatique ; 5 thèmes du kit ; mode nuit ; polices du kit ; animations expressives (mouvement réduit respecté) ; bureau comme le kit ; original gardé 30 jours ; « Demander » et la nouvelle révision à la passe suivante ; abonnement « bientôt » ; installable et lecture hors connexion.
+
+### FAIT
+- **Système visuel** : jetons du kit (ivoire, encre, jaune, vert), polices locales Inter / Source Serif 4 / IBM Plex Mono, logo, 36 icônes, mode clair/sombre/système (le PDF reste clair), taille du texte, contraste renforcé, mouvement réduit (réglage appareil et réglage Limpid). Feuilles de style découpées (`src/app/styles/`).
+- **Animations** : entrée d'écran, apparition en cascade, livre animé de préparation (sans pourcentage), étapes qui se cochent, volets (bas d'écran sur mobile, panneau latéral ≥ 1200 px), squelettes de chargement, bouton occupé, célébration du quiz réussi. Désactivées avec le mouvement réduit.
+- **Coquille responsive** : < 700 px barre du bas ; 700–1199 px rail compact ; ≥ 1200 px barre latérale avec « Ajouter un document ». Barre de lecture fixe dans le rapport. Aucun débordement horizontal de 320 à 1440 px.
+- **Parcours automatique** : Ajouter un document → Document ajouté (un seul aperçu, « Ouvrir le PDF », approche annoncée, note de fidélité) → « Expliquer mon document » sans réglage : niveau et objectif tirés des préférences, longueur selon la taille du texte (≤ 12 000 caractères : 5 pages, ≤ 60 000 : 7, au-delà : 12), thème choisi selon l'organisation du rapport. Préparation : 4 étapes dérivées de l'étape réelle de la tâche, titre qui change, « Revenir à l'accueil ». Erreur : « Lecture à compléter » avec actions.
+- **Lecteur** : en-tête « Votre rapport » et options (export PDF, présentation, source, enregistrement hors connexion, versions, suppression) ; **notions soulignées** (première occurrence) ouvrant « Une notion en clair » (définition, source, « Vérifier si j'ai compris ») ; source citée avec « Ouvrir l'original » ou « Original indisponible » ; barre Sommaire / Me tester / Demander (« bientôt ») ; sommaire « Dans ce rapport » avec la position de lecture ; schémas aux couleurs du thème et du mode nuit.
+- **5 thèmes** (Sciences, Récit, Dossier, Guide, Confort), web et PDF, choix « Automatique » ; anciens thèmes convertis (Essentiel → Dossier, Visuel → Guide, Éditorial → automatique).
+- **Original conservé 30 jours** (`LIMPID_RETENTION_ORIGINAL_HOURS=720`) et servi par `/api/sources/[id]/original` (propriétaire seulement, lien signé de 60 s) ; envoi non utilisé : 24 h ; échec de lecture OCR : effacé.
+- **Bibliothèque** : onglets Rapports / Sources, recherche par titre, filtres effaçables (Tous, Prêts, En préparation, À revoir), états distincts, état vide, exemple ; sources avec original indisponible et réimport.
+- **Compte** : profil, utilisation réelle (rapports sur 24 h, sans tarif), Préférences de lecture directes (familiarité, objectif, explications concrètes, taille, animations, contraste), Apparence (mode + thème par défaut), Abonnement (« bientôt », aucun tarif), Utilisation, Confidentialité et données (durées issues de la configuration, suppression du compte), Installer, Mot de passe, Administration. Anciennes adresses `/rapports` et `/preferences` redirigées.
+- **PWA** : manifeste et icônes, service worker (`public/sw.js`) : fichiers statiques en cache, pages en réseau d'abord, **rapports enregistrés lisibles hors connexion** (cache par compte, effacé à la déconnexion ou au changement de compte), écran « Hors connexion », bandeau réseau, mise à jour proposée. CSP : `worker-src 'self'`, `manifest-src 'self'`.
+
+### EN TEST (résultats réels)
+- `npm test` : 161 tests ; recette SQL OK (avec la migration V3) ; build OK.
+- Recette visuelle locale (données de démonstration, sans réseau) : 18 écrans × 320, 390, 768, 1024, 1440 px + mode nuit à 390 px : **0 violation axe (WCAG 2.2 AA), 0 débordement horizontal**. Volets notion, options, sommaire, source vérifiés (focus rendu au mot). Captures : `docs/recette/v3/captures/`.
+
+### NON TESTÉ / À FAIRE
+- Migration `20261005000000_v3_themes_originals.sql` : **à appliquer en production au moment de la fusion** (l'ancien code écrit encore les anciens thèmes).
+- Service worker et installation : à vérifier sur téléphone après déploiement (actifs en production seulement).
+- Passe suivante : « Demander au document », révision V3 (QCM, relier, ordonner), favoris, renommer, signaler.
+
 ## Correctifs après livraison (4 octobre 2026)
 - **Diagnostic Gemini** : une requête sans donnée était refusée (HTTP 400) ; corrigé (PR #10).
 - **Conservation des rapports : 30 jours** après création (décision du propriétaire), effacement complet par le cron quotidien (`purgeExpiredReports`, journal `report.expired`), date affichée dans le lecteur, durée affichée dans le diagnostic. `LIMPID_RETENTION_REPORT_DAYS=30` par défaut.

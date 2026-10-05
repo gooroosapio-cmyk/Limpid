@@ -54,7 +54,7 @@ describe("export PDF", () => {
       },
     );
     blueprint.sections[0]!.visual_ids.push("vis_chart", "vis_compare");
-    for (const theme of ["editorial", "essentiel", "visuel"] as const) {
+    for (const theme of ["sciences", "recit", "dossier", "guide", "confort"] as const) {
       const buf = await renderReportPdf({ blueprint, explanation: demoExplanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE, theme });
       const text = (await extractPdf(new Uint8Array(buf), { maxPages: 50 })).blocks.map((b) => b.text).join(" ");
       expect(text).toContain("Où se trouve l'eau");
