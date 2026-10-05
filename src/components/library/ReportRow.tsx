@@ -1,5 +1,6 @@
 "use client";
 
+import { walletChanged } from "@/components/billing/wallet-store";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
@@ -79,6 +80,7 @@ export function ReportRow({
       body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
     }).catch(() => null);
     const body = await res?.json().catch(() => ({}));
+    walletChanged();
     setBusy(false);
     if (!res?.ok) return toast(apiMessage(t, body, t.library.actionFailed), "error");
     toast(t.library.retried);

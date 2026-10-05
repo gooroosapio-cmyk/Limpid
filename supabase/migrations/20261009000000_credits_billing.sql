@@ -19,6 +19,10 @@ alter table public.profiles add constraint profiles_plan_check
 -- Inscriptions publiques (offre gratuite) : fermées par défaut, ouvertes depuis l'administration.
 alter table public.app_settings add column signup_open boolean not null default false;
 
+-- Essais d'inscription limités comme les connexions.
+alter table public.auth_attempts drop constraint if exists auth_attempts_kind_check;
+alter table public.auth_attempts add constraint auth_attempts_kind_check check (kind in ('password', 'reset', 'signup'));
+
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare

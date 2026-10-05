@@ -5,8 +5,8 @@ import { LinkRow } from "@/components/LinkRow";
 import { Screen } from "@/components/shell/Screen";
 import { isAdmin } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
-import { getT } from "@/lib/i18n/server";
-import { usageToday } from "@/lib/jobs/limits";
+import { getLang, getT } from "@/lib/i18n/server";
+import { getWallet } from "@/lib/billing/wallet";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,12 +25,14 @@ export default async function AccountPage() {
   const t = await getT();
   const user = await requireUser();
   const email = user.email ?? "";
-  const [admin, usage] = await Promise.all([
+  const [admin, wallet, lang] = await Promise.all([
     isAdmin(user.id),
-    isAdminConfigured() ? usageToday(user.id).catch(() => null) : Promise.resolve(null),
+    isAdminConfigured() ? getWallet(user.id).catch(() => null) : Promise.resolve(null),
+    getLang(),
   ]);
-  const left = usage ? Math.max(0, usage.limit - usage.used) : null;
   const r = t.compte.rows;
+  const b = t.billing;
+  const day = (iso: string) => new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", timeZone: "Africa/Abidjan" });
 
   return (
     <Screen>
@@ -44,23 +46,27 @@ export default async function AccountPage() {
           </div>
         </div>
 
-        {usage && left !== null && (
+        {wallet && (
           <section className="card usage-card" aria-labelledby="usage-h">
             <div className="head">
-              <h2 id="usage-h" className="small">{t.compte.usageTitle}</h2>
-              <span className="chip">{t.compte.usageBadge}</span>
+              <h2 id="usage-h" className="small">{b.wallet.title}</h2>
+              <span className="chip">{wallet.mode === "topup" ? b.topupMode : b.plans[wallet.plan]}</span>
             </div>
-            <p className="big">{t.compte.usageBig(left)}</p>
-            <progress value={usage.used} max={usage.limit} aria-label={t.compte.usageNote(usage.used, usage.limit)} />
-            <p className="muted small">{t.compte.usageNote(usage.used, usage.limit)}</p>
-            <p className="center"><Link href="/compte/utilisation" className="btn-link">{t.compte.usageLink}</Link></p>
+            <p className="big">{b.available(wallet.available)}</p>
+            {wallet.reserved > 0 && <p className="muted small">{b.availableReserved(wallet.available, wallet.reserved)}</p>}
+            {wallet.nextGrant && <p className="muted small">{b.wallet.nextGrant(wallet.nextGrant.credits, day(wallet.nextGrant.at))}</p>}
+            {wallet.weekly && <p className="muted small">{b.wallet.weekly(wallet.weekly.used, wallet.weekly.limit)}</p>}
+            <div className="actions-row">
+              <Link href="/compte/credits" className="btn">{b.wallet.title}</Link>
+              {wallet.mode !== "subscription" && <Link href="/offres" className="btn btn-primary">{b.wallet.discover}</Link>}
+            </div>
           </section>
         )}
 
         <ul className="rows">
           <LinkRow href="/parametres" icon="settings" title={r.settings![0]} sub={r.settings![1]} />
-          <LinkRow href="/compte/abonnement" icon="star" title={r.subscription![0]} sub={r.subscription![1]} />
-          <LinkRow href="/compte/utilisation" icon="clock" title={r.usage![0]} sub={r.usage![1]} />
+          <LinkRow href="/offres" icon="star" title={r.subscription![0]} sub={r.subscription![1]} />
+          <LinkRow href="/compte/credits" icon="clock" title={r.usage![0]} sub={r.usage![1]} />
           <LinkRow href="/compte/donnees" icon="shield" title={r.data![0]} sub={r.data![1]} />
           <LinkRow href="/compte/installer" icon="download" title={r.install![0]} sub={r.install![1]} />
           <LinkRow href="/compte/mot-de-passe" icon="eye" title={r.password![0]} sub={r.password![1]} />

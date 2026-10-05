@@ -1,5 +1,6 @@
 "use client";
 
+import { walletChanged } from "@/components/billing/wallet-store";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -99,6 +100,7 @@ export function OptionsPanel({
         body: JSON.stringify({ variation: "mode", mode, idempotency_key: crypto.randomUUID() }),
       });
       const body = await res.json().catch(() => ({}));
+      walletChanged();
       if (!res.ok) throw new Error(apiMessage(t, body, t.versions.failed));
       setMessage(t.lim.requested);
       router.refresh();

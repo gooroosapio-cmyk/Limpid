@@ -1,5 +1,32 @@
 # Avancement
 
+## Phase 14 — Comptes, crédits et paiements Chariow (5 octobre 2026)
+
+Spécification : `docs/SPEC_COMPTES_CREDITS_CHARIOW.md` (révision tarifaire). Mise en service : `docs/PAIEMENTS_CHARIOW.md`.
+
+### FAIT
+- **Offres** : Gratuit (bonus de 80 crédits par cycle mensuel, 2 rapports par semaine au plus), Essentiel 2 900 FCFA (240 crédits, 12 rapports), Plus 5 900 FCFA (600, 30), Pro 11 900 FCFA (1 500, 75) ; annuel au prix de dix mois avec allocation mensuelle ; recharges de 1 000 FCFA (70 crédits), 2 500 FCFA (180) et 5 000 FCFA (500, 25 rapports), valables 12 mois.
+- **Moteur de crédits** (migration `20261009000000_credits_billing.sql`) : lots datés, réservation idempotente sous verrou par compte, consommation à la livraison, restitution à l'échec ou à l'annulation, une seule fois ; journal append-only ; cycles ancrés sans dérive (31 janvier, 29 février) ; rattrapage des réservations orphelines.
+- **Prix fixes** : rapport court, standard ou long (8, 20 ou 40, selon la taille réelle du texte lu) ; nouvelle version 8 ; question 1 ; nouveau test 3 ; lecture, PDF, exercices déjà prêts : 0. Le prix s'affiche sur le bouton de création.
+- **Droits par offre** : Limpid conservés (3 / 30 / 100 / 300), documents par Limpid (1 en gratuit), préparations simultanées (1 / 1 / 2 / 3), filigrane du PDF en gratuit. La limite « 3 rapports par 24 h » de l'alpha est remplacée par les crédits. Les blocages expliquent la limite exacte et proposent la bonne action.
+- **Chariow** : commande liée au compte et créée côté serveur, paiement dans le même onglet, webhook vérifié sur le corps brut (HMAC-SHA256) et persisté avant l'accusé de réception, vente relue (statut, paiement, produit, montant XOF, boutique) avant une attribution unique. Rapprochement par la page de retour, par l'administration et par le cron.
+- **Écrans** : solde dans l'en-tête, Offres (Mensuel/Annuel, comparatif, prix des actions, FAQ), Récapitulatif, Retour de paiement, Mes crédits (lots, expirations, historique, achats), Inscription gratuite (activable dans l'administration), carte crédits dans Compte. Français et anglais.
+- **Administration** : ouverture des inscriptions, état de la configuration Chariow, encaissé du mois, crédits attribués/consommés/réservés, commandes, webhooks reçus, ajout de crédits motivé et journalisé. Les administrateurs ne sont pas soumis à la limite hebdomadaire (les crédits restent dus).
+
+### EN TEST
+- Recette SQL des crédits (`supabase/tests/credits.test.sql`) : allocation unique, solde insuffisant sans effet partiel, clé réutilisée refusée, double livraison/restitution sans effet, réservation honorée après expiration, annuel = allocation mensuelle, renouvellement anticipé différé, recharge unique, journal non modifiable, isolation entre comptes, fonctions non appelables par les clients, suppression de compte.
+- Vitest : 252 tests, dont signature sur octets bruts, contrôle des ventes, webhook (signature invalide, dix livraisons identiques, test sans livraison, base indisponible).
+- Recette visuelle : page Offres à 412 px, clair et sombre, sans débordement.
+
+### À FAIRE (hors code)
+- Créer les neuf produits et le Pulse dans Chariow, définir les variables dans Vercel (`docs/PAIEMENTS_CHARIOW.md`), puis un achat réel de 1 000 FCFA.
+- Ouvrir les inscriptions dans `/admin` quand vous êtes prêt.
+
+### LIMITES
+- Temps réel : le solde se met à jour au chargement, au retour sur l'onglet, après chaque action et toutes les 4 s pendant une réservation (pas de SSE).
+- Plafonds de pages et de stockage par offre, PowerPoint, partage et narration : non implémentés, donc non vendus.
+- Pas de prélèvement automatique (accès prépayés), pas de remboursement automatisé.
+
 ## Phase 13.1 — Correctifs après audit et mise en production de la V5 (5 octobre 2026)
 
 ### FAIT

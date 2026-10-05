@@ -13,13 +13,20 @@ import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 
 /** Fenêtre et nombre d'essais autorisés (par adresse et par IP). */
 export const ATTEMPT_WINDOW_MINUTES = 15;
-export const MAX_ATTEMPTS = { password: 8, reset: 3 } as const;
+export const MAX_ATTEMPTS = { password: 8, reset: 3, signup: 5 } as const;
 
 export async function isAllowed(email: string): Promise<boolean> {
   if (isEmailAllowed(email)) return true;
   if (!isAdminConfigured()) return false;
   const { data } = await adminClient().from("allowed_emails").select("email").eq("email", email).maybeSingle();
-  return !!data;
+  return !!data || (await signupOpen());
+}
+
+/** Inscriptions publiques (offre gratuite) : ouvertes ou fermées depuis l'administration. */
+export async function signupOpen(): Promise<boolean> {
+  if (!isAdminConfigured()) return false;
+  const { data } = await adminClient().from("app_settings").select("signup_open").maybeSingle();
+  return data?.signup_open === true;
 }
 
 const hash = (s: string) => createHash("sha256").update(`limpid:${s}`).digest("hex");

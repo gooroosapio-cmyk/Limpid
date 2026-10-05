@@ -146,3 +146,15 @@ dialog.drawer::backdrop { background: var(--backdrop); animation: fade-in var(--
 .app:has(.reader-immersive) ~ .toasts { bottom: calc(132px + env(safe-area-inset-bottom)); }
 .toast-action { flex: none; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--yellow); font: inherit; font-weight: 700; cursor: pointer; }
 .toast-action:hover { background: rgb(255 255 255 / 10%); }
+
+/* Solde de crédits dans l'en-tête */
+.wallet-chip {
+  display: inline-flex; align-items: baseline; gap: 6px; min-height: var(--cible); padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface);
+  color: var(--ink); text-decoration: none; font-size: 14px; white-space: nowrap; align-items: center;
+}
+.wallet-chip:hover { border-color: var(--ink); }
+.wallet-n { font-weight: 720; font-variant-numeric: tabular-nums; }
+.wallet-plan { font-size: 12px; color: var(--muted); }
+.wallet-chip.pending { color: var(--muted); font-size: 12px; }
+@media (max-width: 380px) { .wallet-plan { display: none; } }

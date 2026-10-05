@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ModeIcon } from "@/components/ModeIcon";
@@ -45,6 +46,8 @@ class FormError extends Error {
     message: string,
     public readonly code?: string,
     public readonly reportId?: string,
+    /** Blocage de l'offre : liens vers les offres et, si elle aide, la recharge. */
+    public readonly billing?: { code: string; topup: string | null },
   ) {
     super(message);
   }
@@ -65,6 +68,7 @@ async function postJson(url: string, body: unknown, fallback: string, t: Dict): 
       apiMessage(t, data, fallback),
       typeof data.error === "string" ? data.error : undefined,
       typeof data.reportId === "string" ? data.reportId : undefined,
+      (data.billing as { code: string; topup: string | null } | undefined) ?? undefined,
     );
   }
   return data;
@@ -121,6 +125,8 @@ export function ImportForm({
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
   const [error, setError] = useState<string | null>(null);
+  const [billing, setBilling] = useState<{ code: string; topup: string | null } | null>(null);
+  const [quote, setQuote] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
@@ -223,6 +229,20 @@ export function ImportForm({
   }
 
   const readyItems = items.filter((x) => x.status === "ready" && x.prepared);
+  // Devis fixe dès que les documents sont lus (Limpid commun) : affiché sur le bouton.
+  const quoteKey = tab === "file" && !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
+  useEffect(() => {
+    setQuote(null);
+    if (!quoteKey) return;
+    let live = true;
+    fetch("/api/billing/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_ids: quoteKey.split(",") }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { credits?: number } | null) => live && setQuote(typeof d?.credits === "number" ? d.credits : null))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [quoteKey]);
   const pendingItems = items.filter((x) => x.status !== "ready" && x.status !== "error");
   const failedItems = items.filter((x) => x.status === "error");
   const many = tab === "file" && items.length > 1;
@@ -267,6 +287,7 @@ export function ImportForm({
         return;
       }
       setError(err instanceof FormError ? err.message : t.create.networkError);
+      setBilling(err instanceof FormError ? (err.billing ?? null) : null);
       setPhase({ step: "idle" });
       key.current = crypto.randomUUID();
     }
@@ -481,14 +502,26 @@ export function ImportForm({
       </fieldset>
 
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
-      {error && <p className="notice notice-error" role="alert">{error}</p>}
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <p>{error}</p>
+          {billing && (
+            <div className="billing-cta">
+              <Link href="/offres" className="btn btn-primary">{t.billing.seeOffers}</Link>
+              {billing.topup && <Link href={billing.topup} className="btn">{t.billing.topup}</Link>}
+            </div>
+          )}
+        </div>
+      )}
       <button
         type="submit"
         className={`btn btn-primary btn-block${phase.step !== "idle" ? " busy" : ""}`}
         disabled={!ready}
       >
-        {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : t.add.create} {phase.step !== "creating" && <Icon name="arrow" />}
+        {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : quote ? t.billing.createCost(quote) : t.add.create}{" "}
+        {phase.step !== "creating" && <Icon name="arrow" />}
       </button>
+      {count === 1 && !quote && <p className="muted small center">{t.billing.createCostFrom(8)}</p>}
     </form>
   );
 }

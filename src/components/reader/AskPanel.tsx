@@ -1,5 +1,6 @@
 "use client";
 
+import { walletChanged } from "@/components/billing/wallet-store";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { apiMessage } from "@/lib/i18n/api";
@@ -43,6 +44,7 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
         body: JSON.stringify({ question: q, section_id: scope?.id ?? null, history }),
       });
       const data = await res.json().catch(() => ({}));
+      walletChanged();
       if (!res.ok || typeof data.answer !== "string") throw new Error(apiMessage(L, data, L.ask.failed));
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a: data as Answer } : x)));
     } catch (e) {

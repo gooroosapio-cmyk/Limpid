@@ -103,7 +103,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
   await sweepReservations(userId);
   const db = adminClient();
   const now = new Date();
-  const [{ data: lots }, { data: subs }, { data: weeklyRows }, { data: user }] = await Promise.all([
+  const [{ data: lots }, { data: subs }, { data: weeklyRows }, { data: user }, { data: profile }] = await Promise.all([
     db.from("credit_lots").select("origin, available, reserved, expires_at").eq("owner_id", userId),
     db.from("subscriptions").select("plan, starts_at, ends_at, monthly_credits").eq("owner_id", userId).order("starts_at"),
     db
@@ -114,6 +114,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
       .neq("status", "released")
       .gte("created_at", new Date(now.getTime() - WEEK_MS).toISOString()),
     db.auth.admin.getUserById(userId),
+    db.from("profiles").select("role").eq("id", userId).maybeSingle(),
   ]);
   const lotRows = (lots ?? []) as LotRow[];
   const subRows = (subs ?? []) as SubRow[];
@@ -132,7 +133,8 @@ export async function getWallet(userId: string): Promise<Wallet> {
     const cycleEnd = valid.filter((l) => l.origin === "free_cycle").map((l) => l.expires_at).sort().at(-1);
     if (cycleEnd) nextGrant = { at: cycleEnd, credits: PLANS.free.monthlyCredits };
   }
-  const weeklyLimit = PLANS[mode === "free" ? "free" : plan].limits.weeklyReports;
+  // Administrateurs : pas de limite hebdomadaire (les crédits restent dus, jamais illimités).
+  const weeklyLimit = profile?.role === "admin" ? null : PLANS[mode === "free" ? "free" : plan].limits.weeklyReports;
   return {
     available: valid.reduce((n, l) => n + l.available, 0),
     reserved: lotRows.reduce((n, l) => n + l.reserved, 0),
