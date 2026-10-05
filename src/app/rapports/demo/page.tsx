@@ -1,41 +1,52 @@
 import type { Metadata } from "next";
-import { Immersive } from "@/components/reader/Immersive";
-import { Reader } from "@/components/reader/Reader";
-import { ReportOptions } from "@/components/reader/ReportOptions";
-import { fr } from "@/lib/i18n/fr";
-import {
-  DEMO_SOURCE_TITLE,
-  demoBlueprint,
-  demoEvidence,
-  demoExplanation,
-  demoSegments,
-} from "@/lib/demo/cycle-eau";
+import { cookies } from "next/headers";
+import { composeLimpid } from "@/components/reader/v4/Pieces";
+import { LimpidScreen } from "@/components/reader/v4/LimpidScreen";
+import { readDisplayPrefs } from "@/lib/display/prefs";
+import { getT } from "@/lib/i18n/server";
+import { DEMO_SOURCE_TITLE, demoBlueprint, demoEvidence, demoExplanation, demoSegments } from "@/lib/demo/cycle-eau";
 
-export const metadata: Metadata = { title: `${demoBlueprint.title} (démonstration)` };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: `${demoBlueprint.title} (${t.demo.badge})` };
+}
 
-export default function DemoReportPage() {
+export default async function DemoReportPage() {
+  const [t, jar] = await Promise.all([getT(), cookies()]);
+  const doc = composeLimpid({
+    t,
+    blueprint: demoBlueprint,
+    explanation: demoExplanation,
+    evidence: demoEvidence,
+    segments: demoSegments,
+    exercises: null,
+    modeLabel: t.add.modes.claire?.title ?? null,
+    status: <p className="notice" role="note">{t.reader.demoActions}</p>,
+    canReformulate: false,
+    isDemo: true,
+  });
   return (
-    <Immersive>
-      <div className="page page-reader">
-        <Reader
-          blueprint={demoBlueprint}
-          explanation={demoExplanation}
-          evidence={demoEvidence}
-          segments={demoSegments}
-          sourceTitle={DEMO_SOURCE_TITLE}
-          actionsNote={fr.reader.demoActions}
-          isDemo
-          options={
-            <ReportOptions
-              reportId={null}
-              pdfHref="/rapports/demo/pdf"
-              originalHref={null}
-              sourceTitle={DEMO_SOURCE_TITLE}
-              themeLabel={fr.themes.names.sciences ?? "Sciences"}
-            />
-          }
-        />
-      </div>
-    </Immersive>
+    <LimpidScreen
+      doc={doc}
+      reportId={null}
+      versionId={null}
+      initialAnchor={null}
+      bilan={null}
+      insufficient={false}
+      options={{
+        reportId: null,
+        title: demoBlueprint.title,
+        pdfHref: "/rapports/demo/pdf",
+        hasExercises: false,
+        sourceTitle: DEMO_SOURCE_TITLE,
+        originalHref: null,
+        sources: doc.entries.map((e) => ({ n: e.n, location: e.location, quote: e.quote })),
+        glossary: demoExplanation.glossary.map((g) => ({ term: g.term, definition: g.definition })),
+        mode: "claire",
+        versions: [],
+        offlineAccount: null,
+        display: readDisplayPrefs((n) => jar.get(n)?.value),
+      }}
+    />
   );
 }

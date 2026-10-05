@@ -12,7 +12,8 @@ import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-p
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Reader } from "@/components/reader/Reader";
+import { composeLimpid } from "@/components/reader/v4/Pieces";
+import { dictFor } from "@/lib/i18n";
 import { estimateCents } from "@/lib/budget";
 import { GeminiProvider, geminiConfigFromEnv } from "@/lib/engine/gemini";
 import { generateReport } from "@/lib/engine/pipeline";
@@ -105,14 +106,20 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot B : tranche compl
     // Lecteur web : rendu serveur réel du composant utilisé par l'application.
     t0 = Date.now();
     const html = renderToStaticMarkup(
-      h(Reader, {
-        blueprint: report.blueprint,
-        explanation: report.explanation,
-        evidence: report.evidence,
-        segments: extraction.extracted.segments,
-        sourceTitle: EAU_VILLE_TITLE,
-        isDemo: false,
-      }),
+      h(
+        "div",
+        null,
+        composeLimpid({
+          t: dictFor("fr"),
+          blueprint: report.blueprint,
+          explanation: report.explanation,
+          evidence: report.evidence,
+          segments: extraction.extracted.segments,
+          exercises: null,
+          modeLabel: null,
+          canReformulate: false,
+        }).pieces,
+      ),
     );
     timings.web_render_ms = t(t0);
     writeFileSync(path.join(out, "rapport.html"), `<!doctype html><meta charset="utf-8">${html}`);

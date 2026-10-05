@@ -140,7 +140,7 @@ async function fromUpload(userId: string, uploadId: string, allowOcr: boolean): 
       return fail("ocr_too_large", `Pour être lu comme une image, le fichier doit faire moins de ${Math.round(limits.maxOcrBytes / 1024 / 1024)} Mo.`);
     }
     const what = kind === "pdf" ? `Ce PDF est scanné (${pages} page${pages > 1 ? "s" : ""}).` : "Cette image doit être lue.";
-    if (!allowOcr) return askConsent(`${what} Pour en lire le texte, le fichier sera envoyé à Google Gemini.`, pages);
+    if (!allowOcr) return askConsent(`${what} Pour en lire le texte, le fichier sera analysé par notre service d'IA.`, pages);
     return {
       sourceId: src.id,
       extracted: null,

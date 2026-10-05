@@ -3,6 +3,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { drainQueue } from "@/lib/jobs/worker";
 import { ThemeId } from "@/lib/contracts/schemas";
+import { moveReport } from "@/lib/library/folders";
 import { deleteReport } from "@/lib/reports/delete";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
@@ -53,6 +54,7 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 }
 
 const ThemeChange = z.strictObject({ theme_id: ThemeId.nullable() });
+const FolderMove = z.strictObject({ folder_id: z.string().uuid().nullable() });
 
 /** Changement de présentation (null = automatique) : même contenu validé, nouveau rendu, aucun appel IA. */
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -62,7 +64,15 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
   if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ error: "origine" }, { status: 403 });
   const { id } = await ctx.params;
   if (!Id.safeParse(id).success) return NextResponse.json({ error: "introuvable" }, { status: 404 });
-  const body = ThemeChange.safeParse(await request.json().catch(() => null));
+  const raw = await request.json().catch(() => null);
+  // Déplacement vers un dossier (null : racine de la bibliothèque).
+  const move = FolderMove.safeParse(raw);
+  if (move.success) {
+    return (await moveReport(user.id, id, move.data.folder_id))
+      ? NextResponse.json({ folder_id: move.data.folder_id })
+      : NextResponse.json({ error: "introuvable" }, { status: 404 });
+  }
+  const body = ThemeChange.safeParse(raw);
   if (!body.success) return NextResponse.json({ error: "requete" }, { status: 400 });
   const { data, error } = await adminClient()
     .from("reports")

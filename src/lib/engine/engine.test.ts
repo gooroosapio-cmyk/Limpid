@@ -119,7 +119,7 @@ const goodComp: z.infer<typeof ComprehensionDraft> = {
 
 const goodExpl: z.infer<typeof ExplanationDraft> = {
   title: "Le cycle de l'eau",
-  template_id: "comprendre_processus",
+  key_points: ["L'eau circule."], template_id: "comprendre_processus",
   sections: [
     {
       id: "sec_1",
@@ -470,5 +470,25 @@ describe("requête sans donnée", () => {
     const parts = requestParts(req, "n0nce");
     expect(parts.length).toBeGreaterThan(0);
     expect(parts.every((p) => "text" in p && p.text.length > 0)).toBe(true);
+  });
+});
+
+describe("réparations sûres du brouillon (V4)", () => {
+  it("une analogie sans limite devient un exemple imaginé ; une variante sans limite reçoit null", async () => {
+    const { repairDraftBlocks, ExplanationDraft } = await import("./pipeline");
+    const fixed = repairDraftBlocks({
+      sections: [
+        {
+          blocks: [
+            { type: "analogy", id: "blk_1", text: "Comme une éponge.", claim_ids: [], evidence_ids: [], variants: [{ text: "Comme un buvard." }] },
+            { type: "analogy", id: "blk_2", text: "Comme un filtre.", limit: "Un filtre retient, le sol laisse passer.", claim_ids: [], evidence_ids: [] },
+          ],
+        },
+      ],
+    }) as { sections: { blocks: Record<string, unknown>[] }[] };
+    expect(fixed.sections[0]!.blocks[0]).toMatchObject({ type: "fictional_example", variants: [{ text: "Comme un buvard.", limit: null }] });
+    expect(fixed.sections[0]!.blocks[0]).not.toHaveProperty("limit");
+    expect(fixed.sections[0]!.blocks[1]).toMatchObject({ type: "analogy", limit: "Un filtre retient, le sol laisse passer." });
+    expect(ExplanationDraft).toBeDefined();
   });
 });

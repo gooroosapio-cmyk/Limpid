@@ -121,3 +121,26 @@ dialog.drawer::backdrop { background: var(--backdrop); animation: fade-in var(--
 }
 .connectivity .btn { width: auto; min-height: 40px; margin: 0 0 0 auto; padding: 0 var(--s3); font-size: 13px; }
 .app:has(.reader-immersive) .connectivity { bottom: calc(var(--readerbar) + var(--s3) + env(safe-area-inset-bottom)); }
+
+/* Menu V4 : dossiers, non lu, en cours */
+.drawer-folders { flex: none; max-height: 32vh; }
+.drawer-folders a .icon { flex: none; color: var(--muted); }
+.drawer-label { cursor: default; }
+.drawer-state { flex: none; display: inline-grid; place-items: center; color: var(--muted); }
+.unread-dot { flex: none; display: inline-block; width: 9px; height: 9px; margin-left: 8px; border-radius: 50%; background: var(--danger); vertical-align: 2px; }
+
+/* Notifications flottantes */
+.toasts {
+  position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(var(--s5) + env(safe-area-inset-bottom));
+  display: grid; gap: var(--s2); width: min(440px, calc(100% - 32px)); pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: var(--s2); padding: 10px 8px 10px 14px; border-radius: 14px; background: var(--ink); color: var(--bg);
+  font-size: 14px; line-height: 1.4; box-shadow: var(--shadow-lift); pointer-events: auto; animation: rise-in var(--t-panel) var(--ease-spring) both;
+}
+.toast span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast .ib { color: inherit; width: 36px; height: 36px; min-width: 36px; }
+.toast-error .icon:first-child { color: #f0a493; }
+.toast-ok .icon:first-child { color: var(--yellow); }
+.app:has(.fab) ~ .toasts { bottom: calc(96px + env(safe-area-inset-bottom)); }
+.app:has(.reader-immersive) ~ .toasts { bottom: calc(132px + env(safe-area-inset-bottom)); }

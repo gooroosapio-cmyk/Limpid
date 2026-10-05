@@ -132,7 +132,7 @@ export async function gradeAnswer(userId: string, reportId: string, input: z.inf
     if (e instanceof ProviderError && e.usage) await record(e.usage);
     const msg =
       e instanceof ProviderError && e.code === "quota_exhausted"
-        ? "Le quota quotidien gratuit de Gemini est atteint. Réessayez demain."
+        ? "Le quota quotidien de l'IA est atteint. Réessayez demain."
         : e instanceof ProviderError && e.code === "rate_limited"
           ? "Le fournisseur IA limite les demandes. Réessayez dans une minute."
           : "La correction n'a pas pu être faite. Réessayez.";

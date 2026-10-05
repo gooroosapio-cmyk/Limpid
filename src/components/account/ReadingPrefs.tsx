@@ -2,13 +2,31 @@
 
 import { useState, useTransition } from "react";
 import { savePreferenceField } from "@/app/preferences/actions";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
-type Field = "familiarity" | "goal";
+type Field = "familiarity" | "goal" | "default_mode" | "explanation_lang";
 
 /** Préférences pédagogiques directes : chaque choix est enregistré et vaut pour les prochains rapports. */
-export function ReadingPrefs({ familiarity, goal, concrete }: { familiarity: string | null; goal: string | null; concrete: boolean }) {
-  const [values, setValues] = useState<Record<Field, string | null>>({ familiarity, goal });
+export function ReadingPrefs({
+  familiarity,
+  goal,
+  concrete,
+  defaultMode,
+  explanationLang,
+}: {
+  familiarity: string | null;
+  goal: string | null;
+  concrete: boolean;
+  defaultMode: string | null;
+  explanationLang: string | null;
+}) {
+  const t = useT();
+  const [values, setValues] = useState<Record<Field, string | null>>({
+    familiarity,
+    goal,
+    default_mode: defaultMode ?? "claire",
+    explanation_lang: explanationLang ?? "fr",
+  });
   const [isConcrete, setConcrete] = useState(concrete);
   const [status, setStatus] = useState<"" | "saved" | "failed">("");
   const [pending, start] = useTransition();
@@ -45,10 +63,12 @@ export function ReadingPrefs({ familiarity, goal, concrete }: { familiarity: str
 
   return (
     <>
-      {group("familiarity", fr.compte.familiarity, fr.compte.familiarities)}
-      {group("goal", fr.compte.goal, fr.compte.goals)}
+      {group("explanation_lang", t.compte.language, t.compte.languages)}
+      {group("default_mode", t.compte.defaultMode, Object.fromEntries(Object.entries(t.add.modes).map(([k, v]) => [k, v.title])))}
+      {group("familiarity", t.compte.familiarity, t.compte.familiarities)}
+      {group("goal", t.compte.goal, t.compte.goals)}
       <label className="setting">
-        <span><b>{fr.compte.concrete[0]}</b><small>{fr.compte.concrete[1]}</small></span>
+        <span><b>{t.compte.concrete[0]}</b><small>{t.compte.concrete[1]}</small></span>
         <span className="switch">
           <input
             type="checkbox"
@@ -64,7 +84,7 @@ export function ReadingPrefs({ familiarity, goal, concrete }: { familiarity: str
         </span>
       </label>
       <p role="status" aria-live="polite" className="small muted">
-        {status === "saved" ? fr.compte.saved : status === "failed" ? fr.compte.failed : ""}
+        {status === "saved" ? t.compte.saved : status === "failed" ? t.compte.failed : ""}
       </p>
     </>
   );

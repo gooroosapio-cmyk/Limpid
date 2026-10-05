@@ -1,5 +1,44 @@
 # Avancement
 
+## Phase 12.1 — Illustrations incrustées et pages plus denses (5 octobre 2026)
+
+### FAIT
+- **Planche de dessins vectoriels** : en **une seule génération**, le modèle propose de petits dessins simples (environ un pour deux parties, 6 au plus, 2 en résumé fidèle), chacun ancré sur le bloc dont il rend visible une notion complexe ou une observation. Le moteur valide chaque forme (repère borné, chemins restreints, **aucun fond**, étiquettes courtes sans chiffre inventé) et dessine lui-même le SVG aux couleurs du thème (clair et sombre). Jamais une preuve : légendé « Illustration ». Désactivable (`LIMPID_DRAWINGS=off`) et coupé en « texte seul ».
+- **Planche d'images** (quand la génération d'images est activée) : toutes les illustrations du rapport en **une seule image**, en grille sur fond blanc ; le serveur découpe chaque case, **rend le fond transparent**, recadre et stocke des PNG prêts à incruster, sans chevauchement (`sharp`, dépendance explicite).
+- **Incrustation** : dessins et images flottent dans un bloc de texte (côtés alternés), le texte les longe à hauteur du visuel (ratio respecté) puis **continue sous leur pied** ; légende sous le visuel. PDF : dessin vectoriel centré avec sa légende.
+- **Pages plus denses** : deux notions peuvent partager une vue (plus de saut de vue imposé à chaque partie ; un titre reste toujours avec son premier bloc) ; consignes de rédaction contre les vides et les murs de texte (paragraphes de 2 à 4 phrases, notions minces regroupées).
+
+### EN TEST
+- 207 tests (validation des formes, ancrage, rendu SVG sans script, export PDF, planche découpée sur une vraie image avec fond transparent et recadrage, une seule génération pour toute la planche).
+
+## Phase 12 — Refonte V4 « LIMPID » et interface en anglais (5 octobre 2026)
+
+### FAIT
+- **Moteur éditorial maison** (pas de Puck) : le document structuré (contrat 1.1.0, compatible 1.0.0) devient des **pièces** (couverture, parties, blocs, éléments de liste, formules, visuels, points de contrôle, fin, annexes). Le lecteur **mesure leurs hauteurs réelles** et compose les vues : aucune coupure, aucun `overflow: hidden`, aucune réduction de police ; une pièce plus haute que l'écran forme une vue qui défile, et un titre n'est jamais isolé.
+- **4 approches** à l'import (Très simple, Explication claire présélectionnée la première fois, Résumé fidèle, Révision active ; le dernier choix explicite est retenu), **5 à 18 pages** pédagogiques, résultat court annoncé quand la source est pauvre, points clés, idée clé, listes, formules, compléments signalés.
+- **Lecteur** : carrousel vertical une vue à la fois (transition 220 ms, mouvement réduit respecté), **lecture continue** en option ; en haut « × Fermer » + partie courante (Fermer rend l'état exact de la bibliothèque) ; en bas **Sommaire | progression | Options** ; bouton jaune **Discuter** dans une bande réservée (jamais sur le texte) ; le retour du téléphone ferme d'abord un panneau ; position de lecture enregistrée.
+- **Options** : Exporter en PDF, Affichage, Sources, Glossaire, Créer une autre version (4 approches), versions conservées, hors connexion, suppression.
+- **Points de contrôle intégrés** (1 à 3 questions, lecture → quiz → correction → reprise, carrousel suspendu, « Passer pour le moment ») et **« Tester ma compréhension »** : bilan de 5 à 25 questions, tentatives conservées, score observé distinct de la maîtrise. Types : QCM simple et multiple, vrai/faux, classement par boutons, association, texte à trous, réponse courte (correction IA présentée comme indicative). Corrections objectives déterministes.
+- **« Autre exemple »** : variantes pré-générées, changement sur place **sans appel IA**, hauteur réservée. « Plus simple » et les actions par partie sont retirés.
+- **« Essayer une autre formulation »** avec motifs (trop compliqué, trop court, trop long, pas assez concret, information incorrecte ou absente, autre + commentaire) : nouvelle version liée ; un fait signalé incorrect est d'abord revérifié contre la source.
+- **Rôles IA** : `AI_REPORT_MODEL` (rapports) et `AI_CHAT_MODEL` (discussion, corrections) ; noms de modèles retirés des écrans courants (transparence gardée dans Confidentialité et dans l'administration).
+- **Import** « Que voulez-vous comprendre ? » : Fichier / Lien / Texte, ligne compacte du fichier (nom, taille, pages détectées, Remplacer, ×), « Créer mon Limpid », « Voir mes Limpid », étapes réelles de préparation.
+- **Bibliothèque** : recherche repliable à côté du titre avec les **5 recherches récentes** du compte et un indicateur de recherche active ; filtres **Tous / Prêts / En cours / Échecs** sur une ligne ; **dossiers** en premier (supprimer un dossier ne supprime jamais ses Limpid) ; « Nouveau dossier » ; appui long ou ⋯ → **Déplacer vers…** ; date et heure (« Aujourd'hui · 14:32 ») ; échecs expliqués avec **Réessayer** (mêmes réglages, limites du compte).
+- **Menu** : Accueil (bibliothèque), Nouveau Limpid, Nouveau dossier, Paramètres, dossiers, Limpid (échecs masqués), **pastille rouge non lu** (texte accessible) et **sablier** en cours.
+- **Paramètres** : langue de l'interface, langue des explications, approche par défaut, familiarité, objectif, confort de lecture, apparence, **Réinitialiser mes préférences** ; thème par défaut et thèmes retirés ; **À propos de nous** (goooroo corporate) ; pied **« Propulsé par gooroo »** (jamais dans le lecteur) ; notifications flottantes.
+- **Interface en anglais** : dictionnaire complet (mêmes clés que le français, vérifié par tests), choix immédiat dans les Paramètres (cookie `limpid-lang`, sinon langue du navigateur), dates, messages de connexion, de mot de passe, d'API et du PDF traduits.
+- **Export PDF** depuis le document structuré : style unique, annexes (limites, glossaire, sources), « Avec les exercices » (sans réponses) et « Corrigé » séparés, **filigrane discret des exports gratuits décidé côté serveur** (`profiles.plan`).
+
+### EN TEST (résultats réels)
+- `npm test` : 199 tests ; typecheck ; build de production ; **recette SQL OK** (nouvelles tables isolées par compte, suppression d'un dossier sans perte).
+- **Gemini réel (offre gratuite)**, approches Explication claire et Révision active : statut `validated`, 5 parties, 4 points clés, 2 et 5 points de contrôle, bilan de 7 questions sur 6 types, aucune erreur bloquante. Tous les modèles « flash » sont **hors quota aujourd'hui** (429) ; le repli `gemini-3.1-flash-lite` a tout produit. Avec ce modèle léger, peu d'exemples et aucune variante : à revoir avec le modèle principal.
+- Recette visuelle locale (sorties réelles ci-dessus) : 320, 360, 390, 430, 768, 1024, 1440 px et paysage 844×390, très grand texte, mouvement réduit et activé, français et anglais : **0 violation axe**, aucun débordement horizontal ; seules les pièces plus hautes que l'écran défilent (couverture, point de contrôle, paysage). Parcours : sommaire, options, retour qui ferme le panneau, point de contrôle (carrousel suspendu puis reprise), bilan, autre formulation, Discuter, Fermer → bibliothèque, autre exemple, dossiers, déplacer, échecs, menu.
+
+### À FAIRE / LIMITES
+- Migration `20261006000000_v4_reader_library.sql` : **à appliquer en production à la fusion**.
+- Parcours complet en production (import → génération → lecture → quiz → bibliothèque → export) : à vérifier après déploiement, sur un quota Gemini disponible.
+- Le contenu d'un Limpid reste dans sa langue d'explication ; seule l'interface change de langue.
+
 ## Phase 11.1 — Navigation façon Gemini et lecteur plein écran (5 octobre 2026)
 
 ### FAIT

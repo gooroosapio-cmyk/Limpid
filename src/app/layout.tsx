@@ -4,10 +4,11 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { Pwa } from "@/components/shell/Pwa";
+import { Toaster } from "@/components/shell/Toasts";
 import { currentUser } from "@/lib/auth";
-import { isUrlImportEnabled } from "@/lib/config";
 import { htmlAttributes, readDisplayPrefs } from "@/lib/display/prefs";
-import { fr } from "@/lib/i18n/fr";
+import { I18nProvider } from "@/lib/i18n/client";
+import { getLang, getT } from "@/lib/i18n/server";
 import { offlineKey } from "@/lib/offline-key";
 import "./styles/base.css";
 import "./styles/shell.css";
@@ -36,24 +37,28 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const [t, lang] = await Promise.all([getT(), getLang()]);
   // Rendu dynamique obligatoire : la CSP utilise un nonce par requête.
   await connection();
   const store = await cookies();
   const prefs = readDisplayPrefs((n) => store.get(n)?.value);
   const user = await currentUser();
   return (
-    <html lang="fr" {...htmlAttributes(prefs)}>
+    <html lang={lang} {...htmlAttributes(prefs)}>
       <body>
-        <a className="skip-link" href="#contenu">{fr.nav.skip}</a>
+        <I18nProvider lang={lang}>
+        <a className="skip-link" href="#contenu">{t.nav.skip}</a>
         <div className="app">
           {user && (
             <Suspense>
-              <AppShell email={user.email ?? ""} urlEnabled={isUrlImportEnabled()} />
+              <AppShell email={user.email ?? ""} />
             </Suspense>
           )}
           <main id="contenu" className="app-content">{children}</main>
         </div>
         <Pwa account={user ? offlineKey(user.id) : null} />
+        <Toaster closeLabel={t.reader.close} />
+        </I18nProvider>
       </body>
     </html>
   );

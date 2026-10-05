@@ -1,9 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { MODES, type Mode } from "@/lib/contracts/schemas";
+import type { Dict } from "@/lib/i18n";
+import { apiMessage } from "@/lib/i18n/api";
+import { useLang, useT } from "@/lib/i18n/client";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
 type Tab = "file" | "link" | "text";
@@ -11,38 +14,52 @@ type Phase =
   | { step: "idle" }
   | { step: "upload"; percent: number }
   | { step: "reading" }
-  // PDF scanné : l'envoi est fait, l'accord pour la lecture par Gemini est demandé.
-  | { step: "consent"; uploadId: string; message: string };
+  // Image ou PDF scanné : l'envoi est fait, l'accord pour la lecture par l'IA est demandé.
+  | { step: "consent"; uploadId: string; message: string }
+  | { step: "creating" };
+
+interface Prepared {
+  sourceId: string;
+  title: string | null;
+  pageCount: number | null;
+  byteSize: number | null;
+}
 
 const MAX_PASTED = 50_000;
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
-const IMAGE = /\.(jpe?g|png|webp)$/i;
 
 class FormError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
+    public readonly reportId?: string,
   ) {
     super(message);
   }
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("fr-FR")} Ko`;
-  return `${(bytes / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
+function formatSize(bytes: number, lang: string): string {
+  const locale = lang === "en" ? "en-GB" : "fr-FR";
+  const [kb, mb] = lang === "en" ? ["KB", "MB"] : ["Ko", "Mo"];
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString(locale)} ${kb}`;
+  return `${(bytes / 1024 / 1024).toLocaleString(locale, { maximumFractionDigits: 1 })} ${mb}`;
 }
 
-async function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
+async function postJson(url: string, body: unknown, fallback: string, t: Dict): Promise<Record<string, unknown>> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new FormError(typeof data.message === "string" ? data.message : "La création a échoué.", data.error);
+    throw new FormError(
+      apiMessage(t, data, fallback),
+      typeof data.error === "string" ? data.error : undefined,
+      typeof data.reportId === "string" ? data.reportId : undefined,
+    );
   }
   return data;
 }
 
 /** Envoi direct vers le stockage privé par URL signée, avec suivi de progression. */
-function putFile(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {
+function putFile(url: string, file: File, onProgress: (percent: number) => void, failed: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
@@ -50,253 +67,296 @@ function putFile(url: string, file: File, onProgress: (percent: number) => void)
     xhr.setRequestHeader("x-upsert", "false");
     xhr.setRequestHeader("content-type", file.type || "application/octet-stream");
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new FormError(fr.create.uploadFailed)));
-    xhr.onerror = () => reject(new FormError(fr.create.uploadFailed));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new FormError(failed)));
+    xhr.onerror = () => reject(new FormError(failed));
     xhr.send(file);
   });
 }
 
-/** Formulaire d'import (PDF p. 5) : fichier, lien ou texte collé. */
+/**
+ * Nouveau Limpid (V4) : Fichier, Lien ou Texte, puis une approche parmi quatre, puis
+ * « Créer mon Limpid ». Un fichier choisi est envoyé et lu aussitôt (pages détectées) ;
+ * la génération ne part qu'à la création.
+ */
 export function ImportForm({
   enabled,
   urlEnabled,
   maxFileMb = 20,
   maxPages = 100,
   initialTab = "file",
+  defaultMode = "claire",
 }: {
-  /** Onglet ouvert à l'arrivée (menu : Ajouter un texte, un PDF, un lien). */
-  initialTab?: "file" | "link" | "text";
   enabled: boolean;
   urlEnabled: boolean;
   maxFileMb?: number;
   maxPages?: number;
+  /** Onglet ouvert à l'arrivée (menu : texte, PDF, lien). */
+  initialTab?: Tab;
+  /** Dernier choix explicite, sinon Explication claire. */
+  defaultMode?: Mode;
 }) {
-  const MAX_FILE_BYTES = maxFileMb * 1024 * 1024;
-  const [dragging, setDragging] = useState(false);
-  const [tab, setTab] = useState<Tab>(initialTab === "link" && !urlEnabled ? "file" : initialTab);
-  const [text, setText] = useState("");
-  const [url, setUrl] = useState("");
+  const t = useT();
+  const lang = useLang();
+  const tabs: Tab[] = urlEnabled ? ["file", "link", "text"] : ["file", "text"];
+  const [tab, setTab] = useState<Tab>(tabs.includes(initialTab) ? initialTab : "file");
+  const [mode, setMode] = useState<Mode>(defaultMode);
   const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const [url, setUrl] = useState("");
+  const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
-  const [imageConsent, setImageConsent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const key = useRef("");
   const router = useRouter();
   const base = useId();
-  const pending = phase.step !== "idle" && phase.step !== "consent";
-  const isImage = tab === "file" && !!file && IMAGE.test(file.name);
+  const busy = phase.step === "upload" || phase.step === "reading" || phase.step === "creating";
 
-  const content =
-    tab === "text" ? text.trim() : tab === "link" ? url.trim() : file ? `${file.name}:${file.size}:${file.lastModified}` : "";
-  const fileError =
-    tab === "file" && file && file.size > MAX_FILE_BYTES ? `Ce fichier dépasse ${maxFileMb} Mo.` : null;
-  const canSubmit =
-    enabled && !pending && phase.step !== "consent" && !!content && !fileError && (tab !== "link" || urlEnabled) && (!isImage || imageConsent);
+  useEffect(() => {
+    key.current = crypto.randomUUID();
+  }, []);
 
-  async function create(body: Record<string, unknown>) {
+  async function prepare(body: Record<string, unknown>): Promise<Prepared> {
+    const data = await postJson("/api/sources", body, t.add.failed, t);
+    return {
+      sourceId: String(data.sourceId),
+      title: typeof data.title === "string" ? data.title : null,
+      pageCount: typeof data.pageCount === "number" ? data.pageCount : null,
+      byteSize: typeof data.byteSize === "number" ? data.byteSize : null,
+    };
+  }
+
+  /** Lecture d'un fichier envoyé ; demande l'accord si l'IA doit lire des images. */
+  async function readUpload(uploadId: string, allowOcr: boolean) {
+    setPhase({ step: "reading" });
     try {
-      // Préparation sans IA : le lecteur vérifie ensuite ce qui a été lu.
-      const prepared = await postJson("/api/sources", body);
-      router.push(`/sources/${prepared.sourceId}`);
+      setPrepared(await prepare({ source: "upload", upload_id: uploadId, allow_ocr: allowOcr }));
+      setPhase({ step: "idle" });
     } catch (err) {
-      if (err instanceof FormError && err.code === "ocr_consent" && typeof body.upload_id === "string") {
-        setPhase({ step: "consent", uploadId: body.upload_id, message: err.message });
+      if (err instanceof FormError && err.code === "ocr_consent") {
+        setPhase({ step: "consent", uploadId, message: err.message });
         return;
       }
       throw err;
     }
   }
 
-  /** Accord donné pour un PDF scanné : même envoi, même clé, lecture OCR autorisée. */
-  async function confirmOcr() {
-    if (phase.step !== "consent") return;
-    const uploadId = phase.uploadId;
+  /** Document ajouté mais non expliqué : retiré (original effacé). */
+  function forget(sourceId: string) {
+    void fetch(`/api/sources/${sourceId}`, { method: "DELETE" }).catch(() => undefined);
+  }
+
+  async function choose(f: File | null) {
     setError(null);
-    setPhase({ step: "reading" });
+    if (prepared) forget(prepared.sourceId);
+    setPrepared(null);
+    setFile(f);
+    if (!f) return setPhase({ step: "idle" });
+    if (f.size > maxFileMb * 1024 * 1024) {
+      setError(t.create.fileTooLarge.replace("20", String(maxFileMb)));
+      setFile(null);
+      return;
+    }
+    if (!enabled) return;
     try {
-      await create({ source: "upload", upload_id: uploadId, allow_ocr: true });
+      setPhase({ step: "upload", percent: 0 });
+      const up = await postJson("/api/uploads", { file_name: f.name, byte_size: f.size }, t.create.uploadFailed, t);
+      await putFile(String(up.signedUrl), f, (percent) => setPhase({ step: "upload", percent }), t.create.uploadFailed);
+      await readUpload(String(up.uploadId), false);
     } catch (err) {
-      setError(err instanceof FormError ? err.message : fr.create.networkError);
+      setError(err instanceof FormError ? err.message : t.create.networkError);
       setPhase({ step: "idle" });
+      setFile(null);
     }
   }
+
+  function remove() {
+    if (prepared) forget(prepared.sourceId);
+    setPrepared(null);
+    setFile(null);
+    setPhase({ step: "idle" });
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  const ready =
+    enabled &&
+    !busy &&
+    phase.step !== "consent" &&
+    (tab === "file" ? !!prepared : tab === "link" ? /^https?:\/\/\S+\.\S+/.test(url.trim()) : text.trim().length >= 20);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!ready) return;
     setError(null);
     try {
-      let body: Record<string, unknown>;
-      if (tab === "file" && file) {
-        setPhase({ step: "upload", percent: 0 });
-        const up = await postJson("/api/uploads", { file_name: file.name, byte_size: file.size });
-        await putFile(String(up.signedUrl), file, (percent) => setPhase({ step: "upload", percent }));
+      let sourceId = prepared?.sourceId;
+      if (tab !== "file") {
         setPhase({ step: "reading" });
-        body = { source: "upload", upload_id: up.uploadId, allow_ocr: isImage && imageConsent };
-      } else if (tab === "link") {
-        setPhase({ step: "reading" });
-        body = { source: "url", url: url.trim() };
-      } else {
-        setPhase({ step: "reading" });
-        body = { source: "text", text };
+        sourceId = (await prepare(tab === "link" ? { source: "url", url: url.trim() } : { source: "text", text })).sourceId;
       }
-      await create(body);
+      setPhase({ step: "creating" });
+      const data = await postJson("/api/reports", { source_id: sourceId, mode, idempotency_key: key.current }, t.add.failed, t);
+      router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
-      setError(err instanceof FormError ? err.message : fr.create.networkError);
+      if (err instanceof FormError && err.reportId) {
+        router.push(`/rapports/${err.reportId}`);
+        return;
+      }
+      setError(err instanceof FormError ? err.message : t.create.networkError);
       setPhase({ step: "idle" });
+      key.current = crypto.randomUUID();
     }
   }
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "file", label: fr.create.tabs.file },
-    { id: "link", label: fr.create.tabs.link },
-    { id: "text", label: fr.create.tabs.text },
-  ];
-
-  function onKey(e: React.KeyboardEvent, i: number) {
+  function onTabKey(e: React.KeyboardEvent, i: number) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
-    setTab(next.id);
-    document.getElementById(`${base}-tab-${next.id}`)?.focus();
+    setTab(next);
+    document.getElementById(`${base}-tab-${next}`)?.focus();
   }
 
+  const status =
+    phase.step === "upload" ? t.add.uploading(phase.percent) : phase.step === "reading" ? t.add.reading : phase.step === "creating" ? t.add.creating : "";
+
   return (
-    <form onSubmit={submit} aria-busy={pending} className="stagger">
-      <div className="tabs" role="tablist" aria-label="Type de source">
-        {tabs.map((t, i) => (
+    <form onSubmit={submit} aria-busy={busy} className="import">
+      <div className="seg import-tabs" role="tablist" aria-label={t.add.tabsLabel}>
+        {tabs.map((id, i) => (
           <button
-            key={t.id}
-            id={`${base}-tab-${t.id}`}
+            key={id}
+            id={`${base}-tab-${id}`}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
-            aria-controls={`${base}-panel-${t.id}`}
-            tabIndex={tab === t.id ? 0 : -1}
-            onClick={() => setTab(t.id)}
-            onKeyDown={(e) => onKey(e, i)}
-            disabled={pending}
+            aria-selected={tab === id}
+            aria-controls={`${base}-panel`}
+            tabIndex={tab === id ? 0 : -1}
+            onClick={() => setTab(id)}
+            onKeyDown={(e) => onTabKey(e, i)}
+            disabled={busy}
           >
-            {t.label}
+            <Icon name={id === "file" ? "file" : id === "link" ? "link" : "list"} size={18} /> {t.add.tabs[id]}
           </button>
         ))}
       </div>
 
-      {tab === "file" && (
-        <div role="tabpanel" id={`${base}-panel-file`} aria-labelledby={`${base}-tab-file`}>
-          <label
-            htmlFor={`${base}-file`}
-            className={dragging ? "upload dragging" : "upload"}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              const dropped = e.dataTransfer.files?.[0];
-              if (dropped && !pending) {
-                setFile(dropped);
-                setImageConsent(false);
-              }
-            }}
-          >
-            <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={26} /></span>
-            <h2>{file ? fr.create.changeFile : fr.add.choose}</h2>
-            <p>{fr.add.formats}</p>
-            <p className="micro">{fr.add.limits(maxFileMb, maxPages)}</p>
-          </label>
-          <input
-            id={`${base}-file`}
-            className="sr-only"
-            type="file"
-            accept={ACCEPT}
-            disabled={pending}
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setImageConsent(false);
-              if (phase.step === "consent") setPhase({ step: "idle" });
-            }}
-          />
-          {file && (
-            <p className="file-name" aria-live="polite">
-              <Icon name="file" size={18} /> {file.name} · {formatSize(file.size)}
-            </p>
-          )}
-          {fileError && <p className="notice notice-warn" role="alert">{fileError}</p>}
-          {isImage && (
-            <label className="consent">
-              <input type="checkbox" checked={imageConsent} onChange={(e) => setImageConsent(e.target.checked)} disabled={pending} />
-              <span>{fr.create.imageConsent}</span>
-            </label>
-          )}
-        </div>
-      )}
-
-      {tab === "link" && (
-        <div role="tabpanel" id={`${base}-panel-link`} aria-labelledby={`${base}-tab-link`}>
-          <label htmlFor={`${base}-url`}>{fr.create.linkLabel}</label>
-          <input
-            id={`${base}-url`}
-            type="url"
-            inputMode="url"
-            placeholder="https://"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            disabled={pending || !urlEnabled}
-            aria-describedby={`${base}-url-hint`}
-          />
-          <p id={`${base}-url-hint`} className="muted">{urlEnabled ? fr.create.linkHint : fr.create.linkDisabled}</p>
-        </div>
-      )}
-
-      {tab === "text" && (
-        <div role="tabpanel" id={`${base}-panel-text`} aria-labelledby={`${base}-tab-text`}>
-          <label htmlFor={`${base}-text`}>{fr.create.textLabel}</label>
-          <textarea
-            id={`${base}-text`}
-            maxLength={MAX_PASTED}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={pending}
-            aria-describedby={`${base}-text-hint`}
-          />
-          <p id={`${base}-text-hint`} className="muted">
-            {fr.create.textHint} {text.length.toLocaleString("fr-FR")} / {MAX_PASTED.toLocaleString("fr-FR")}
-          </p>
-        </div>
-      )}
-
-      {error && <p className="notice notice-warn" role="alert">{error}</p>}
-      {phase.step === "consent" && (
-        <div className="notice notice-warn" role="alertdialog" aria-labelledby={`${base}-consent`}>
-          <p id={`${base}-consent`}>{phase.message}</p>
-          <p className="muted">{fr.create.ocrInfo}</p>
-          <div className="consent-actions">
-            <button type="button" className="btn btn-primary" onClick={confirmOcr}>{fr.create.ocrAccept}</button>
-            <button type="button" className="btn" onClick={() => setPhase({ step: "idle" })}>{fr.create.ocrDecline}</button>
-          </div>
-        </div>
-      )}
-      {phase.step !== "idle" && (
-        <div role="status" aria-live="polite" className="submit-status">
-          {phase.step === "upload" ? (
-            <>
-              <label htmlFor={`${base}-progress`}>{fr.create.uploading(phase.percent)}</label>
-              <progress id={`${base}-progress`} max={100} value={phase.percent} />
-            </>
-          ) : (
-            <p>{tab === "text" ? fr.create.submitting : fr.create.reading}</p>
-          )}
-        </div>
-      )}
-      <div className="note">
-        <b>{fr.add.nothingTitle}</b>
-        <p>{fr.add.nothing}</p>
+      <div id={`${base}-panel`} role="tabpanel" aria-labelledby={`${base}-tab-${tab}`} className="import-panel">
+        {tab === "file" && (
+          <>
+            <input
+              ref={inputRef}
+              id={`${base}-file`}
+              type="file"
+              accept={ACCEPT}
+              className="sr-only"
+              disabled={busy || !enabled}
+              onChange={(e) => void choose(e.target.files?.[0] ?? null)}
+            />
+            {!file ? (
+              <label
+                htmlFor={`${base}-file`}
+                className={dragging ? "upload dragging" : "upload"}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  void choose(e.dataTransfer.files?.[0] ?? null);
+                }}
+              >
+                <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={26} /></span>
+                <span className="upload-title">{t.add.choose}</span>
+                <span className="muted small">{t.add.drop}</span>
+                <span className="muted small">{t.add.formats} · {t.add.limits(maxFileMb, maxPages)}</span>
+              </label>
+            ) : (
+              <div className="fileline">
+                <span className="fileline-icon" aria-hidden="true"><Icon name="file" /></span>
+                <span className="fileline-text">
+                  <b>{prepared?.title ?? file.name}</b>
+                  <small>
+                    {[formatSize(prepared?.byteSize ?? file.size, lang), prepared?.pageCount ? t.add.pages(prepared.pageCount) : null, status || null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </small>
+                  {phase.step === "upload" && <progress value={phase.percent} max={100} aria-hidden="true" />}
+                </span>
+                <label htmlFor={`${base}-file`} className="btn-link fileline-replace" aria-disabled={busy}>
+                  {t.add.replace}
+                </label>
+                <button type="button" className="ib" aria-label={t.add.remove} onClick={remove} disabled={busy}>
+                  <Icon name="close" />
+                </button>
+              </div>
+            )}
+            {phase.step === "consent" && (
+              <div className="notice" role="alert">
+                <strong>{t.add.ocrTitle}</strong>
+                <p>{phase.message}</p>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    void readUpload(phase.uploadId, true).catch((err) => {
+                      setError(err instanceof FormError ? err.message : t.create.networkError);
+                      setPhase({ step: "idle" });
+                    })
+                  }
+                >
+                  {t.add.ocrAllow}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+        {tab === "link" && (
+          <>
+            <label htmlFor={`${base}-url`}>{t.add.linkLabel}</label>
+            <input id={`${base}-url`} type="url" inputMode="url" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} autoComplete="off" />
+          </>
+        )}
+        {tab === "text" && (
+          <>
+            <label htmlFor={`${base}-text`}>{t.add.textLabel}</label>
+            <textarea
+              id={`${base}-text`}
+              value={text}
+              maxLength={MAX_PASTED}
+              placeholder={t.add.textPlaceholder}
+              onChange={(e) => setText(e.target.value)}
+              disabled={busy}
+              aria-describedby={`${base}-count`}
+            />
+            <p id={`${base}-count`} className="muted small text-count">{t.add.textCount(text.length, MAX_PASTED)}</p>
+          </>
+        )}
       </div>
-      <button type="submit" className={pending ? "btn btn-primary btn-block busy" : "btn btn-primary btn-block"} disabled={!canSubmit} aria-disabled={!canSubmit}>
-        {pending ? fr.create.reading : <>{fr.create.next} <Icon name="arrow" size={20} /></>}
+
+      <fieldset className="modes" disabled={busy}>
+        <legend>{t.add.modesLegend}</legend>
+        {MODES.map((m) => (
+          <label key={m} className="option mode-option">
+            <input type="radio" name={`${base}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+            <span>
+              <strong>{t.add.modes[m]?.title}</strong>
+              <span className="option-desc">{t.add.modes[m]?.desc}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+
+      <p role="status" aria-live="polite" className="sr-only">{status}</p>
+      {error && <p className="notice notice-error" role="alert">{error}</p>}
+      <button
+        type="submit"
+        className={`btn btn-primary btn-block${phase.step === "creating" || phase.step === "reading" ? " busy" : ""}`}
+        disabled={!ready}
+      >
+        {phase.step === "creating" ? t.add.creating : t.add.create} {phase.step !== "creating" && <Icon name="arrow" />}
       </button>
-      <p className="muted small">{fr.create.privacy}</p>
     </form>
   );
 }

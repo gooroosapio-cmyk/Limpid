@@ -1,6 +1,9 @@
+"use client";
+
 import type { VisualSpec } from "@/lib/contracts/schemas";
-import { fr } from "@/lib/i18n/fr";
-import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
+import { useT } from "@/lib/i18n/client";
+import { barRatios, ChartData, ComparisonData, DrawingData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
+import { DrawingSvg } from "./Drawing";
 
 export type { AssetView };
 import { FlowDiagram } from "./FlowDiagram";
@@ -29,6 +32,7 @@ function BarChart({ data, labelledBy }: { data: ChartData; labelledBy: string })
 }
 
 function ComparisonTable({ data, caption }: { data: ComparisonData; caption: React.ReactNode }) {
+  const t = useT();
   return (
     <div className="table-scroll">
       <table className="compare">
@@ -45,7 +49,7 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
               <th scope="row">{o.name}</th>
               {data.criteria.map((c, i) => {
                 const cell = o.cells[i];
-                return <td key={c}>{cell?.text ?? <span className="muted">{fr.visuals.notStated}</span>}</td>;
+                return <td key={c}>{cell?.text ?? <span className="muted">{t.visuals.notStated}</span>}</td>;
               })}
             </tr>
           ))}
@@ -56,7 +60,8 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
 }
 
 export function Credit({ asset }: { asset: AssetView }) {
-  if (asset.provider === "gemini") return <span className="credit">{fr.visuals.generated(asset.model)}</span>;
+  const t = useT();
+  if (asset.provider === "gemini") return <span className="credit">{t.visuals.generated}</span>;
   const via = asset.provider === "commons" ? "Wikimedia Commons" : "Unsplash";
   const licenseUrl = safeHref(asset.licenseUrl);
   const sourceUrl = safeHref(asset.sourceUrl);
@@ -94,10 +99,11 @@ export function VisualFigure({
   asset?: AssetView;
   showIllustrations: boolean;
 }) {
+  const t = useT();
   const altId = `${v.id}-alt`;
   const alternative = (
     <details>
-      <summary>{fr.reader.textAlternative}</summary>
+      <summary>{t.reader.textAlternative}</summary>
       <p id={altId}>{v.alt_text}</p>
     </details>
   );
@@ -142,14 +148,54 @@ export function VisualFigure({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset.src} alt={v.alt_text} width={asset.width} height={asset.height} loading="lazy" decoding="async" />
           <figcaption>
-            <span className="eyebrow">{fr.visuals.illustration}</span> {v.caption}
+            <span className="eyebrow">{t.visuals.illustration}</span> {v.caption}
             <br />
             <Credit asset={asset} />
           </figcaption>
         </figure>
       );
     }
+    case "drawing": {
+      const d = DrawingData.safeParse(v.data);
+      if (!d.success) return null;
+      return (
+        <figure className="visual visual-drawing">
+          <DrawingSvg data={d.data} label={v.alt_text} />
+          <figcaption><span className="eyebrow">{t.visuals.illustration}</span> {v.caption}</figcaption>
+        </figure>
+      );
+    }
     default:
       return null;
   }
+}
+
+/** Visuel incrusté dans un bloc : le texte l'entoure puis continue sous son pied. */
+export function WrapFigure({ visual: v, asset, side }: { visual: VisualSpec; asset?: AssetView; side: "left" | "right" }) {
+  const t = useT();
+  const cls = `wrap-fig wrap-${side} wrap-${v.size ?? "thumb"}`;
+  if (v.kind === "drawing") {
+    const d = DrawingData.safeParse(v.data);
+    if (!d.success) return null;
+    return (
+      <figure className={`${cls} wrap-ratio-${d.data.ratio.replace(":", "-")}`}>
+        <DrawingSvg data={d.data} label={v.alt_text} />
+        <figcaption>{v.caption}</figcaption>
+      </figure>
+    );
+  }
+  if (v.kind === "illustration" && asset) {
+    return (
+      <figure className={cls}>
+        {/* Actif vérifié (type, taille, dimensions) et servi par Limpid ou l'hébergeur autorisé. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={asset.src} alt={v.alt_text} width={asset.width} height={asset.height} loading="lazy" decoding="async" />
+        <figcaption>
+          {v.caption}
+          <span className="credit"> · <Credit asset={asset} /></span>
+        </figcaption>
+      </figure>
+    );
+  }
+  return null;
 }

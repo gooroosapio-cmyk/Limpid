@@ -6,10 +6,13 @@ import { ExplainDocument } from "@/components/prep/ExplainDocument";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import type { Locator } from "@/lib/contracts/schemas";
-import { fr } from "@/lib/i18n/fr";
+import { getLang, getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: fr.added.title };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t.added.title };
+}
 
 const Coverage = z.object({
   notes: z.array(z.string()).optional(),
@@ -27,6 +30,8 @@ function approachKey(familiarity: string | null | undefined, goal: string | null
 
 /** Document ajouté (kit V3, écran 03) : un seul aperçu de fichier, l'original et le lancement. */
 export default async function SourcePage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getT();
+  const locale = (await getLang()) === "en" ? "en-GB" : "fr-FR";
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   await requireUser();
@@ -52,27 +57,27 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
     (segs ?? []).flatMap((s) => ((s.locator as Locator).kind === "pdf_page" ? [(s.locator as { physical_index: number }).physical_index] : [])),
   ).size;
   const reading = pendingOcr
-    ? fr.source.pendingOcr
+    ? t.source.pendingOcr
     : src.page_count && pages
-      ? fr.source.pagesRead(pages, src.page_count)
-      : fr.source.paragraphs(segs?.length ?? 0);
+      ? t.source.pagesRead(pages, src.page_count)
+      : t.source.paragraphs(segs?.length ?? 0);
   const meta = [
     KIND_LABELS[src.kind] ?? src.kind,
-    src.page_count ? fr.added.pageCount(src.page_count) : null,
-    src.byte_size ? fr.added.size(src.byte_size) : null,
+    src.page_count ? t.added.pageCount(src.page_count) : null,
+    src.byte_size ? t.added.size(src.byte_size) : null,
   ].filter(Boolean).join(" · ");
-  const approach = fr.added.approaches[approachKey(prefs?.familiarity, prefs?.goal)]!;
+  const approach = t.added.approaches[approachKey(prefs?.familiarity, prefs?.goal)]!;
   const isUrl = src.kind === "url";
   const hasOriginal = isUrl ? !!src.original_url : !!src.storage_path;
-  const openLabel = isUrl ? fr.added.openLink : src.kind === "pdf" ? fr.added.open : fr.added.openOriginal;
+  const openLabel = isUrl ? t.added.openLink : src.kind === "pdf" ? t.added.open : t.added.openOriginal;
   const until = src.original_purge_at
-    ? new Date(src.original_purge_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })
+    ? new Date(src.original_purge_at).toLocaleDateString(locale, { day: "numeric", month: "long", timeZone: "Europe/Paris" })
     : null;
 
   return (
     <Screen>
       <div className="stagger">
-        <h1 className="display">{fr.added.heading}</h1>
+        <h1 className="display">{t.added.heading}</h1>
         <div className="card filecard">
           <span className="filetile filetile-sm" aria-hidden="true"><Icon name={isUrl ? "link" : "file"} /></span>
           <h2>{src.title}</h2>
@@ -86,20 +91,20 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
               <Icon name={isUrl ? "link" : "file"} /> {openLabel}
             </a>
           ) : (
-            <p className="muted small"><Icon name="info" size={16} /> {fr.added.unavailable}. {fr.added.unavailableNote}</p>
+            <p className="muted small"><Icon name="info" size={16} /> {t.added.unavailable}. {t.added.unavailableNote}</p>
           )}
-          {hasOriginal && !isUrl && until && <p className="muted small">{fr.added.keptUntil(until)}</p>}
+          {hasOriginal && !isUrl && until && <p className="muted small">{t.added.keptUntil(until)}</p>}
         </div>
 
         {coverage.notes && coverage.notes.length > 0 && (
           <div className="notice notice-warn" role="status">
-            <strong>{coverage.partial ? fr.reader.partialCoverage : fr.reader.aboutSource}</strong>
+            <strong>{coverage.partial ? t.reader.partialCoverage : t.reader.aboutSource}</strong>
             <ul>{coverage.notes.map((n) => <li key={n}>{n}</li>)}</ul>
           </div>
         )}
 
         <section aria-labelledby="approach-h">
-          <h2 id="approach-h" className="eyebrow">{fr.added.approach}</h2>
+          <h2 id="approach-h" className="eyebrow">{t.added.approach}</h2>
           <div className="approach">
             <Icon name="sun" />
             <span><b>{approach.title}</b><small>{approach.sub}</small></span>
@@ -107,10 +112,10 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
         </section>
 
         <div className="note">
-          <b>{fr.added.faithfulTitle}</b>
-          <p>{fr.added.faithful}</p>
+          <b>{t.added.faithfulTitle}</b>
+          <p>{t.added.faithful}</p>
         </div>
-        {pendingOcr && <p className="notice" role="status">{fr.source.ocrNote}</p>}
+        {pendingOcr && <p className="notice" role="status">{t.source.ocrNote}</p>}
         <ExplainDocument sourceId={src.id} />
       </div>
     </Screen>

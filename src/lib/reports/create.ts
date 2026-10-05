@@ -5,14 +5,17 @@
  */
 import "server-only";
 import { z } from "zod";
-import { Goal, Level, TargetPages, TemplateId, ThemeId, VisualMode } from "@/lib/contracts/schemas";
+import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, VisualMode } from "@/lib/contracts/schemas";
+import { planPages } from "@/lib/engine/pipeline";
 import { assertCanStartJob, LimitError, recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { adminClient } from "@/lib/supabase/admin";
 import { effectiveVisualMode } from "@/lib/visuals/config";
 
 const Settings = {
-  /** Absents (parcours V3) : déduits des préférences et de la taille du document. */
+  /** Approche choisie à l'import (V4) ; absente : dernier choix, sinon explication claire. */
+  mode: Mode.optional(),
+  /** Absents : déduits du mode, des préférences et de la taille du document. */
   level: Level.optional(),
   goal: Goal.optional(),
   target_pages: TargetPages.optional(),
@@ -86,7 +89,7 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   if ("source_id" in input) {
     sourceId = input.source_id;
   } else {
-    const { level: _l, goal: _g, target_pages: _t, template: _tp, theme: _th, visual_mode: _vm, idempotency_key: _k, ...source } = input;
+    const { mode: _m, level: _l, goal: _g, target_pages: _t, template: _tp, theme: _th, visual_mode: _vm, idempotency_key: _k, ...source } = input;
     try {
       sourceId = (await prepareSource(userId, source as PrepareRequest)).sourceId;
     } catch (e) {
@@ -110,15 +113,16 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   const { data: used } = await db.from("reports").select("id").eq("source_id", sourceId).is("deleted_at", null).limit(1).maybeSingle();
   if (used) throw new CreateError("source_used", "Ce document a déjà son rapport.", undefined, used.id);
 
-  const auto = await automaticSettings(userId, sourceId);
+  const auto = await automaticSettings(userId, sourceId, input.mode);
+  const mode = input.mode ?? auto.mode;
   const level = input.level ?? auto.level;
   const goal = input.goal ?? auto.goal;
   const targetPages = input.target_pages ?? auto.targetPages;
-  const theme = input.theme ?? auto.theme;
+  const theme = input.theme ?? null;
   const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
   const report = await db
     .from("reports")
-    .insert({ owner_id: userId, source_id: sourceId, title: src.title, theme_id: theme, visual_mode: visualMode })
+    .insert({ owner_id: userId, source_id: sourceId, title: src.title, theme_id: theme, visual_mode: visualMode, mode })
     .select("id")
     .single();
   if (report.error || !report.data) throw new CreateError("storage", "Création du rapport impossible.");
@@ -130,6 +134,8 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     kind: "generate_report",
     idempotency_key: input.idempotency_key,
     params: {
+      mode,
+      language: auto.language,
       level,
       goal,
       target_pages: targetPages,
@@ -153,34 +159,42 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     throw new CreateError("storage", "Création de la tâche impossible.");
   }
   await recordLimitEvent(userId, REPORT_CREATED, report.data.id);
+  // Le dernier choix explicite est retenu pour le prochain import.
+  if (input.mode) await db.from("reader_preferences").upsert({ owner_id: userId, default_mode: input.mode });
   return { reportId: report.data.id };
 }
 
 const LEVEL_BY_FAMILIARITY: Record<string, z.infer<typeof Level>> = { aucune: "grand_public", bases: "grand_public", maitrise: "etudiant" };
 
+/** Niveau rédactionnel d'une approche : très simple impose le niveau le plus simple. */
+export function levelFor(mode: Mode, familiarity: string | null | undefined): z.infer<typeof Level> {
+  if (mode === "tres_simple") return "ultra_simple";
+  return LEVEL_BY_FAMILIARITY[familiarity ?? ""] ?? "grand_public";
+}
+
 /**
- * Réglages automatiques (kit V3 : aucun choix de longueur ni de modèle à l'import) : niveau selon
- * la familiarité déclarée, objectif selon les préférences, longueur selon la taille du document,
- * thème par défaut du lecteur (null = choisi selon l'organisation du rapport).
+ * Réglages automatiques : approche (choix explicite, sinon le dernier, sinon explication
+ * claire), niveau selon l'approche et la familiarité, objectif selon les préférences, plan
+ * de pages selon la taille du texte lu, langue des explications.
  */
-export async function automaticSettings(userId: string, sourceId: string) {
+export async function automaticSettings(userId: string, sourceId: string, chosen?: Mode) {
   const db = adminClient();
   const [{ data: prefs }, { data: segs }] = await Promise.all([
-    db.from("reader_preferences").select("familiarity, goal, theme_id").eq("owner_id", userId).maybeSingle(),
+    db.from("reader_preferences").select("familiarity, goal, default_mode, explanation_lang").eq("owner_id", userId).maybeSingle(),
     db.from("source_segments").select("text").eq("source_id", sourceId).limit(3_000),
   ]);
   const chars = (segs ?? []).reduce((n, x) => n + (x.text as string).length, 0);
+  const mode: Mode = chosen ?? Mode.safeParse(prefs?.default_mode).data ?? "claire";
   return {
-    level: LEVEL_BY_FAMILIARITY[prefs?.familiarity ?? ""] ?? "grand_public",
-    goal: Goal.safeParse(prefs?.goal).data ?? "comprendre",
-    targetPages: pagesForLength(chars),
-    theme: ThemeId.safeParse(prefs?.theme_id).data ?? null,
-  } as const;
+    mode,
+    level: levelFor(mode, prefs?.familiarity),
+    goal: mode === "revision" ? ("reviser" as const) : (Goal.safeParse(prefs?.goal).data ?? "comprendre"),
+    targetPages: planPages(chars, mode),
+    language: (prefs?.explanation_lang === "fr" || prefs?.explanation_lang === "en" ? prefs.explanation_lang : null) as "fr" | "en" | null,
+  };
 }
 
-/** Longueur du rapport selon le texte lu (OCR en attente : longueur standard). */
-export function pagesForLength(chars: number): 5 | 7 | 12 {
-  if (chars === 0 || chars <= 12_000) return 5;
-  if (chars <= 60_000) return 7;
-  return 12;
+/** Ancien repère (V3), conservé pour les tests de compatibilité. */
+export function pagesForLength(chars: number): number {
+  return planPages(chars, "claire");
 }

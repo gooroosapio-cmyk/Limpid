@@ -5,15 +5,21 @@
  */
 import "server-only";
 import { z } from "zod";
-import { Level } from "@/lib/contracts/schemas";
-import { simplerLevel } from "@/lib/engine/pipeline";
+import { Level, Mode } from "@/lib/contracts/schemas";
+import { REFORMULATE_REASONS, simplerLevel } from "@/lib/engine/pipeline";
+import { levelFor } from "./create";
 import { assertCanStartJob, LimitError } from "@/lib/jobs/limits";
 import { adminClient } from "@/lib/supabase/admin";
 
-export const MAX_VERSIONS = 10;
+export const MAX_VERSIONS = 20;
 
 export const VersionRequest = z.strictObject({
-  variation: z.enum(["simpler", "other_example"]),
+  variation: z.enum(["simpler", "other_example", "mode", "reformulate"]),
+  /** Créer une autre version : approche demandée. */
+  mode: Mode.optional(),
+  /** Essayer une autre formulation : motifs (choix multiples) et remarque facultative. */
+  reasons: z.array(z.enum(REFORMULATE_REASONS)).max(6).optional(),
+  comment: z.string().trim().max(1_000).optional(),
   /** Section à réécrire seule ; absente = tout le rapport. */
   section_id: z.string().regex(/^[a-z]{1,6}_[A-Za-z0-9_-]{1,64}$/).optional(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/),
@@ -62,13 +68,16 @@ export async function requestVersion(userId: string, reportId: string, input: z.
 
   const { data: current } = await db
     .from("report_versions")
-    .select("id, level, goal, target_pages, explanation")
+    .select("id, level, goal, target_pages, explanation, mode")
     .eq("id", report.current_version_id)
     .single();
   if (!current) throw new VersionError("not_found", "Version introuvable.");
   const sections = ((current.explanation as { sections?: { id: string }[] } | null)?.sections ?? []).map((x) => x.id);
   if (input.section_id && !sections.includes(input.section_id)) throw new VersionError("not_found", "Cette partie n'existe plus dans la version actuelle.");
   const level = Level.parse(current.level);
+  if (input.variation === "mode" && !input.mode) throw new VersionError("not_found", "Approche manquante.");
+  const mode = input.variation === "mode" ? input.mode! : (Mode.safeParse(current.mode).data ?? "claire");
+  const { data: prefs } = await db.from("reader_preferences").select("familiarity, explanation_lang").eq("owner_id", userId).maybeSingle();
 
   const job = await db.from("jobs").insert({
     owner_id: userId,
@@ -80,9 +89,17 @@ export async function requestVersion(userId: string, reportId: string, input: z.
       variation: input.variation,
       base_version_id: current.id,
       // Une section plus simple garde le niveau du rapport ; seule sa rédaction change.
-      level: input.variation === "simpler" && !input.section_id ? simplerLevel(level) : level,
+      level:
+        input.variation === "mode"
+          ? levelFor(mode, prefs?.familiarity)
+          : input.variation === "simpler" && !input.section_id
+            ? simplerLevel(level)
+            : level,
       ...(input.section_id ? { section_id: input.section_id } : {}),
-      goal: current.goal,
+      mode,
+      language: prefs?.explanation_lang === "fr" || prefs?.explanation_lang === "en" ? prefs.explanation_lang : null,
+      ...(input.variation === "reformulate" ? { reasons: input.reasons ?? [], comment: input.comment || null } : {}),
+      goal: mode === "revision" ? "reviser" : current.goal === "reviser" && input.variation === "mode" ? "comprendre" : current.goal,
       target_pages: current.target_pages,
     },
   });

@@ -2,7 +2,8 @@ import { parseHTML } from "linkedom";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Reader } from "@/components/reader/Reader";
+import { composeLimpid } from "@/components/reader/v4/Pieces";
+import { dictFor } from "@/lib/i18n";
 import { DEMO_SOURCE_TITLE, demoBlueprint, demoEvidence, demoExplanation, demoSegments } from "@/lib/demo/cycle-eau";
 import { extractPdf } from "@/lib/extract/pdf";
 import { renderReportPdf } from "./pdf";
@@ -36,30 +37,36 @@ describe("rendu face à un contenu hostile (XSS)", () => {
   it("échappe le texte et neutralise les liens dangereux", () => {
     const { explanation, blueprint } = hostileReport();
     const html = renderToStaticMarkup(
-      h(Reader, {
-        blueprint,
-        explanation,
-        evidence: demoEvidence,
-        segments: demoSegments,
-        sourceTitle: `${DEMO_SOURCE_TITLE} ${HOSTILE}`,
-        sourceUrl: "javascript:alert(4)",
-        isDemo: false,
-        assets: {
-          "00000000-0000-4000-8000-000000000001": {
-            id: "a",
-            src: "/x.jpg",
-            width: 960,
-            height: 640,
-            provider: "commons",
-            author: HOSTILE,
-            license: "CC0",
-            licenseUrl: "javascript:alert(5)",
-            sourceUrl: "data:text/html,<script>alert(6)</script>",
-            modifications: null,
-            model: null,
+      h(
+        "div",
+        null,
+        composeLimpid({
+          t: dictFor("fr"),
+          blueprint,
+          explanation,
+          evidence: demoEvidence,
+          segments: demoSegments,
+          exercises: null,
+          modeLabel: null,
+          canReformulate: true,
+          expiry: `Expire ${HOSTILE}`,
+          assets: {
+            "00000000-0000-4000-8000-000000000001": {
+              id: "a",
+              src: "/x.jpg",
+              width: 960,
+              height: 640,
+              provider: "commons",
+              author: HOSTILE,
+              license: "CC0",
+              licenseUrl: "javascript:alert(5)",
+              sourceUrl: "data:text/html,<script>alert(6)</script>",
+              modifications: null,
+              model: null,
+            },
           },
-        },
-      }),
+        }).pieces,
+      ),
     );
     const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
     expect(document.querySelectorAll("script")).toHaveLength(0);

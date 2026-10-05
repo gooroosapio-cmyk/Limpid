@@ -4,13 +4,15 @@
  * se résolvent, que les extraits existent réellement dans la source et que les
  * chiffres annoncés figurent dans les preuves. Elles ne prouvent pas la vérité.
  */
-import type {
-  Evidence,
-  ExplanationObject,
-  KnowledgeObject,
-  ReportBlueprint,
-  SourceSegment,
-  ValidationResult,
+import {
+  blockClaimIds,
+  blockEvidenceIds,
+  type Evidence,
+  type ExplanationObject,
+  type KnowledgeObject,
+  type ReportBlueprint,
+  type SourceSegment,
+  type ValidationResult,
 } from "./schemas";
 
 type Check = ValidationResult["checks"][number];
@@ -174,17 +176,21 @@ export function validateExplanation(
   for (const section of ex.sections) {
     for (const b of section.blocks) {
       blockIds.push(b.id);
-      for (const cid of b.claim_ids) {
+      for (const cid of blockClaimIds(b)) {
         if (!claims.has(cid)) v.fail("block_claims_exist", "reference", [b.id, cid], "affirmation inexistante");
       }
-      for (const eid of b.evidence_ids) {
+      for (const eid of blockEvidenceIds(b)) {
         if (!evidenceIds.has(eid)) v.fail("block_evidence_exist", "reference", [b.id, eid], "preuve inexistante");
       }
-      if (b.type === "fact" || b.type === "definition") {
-        if (b.claim_ids.length === 0) {
-          v.fail("fact_has_claim", "reference", [b.id], "bloc factuel sans affirmation sourcée");
+      // Les éléments d'une liste rapportent des faits : ils s'appuient sur des affirmations soutenues.
+      const sourced =
+        b.type === "fact" || b.type === "definition" ? [b.claim_ids] : b.type === "list" ? b.items.map((i) => i.claim_ids) : [];
+      for (const list of sourced) {
+        if (list.length === 0) {
+          if (b.type === "list") v.fail("list_item_has_claim", "reference", [b.id], "élément de liste sans affirmation sourcée", false);
+          else v.fail("fact_has_claim", "reference", [b.id], "bloc factuel sans affirmation sourcée");
         }
-        for (const cid of b.claim_ids) {
+        for (const cid of list) {
           const status = claims.get(cid)?.support_status;
           if (status === "unsupported" || status === "contradicted") {
             v.fail("fact_supported", "reference", [b.id, cid], `affirmation ${status === "contradicted" ? "contredite par la source" : "non soutenue"} présentée comme établie`);
@@ -192,6 +198,9 @@ export function validateExplanation(
             v.fail("fact_ambiguous", "reference", [b.id, cid], "affirmation partiellement soutenue ou ambiguë : formulation prudente requise", false);
           }
         }
+      }
+      if (b.type === "complement" && (b.claim_ids.length > 0 || b.evidence_ids.length > 0)) {
+        v.fail("complement_unreferenced", "reference", [b.id], "un complément ne porte pas de référence à la source", false);
       }
     }
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { kindFromFileName, titleFromFileName } from "@/lib/sources/uploads";
-import { CreateRequest, pagesForLength } from "./create";
+import { planPages } from "@/lib/engine/pipeline";
+import { CreateRequest, levelFor } from "./create";
 
 const params = { level: "grand_public", goal: "comprendre", target_pages: 5, idempotency_key: "cle-de-test-123" };
 
@@ -9,12 +10,35 @@ describe("parcours V3 : réglages automatiques", () => {
     expect(CreateRequest.safeParse({ source_id: crypto.randomUUID(), idempotency_key: "cle-de-test-123" }).success).toBe(true);
   });
 
-  it("déduit la longueur du rapport de la taille du texte lu", () => {
-    expect(pagesForLength(0)).toBe(5);
-    expect(pagesForLength(12_000)).toBe(5);
-    expect(pagesForLength(12_001)).toBe(7);
-    expect(pagesForLength(60_000)).toBe(7);
-    expect(pagesForLength(60_001)).toBe(12);
+  it("planifie 5 à 18 pages selon la richesse de la source et l'approche", () => {
+    expect(planPages(0, "claire")).toBe(5);
+    expect(planPages(12_000, "claire")).toBe(7);
+    expect(planPages(30_000, "claire")).toBe(10);
+    expect(planPages(80_000, "claire")).toBe(13);
+    expect(planPages(400_000, "claire")).toBe(16);
+    expect(planPages(400_000, "tres_simple")).toBe(17);
+    expect(planPages(400_000, "resume")).toBe(12);
+    expect(planPages(1_000, "resume")).toBe(5);
+    for (const m of ["tres_simple", "claire", "resume", "revision"] as const) {
+      for (const c of [0, 5_000, 50_000, 10_000_000]) {
+        expect(planPages(c, m)).toBeGreaterThanOrEqual(5);
+        expect(planPages(c, m)).toBeLessThanOrEqual(18);
+      }
+    }
+  });
+
+  it("très simple impose le niveau le plus simple ; sinon la familiarité décide", () => {
+    expect(levelFor("tres_simple", "maitrise")).toBe("ultra_simple");
+    expect(levelFor("claire", "maitrise")).toBe("etudiant");
+    expect(levelFor("resume", null)).toBe("grand_public");
+  });
+
+  it("accepte les quatre approches et refuse une approche inconnue", () => {
+    const id = crypto.randomUUID();
+    for (const mode of ["tres_simple", "claire", "resume", "revision"]) {
+      expect(CreateRequest.safeParse({ source_id: id, mode, idempotency_key: "cle-de-test-123" }).success).toBe(true);
+    }
+    expect(CreateRequest.safeParse({ source_id: id, mode: "magique", idempotency_key: "cle-de-test-123" }).success).toBe(false);
   });
 });
 

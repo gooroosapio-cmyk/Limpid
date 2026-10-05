@@ -1,0 +1,246 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Icon, type IconName } from "@/components/Icon";
+import { ComfortSettings } from "@/components/account/DisplaySettings";
+import { MODES, type Mode } from "@/lib/contracts/schemas";
+import type { DisplayPrefs } from "@/lib/display/prefs";
+import { apiMessage } from "@/lib/i18n/api";
+import { useLang, useT } from "@/lib/i18n/client";
+import { OfflineSave } from "../OfflineSave";
+
+export interface SourceItem {
+  n: number;
+  location: string;
+  quote: string;
+}
+
+export interface OptionsData {
+  reportId: string | null;
+  title: string;
+  pdfHref: string;
+  hasExercises: boolean;
+  sourceTitle: string;
+  originalHref: string | null;
+  sources: SourceItem[];
+  glossary: { term: string; definition: string }[];
+  mode: Mode | null;
+  versions: { href: string; number: number; mode: Mode | null; createdAt: string; current: boolean; shown: boolean }[];
+  /** Clé hors connexion du compte (null : démonstration). */
+  offlineAccount: string | null;
+  display: DisplayPrefs;
+}
+
+type View = "menu" | "export" | "display" | "sources" | "glossary" | "version" | "versions";
+
+function Row({ icon, title, sub, onClick, href, danger, external }: { icon: IconName; title: string; sub?: string; onClick?: () => void; href?: string; danger?: boolean; external?: boolean }) {
+  const inner = (
+    <>
+      <span className="row-icon"><Icon name={icon} /></span>
+      <span className="row-text"><b>{title}</b>{sub && <small>{sub}</small>}</span>
+      <Icon name="chevron" className="row-chevron" />
+    </>
+  );
+  return (
+    <li>
+      {href ? (
+        <a className={danger ? "row row-danger" : "row"} href={href} {...(external ? { target: "_blank", rel: "noopener" } : {})}>{inner}</a>
+      ) : (
+        <button type="button" className={danger ? "row row-danger" : "row"} onClick={onClick}>{inner}</button>
+      )}
+    </li>
+  );
+}
+
+/** Options du Limpid (V4, § 8) : actions rares, distinctes de la lecture. */
+export function OptionsPanel({
+  data,
+  continuous,
+  onContinuous,
+  onNavigate,
+}: {
+  data: OptionsData;
+  continuous: boolean;
+  onContinuous: (on: boolean) => void;
+  onNavigate: () => void;
+}) {
+  const t = useT();
+  const lang = useLang();
+  const router = useRouter();
+  const [view, setView] = useState<View>("menu");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString(lang === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const modeName = (m: Mode | null) => (m ? (t.add.modes[m]?.title ?? m) : "—");
+
+  async function newVersion(mode: Mode) {
+    if (!data.reportId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/reports/${data.reportId}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variation: "mode", mode, idempotency_key: crypto.randomUUID() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(apiMessage(t, body, t.versions.failed));
+      setMessage(t.lim.requested);
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!data.reportId || !window.confirm(t.reports.deleteConfirm)) return;
+    setBusy(true);
+    const res = await fetch(`/api/reports/${data.reportId}`, { method: "DELETE" }).catch(() => null);
+    if (res?.ok) {
+      router.push("/");
+      router.refresh();
+    } else {
+      setError(t.common.deleteFailed);
+      setBusy(false);
+    }
+  }
+
+  const back = (title: string) => (
+    <div className="sheet-sub">
+      <button type="button" className="btn-link" onClick={() => setView("menu")}>
+        <Icon name="back" size={18} /> {t.options.back}
+      </button>
+      <h3>{title}</h3>
+    </div>
+  );
+
+  if (view === "export")
+    return (
+      <div className="stagger" key="export">
+        {back(t.lim.optExport)}
+        <ul className="rows">
+          <Row icon="download" title={t.lim.exportContent} href={data.pdfHref} />
+          {data.hasExercises && <Row icon="quiz" title={t.lim.exportExercises} href={`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}exercices=1`} />}
+          {data.hasExercises && <Row icon="check" title={t.lim.exportKey} href={`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}corrige=1`} />}
+        </ul>
+        <p className="muted small">{t.lim.exportNote}</p>
+      </div>
+    );
+
+  if (view === "display")
+    return (
+      <div className="stagger" key="display">
+        {back(t.lim.optDisplay)}
+        <ComfortSettings initial={data.display} />
+        <label className="setting">
+          <span><b>{t.lim.continuous[0]}</b><small>{t.lim.continuous[1]}</small></span>
+          <span className="switch">
+            <input type="checkbox" checked={continuous} onChange={(e) => onContinuous(e.target.checked)} />
+            <i aria-hidden="true" />
+          </span>
+        </label>
+      </div>
+    );
+
+  if (view === "sources")
+    return (
+      <div className="stagger" key="sources">
+        {back(t.lim.optSources)}
+        <p className="muted small">{data.sourceTitle}</p>
+        <ol className="sources-list">
+          {data.sources.map((s) => (
+            <li key={s.n}>
+              <span className="src-n">{s.n}</span>
+              <span><small>{s.location}</small><q>{s.quote}</q></span>
+            </li>
+          ))}
+        </ol>
+        {data.originalHref ? (
+          <a className="btn btn-block" href={data.originalHref} target="_blank" rel="noopener noreferrer nofollow"><Icon name="file" /> {t.lim.original}</a>
+        ) : (
+          <p className="notice">{t.lim.originalMissing}</p>
+        )}
+      </div>
+    );
+
+  if (view === "glossary")
+    return (
+      <div className="stagger" key="glossary">
+        {back(t.lim.optGlossary)}
+        {data.glossary.length ? (
+          <dl className="glossary">
+            {data.glossary.map((g) => (
+              <div key={g.term}><dt>{g.term}</dt><dd>{g.definition}</dd></div>
+            ))}
+          </dl>
+        ) : (
+          <p className="muted">{t.lim.noGlossary}</p>
+        )}
+      </div>
+    );
+
+  if (view === "version")
+    return (
+      <div className="stagger" key="version">
+        {back(t.lim.optNewVersion)}
+        <p className="muted small">{t.lim.keptNote}</p>
+        <ul className="rows">
+          {MODES.map((m) => (
+            <li key={m}>
+              <button type="button" className="row" disabled={busy || !data.reportId} onClick={() => newVersion(m)}>
+                <span className="row-icon"><Icon name={m === data.mode ? "check" : "spark"} /></span>
+                <span className="row-text">
+                  <b>{t.add.modes[m]?.title}{m === data.mode ? ` (${t.lim.currentMode})` : ""}</b>
+                  <small>{t.add.modes[m]?.desc}</small>
+                </span>
+                <Icon name="chevron" className="row-chevron" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        {message && <p className="notice notice-ok" role="status">{message}</p>}
+        {error && <p className="notice notice-error" role="alert">{error}</p>}
+      </div>
+    );
+
+  if (view === "versions")
+    return (
+      <div className="stagger" key="versions">
+        {back(t.lim.optVersions)}
+        <ul className="rows">
+          {data.versions.map((v) => (
+            <li key={v.href}>
+              <Link className="row" href={v.href} aria-current={v.shown ? "page" : undefined} onClick={onNavigate}>
+                <span className="row-icon"><Icon name={v.shown ? "check" : "clock"} /></span>
+                <span className="row-text"><b>{t.lim.versionLine(v.number, modeName(v.mode), when(v.createdAt))}</b></span>
+                <Icon name="chevron" className="row-chevron" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+
+  return (
+    <div>
+      <ul className="rows">
+        <Row icon="download" title={t.lim.optExport} sub={t.lim.optExportSub} onClick={() => setView("export")} />
+        <Row icon="eye" title={t.lim.optDisplay} sub={t.lim.optDisplaySub} onClick={() => setView("display")} />
+        <Row icon="file" title={t.lim.optSources} sub={data.sourceTitle} onClick={() => setView("sources")} />
+        <Row icon="book" title={t.lim.optGlossary} onClick={() => setView("glossary")} />
+        {data.reportId && <Row icon="spark" title={t.lim.optNewVersion} sub={t.lim.optNewVersionSub} onClick={() => setView("version")} />}
+        {data.versions.length > 1 && <Row icon="clock" title={t.lim.optVersions} sub={t.options.versionsSub(data.versions.length)} onClick={() => setView("versions")} />}
+        {data.offlineAccount && data.reportId && <OfflineSave account={data.offlineAccount} path={`/rapports/${data.reportId}`} title={data.title} />}
+        {data.reportId && <Row icon="trash" title={t.options.delete} sub={t.options.deleteSub} onClick={remove} danger />}
+      </ul>
+      {error && <p className="notice notice-error" role="alert">{error}</p>}
+      <p className="muted small">{t.options.retention}</p>
+    </div>
+  );
+}

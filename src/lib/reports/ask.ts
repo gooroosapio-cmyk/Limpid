@@ -5,7 +5,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import type { SourceSegment } from "@/lib/contracts/schemas";
+import { blockEvidenceIds, type SourceSegment } from "@/lib/contracts/schemas";
 import { getProvider } from "@/lib/engine";
 import type { AIProvider } from "@/lib/engine/provider";
 import { describeLocator } from "@/lib/render/sources";
@@ -121,7 +121,7 @@ export async function askDocument(userId: string, reportId: string, input: AskRe
   const section = report.explanation.sections.find((s) => s.id === input.section_id) ?? null;
   const evidence = new Map(report.evidence.map((e) => [e.id, e.segment_id]));
   const preferred = new Set(
-    (section?.blocks ?? []).flatMap((b) => b.evidence_ids.map((id) => evidence.get(id)).filter((x): x is string => !!x)),
+    (section?.blocks ?? []).flatMap((b) => blockEvidenceIds(b).map((id) => evidence.get(id)).filter((x): x is string => !!x)),
   );
   const passages = pickSegments(report.segments, input.question, preferred);
   const explanation = section ? explanationText(report.explanation, [section.id], 6_000) : explanationText(report.explanation, undefined, 6_000);

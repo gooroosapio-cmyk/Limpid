@@ -1,4 +1,4 @@
-import { fr } from "@/lib/i18n/fr";
+import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
@@ -21,7 +21,7 @@ const STAGES: Record<string, string> = {
 /** Tableau de bord d'administration (données chargées par la page, côté serveur). */
 const seconds = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`);
 
-export function AdminView({
+export async function AdminView({
   o,
   perf,
   userEmail,
@@ -32,6 +32,7 @@ export function AdminView({
   userEmail: string | null;
   message?: string;
 }) {
+  const t = await getT();
   const monthPct = o.monthlyCapCents ? Math.min(100, Math.round((o.spentMonthCents / o.monthlyCapCents) * 100)) : 100;
   const models = o.quota.configured.length
     ? [...new Set([...o.quota.configured, ...o.quota.models.map(([m]) => m)])]
@@ -40,33 +41,33 @@ export function AdminView({
 
   return (
     <>
-      <h1>{fr.admin.title}</h1>
+      <h1>{t.admin.title}</h1>
       {message && <p className="notice" role="status">{message.slice(0, 200)}</p>}
 
       <section className="admin-section" aria-labelledby="adm-budget">
-        <h2 id="adm-budget">{fr.admin.spending}</h2>
+        <h2 id="adm-budget">{t.admin.spending}</h2>
         <dl className="stats">
-          <div><dt>{fr.admin.month}</dt><dd>{euros(o.spentMonthCents)} <span className="muted">/ {euros(o.monthlyCapCents)}</span></dd></div>
-          <div><dt>{fr.admin.last24h}</dt><dd>{euros(o.spent24hCents)} <span className="muted">/ {euros(o.dailyAccountCapCents)} {fr.admin.perAccount}</span></dd></div>
-          <div><dt>{fr.admin.reports}</dt><dd>{o.reportCount}</dd></div>
+          <div><dt>{t.admin.month}</dt><dd>{euros(o.spentMonthCents)} <span className="muted">/ {euros(o.monthlyCapCents)}</span></dd></div>
+          <div><dt>{t.admin.last24h}</dt><dd>{euros(o.spent24hCents)} <span className="muted">/ {euros(o.dailyAccountCapCents)} {t.admin.perAccount}</span></dd></div>
+          <div><dt>{t.admin.reports}</dt><dd>{o.reportCount}</dd></div>
         </dl>
-        <label htmlFor="month-meter">{fr.admin.monthUse(monthPct)}</label>
+        <label htmlFor="month-meter">{t.admin.monthUse(monthPct)}</label>
         <meter id="month-meter" min={0} max={100} low={70} high={90} optimum={0} value={monthPct}>{monthPct} %</meter>
         {o.byStage.length > 0 && (
           <table className="admin-table">
-            <caption className="sr-only">{fr.admin.byStage}</caption>
-            <thead><tr><th scope="col">{fr.admin.stage}</th><th scope="col">{fr.admin.cost}</th></tr></thead>
+            <caption className="sr-only">{t.admin.byStage}</caption>
+            <thead><tr><th scope="col">{t.admin.stage}</th><th scope="col">{t.admin.cost}</th></tr></thead>
             <tbody>{o.byStage.map(([stage, c]) => <tr key={stage}><td>{STAGES[stage] ?? stage}</td><td>{euros(c)}</td></tr>)}</tbody>
           </table>
         )}
-        <p className="muted small">{fr.admin.estimateNote}</p>
+        <p className="muted small">{t.admin.estimateNote}</p>
       </section>
 
       <section className="admin-section" aria-labelledby="adm-quota">
-        <h2 id="adm-quota">{fr.admin.quota}</h2>
-        <p className="muted">{fr.admin.quotaIntro(o.quota.limit, when(o.quota.since.toISOString()))}</p>
+        <h2 id="adm-quota">{t.admin.quota}</h2>
+        <p className="muted">{t.admin.quotaIntro(o.quota.limit, when(o.quota.since.toISOString()))}</p>
         {models.length === 0 ? (
-          <p className="muted">{fr.admin.noRequests}</p>
+          <p className="muted">{t.admin.noRequests}</p>
         ) : (
           models.map((m) => {
             const n = used.get(m) ?? 0;
@@ -81,22 +82,22 @@ export function AdminView({
       </section>
 
       <section className="admin-section" aria-labelledby="adm-diag">
-        <h2 id="adm-diag">{fr.admin.diagnostic}</h2>
-        <p className="muted">{fr.admin.diagIntro}</p>
+        <h2 id="adm-diag">{t.admin.diagnostic}</h2>
+        <p className="muted">{t.admin.diagIntro}</p>
         <DiagnosticPanel />
       </section>
 
       {perf && (
         <section className="admin-section" aria-labelledby="adm-perf">
-          <h2 id="adm-perf">{fr.admin.performance}</h2>
+          <h2 id="adm-perf">{t.admin.performance}</h2>
           <p className="muted">
-            {fr.admin.perfReports(perf.reports.count, seconds(perf.reports.p50), seconds(perf.reports.p95))}
-            {perf.reports.successRate !== null && ` ${fr.admin.perfSuccess(Math.round(perf.reports.successRate * 100))}`}
+            {t.admin.perfReports(perf.reports.count, seconds(perf.reports.p50), seconds(perf.reports.p95))}
+            {perf.reports.successRate !== null && ` ${t.admin.perfSuccess(Math.round(perf.reports.successRate * 100))}`}
           </p>
           {perf.stages.length > 0 && (
-            <div className="table-scroll" tabIndex={0} role="region" aria-label={fr.admin.perfTable}>
+            <div className="table-scroll" tabIndex={0} role="region" aria-label={t.admin.perfTable}>
               <table className="admin-table">
-                <thead><tr><th scope="col">{fr.admin.stage}</th><th scope="col">{fr.admin.calls}</th><th scope="col">p50</th><th scope="col">p95</th><th scope="col">{fr.admin.avgCost}</th></tr></thead>
+                <thead><tr><th scope="col">{t.admin.stage}</th><th scope="col">{t.admin.calls}</th><th scope="col">p50</th><th scope="col">p95</th><th scope="col">{t.admin.avgCost}</th></tr></thead>
                 <tbody>
                   {perf.stages.map((x) => (
                     <tr key={x.stage}>
@@ -115,61 +116,61 @@ export function AdminView({
       )}
 
       <section className="admin-section" aria-labelledby="adm-switch">
-        <h2 id="adm-switch">{fr.admin.circuit}</h2>
+        <h2 id="adm-switch">{t.admin.circuit}</h2>
         <form action={setGeneration} className="admin-form">
           <label className="consent">
             <input type="checkbox" name="enabled" defaultChecked={o.generationEnabled} />
-            <span>{fr.admin.generationEnabled}</span>
+            <span>{t.admin.generationEnabled}</span>
           </label>
-          <button type="submit" className="btn">{fr.admin.save}</button>
+          <button type="submit" className="btn">{t.admin.save}</button>
         </form>
         <form action={setMonthlyCap} className="admin-form">
-          <label htmlFor="cap">{fr.admin.capLabel(o.envCapCents / 100)}</label>
+          <label htmlFor="cap">{t.admin.capLabel(o.envCapCents / 100)}</label>
           <input id="cap" name="euros" type="number" inputMode="decimal" min={0} max={o.envCapCents / 100} step="0.5" defaultValue={o.monthlyCapCents / 100} />
-          <button type="submit" className="btn">{fr.admin.save}</button>
+          <button type="submit" className="btn">{t.admin.save}</button>
         </form>
       </section>
 
       <section className="admin-section" aria-labelledby="adm-allow">
-        <h2 id="adm-allow">{fr.admin.allowlist}</h2>
+        <h2 id="adm-allow">{t.admin.allowlist}</h2>
         <ul className="allow-list">
           {o.emails.map((e) => (
             <li key={e.email}>
               <span className="allow-email">{e.email}</span>
-              <span className="badge">{e.role === "admin" ? fr.admin.roleAdmin : fr.admin.roleUser}</span>
+              <span className="badge">{e.role === "admin" ? t.admin.roleAdmin : t.admin.roleUser}</span>
               {e.email !== userEmail?.toLowerCase() && (
                 <form action={removeAllowedEmail}>
                   <input type="hidden" name="email" value={e.email} />
-                  <button type="submit" className="btn-link" aria-label={fr.admin.removeLabel(e.email)}>{fr.admin.remove}</button>
+                  <button type="submit" className="btn-link" aria-label={t.admin.removeLabel(e.email)}>{t.admin.remove}</button>
                 </form>
               )}
             </li>
           ))}
         </ul>
         <form action={addAllowedEmail} className="admin-form">
-          <label htmlFor="new-email">{fr.admin.addLabel}</label>
+          <label htmlFor="new-email">{t.admin.addLabel}</label>
           <input id="new-email" name="email" type="email" autoComplete="off" required />
-          <label htmlFor="new-role">{fr.admin.role}</label>
+          <label htmlFor="new-role">{t.admin.role}</label>
           <select id="new-role" name="role" defaultValue="user">
-            <option value="user">{fr.admin.roleUser}</option>
-            <option value="admin">{fr.admin.roleAdmin}</option>
+            <option value="user">{t.admin.roleUser}</option>
+            <option value="admin">{t.admin.roleAdmin}</option>
           </select>
-          <button type="submit" className="btn">{fr.admin.add}</button>
+          <button type="submit" className="btn">{t.admin.add}</button>
         </form>
       </section>
 
       <section className="admin-section" aria-labelledby="adm-jobs">
-        <h2 id="adm-jobs">{fr.admin.jobs}</h2>
-        {o.jobs.length === 0 ? <p className="muted">{fr.admin.none}</p> : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label={fr.admin.jobsTable}>
+        <h2 id="adm-jobs">{t.admin.jobs}</h2>
+        {o.jobs.length === 0 ? <p className="muted">{t.admin.none}</p> : (
+          <div className="table-scroll" tabIndex={0} role="region" aria-label={t.admin.jobsTable}>
             <table className="admin-table">
-              <thead><tr><th scope="col">{fr.admin.date}</th><th scope="col">{fr.admin.kind}</th><th scope="col">{fr.admin.status}</th><th scope="col">{fr.admin.error}</th></tr></thead>
+              <thead><tr><th scope="col">{t.admin.date}</th><th scope="col">{t.admin.kind}</th><th scope="col">{t.admin.status}</th><th scope="col">{t.admin.error}</th></tr></thead>
               <tbody>
                 {o.jobs.map((j) => (
                   <tr key={j.id}>
                     <td>{when(j.created_at)}</td>
-                    <td>{fr.admin.kinds[j.kind] ?? j.kind}</td>
-                    <td>{fr.reports.status[j.status] ?? j.status}</td>
+                    <td>{t.admin.kinds[j.kind] ?? j.kind}</td>
+                    <td>{t.reports.status[j.status] ?? j.status}</td>
                     <td><code>{j.error_code ?? "—"}</code></td>
                   </tr>
                 ))}
@@ -180,8 +181,8 @@ export function AdminView({
       </section>
 
       <section className="admin-section" aria-labelledby="adm-audit">
-        <h2 id="adm-audit">{fr.admin.audit}</h2>
-        {o.audit.length === 0 ? <p className="muted">{fr.admin.none}</p> : (
+        <h2 id="adm-audit">{t.admin.audit}</h2>
+        {o.audit.length === 0 ? <p className="muted">{t.admin.none}</p> : (
           <ul className="audit-list">
             {o.audit.map((a, i) => <li key={i}><span className="muted">{when(a.created_at)}</span> <code>{a.action}</code></li>)}
           </ul>

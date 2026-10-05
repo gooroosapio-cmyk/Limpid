@@ -3,30 +3,21 @@ import { currentUser } from "@/lib/auth";
 import { isDemoMode } from "@/lib/config";
 import { drainQueue } from "@/lib/jobs/worker";
 import { CreateError, CreateRequest, createReport } from "@/lib/reports/create";
+import { loadLibrary } from "@/lib/library/load";
 import { isAdminConfigured } from "@/lib/supabase/admin";
-import { createUserClient } from "@/lib/supabase/server";
 
 // La génération s'exécute après la réponse, dans la même fonction (durée Vercel max.).
 export const maxDuration = 300;
 
-/** Liste courte des rapports du lecteur (menu latéral), via la RLS. */
+/** Menu latéral : dossiers et Limpid (échecs masqués), état lu / en cours, via la RLS. */
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "non_connecte" }, { status: 401 });
-  const supabase = await createUserClient();
-  const { data } = await supabase
-    .from("reports")
-    .select("id, title, current_version_id, jobs(status, created_at)")
-    .eq("is_demo", false)
-    .order("created_at", { ascending: false })
-    .limit(60);
-  const reports = (data ?? []).map((r) => {
-    const job = [...((r.jobs as { status: string; created_at: string }[] | null) ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-    const running = !!job && (job.status === "queued" || job.status === "running");
-    const state = r.current_version_id ? (running ? "updating" : "ready") : running ? "preparing" : "failed";
-    return { id: r.id, title: r.title, state };
-  });
-  return NextResponse.json({ reports }, { headers: { "Cache-Control": "no-store" } });
+  const { folders, items } = await loadLibrary({ limit: 60 });
+  const reports = items
+    .filter((i) => i.state !== "failed")
+    .map((i) => ({ id: i.id, title: i.title, state: i.state === "running" ? "preparing" : i.updating ? "updating" : "ready", unread: i.unread, folderId: i.folderId }));
+  return NextResponse.json({ folders: folders.map((f) => ({ id: f.id, name: f.name })), reports }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: NextRequest) {

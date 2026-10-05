@@ -1,7 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_SOURCE_TITLE, demoBlueprint, demoEvidence, demoExplanation, demoSegments } from "@/lib/demo/cycle-eau";
 import { extractPdf } from "@/lib/extract/pdf";
+import type { Exercise, ExerciseSet } from "@/lib/contracts/schemas";
 import { pdfFileName, renderReportPdf } from "./pdf";
+
+function ex(id: string, kind: Exercise["kind"]): Exercise {
+  return {
+    id,
+    kind,
+    prompt: `Question ${id} ?`,
+    objective: "Comprendre",
+    notion: null,
+    section_id: demoExplanation.sections[0]!.id,
+    evidence_ids: [],
+    options: kind === "single" ? [{ text: "Oui", correct: true, why: "" }, { text: "Non", correct: false, why: "" }] : [],
+    truth: kind === "truefalse" ? true : null,
+    items: [],
+    pairs: [],
+    blanks: [],
+    expected: null,
+    rubric: [],
+    explanation: `Explication ${id}`,
+  };
+}
 
 describe("export PDF", () => {
   it("produit un PDF lisible contenant le titre, les sections et les sources numérotées", async () => {
@@ -27,7 +48,7 @@ describe("export PDF", () => {
     expect(text).toContain("140 ont été lues");
   }, 30_000);
 
-  it("rend graphique et tableau dans les trois présentations, sans perdre le texte", async () => {
+  it("rend graphique et tableau, sans perdre le texte", async () => {
     const blueprint = structuredClone(demoBlueprint);
     blueprint.visual_specs.push(
       {
@@ -54,14 +75,40 @@ describe("export PDF", () => {
       },
     );
     blueprint.sections[0]!.visual_ids.push("vis_chart", "vis_compare");
-    for (const theme of ["sciences", "recit", "dossier", "guide", "confort"] as const) {
-      const buf = await renderReportPdf({ blueprint, explanation: demoExplanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE, theme });
+    {
+      const buf = await renderReportPdf({ blueprint, explanation: demoExplanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE });
       const text = (await extractPdf(new Uint8Array(buf), { maxPages: 50 })).blocks.map((b) => b.text).join(" ");
       expect(text).toContain("Où se trouve l'eau");
       expect(text).toContain("Non précisé par la source");
       expect(text).toContain("Environ 97 %");
       expect(text).toContain(demoExplanation.sections.at(-1)!.question);
     }
+  }, 60_000);
+
+  it("exporte les exercices sans réponses, et le corrigé à part", async () => {
+    const exercises: ExerciseSet = {
+      schema_version: "1.1.0",
+      checkpoints: [{ section_id: demoExplanation.sections[0]!.id, exercises: [ex("ex_a", "single")] }],
+      bilan: [ex("ex_b", "truefalse"), { ...ex("ex_c", "order"), items: ["Évaporation", "Condensation", "Précipitations"] }],
+      insufficient: false,
+    };
+    const base = { blueprint: demoBlueprint, explanation: demoExplanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE, exercises };
+    const read = async (buf: Buffer) => (await extractPdf(new Uint8Array(buf), { maxPages: 50 })).blocks.map((b) => b.text).join(" ").replace(/\s+/g, " ");
+    const withEx = await read(await renderReportPdf({ ...base, variant: "exercises", watermark: true }));
+    expect(withEx).toContain("Exercices");
+    expect(withEx).toContain("Question ex_a ?");
+    expect(withEx).not.toContain("Explication ex_a");
+    expect(withEx).toContain("Créé avec Limpid · version gratuite");
+    expect(withEx).toContain("Annexes");
+    const key = await read(await renderReportPdf({ ...base, variant: "key" }));
+    expect(key).toContain("Corrigé des exercices");
+    expect(key).toContain("Explication ex_a");
+    expect(key).toContain("Évaporation → Condensation → Précipitations");
+    expect(key).not.toContain(demoExplanation.sections[0]!.blocks[0]!.text.slice(0, 40));
+    expect(key).not.toContain("version gratuite");
+    const en = await read(await renderReportPdf({ ...base, lang: "en" }));
+    expect(en).toContain("Appendices");
+    expect(en).toContain("The essentials");
   }, 60_000);
 
   it("fabrique un nom de fichier sûr", () => {

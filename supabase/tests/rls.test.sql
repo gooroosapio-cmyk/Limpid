@@ -164,4 +164,44 @@ do $$ begin
   end if;
 end $$;
 
+-- V4 : dossiers, progression, tentatives — lecture par le propriétaire, écriture serveur
+insert into public.folders (id, owner_id, name) values
+  ('40000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000b', 'Cours B');
+update public.reports set folder_id = '40000000-0000-0000-0000-00000000000b' where id = '20000000-0000-0000-0000-00000000000b';
+insert into public.report_progress (owner_id, report_id, anchor, read_at) values
+  ('00000000-0000-0000-0000-00000000000b', '20000000-0000-0000-0000-00000000000b', 'sec_2', now());
+insert into public.quiz_attempts (owner_id, report_version_id, kind, score, total, answers) values
+  ('00000000-0000-0000-0000-00000000000b', '30000000-0000-0000-0000-0000000000b2', 'bilan', 3, 5, '[]');
+do $$ begin
+  insert into public.quiz_attempts (owner_id, report_version_id, kind, score, total, answers)
+    values ('00000000-0000-0000-0000-00000000000b', '30000000-0000-0000-0000-0000000000b2', 'bilan', 6, 5, '[]');
+  raise exception 'ECHEC : score supérieur au total accepté';
+exception when check_violation then null;
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$ begin
+  if exists (select 1 from public.folders) then raise exception 'ECHEC : A voit le dossier de B'; end if;
+  if exists (select 1 from public.report_progress) then raise exception 'ECHEC : A voit la progression de B'; end if;
+  if exists (select 1 from public.quiz_attempts) then raise exception 'ECHEC : A voit les tentatives de B'; end if;
+end $$;
+do $$ begin
+  insert into public.folders (owner_id, name) values ('00000000-0000-0000-0000-00000000000a', 'client');
+  raise exception 'ECHEC : dossier écrit par le client';
+exception when insufficient_privilege then null;
+end $$;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+do $$ begin
+  if (select count(*) from public.folders) <> 1 or (select count(*) from public.quiz_attempts) <> 1 then
+    raise exception 'ECHEC : B ne voit pas ses dossiers ou tentatives';
+  end if;
+end $$;
+reset role;
+delete from public.folders where id = '40000000-0000-0000-0000-00000000000b';
+do $$ begin
+  if not exists (select 1 from public.reports where id = '20000000-0000-0000-0000-00000000000b' and folder_id is null) then
+    raise exception 'ECHEC : supprimer un dossier a supprimé ou laissé rattaché son rapport';
+  end if;
+end $$;
+
 select 'RECETTE SQL : OK' as resultat;
