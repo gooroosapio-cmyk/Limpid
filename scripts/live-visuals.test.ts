@@ -103,7 +103,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot D : visuels réel
     for (const theme of THEMES) {
       const html = renderToStaticMarkup(h("div", null, composeLimpid({ t: dictFor("fr"), blueprint, explanation: report.explanation, evidence: report.evidence, segments, exercises: null, modeLabel: null, canReformulate: false, assets }).pieces));
       writeFileSync(path.join(out, `rapport-${theme}.html`), `<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="globals.css">${html}`);
-      const pdf = await renderReportPdf({ blueprint, explanation: report.explanation, evidence: report.evidence, segments, sourceTitle: EAU_VILLE_TITLE, theme, images });
+      const pdf = await renderReportPdf({ blueprint, explanation: report.explanation, evidence: report.evidence, segments, sourceTitle: EAU_VILLE_TITLE, images });
       writeFileSync(path.join(out, `rapport-${theme}.pdf`), pdf);
       pdfTexts[theme] = (await extractPdf(new Uint8Array(pdf), { maxPages: 50 })).blocks.map((b) => b.text).join(" ");
     }

@@ -536,6 +536,25 @@ export const fr = {
    * précis en français. Rempli dans les autres langues (repli générique par code).
    */
   apiErrors: {} as Record<string, string>,
+  pdf: {
+    basedOn: (source: string, date: string) => `D'après : ${source} · ${date}`,
+    footer: (page: number, total: number) => `Limpid · explication générée par IA, vérifiez les sources citées · page ${page} / ${total}`,
+    watermark: "Créé avec Limpid · version gratuite",
+    cycle: "↺ puis le cycle recommence",
+    exercises: "Exercices",
+    exercisesIntro: "Répondez sans regarder le corrigé, fourni séparément.",
+    answerKey: "Corrigé des exercices",
+    answerKeyIntro: (title: string) => `Corrigé des exercices de « ${title} ».`,
+    checkpointOf: (part: string) => `Après la partie « ${part} »`,
+    bilan: "Bilan de compréhension",
+    trueFalse: "Vrai ou faux ?",
+    order: "Remettez dans l'ordre :",
+    match: "Associez :",
+    answerLines: "Votre réponse :",
+    answer: "Réponse :",
+    expectedPoints: "Éléments attendus :",
+    noExercises: "Aucun exercice n'a été préparé pour cette version.",
+  },
   common: {
     loading: "Chargement…",
     openingReport: "Ouverture du Limpid…",
