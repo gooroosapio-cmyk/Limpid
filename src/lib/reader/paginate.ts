@@ -47,6 +47,12 @@ export function paginate(pieces: PieceMetrics[], available: number): View[] {
       // Ne pas laisser de titres orphelins en bas de vue : ils passent à la vue suivante.
       let end = i - 1;
       while (end > start && pieces[end]!.keepWithNext) end--;
+      // Titre seul devant une pièce trop haute : il reste avec elle (la vue défile).
+      if (end === start && pieces[start]!.keepWithNext && !pieces[i]!.breakBefore) {
+        close(i);
+        i = start - 1;
+        continue;
+      }
       close(end);
       // Les titres reportés recommencent la vue suivante.
       i = start;

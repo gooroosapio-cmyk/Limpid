@@ -36,7 +36,7 @@ export function stripRich(text: string): string {
  * composition des vues remplisse l'écran sans couper de phrase. Une marque de mise en forme
  * à cheval sur une coupure annule le découpage (le texte reste entier).
  */
-export function splitParagraph(text: string, target = 280): string[] {
+export function splitParagraph(text: string, target = 220): string[] {
   if (text.length <= target * 1.4) return [text];
   const sentences = text.split(/(?<=[.!?…»])\s+(?=[«"A-ZÀ-ÖØ-Þ0-9])/u);
   const out: string[] = [];

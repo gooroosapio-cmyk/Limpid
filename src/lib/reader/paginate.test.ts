@@ -52,4 +52,10 @@ describe("pagination mesurée du lecteur", () => {
     expect(viewOf(views, 2)).toBe(1);
     expect(viewOf(views, 99)).toBe(0);
   });
+
+  it("garde un titre avec une pièce plus haute que l'écran", () => {
+    const v = paginate([{ height: 100 }, { height: 60, keepWithNext: true }, { height: 900 }, { height: 100 }], 500);
+    expect(v.map((x) => [x.start, x.end])).toEqual([[0, 0], [1, 2], [3, 3]]);
+    expect(v[1]!.oversized).toBe(true);
+  });
 });
