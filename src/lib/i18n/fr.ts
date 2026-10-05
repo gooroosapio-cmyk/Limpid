@@ -1191,4 +1191,21 @@ export const fr = {
     closed: "Les inscriptions ne sont pas encore ouvertes.",
     create: "Créer un compte gratuit",
   },
+  devices: {
+    title: "Appareils connectés",
+    lede: "Les appareils où votre compte est ouvert. Une session se ferme après 7 jours sans activité, et au plus tard après 90 jours.",
+    thisDevice: "cet appareil",
+    lastActive: (d: string) => `Dernière activité : ${d}`,
+    since: (d: string) => `connecté depuis le ${d}`,
+    signOut: "Déconnecter",
+    signOutOthers: "Déconnecter les autres appareils",
+    signOutAll: "Déconnecter tous les appareils",
+    rules: "Vos rapports restent dans votre compte : se déconnecter n'efface rien.",
+    expired: {
+      inactive: "Votre session a expiré après 7 jours d'inactivité. Reconnectez-vous pour retrouver vos rapports.",
+      inactive_admin: "Session d'administration fermée après 30 minutes d'inactivité. Reconnectez-vous.",
+      absolute: "Votre session a atteint sa durée maximale. Reconnectez-vous pour retrouver vos rapports.",
+      revoked: "Cet appareil a été déconnecté. Reconnectez-vous pour retrouver vos rapports.",
+    },
+  },
 } as const;

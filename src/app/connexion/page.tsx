@@ -12,10 +12,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: "Connexion" };
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ erreur?: string; compte?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ erreur?: string; compte?: string; session?: string }> }) {
   const t = await getT();
   if (await currentUser()) redirect("/");
-  const { erreur, compte } = await searchParams;
+  const { erreur, compte, session } = await searchParams;
   const open = await signupOpen();
   return (
     <div className="page page-enter login-page stagger">
@@ -24,6 +24,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <p className="lede">{t.login.subtitle}</p>
       {!open && <p className="muted">{t.login.alpha}</p>}
       {compte === "supprime" && <p className="notice" role="status">{t.account.deleted}</p>}
+      {session && session in t.devices.expired && (
+        <p className="notice" role="status">{t.devices.expired[session as keyof typeof t.devices.expired]}</p>
+      )}
       {erreur && (
         <p className="notice notice-warn" role="alert">
           {t.login.linkInvalid}

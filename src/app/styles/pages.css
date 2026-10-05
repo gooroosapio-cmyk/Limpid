@@ -355,3 +355,4 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .stack-form .btn { justify-self: start; margin-top: var(--s2); }
 .stack-form .check { display: flex; gap: 10px; align-items: flex-start; }
 .quota-list { list-style: none; padding: 0; margin: var(--s2) 0; color: var(--muted); font-size: 14px; }
+.device-row { display: flex; gap: var(--s3); align-items: center; }
