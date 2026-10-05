@@ -51,7 +51,7 @@ export default async function HomeLibraryPage({
   if (view === "sources") {
     const { data: sources } = await supabase
       .from("sources")
-      .select("id, title, kind, page_count, byte_size, storage_path, original_url, original_purged_at, created_at, reports(id)")
+      .select("id, title, kind, page_count, byte_size, storage_path, original_url, original_purged_at, created_at, reports!report_sources(id)")
       .eq("is_demo", false)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
