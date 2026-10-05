@@ -466,3 +466,44 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 .login-magic { display: flex; width: 100%; justify-content: center; text-decoration: none; color: var(--ink); font-weight: 500; }
 .login-private { display: flex; align-items: center; justify-content: center; gap: 8px; margin: var(--s6) 0 0; color: var(--muted); font-size: 13px; line-height: 18px; }
 .login-signup { border-top-color: var(--line); }
+
+/* ---------- En-tête V2.1 : cloche et avatar ---------- */
+.appbar-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.appbar-bell { position: relative; width: 44px; height: 44px; }
+.bell-dot { position: absolute; top: 9px; right: 10px; width: 9px; height: 9px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 2px var(--bg); }
+.appbar .avatar { width: 44px; height: 44px; font-size: 15px; }
+.notif-list .row-icon.is-danger { color: var(--danger); }
+.notif-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--yellow); }
+
+/* ---------- V2.1 : alignement sur les maquettes ---------- */
+h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
+.page-title h1 { font-size: 34px; line-height: 38px; }
+.page-title p { font-size: 17px; line-height: 24px; }
+
+/* Votre espace */
+.profile-id { display: flex; align-items: center; gap: 18px; margin: var(--s4) 0 var(--s5); }
+.profile-id-text { flex: 1; min-width: 0; }
+.profile-id h2 { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0; }
+.profile-id p { margin: 2px 0 0; font-size: 16px; line-height: 22px; color: var(--muted); }
+.avatar-xl { width: 64px; height: 64px; font-size: 22px; box-shadow: inset 0 0 0 2px var(--line-strong); }
+.profile-edit { width: 44px; height: 44px; border-radius: 50%; background: var(--elevated); box-shadow: inset 0 0 0 1px var(--line); }
+.offer-card { min-height: 164px; padding: 22px 20px 14px; border: 1px solid rgb(241 217 78 / 28%); border-radius: var(--r-card); }
+.offer-card-cover { inset: 0 0 0 30% !important; opacity: 1 !important; }
+.offer-emblem {
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 64px; height: 64px;
+  border-radius: 50%; color: var(--yellow); background: rgb(14 17 15 / 55%);
+  box-shadow: inset 0 0 0 2px rgb(241 217 78 / 80%), 0 0 24px rgb(241 217 78 / 35%);
+}
+.offer-emblem svg rect { fill: var(--yellow); }
+.offer-eyebrow { font-size: 13px; letter-spacing: 2px; }
+.offer-number { font-size: 48px; line-height: 52px; font-weight: 700; }
+.offer-label { font-size: 16px; margin: 0; }
+.offer-link { display: inline-flex; margin-top: 14px; padding-top: 12px; border-top: 0; position: relative; font-size: 17px; }
+.offer-link::before { content: ""; position: absolute; left: 0; top: 0; width: 110px; height: 1px; background: linear-gradient(90deg, rgb(241 217 78 / 70%), transparent); }
+.profile-h { font-size: 26px; line-height: 32px; font-weight: 700; letter-spacing: -0.6px; margin: var(--s7) 0 var(--s2); }
+.settings-rows .row { min-height: 60px; gap: 18px; }
+.settings-rows .row-text b { font-size: 17px; line-height: 23px; font-weight: 600; }
+.settings-rows .row-text small { font-size: 15px; line-height: 20px; }
+.settings-rows .row-icon { width: 26px; height: 26px; }
+.settings-rows .row-icon .icon { width: 26px; height: 26px; }
+.settings-profile .avatar { width: 48px; height: 48px; }
