@@ -256,6 +256,23 @@ export function ImportForm({
         ? /^https?:\/\/\S+\.\S+/.test(url.trim())
         : text.trim().length >= 20);
 
+  /** Condition manquante, dite à côté du bouton désactivé. */
+  const missing = !enabled || busy
+    ? null
+    : tab === "file"
+      ? failedItems.length > 0
+        ? t.add.v2.needFix
+        : pendingItems.length > 0
+          ? t.add.v2.needWait
+          : readyItems.length === 0
+            ? t.add.v2.needFile
+            : null
+      : tab === "link"
+        ? (/^https?:\/\/\S+\.\S+/.test(url.trim()) ? null : t.add.v2.needLink)
+        : text.trim().length >= 20
+          ? null
+          : t.add.v2.needText;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ready) return;
@@ -502,6 +519,12 @@ export function ImportForm({
         </div>
       </fieldset>
 
+      <Link href="/parametres/preferences" className="row settings-row import-prefs">
+        <span className="row-icon"><Icon name="sliders" /></span>
+        <span className="row-text"><b>{t.add.v2.levelLength[0]}</b><small>{t.add.v2.levelLength[1]}</small></span>
+        <Icon name="chevron" className="row-chevron" />
+      </Link>
+
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
       {error && (
         <div className="notice notice-error" role="alert">
@@ -518,10 +541,12 @@ export function ImportForm({
         type="submit"
         className={`btn btn-primary btn-block${phase.step !== "idle" ? " busy" : ""}`}
         disabled={!ready}
+        aria-describedby={missing ? `${base}-missing` : undefined}
       >
         {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : quote ? t.billing.createCost(quote) : t.add.create}{" "}
         {phase.step !== "creating" && <Icon name="arrow" />}
       </button>
+      {missing && <p id={`${base}-missing`} className="muted small center">{missing}</p>}
       {count === 1 && !quote && <p className="muted small center">{t.billing.createCostFrom(8)}</p>}
     </form>
   );

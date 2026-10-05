@@ -24,7 +24,7 @@ export default async function SettingsPage() {
       <h1>{t.nav.settings}</h1>
       <p className="lede">{t.compte.prefsLede}</p>
 
-      <section aria-labelledby="set-ui" className="settings-block">
+      <section id="langue" aria-labelledby="set-ui" className="settings-block">
         <h2 id="set-ui" className="eyebrow">{t.compte.interfaceHeading}</h2>
         <InterfaceLanguage />
       </section>
@@ -33,7 +33,7 @@ export default async function SettingsPage() {
         <LinkRow href="/parametres/preferences" icon="spark" title={t.compte.prefsEntry[0]} sub={t.compte.prefsEntry[1]} />
       </ul>
 
-      <section aria-labelledby="set-comfort" className="settings-block">
+      <section id="confort" aria-labelledby="set-comfort" className="settings-block">
         <h2 id="set-comfort" className="eyebrow">{t.compte.comfort}</h2>
         <ComfortSettings initial={display} />
       </section>

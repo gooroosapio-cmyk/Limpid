@@ -4,115 +4,127 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
-import { keyboardLikelyOpen, matchesQuery, shouldCollapse } from "@/lib/library/search";
+import { matchesQuery } from "@/lib/library/search";
+import type { CoverView } from "@/lib/library/covers";
+import { Cover } from "./Cover";
 import { MovePanel } from "./MovePanel";
 import { ReportRow, type RowData } from "./ReportRow";
-
-type Section = "folders" | "limpids";
-const COLLAPSE_KEY = "limpid-library-collapsed";
-
-function readCollapsed(): Set<Section> {
-  try {
-    const raw = JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? "[]") as unknown;
-    return new Set((Array.isArray(raw) ? raw : []).filter((s): s is Section => s === "folders" || s === "limpids"));
-  } catch {
-    return new Set();
-  }
-}
-
-function writeCollapsed(s: Set<Section>) {
-  try {
-    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...s]));
-  } catch {
-    // Stockage indisponible (navigation privée) : le repli vaut pour la visite.
-  }
-}
-
-/** Titre de section repliable : le nombre d'éléments reste visible une fois replié. */
-function SectionToggle({ id, label, count, open, onToggle }: { id: string; label: string; count: number; open: boolean; onToggle: () => void }) {
-  return (
-    <h2 id={id} className="eyebrow lib-section-title">
-      <button type="button" className="lib-toggle" aria-expanded={open} aria-controls={`${id}-list`} onClick={onToggle}>
-        <Icon name="chevron" size={16} className="lib-toggle-chevron" />
-        <span>{label}</span>
-        <span className="lib-toggle-count">{count}</span>
-      </button>
-    </h2>
-  );
-}
 
 export interface FolderItem {
   id: string;
   name: string;
   count: number;
+  cover: CoverView;
 }
 
+export interface ResumeItem {
+  id: string;
+  title: string;
+  cover: CoverView;
+  sourceCount: number;
+  opened: string;
+}
+
+export type LibraryFilter = "tous" | "recents" | "dossiers" | "prets" | "favoris";
+type View = "grid" | "list";
+
+const VIEW_KEY = "limpid-library-view";
 const DEBOUNCE_MS = 250;
 
+function readView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid";
+  } catch {
+    return "grid";
+  }
+}
+
+/** Tuile de dossier (FolderTile) : petite, horizontale, avec sa couverture en filigrane. */
+export function FolderTile({ folder }: { folder: FolderItem }) {
+  const t = useT();
+  return (
+    <li className="folder-tile">
+      <Link href={`/?dossier=${folder.id}`}>
+        <Cover cover={folder.cover} className="folder-tile-cover" />
+        <span className="folder-tile-icon"><Icon name="folder" /></span>
+        <span className="folder-tile-text">
+          <b>{folder.name}</b>
+          <small>{t.library.v2.items(folder.count)}</small>
+        </span>
+        <Icon name="chevron" className="folder-tile-chevron" />
+      </Link>
+    </li>
+  );
+}
+
 /**
- * Bibliothèque côté client (V5, § 6 à 8) : recherche instantanée dans le flux (aucun réseau ni
- * IA pendant la saisie), repli selon le clavier, sélection multiple et « Déplacer vers… ».
+ * Bibliothèque V2 (galerie) : recherche visible, rail de filtres, Reprendre, collections et
+ * leçons en grille 4:5 ou en liste (choix mémorisé). Recherche instantanée sans réseau ni IA ;
+ * sélection multiple et « Déplacer vers… » conservées.
  */
 export function LibraryBrowser({
   title,
+  subtitle,
   folder,
   folders,
   allFolders,
   rows,
   root,
-  filters,
+  filter,
+  rail,
+  resume,
+  preparations,
   headerExtra,
   footer,
   emptyText,
   recent: initialRecent,
   initialQuery,
-  showFailure,
   newFolder,
 }: {
   title: string;
+  subtitle: string | null;
   folder: { id: string; name: string } | null;
-  /** Dossiers affichés (racine). */
   folders: FolderItem[];
-  /** Tous les dossiers (destinations du déplacement). */
   allFolders: { id: string; name: string }[];
-  /** Limpid de la portée (filtre appliqué) ; à la racine, y compris ceux rangés en dossier. */
   rows: RowData[];
   root: boolean;
-  filters: React.ReactNode;
+  filter: LibraryFilter;
+  rail: React.ReactNode;
+  resume: ResumeItem | null;
+  /** Lien vers les préparations (en cours, à vérifier), si elles existent. */
+  preparations: React.ReactNode;
   headerExtra?: React.ReactNode;
   footer?: React.ReactNode;
   emptyText: string;
   recent: string[];
   initialQuery: string;
-  showFailure: boolean;
   newFolder: React.ReactNode;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(!!initialQuery);
+  const v = t.library.v2;
   const [value, setValue] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
+  const [focused, setFocused] = useState(false);
   const [recent, setRecent] = useState(initialRecent);
-  const [kb, setKb] = useState({ open: false, seen: false });
-  const [focusInside, setFocusInside] = useState(false);
+  const [view, setView] = useState<View>("grid");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
   const [moveIds, setMoveIds] = useState<string[] | null>(null);
-  // Sections repliées (Dossiers, Limpid) : préférence de l'appareil, relue après l'hydratation.
-  const [collapsed, setCollapsed] = useState<Set<Section>>(new Set());
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- stockage de l'appareil, lu après l'hydratation
-  useEffect(() => setCollapsed(readCollapsed()), []);
-  const toggleSection = (s: Section) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(s)) next.delete(s);
-      else next.add(s);
-      writeCollapsed(next);
-      return next;
-    });
   const inputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
-  const saved = useRef<string>("");
-  const baseline = useRef({ w: 0, h: 0 });
+  const saved = useRef("");
+
+  // Affichage grille / liste : préférence de l'appareil, relue après l'hydratation.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- stockage de l'appareil, lu après l'hydratation
+  useEffect(() => setView(readView()), []);
+  const chooseView = (next: View) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Navigation privée : le choix vaut pour la visite.
+    }
+  };
 
   // Requête appliquée 250 ms après la dernière frappe (pas pendant une composition).
   useEffect(() => {
@@ -121,7 +133,7 @@ export function LibraryBrowser({
     return () => clearTimeout(id);
   }, [value]);
 
-  // La requête est gardée dans l'adresse : le retour depuis un Limpid la restaure.
+  // La requête est gardée dans l'adresse : le retour depuis une leçon la restaure.
   useEffect(() => {
     const url = new URL(window.location.href);
     if (query.trim()) url.searchParams.set("q", query.trim());
@@ -129,59 +141,25 @@ export function LibraryBrowser({
     window.history.replaceState(window.history.state, "", url.toString());
   }, [query]);
 
-  // Clavier virtuel : hauteur visible comparée à la plus grande hauteur vue à cette largeur.
-  useEffect(() => {
-    const measure = () => {
-      const vv = window.visualViewport;
-      const h = Math.min(window.innerHeight, vv?.height ?? window.innerHeight);
-      if (baseline.current.w !== window.innerWidth) baseline.current = { w: window.innerWidth, h };
-      baseline.current.h = Math.max(baseline.current.h, h);
-      const isOpen = keyboardLikelyOpen(baseline.current.h, h, vv?.scale ?? 1);
-      setKb((k) => (k.open === isOpen ? k : { open: isOpen, seen: k.seen || isOpen }));
-    };
-    measure();
-    window.visualViewport?.addEventListener("resize", measure);
-    window.addEventListener("resize", measure);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", measure);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    if (shouldCollapse({ query: value, keyboardOpen: kb.open, keyboardSeen: kb.seen, focusInside })) {
-      const id = setTimeout(() => setOpen(false), 150);
-      return () => clearTimeout(id);
-    }
-  }, [open, value, kb, focusInside]);
-
-  const openSearch = () => {
-    setKb((k) => ({ open: k.open, seen: k.open }));
-    setOpen(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
   /** Mémorise une recherche réellement utilisée (validée ou suivie d'une ouverture). */
-  const remember = useCallback(
-    (q: string) => {
-      const v = q.trim();
-      if (!v || saved.current === v) return;
-      saved.current = v;
-      void fetch("/api/library/searches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: v.slice(0, 80) }) })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: { recent?: string[] } | null) => d?.recent && setRecent(d.recent))
-        .catch(() => undefined);
-    },
-    [],
-  );
+  const remember = useCallback((q: string) => {
+    const s = q.trim();
+    if (!s || saved.current === s) return;
+    saved.current = s;
+    void fetch("/api/library/searches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: s.slice(0, 80) }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { recent?: string[] } | null) => d?.recent && setRecent(d.recent))
+      .catch(() => undefined);
+  }, []);
 
   const searching = query.trim().length > 0;
   const visible = useMemo(() => {
-    if (!searching) return root ? rows.filter((r) => !r.folderId) : rows;
+    if (!searching) return rows;
     return rows.filter((r) => matchesQuery(`${r.title} ${r.folderName ?? ""}`, query));
-  }, [rows, root, query, searching]);
-  const shownFolders = root ? (searching ? folders.filter((f) => matchesQuery(f.name, query)) : folders) : [];
+  }, [rows, query, searching]);
+  const shownFolders = searching ? folders.filter((f) => matchesQuery(f.name, query)) : folders;
+  const showFolders = root && (filter === "tous" || filter === "dossiers" || searching);
+  const showLessons = filter !== "dossiers" || searching;
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -191,137 +169,119 @@ export function LibraryBrowser({
       return next;
     });
   }
-  function startSelect(id: string) {
+  const startSelect = (id: string) => {
     setSelecting(true);
     setSelected(new Set([id]));
-  }
-  function endSelect() {
+  };
+  const endSelect = () => {
     setSelecting(false);
     setSelected(new Set());
-  }
-
+  };
   const moveRows = rows.filter((r) => moveIds?.includes(r.id));
 
   return (
     <>
-      <div className="lib-head">
+      <div className="page-title lib-title">
         <h1>{title}</h1>
-        <button
-          type="button"
-          className={`ib lib-search-toggle${searching ? " is-active" : ""}`}
-          aria-expanded={open}
-          aria-controls="lib-search"
-          aria-label={searching ? `${t.library.searchOpen} — ${t.library.searchActive(query)}` : t.library.searchOpen}
-          onClick={() => (open && !value.trim() ? setOpen(false) : openSearch())}
-        >
-          <Icon name="search" />
-          {searching && <span className="lib-search-dot" aria-hidden="true" />}
-        </button>
+        {subtitle && <p>{subtitle}</p>}
       </div>
       {headerExtra}
 
-      {open && (
-        <div
-          id="lib-search"
-          className="lib-search"
-          onFocus={() => setFocusInside(true)}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusInside(false);
-          }}
-        >
-          <div className="searchbox" role="search">
-            <Icon name="search" />
-            <label htmlFor="lib-q" className="sr-only">{t.library.searchLabel}</label>
-            <input
-              ref={inputRef}
-              id="lib-q"
-              type="search"
-              value={value}
-              placeholder={t.library.search}
-              maxLength={80}
-              autoComplete="off"
-              enterKeyHint="search"
-              aria-describedby={searching ? "lib-scope" : undefined}
-              onChange={(e) => setValue(e.target.value)}
-              onCompositionStart={() => (composing.current = true)}
-              onCompositionEnd={(e) => {
-                composing.current = false;
-                setValue((e.target as HTMLInputElement).value);
+      <div
+        className="lib-search"
+        onFocus={() => setFocused(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+        }}
+      >
+        <div className="searchbox" role="search">
+          <Icon name="search" />
+          <label htmlFor="lib-q" className="sr-only">{t.library.searchLabel}</label>
+          <input
+            ref={inputRef}
+            id="lib-q"
+            type="search"
+            value={value}
+            placeholder={t.library.search}
+            maxLength={80}
+            autoComplete="off"
+            enterKeyHint="search"
+            aria-describedby={searching ? "lib-scope" : undefined}
+            onChange={(e) => setValue(e.target.value)}
+            onCompositionStart={() => (composing.current = true)}
+            onCompositionEnd={(e) => {
+              composing.current = false;
+              setValue((e.target as HTMLInputElement).value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setQuery(value);
+                remember(value);
+                inputRef.current?.blur();
+              } else if (e.key === "Escape") {
+                setValue("");
+                setQuery("");
+              }
+            }}
+          />
+          {value && (
+            <button
+              type="button"
+              className="ib searchbox-clear"
+              aria-label={t.library.searchClear}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setValue("");
+                setQuery("");
+                inputRef.current?.focus();
               }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  setQuery(value);
-                  remember(value);
-                  inputRef.current?.blur();
-                } else if (e.key === "Escape") {
-                  setValue("");
-                  setQuery("");
-                  setOpen(false);
-                }
-              }}
-            />
-            {value && (
-              <button
-                type="button"
-                className="ib searchbox-clear"
-                aria-label={t.library.searchClear}
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setValue("");
-                  setQuery("");
-                  inputRef.current?.focus();
-                }}
-              >
-                <Icon name="close" size={18} />
-              </button>
-            )}
-          </div>
-          {!value && recent.length > 0 && (
-            <div className="recent-searches">
-              <p className="eyebrow" id="recent-h">{t.library.recentSearches}</p>
-              <ul aria-labelledby="recent-h">
-                {recent.map((r) => (
-                  <li key={r}>
-                    {/* Appliquée avant tout repli dû à la perte de focus. */}
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setValue(r);
-                        setQuery(r);
-                        remember(r);
-                      }}
-                    >
-                      <Icon name="clock" size={16} /> <span>{r}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                className="btn-link small"
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setRecent([]);
-                  void fetch("/api/library/searches", { method: "DELETE" }).catch(() => undefined);
-                }}
-              >
-                {t.library.clearRecent}
-              </button>
-            </div>
+            >
+              <Icon name="close" size={18} />
+            </button>
           )}
         </div>
-      )}
+        {focused && !value && recent.length > 0 && (
+          <div className="recent-searches">
+            <p className="eyebrow" id="recent-h">{t.library.recentSearches}</p>
+            <ul aria-labelledby="recent-h">
+              {recent.map((r) => (
+                <li key={r}>
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setValue(r);
+                      setQuery(r);
+                      remember(r);
+                    }}
+                  >
+                    <Icon name="clock" size={18} /> <span>{r}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="btn-link small"
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setRecent([]);
+                void fetch("/api/library/searches", { method: "DELETE" }).catch(() => undefined);
+              }}
+            >
+              {t.library.clearRecent}
+            </button>
+          </div>
+        )}
+      </div>
       {searching && (
         <p id="lib-scope" className="active-search" role="status">
-          <span>
-            {t.library.results(visible.length + shownFolders.length, query.trim())} · {folder ? t.library.scopeFolder(folder.name) : t.library.scopeAll}
-          </span>
+          {t.library.results(visible.length + (showFolders ? shownFolders.length : 0), query.trim())} · {folder ? t.library.scopeFolder(folder.name) : t.library.scopeAll}
         </p>
       )}
 
-      {filters}
+      {!searching && rail}
 
       {selecting && (
         <div className="lib-selbar" role="toolbar" aria-label={t.library.selectedCount(selected.size)}>
@@ -333,67 +293,80 @@ export function LibraryBrowser({
         </div>
       )}
 
-      {root && !searching && (
-        <section aria-labelledby="folders-h" className="lib-folders">
-          <div className="lib-section-head">
-            <SectionToggle id="folders-h" label={t.library.folders} count={shownFolders.length} open={!collapsed.has("folders")} onToggle={() => toggleSection("folders")} />
-            {newFolder}
+      {!searching && preparations}
+
+      {!searching && resume && filter === "tous" && root && (
+        <section className="resume" aria-labelledby="resume-h">
+          <Cover cover={resume.cover} className="resume-cover" eager />
+          <div className="resume-body">
+            <p className="resume-eyebrow">{v.resume}</p>
+            <h2 id="resume-h">{resume.title}</h2>
+            <p className="resume-meta">
+              <Icon name="layers" size={18} /> {v.sources(resume.sourceCount)} · {v.opened(resume.opened)}
+            </p>
           </div>
-          {shownFolders.length > 0 && !collapsed.has("folders") && (
-            <ul className="rows" id="folders-h-list">
-              {shownFolders.map((f) => (
-                <li key={f.id}>
-                  <Link href={`/?dossier=${f.id}`} className="row">
-                    <span className="row-icon"><Icon name="folder" /></span>
-                    <span className="row-text"><b>{f.name}</b><small>{t.library.folderCount(f.count)}</small></span>
-                    <Icon name="chevron" className="row-chevron" />
-                  </Link>
-                </li>
+          <Link href={`/rapports/${resume.id}`} className="btn btn-primary resume-cta">
+            {v.continue} <Icon name="arrow" />
+          </Link>
+        </section>
+      )}
+
+      {showFolders && (shownFolders.length > 0 || filter === "dossiers") && (
+        <section aria-labelledby="folders-h">
+          <div className="section-head">
+            <h2 id="folders-h">{v.collections}</h2>
+            {filter === "tous" && !searching && folders.length > 2 ? (
+              <Link href="/?filtre=dossiers">{v.seeAll} <Icon name="chevron" /></Link>
+            ) : (
+              !searching && newFolder
+            )}
+          </div>
+          {shownFolders.length === 0 ? (
+            <p className="muted">{v.noFolders}</p>
+          ) : (
+            <ul className="folder-tiles">
+              {(filter === "tous" && !searching ? shownFolders.slice(0, 2) : shownFolders).map((f) => (
+                <FolderTile key={f.id} folder={f} />
               ))}
             </ul>
           )}
         </section>
       )}
-      {root && searching && shownFolders.length > 0 && (
-        <ul className="rows lib-folders">
-          {shownFolders.map((f) => (
-            <li key={f.id}>
-              <Link href={`/?dossier=${f.id}`} className="row" onClick={() => remember(query)}>
-                <span className="row-icon"><Icon name="folder" /></span>
-                <span className="row-text"><b>{f.name}</b><small>{t.library.folderCount(f.count)}</small></span>
-                <Icon name="chevron" className="row-chevron" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
 
-      <section aria-labelledby="limpids-h">
-        {searching || selecting ? (
-          <h2 id="limpids-h" className="eyebrow">{t.library.limpids}</h2>
-        ) : (
-          <SectionToggle id="limpids-h" label={t.library.limpids} count={visible.length} open={!collapsed.has("limpids")} onToggle={() => toggleSection("limpids")} />
-        )}
-        {!searching && !selecting && collapsed.has("limpids") ? null : visible.length === 0 ? (
-          <p className="muted">{searching ? t.library.noResult : emptyText}</p>
-        ) : (
-          <ul className="rows lib-rows" id="limpids-h-list">
-            {visible.map((r) => (
-              <ReportRow
-                key={r.id}
-                row={searching ? r : { ...r, folderName: null }}
-                showFailure={showFailure}
-                selecting={selecting}
-                selected={selected.has(r.id)}
-                onToggle={toggle}
-                onStartSelect={startSelect}
-                onMove={(id) => setMoveIds([id])}
-                onOpen={() => searching && remember(query)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+      {showLessons && (
+        <section aria-labelledby="limpids-h">
+          <div className="section-head">
+            <h2 id="limpids-h">{filter === "prets" ? v.readyCount(visible.length) : v.yourLimpids}</h2>
+            <div className="view-toggle" role="group" aria-label={v.yourLimpids}>
+              <button type="button" className="ib" aria-pressed={view === "grid"} aria-label={v.viewGrid} onClick={() => chooseView("grid")}>
+                <Icon name="grid" />
+              </button>
+              <button type="button" className="ib" aria-pressed={view === "list"} aria-label={v.viewList} onClick={() => chooseView("list")}>
+                <Icon name="list" />
+              </button>
+            </div>
+          </div>
+          {visible.length === 0 ? (
+            <p className="muted">{searching ? t.library.noResult : emptyText}</p>
+          ) : (
+            <ul className={view === "grid" ? "lesson-grid" : "lesson-list"}>
+              {visible.map((r) => (
+                <ReportRow
+                  key={r.id}
+                  row={searching ? r : { ...r, folderName: null }}
+                  variant={view}
+                  selecting={selecting}
+                  selected={selected.has(r.id)}
+                  onToggle={toggle}
+                  onStartSelect={startSelect}
+                  onMove={(id) => setMoveIds([id])}
+                  onOpen={() => searching && remember(query)}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
       {selecting && <div className="lib-selbar-space" aria-hidden="true" />}
       {footer}
 

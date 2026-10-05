@@ -15,6 +15,7 @@ import "./styles/shell.css";
 import "./styles/components.css";
 import "./styles/reader.css";
 import "./styles/pages.css";
+import "./styles/v2.css";
 
 export const metadata: Metadata = {
   title: { default: "Limpid", template: "%s · Limpid" },
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }, // alpha privée
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
-  appleWebApp: { capable: true, title: "Limpid", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Limpid", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
@@ -30,10 +31,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F6F2" },
-    { media: "(prefers-color-scheme: dark)", color: "#171815" },
-  ],
+  themeColor: "#0E110F",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

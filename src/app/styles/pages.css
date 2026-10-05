@@ -362,3 +362,6 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .oauth-buttons p { margin: 0.25rem 0 0; }
 .copy-email { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .copy-email code { overflow-wrap: anywhere; }
+.login-signup { margin-top: var(--s6); padding-top: var(--s4); border-top: 1px solid var(--line); text-align: center; }
+.login-signup h2 { margin: 0 0 10px; }
+.login-signup p { margin: 8px 0 0; }

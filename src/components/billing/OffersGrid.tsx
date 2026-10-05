@@ -29,7 +29,7 @@ export function OffersGrid({
 
   return (
     <>
-      <div className="period-switch" role="radiogroup" aria-label={`${o.monthly} / ${o.yearly}`}>
+      <div className="seg period-switch" role="radiogroup" aria-label={`${o.monthly} / ${o.yearly}`}>
         {(["monthly", "yearly"] as const).map((p) => (
           <button key={p} type="button" role="radio" aria-checked={period === p} className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>
             {p === "monthly" ? o.monthly : o.yearly}
@@ -39,7 +39,8 @@ export function OffersGrid({
       </div>
 
       <ul className="offers">
-        <li className="offer">
+        <li className={`offer${current?.mode === "free" ? " is-current" : ""}`}>
+          {current?.mode === "free" && <p className="offer-eyebrow">{o.yourPlan}</p>}
           <h2>{t.billing.planNames.free}</h2>
           <p className="muted">{o.taglines.free}</p>
           <p className="offer-price">0 FCFA</p>
@@ -59,8 +60,8 @@ export function OffersGrid({
           const name = t.billing.planNames[code]!;
           const isCurrent = current?.mode === "subscription" && current.plan === code;
           return (
-            <li key={code} className={`offer${code === "plus" ? " featured" : ""}`}>
-              {code === "plus" && <span className="offer-badge">{o.recommended}</span>}
+            <li key={code} className={`offer${code === "plus" ? " featured" : ""}${isCurrent ? " is-current" : ""}`}>
+              {isCurrent ? <p className="offer-eyebrow">{o.yourPlan}</p> : code === "plus" && <span className="offer-badge">{o.recommended}</span>}
               <h2>{name}</h2>
               <p className="muted">{o.taglines[code]}</p>
               <p className="offer-price">

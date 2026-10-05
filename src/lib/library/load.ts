@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { Mode } from "@/lib/contracts/schemas";
+import { coverFor, coverView, type CoverView } from "@/lib/library/covers";
 import { createUserClient } from "@/lib/supabase/server";
 
 export type LibraryState = "ready" | "running" | "failed";
@@ -22,6 +23,12 @@ export interface LibraryItem {
   errorCode: string | null;
   /** Documents utilisés par le Limpid (plusieurs : Limpid commun). */
   sourceCount: number;
+  favorite: boolean;
+  cover: CoverView;
+  /** Dernière consultation (position de lecture enregistrée), ou null. */
+  openedAt: string | null;
+  /** Étape serveur de la préparation en cours (validation, extraction…), ou null. */
+  stage: string | null;
 }
 
 export interface LibraryFolder {
@@ -35,7 +42,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
   let query = supabase
     .from("reports")
     .select(
-      "id, title, created_at, mode, folder_id, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(status, error_code, created_at), report_progress(read_at), report_sources(source_id)",
+      "id, title, created_at, mode, folder_id, favorite, cover_id, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(status, stage, error_code, created_at), report_progress(read_at, updated_at), report_sources(source_id)",
     )
     .eq("is_demo", false)
     .order("created_at", { ascending: false })
@@ -46,13 +53,15 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
     supabase.from("folders").select("id, name, created_at").order("created_at", { ascending: true }).limit(100),
   ]);
   const items: LibraryItem[] = (data ?? []).map((r) => {
-    const jobs = (r.jobs as { status: string; error_code: string | null; created_at: string }[] | null) ?? [];
+    const jobs = (r.jobs as { status: string; stage: string | null; error_code: string | null; created_at: string }[] | null) ?? [];
     const job = [...jobs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     const running = !!job && (job.status === "queued" || job.status === "running");
     const ready = !!r.current_version_id;
     const version = r.report_versions as unknown as { check_status: string } | null;
-    const progress = (r.report_progress as unknown as { read_at: string | null }[] | { read_at: string | null } | null) ?? null;
-    const readAt = Array.isArray(progress) ? progress[0]?.read_at : progress?.read_at;
+    type Progress = { read_at: string | null; updated_at: string | null };
+    const progress = (r.report_progress as unknown as Progress[] | Progress | null) ?? null;
+    const p = Array.isArray(progress) ? progress[0] : progress;
+    const readAt = p?.read_at;
     return {
       id: r.id,
       title: r.title,
@@ -65,6 +74,10 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
       incomplete: version?.check_status === "incomplete",
       errorCode: !ready && !running ? (job?.error_code ?? null) : null,
       sourceCount: Math.max(1, ((r.report_sources as unknown as unknown[] | null) ?? []).length),
+      favorite: r.favorite === true,
+      cover: coverView(coverFor(r.id, r.cover_id as string | null)),
+      openedAt: p?.updated_at ?? null,
+      stage: running ? (job?.stage ?? null) : null,
     };
   });
   const counts = new Map<string, number>();

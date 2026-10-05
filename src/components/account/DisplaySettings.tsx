@@ -57,13 +57,13 @@ export function ComfortSettings({ initial }: { initial: DisplayPrefs }) {
   );
 }
 
-const MODE_ICONS: Record<Mode, "sun" | "moon" | "settings"> = { light: "sun", dark: "moon", system: "settings" };
+const MODE_ICONS: Record<Mode, "sun" | "moon"> = { light: "sun", dark: "moon" };
 
-/** Mode clair / sombre / système (indépendant du thème du rapport). */
+/** Galerie sombre (défaut) ou Papier (indépendant du thème du rapport). */
 export function ModeSettings({ initial }: { initial: Mode }) {
   const t = useT();
   const [mode, setMode] = useState<Mode>(initial);
-  const order: Mode[] = ["light", "dark", "system"];
+  const order: Mode[] = ["dark", "light"];
   return (
     <fieldset className="modecards-field">
       <legend className="eyebrow">{t.compte.mode}</legend>
@@ -77,7 +77,7 @@ export function ModeSettings({ initial }: { initial: Mode }) {
               checked={mode === m}
               onChange={() => {
                 setMode(m);
-                setDisplayPref(DISPLAY_COOKIES.mode, m === "system" ? null : m, "data-mode", m === "system" ? null : m);
+                setDisplayPref(DISPLAY_COOKIES.mode, m === "dark" ? null : m, "data-mode", m === "dark" ? null : m);
               }}
             />
             <Icon name={MODE_ICONS[m]} />
@@ -86,5 +86,28 @@ export function ModeSettings({ initial }: { initial: Mode }) {
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/** Ligne « Réduire les animations » du profil : icône, libellé, interrupteur (respecte aussi l'OS). */
+export function MotionRow({ initial }: { initial: boolean }) {
+  const t = useT();
+  const [motion, setMotion] = useState(initial);
+  return (
+    <label className="row settings-row settings-switch">
+      <span className="row-icon"><Icon name="eye-off" /></span>
+      <span className="row-text"><b>{t.compte.motion[0]}</b><small>{t.compte.motion[1]}</small></span>
+      <span className="switch">
+        <input
+          type="checkbox"
+          checked={motion}
+          onChange={(e) => {
+            setMotion(e.target.checked);
+            setDisplayPref(DISPLAY_COOKIES.motion, e.target.checked ? "reduit" : null, "data-motion", e.target.checked ? "reduit" : null);
+          }}
+        />
+        <i aria-hidden="true" />
+      </span>
+    </label>
   );
 }

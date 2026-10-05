@@ -85,6 +85,24 @@ export function LimpidReader({
     } catch {}
   }, []);
 
+  // Ouverture directe depuis l'aperçu de la leçon : « Demander à Limpid » ou le quiz (?ouvrir=…).
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const open = url.searchParams.get("ouvrir");
+    if (!open) return;
+    url.searchParams.delete("ouvrir");
+    window.history.replaceState(window.history.state, "", url.toString());
+    if (open === "demander") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- action demandée par l'adresse, une seule fois
+      setAskOpened(true);
+      askDialog.current?.showModal();
+    } else if (open === "bilan" && bilan) {
+      bilanDialog.current?.showModal();
+    } else if (open === "options") {
+      optionsDialog.current?.showModal();
+    }
+  }, [bilan]);
+
   const pieceIndex = useCallback((id: string) => piecesRef.current.findIndex((p) => p.id === id), []);
 
 

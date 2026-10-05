@@ -1,5 +1,17 @@
 # Avancement
 
+## Phase 16 — Refonte V2 « Galerie éditoriale » (5 octobre 2026)
+
+- **Système** : palette sombre par défaut (#0E110F…), option **Papier** (claire), Inter seule (400/500/600), échelle 32/22/17/16/15/13/11, rayons 16/20/28, boutons 48 px, icônes 24 px trait 1,75, mouvements courts (200 ms, cascade de 4 éléments, appui 0,985), réduction du mouvement respectée. Feuille `src/app/styles/v2.css` chargée en dernier : elle redéfinit les composants partagés au lieu de les dupliquer.
+- **Navigation** : en-tête compact (logo, initiales), barre basse flottante Bibliothèque / Créer / Profil ; « Créer » ouvre une feuille (importer, lien, texte, nouveau dossier). Tiroir, barre latérale et bouton flottant retirés. Pas de cloche (aucune notification réelle). Barre masquée en lecture, sur l'aperçu de leçon et clavier ouvert.
+- **Bibliothèque** : recherche visible, rail Tous / Récents / Dossiers / Prêts / En cours / Favoris, carte Reprendre (dernière leçon réellement ouverte), collections en tuiles, leçons en grille 4:5 ou en liste (choix mémorisé), favori et menu ⋯ (renommer, couverture, déplacer, sélectionner, supprimer). Vue **Préparations** : En cours (étape serveur réelle) et À vérifier (Réessayer, Détails).
+- **Leçon** : nouvel écran `/rapports/[id]/apercu` (couverture, Aperçu / Sources / Supports, l'essentiel, idée à retenir, Présentation, Quiz, « Demander à Limpid » à la demande).
+- **Import** : Fichier / Lien / Texte en contrôle segmenté, quatre approches 2 × 2, ligne « Niveau et longueur », raison affichée quand le bouton est désactivé.
+- **Profil** « Votre espace », **Offres** « À votre rythme. » (forfait actif, « J'ai déjà payé ») et **Connexion** (illustration, Google officiel, champs à libellés persistants).
+- Base : colonnes `reports.favorite` et `reports.cover_id` (migration `20261014000000_library_v2.sql`, appliquée en production). Banque de 12 couvertures décoratives (dégradés de secours tant que les images ne sont pas livrées).
+- Ressources à fournir : `docs/RESSOURCES_V2.md`.
+- Limites : captures faites sur une page de recette locale (données d'exemple) et sur les pages publiques ; les écrans connectés n'ont pas été rendus avec un vrai compte.
+
 ## Phase 15.1 — Corrections de l'audit complet (5 octobre 2026)
 
 - **Crédits** : une réservation rendue ou consommée n'est plus jamais réutilisée (supprimer puis recréer un rapport débite à nouveau) ; lien réservation ↔ tâche réessayé et retrouvé par sa clé ; suppression d'un rapport en file sans course avec le worker ; relance admin d'une tâche = nouvelle réservation.

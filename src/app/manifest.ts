@@ -12,8 +12,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "any",
-    background_color: "#F7F6F2",
-    theme_color: "#F7F6F2",
+    background_color: "#0E110F",
+    theme_color: "#0E110F",
     categories: ["education", "productivity"],
     icons: [
       { src: "/icons/limpid-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

@@ -9,6 +9,8 @@ import { toast } from "@/components/shell/Toasts";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 import { apiMessage } from "@/lib/i18n/api";
 import { useT } from "@/lib/i18n/client";
+import { COVERS, coverView, type CoverView } from "@/lib/library/covers";
+import { Cover } from "./Cover";
 
 export interface RowData {
   id: string;
@@ -21,20 +23,43 @@ export interface RowData {
   folderName?: string | null;
   /** Explication de l'échec (filtre Échecs). */
   reason?: string;
+  favorite: boolean;
+  cover: CoverView;
+  sourceCount: number;
 }
 
 const LONG_PRESS = 500;
 /** Déplacement du doigt au-delà duquel l'appui long est annulé (défilement). */
 const MOVE_TOLERANCE = 10;
 
+async function patch(id: string, body: Record<string, unknown>): Promise<boolean> {
+  const res = await fetch(`/api/reports/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+  return !!res?.ok;
+}
+
+/** Statut toujours accompagné d'une icône et d'un libellé (jamais la couleur seule). */
+export function StatusLabel({ state, sources }: { state: RowData["state"]; sources: number }) {
+  const t = useT();
+  const icon: IconName = state === "failed" ? "alert" : state === "running" ? "hourglass" : "check";
+  const label = state === "failed" ? t.library.v2.interrupted : state === "running" ? t.library.v2.preparing : t.library.v2.ready;
+  return (
+    <span className={`status status-${state}`}>
+      <Icon name={icon} />
+      <span>{label}</span>
+      <span aria-hidden="true">·</span>
+      <span>{t.library.v2.sources(sources)}</span>
+    </span>
+  );
+}
+
 /**
- * Un Limpid de la bibliothèque. Appui long (ou clic droit, ou touche Menu / Maj+F10) : menu
- * Ouvrir, Sélectionner, Déplacer vers…, Supprimer. Aucun bouton ⋯ visible : il n'apparaît
- * qu'au clavier. En sélection, toucher la ligne la coche au lieu de l'ouvrir.
- * En échec : explication, Réessayer et Supprimer.
+ * Une leçon de la bibliothèque (LessonCard) : couverture 4:5 en grille, miniature en liste.
+ * Favori et menu ⋯ (cibles 44 px) ; appui long, clic droit ou Maj+F10 ouvrent le même menu.
+ * En sélection, toucher la carte la coche au lieu de l'ouvrir. En échec : Réessayer et Supprimer.
  */
 export function ReportRow({
   row,
+  variant = "grid",
   showFailure = false,
   selecting = false,
   selected = false,
@@ -44,6 +69,7 @@ export function ReportRow({
   onOpen,
 }: {
   row: RowData;
+  variant?: "grid" | "list";
   showFailure?: boolean;
   selecting?: boolean;
   selected?: boolean;
@@ -54,15 +80,21 @@ export function ReportRow({
   onOpen?: () => void;
 }) {
   const t = useT();
+  const v = t.library.v2;
   const router = useRouter();
   const menu = useRef<HTMLDialogElement>(null);
+  const covers = useRef<HTMLDialogElement>(null);
+  const rename = useRef<HTMLDialogElement>(null);
   useDialogHistory(menu);
+  useDialogHistory(covers);
+  useDialogHistory(rename);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef<{ x: number; y: number } | null>(null);
   const pressed = useRef(false);
   const [busy, setBusy] = useState(false);
-  const icon: IconName = row.state === "failed" ? "alert" : row.state === "running" ? "hourglass" : "book";
-  const cls = row.state === "failed" ? "row error" : row.state === "running" ? "row running" : "row";
+  const [favorite, setFavorite] = useState(row.favorite);
+  const [cover, setCover] = useState(row.cover);
+  const [title, setTitle] = useState(row.title);
 
   async function remove() {
     menu.current?.close();
@@ -85,6 +117,40 @@ export function ReportRow({
     if (!res?.ok) return toast(apiMessage(t, body, t.library.actionFailed), "error");
     toast(t.library.retried);
     router.push(`/rapports/${row.id}`);
+  }
+
+  async function toggleFavorite() {
+    const next = !favorite;
+    setFavorite(next);
+    if (!(await patch(row.id, { favorite: next }))) {
+      setFavorite(!next);
+      return toast(t.library.actionFailed, "error");
+    }
+    router.refresh();
+  }
+
+  async function chooseCover(id: (typeof COVERS)[number]) {
+    covers.current?.close();
+    const prev = cover;
+    setCover(coverView(id));
+    if (!(await patch(row.id, { cover_id: id }))) {
+      setCover(prev);
+      toast(t.library.actionFailed, "error");
+    }
+  }
+
+  async function saveTitle(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const value = String(new FormData(e.currentTarget).get("title") ?? "").trim();
+    if (!value || value === title) return rename.current?.close();
+    rename.current?.close();
+    const prev = title;
+    setTitle(value);
+    if (!(await patch(row.id, { title: value }))) {
+      setTitle(prev);
+      return toast(t.library.actionFailed, "error");
+    }
+    router.refresh();
   }
 
   const openMenu = () => {
@@ -113,14 +179,12 @@ export function ReportRow({
         openMenu();
       }, LONG_PRESS);
     },
-    // Le défilement annule l'appui long avant son déclenchement.
     onPointerMove: (e: React.PointerEvent) => {
       if (origin.current && Math.hypot(e.clientX - origin.current.x, e.clientY - origin.current.y) > MOVE_TOLERANCE) cancelPress();
     },
     onPointerUp: cancelPress,
     onPointerLeave: cancelPress,
     onPointerCancel: cancelPress,
-    // Clic droit (bureau) : même menu. Sur mobile, l'appui long l'a déjà ouvert.
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
       if (!selecting) openMenu();
@@ -133,75 +197,65 @@ export function ReportRow({
       }
     },
   };
+  const swallowAfterPress = (e: React.MouseEvent) => {
+    if (pressed.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      pressed.current = false;
+      return;
+    }
+    onOpen?.();
+  };
 
-  const text = (
-    <span className="row-text">
-      <b>
-        {row.title}
-        {row.unread && <span className="unread-dot" role="img" aria-label={t.library.unread} />}
-      </b>
-      <small>
-        {row.sub}
-        {row.folderName ? ` · ${t.library.inFolder(row.folderName)}` : ""}
-      </small>
-    </span>
+  const body = (
+    <>
+      <Cover cover={cover} className={variant === "grid" ? "lesson-cover" : "lesson-thumb"} />
+      <span className="lesson-text">
+        <b className="lesson-title">
+          {title}
+          {row.unread && <span className="unread-dot" role="img" aria-label={t.library.unread} />}
+        </b>
+        <StatusLabel state={row.state} sources={row.sourceCount} />
+        {row.folderName && <small className="lesson-folder">{t.library.inFolder(row.folderName)}</small>}
+      </span>
+    </>
   );
 
   return (
-    <li className={`lib-row${showFailure ? " lib-failure" : ""}${selected ? " is-selected" : ""}`}>
-      <div className="lib-row-main" {...press}>
-        {selecting ? (
-          <label className={`${cls} lib-select`}>
-            <input type="checkbox" checked={selected} onChange={() => onToggle?.(row.id)} aria-label={t.library.selectItem(row.title)} />
-            <span className="row-icon" aria-hidden="true"><Icon name={selected ? "check" : icon} /></span>
-            {text}
-          </label>
-        ) : (
-          <ReportLink href={`/rapports/${row.id}`} className={cls} immersive={row.state === "ready"}>
-            <span
-              className="row-icon"
-              onClickCapture={(e) => {
-                if (pressed.current) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  pressed.current = false;
-                }
-              }}
-            >
-              <Icon name={icon} />
-            </span>
-            <span
-              className="lib-row-hit"
-              onClickCapture={(e) => {
-                if (pressed.current) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  pressed.current = false;
-                  return;
-                }
-                onOpen?.();
-              }}
-            >
-              {text}
-            </span>
-          </ReportLink>
-        )}
-        {!selecting && (
-          <button type="button" className="ib lib-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(row.title)} onClick={openMenu}>
-            <Icon name="more" />
+    <li className={`lesson lesson-${variant} lesson-${row.state}${selected ? " is-selected" : ""}`}>
+      <div className="lesson-main" {...press}>
+      {selecting ? (
+        <label className="lesson-hit">
+          <input type="checkbox" className="lesson-check" checked={selected} onChange={() => onToggle?.(row.id)} aria-label={t.library.selectItem(title)} />
+          {body}
+        </label>
+      ) : (
+        <ReportLink href={row.state === "ready" ? `/rapports/${row.id}/apercu` : `/rapports/${row.id}`} className="lesson-hit">
+          <span className="lesson-hit-inner" onClickCapture={swallowAfterPress}>{body}</span>
+        </ReportLink>
+      )}
+      {!selecting && (
+        <div className="lesson-actions">
+          {row.state === "ready" && (
+            <button type="button" className="ib ib-round lesson-fav" aria-pressed={favorite} aria-label={favorite ? v.unfavorite(title) : v.favorite(title)} onClick={toggleFavorite}>
+              <Icon name="heart" size={22} className={favorite ? "is-on" : undefined} />
+            </button>
+          )}
+          <button type="button" className="ib ib-round lesson-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(title)} onClick={openMenu}>
+            <Icon name="more" size={22} />
           </button>
-        )}
+        </div>
+      )}
       </div>
       {showFailure && !selecting && (
-        <div className="lib-failure-body">
+        <div className="lesson-failure">
           {row.reason && <p className="muted small">{row.reason}</p>}
+          <p className="muted small">{v.sourcesKept}</p>
           <div className="actions-row">
             <button type="button" className={`btn btn-primary${busy ? " busy" : ""}`} disabled={busy} onClick={retry}>
-              <Icon name="refresh" /> {busy ? t.library.retrying : t.library.retry}
+              {busy ? t.library.retrying : t.library.retry}
             </button>
-            <button type="button" className="btn" onClick={remove}>
-              <Icon name="trash" /> {t.library.delete}
-            </button>
+            <a href={`/rapports/${row.id}`} className="btn">{v.details}</a>
           </div>
         </div>
       )}
@@ -209,22 +263,36 @@ export function ReportRow({
       <dialog ref={menu} className="sheet side" aria-labelledby={`m-${row.id}`}>
         <div className="sheet-grip" aria-hidden="true" />
         <div className="sheet-head">
-          <h2 id={`m-${row.id}`}>{row.title}</h2>
+          <h2 id={`m-${row.id}`}>{title}</h2>
           <button type="button" className="ib" aria-label={t.reader.close} onClick={() => menu.current?.close()}>
             <Icon name="close" />
           </button>
         </div>
         <ul className="rows">
           <li>
-            <button type="button" className="row" onClick={() => { menu.current?.close(); router.push(`/rapports/${row.id}`); }}>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); router.push(row.state === "ready" ? `/rapports/${row.id}/apercu` : `/rapports/${row.id}`); }}>
               <span className="row-icon"><Icon name="book" /></span>
               <span className="row-text"><b>{t.library.open}</b></span>
             </button>
           </li>
+          {row.state === "ready" && (
+            <li>
+              <button type="button" className="row" onClick={() => { menu.current?.close(); void toggleFavorite(); }}>
+                <span className="row-icon"><Icon name="heart" /></span>
+                <span className="row-text"><b>{favorite ? v.removeFavorite : v.addFavorite}</b></span>
+              </button>
+            </li>
+          )}
           <li>
-            <button type="button" className="row" onClick={() => { menu.current?.close(); onStartSelect?.(row.id); }}>
-              <span className="row-icon"><Icon name="check" /></span>
-              <span className="row-text"><b>{t.library.select}</b></span>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); rename.current?.showModal(); }}>
+              <span className="row-icon"><Icon name="pencil" /></span>
+              <span className="row-text"><b>{v.rename}</b></span>
+            </button>
+          </li>
+          <li>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); covers.current?.showModal(); }}>
+              <span className="row-icon"><Icon name="grid" /></span>
+              <span className="row-text"><b>{v.changeCover}</b><small>{v.coverNote}</small></span>
             </button>
           </li>
           <li>
@@ -232,6 +300,12 @@ export function ReportRow({
               <span className="row-icon"><Icon name="move" /></span>
               <span className="row-text"><b>{t.library.moveTo}</b></span>
               <Icon name="chevron" className="row-chevron" />
+            </button>
+          </li>
+          <li>
+            <button type="button" className="row" onClick={() => { menu.current?.close(); onStartSelect?.(row.id); }}>
+              <span className="row-icon"><Icon name="check" /></span>
+              <span className="row-text"><b>{t.library.select}</b></span>
             </button>
           </li>
           {row.state === "failed" && (
@@ -249,6 +323,40 @@ export function ReportRow({
             </button>
           </li>
         </ul>
+      </dialog>
+
+      <dialog ref={covers} className="sheet center" aria-labelledby={`c-${row.id}`}>
+        <div className="sheet-grip" aria-hidden="true" />
+        <div className="sheet-head">
+          <h2 id={`c-${row.id}`}>{v.changeCover}</h2>
+          <button type="button" className="ib" aria-label={t.reader.close} onClick={() => covers.current?.close()}>
+            <Icon name="close" />
+          </button>
+        </div>
+        <p className="muted small">{v.coverNote}</p>
+        <div className="cover-picker" role="radiogroup" aria-label={v.changeCover}>
+          {COVERS.map((id) => (
+            <button key={id} type="button" role="radio" aria-checked={cover.id === id} aria-label={v.coverNames[id] ?? id} className="cover-choice" onClick={() => chooseCover(id)}>
+              <Cover cover={coverView(id)} />
+              <span>{v.coverNames[id] ?? id}</span>
+            </button>
+          ))}
+        </div>
+      </dialog>
+
+      <dialog ref={rename} className="sheet center" aria-labelledby={`r-${row.id}`}>
+        <div className="sheet-grip" aria-hidden="true" />
+        <form onSubmit={saveTitle}>
+          <div className="sheet-head">
+            <h2 id={`r-${row.id}`}>{v.rename}</h2>
+            <button type="button" className="ib" aria-label={t.reader.close} onClick={() => rename.current?.close()}>
+              <Icon name="close" />
+            </button>
+          </div>
+          <label htmlFor={`rt-${row.id}`}>{v.titleLabel}</label>
+          <input id={`rt-${row.id}`} name="title" type="text" defaultValue={title} maxLength={160} required />
+          <button type="submit" className="btn btn-primary btn-block">{v.save}</button>
+        </form>
       </dialog>
     </li>
   );
