@@ -40,6 +40,7 @@ import { visualConfig } from "@/lib/visuals/config";
 import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
 import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
+import { finishJobReservation } from "@/lib/billing/wallet";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/source-set";
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
@@ -781,10 +782,14 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
     else throw new JobFailure("kind_unsupported");
     if (status === "requeued") return { id: job.id, requeued: true };
     await finish(job.id, status, null);
+    // Module livré : le prix réservé devient une consommation (une seule fois).
+    await finishJobReservation(job.id, status === "succeeded" || status === "incomplete_check");
   } catch (e) {
     const f = failureOf(e);
     console.error("job", job.id, f.code);
     await finish(job.id, f.status, f.code);
+    // Échec ou annulation : les crédits réservés sont rendus à leurs lots d'origine.
+    await finishJobReservation(job.id, false);
     if (e instanceof ProviderError && e.issues.length) await recordSchemaIssues(job, e);
     // Échec technique ou annulation d'un nouveau rapport : le crédit du jour est rendu.
     if (job.kind === "generate_report" && job.report_id) await recordLimitEvent(job.owner_id, CREDIT_RETURNED, job.report_id);

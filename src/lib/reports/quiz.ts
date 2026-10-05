@@ -8,7 +8,7 @@ import { z } from "zod";
 import { getProvider } from "@/lib/engine";
 import type { AIProvider } from "@/lib/engine/provider";
 import { adminClient } from "@/lib/supabase/admin";
-import { guardReaderCall, providerFailure, ReaderAIError, recordReaderUsage } from "./ai-call";
+import { guardReaderCall, providerFailure, ReaderAIError, recordReaderUsage, withCredits } from "./ai-call";
 import { explanationText } from "./explanation-text";
 import { loadReport } from "./load";
 
@@ -124,15 +124,19 @@ export async function getQuiz(userId: string, reportId: string, input: QuizReque
   await guardReaderCall(userId, STAGE, PER_HOUR, RESERVE_CENTS);
   const n = sectionId ? 3 : Math.min(10, Math.max(5, sections.length * 2));
   const text = explanationText(report.explanation, sectionId ? [sectionId] : undefined);
-  let questions: QuizQuestion[];
-  try {
-    const res = await askQuiz(getProvider(), text, n, AbortSignal.timeout(80_000));
-    await recordReaderUsage(userId, STAGE, res.usage);
-    questions = normalizeQuiz(res.value, titles, sectionId ?? sections[0]!.id).slice(0, n);
-  } catch (e) {
-    return providerFailure(userId, STAGE, e, "Les questions n'ont pas pu être préparées. Réessayez.");
-  }
-  if (questions.length === 0) throw new ReaderAIError("invalid", "Les questions reçues n'étaient pas utilisables. Réessayez.");
+  // Nouveau test : 3 crédits, consommés seulement si des questions utilisables sont livrées.
+  const questions = await withCredits(userId, "quiz", reportId, async () => {
+    let qs: QuizQuestion[];
+    try {
+      const res = await askQuiz(getProvider(), text, n, AbortSignal.timeout(80_000));
+      await recordReaderUsage(userId, STAGE, res.usage);
+      qs = normalizeQuiz(res.value, titles, sectionId ?? sections[0]!.id).slice(0, n);
+    } catch (e) {
+      return providerFailure(userId, STAGE, e, "Les questions n'ont pas pu être préparées. Réessayez.");
+    }
+    if (qs.length === 0) throw new ReaderAIError("invalid", "Les questions reçues n'étaient pas utilisables. Réessayez.");
+    return qs;
+  });
 
   await db
     .from("report_quizzes")

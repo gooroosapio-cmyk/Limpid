@@ -7,7 +7,9 @@ import "server-only";
 import { z } from "zod";
 import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import { planPages } from "@/lib/engine/pipeline";
-import { assertCanStartJob, LimitError, recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
+import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
+import { ACTION_PRICES, reportAction } from "@/lib/billing/catalog";
+import { accountUsage, attachReservation, CreditError, getEntitlements, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient } from "@/lib/supabase/admin";
@@ -53,12 +55,18 @@ export class CreateError extends Error {
       | "limit"
       | "rate"
       | "source_missing"
-      | "source_used",
+      | "source_used"
+      | "credits"
+      | "weekly"
+      | "plan_reports"
+      | "plan_sources",
     message: string,
     /** Pages à lire par OCR (demande d'accord). */
     public readonly pages?: number,
     /** Rapport déjà créé pour cette source. */
     public readonly reportId?: string,
+    /** Crédits manquants, limite atteinte : de quoi expliquer la limite exacte (§ 11). */
+    public readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number } = {},
   ) {
     super(message);
   }
@@ -85,15 +93,9 @@ export async function createReport(
   if (!settings.data?.generation_enabled) {
     throw new CreateError("generation_disabled", "La génération est suspendue par l'administrateur.");
   }
-  // Limites du compte vérifiées avant toute lecture du document (aucun travail perdu).
-  if (!opts.limitsChecked) {
-    try {
-      await assertCanStartJob(userId, { newReport: true });
-    } catch (e) {
-      if (e instanceof LimitError) throw new CreateError("limit", e.message);
-      throw e;
-    }
-  }
+  // Droits de l'offre vérifiés avant toute lecture du document (aucun travail perdu).
+  const ent = await getEntitlements(userId);
+  if (!opts.limitsChecked) await assertCanCreate(userId, ent, 1);
 
   let sourceIds: string[];
   if ("source_ids" in input) {
@@ -134,6 +136,9 @@ export async function createReport(
   ]);
   const used = (usedSet?.report_id as string | undefined) ?? usedLegacy?.id;
   if (used) throw new CreateError("source_used", "Ce document a déjà son Limpid.", undefined, used);
+  if (sourceIds.length > ent.limits.sourcesPerReport) {
+    throw new CreateError("plan_sources", "Trop de documents pour votre offre.", undefined, undefined, { limit: ent.limits.sourcesPerReport });
+  }
   const sourceId = sourceIds[0]!;
   const first = byId.get(sourceId)!;
   const title = sourceIds.length > 1 ? `${first.title} + ${sourceIds.length - 1}`.slice(0, 300) : first.title;
@@ -145,18 +150,31 @@ export async function createReport(
   const targetPages = input.target_pages ?? auto.targetPages;
   const theme = input.theme ?? null;
   const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
+
+  // Devis fixe selon la taille réelle du texte lu, puis réservation avant tout appel IA.
+  const action = reportAction(auto.chars);
+  let reservationId: string;
+  try {
+    ({ reservationId } = await reserveCredits(userId, action, `report:${input.idempotency_key}`, {}, { wallet: ent.wallet }));
+  } catch (e) {
+    throw creditFailure(e);
+  }
   const report = await db
     .from("reports")
     .insert({ owner_id: userId, source_id: sourceId, title, theme_id: theme, visual_mode: visualMode, mode })
     .select("id")
     .single();
-  if (report.error || !report.data) throw new CreateError("storage", "Création du rapport impossible.");
+  if (report.error || !report.data) {
+    await releaseReservation(reservationId);
+    throw new CreateError("storage", "Création du rapport impossible.");
+  }
   // Ensemble de sources figé au lancement, dans l'ordre choisi.
   const set = await db
     .from("report_sources")
     .insert(sourceIds.map((id, position) => ({ report_id: report.data.id, source_id: id, owner_id: userId, position })));
   if (set.error) {
     await db.from("reports").delete().eq("id", report.data.id);
+    await releaseReservation(reservationId);
     throw new CreateError("storage", "Création du rapport impossible.");
   }
 
@@ -176,8 +194,9 @@ export async function createReport(
       visual_mode: visualMode,
       ...(sourceIds.length > 1 ? { source_ids: sourceIds } : {}),
       ...(ocrSources.length ? { ocr: true, ocr_sources: ocrSources } : {}),
+      credits: { action, amount: ACTION_PRICES[action] },
     },
-  });
+  }).select("id").single();
   if (job.error) {
     await db.from("reports").delete().eq("id", report.data.id);
     // Course entre deux envois simultanés : on renvoie le rapport de celui qui a gagné.
@@ -188,10 +207,13 @@ export async function createReport(
         .eq("owner_id", userId)
         .eq("idempotency_key", input.idempotency_key)
         .maybeSingle();
+      // Même clé : la réservation est celle du gagnant, elle n'est pas rendue.
       if (winner.data?.report_id) return { reportId: winner.data.report_id };
     }
+    await releaseReservation(reservationId);
     throw new CreateError("storage", "Création de la tâche impossible.");
   }
+  await attachReservation(reservationId, { jobId: job.data.id as string, reportId: report.data.id });
   await recordLimitEvent(userId, REPORT_CREATED, report.data.id);
   // Le dernier choix explicite est retenu pour le prochain import.
   if (input.mode) await db.from("reader_preferences").upsert({ owner_id: userId, default_mode: input.mode });
@@ -217,14 +239,9 @@ export async function createBatch(userId: string, input: z.infer<typeof BatchReq
   const { data: done } = await db.from("jobs").select("report_id, idempotency_key").eq("owner_id", userId).in("idempotency_key", keys);
   const already = new Map((done ?? []).map((j) => [j.idempotency_key as string, j.report_id as string]));
   const todo = keys.filter((k) => !already.has(k)).length;
-  if (todo > 0) {
-    try {
-      await assertCanStartJob(userId, { newReport: true, count: todo });
-    } catch (e) {
-      if (e instanceof LimitError) throw new CreateError("limit", e.message);
-      throw e;
-    }
-  }
+  // Droits vérifiés pour tout le lot avant la première création ; chaque Limpid réserve
+  // ensuite son propre prix (selon la taille de son document).
+  if (todo > 0) await assertCanCreate(userId, await getEntitlements(userId), todo);
   const reportIds: string[] = [];
   for (const [i, sourceId] of ids.entries()) {
     const key = keys[i]!;
@@ -263,9 +280,15 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
     db.from("reader_preferences").select("familiarity, goal, default_mode, explanation_lang").eq("owner_id", userId).maybeSingle(),
     db.from("source_segments").select("text").in("source_id", ids).limit(6_000),
   ]);
-  const chars = (segs ?? []).reduce((n, x) => n + (x.text as string).length, 0);
+  // Pages encore à lire par OCR : estimées (2 500 caractères par page) pour le devis.
+  const { data: pending } = await db.from("sources").select("page_count, coverage").in("id", ids);
+  const ocrChars = (pending ?? [])
+    .filter((s) => (s.coverage as { pending_ocr?: boolean } | null)?.pending_ocr === true)
+    .reduce((n, s) => n + ((s.page_count as number | null) ?? 1) * 2_500, 0);
+  const chars = (segs ?? []).reduce((n, x) => n + (x.text as string).length, 0) + ocrChars;
   const mode: Mode = chosen ?? Mode.safeParse(prefs?.default_mode).data ?? "claire";
   return {
+    chars,
     mode,
     level: levelFor(mode, prefs?.familiarity),
     goal: mode === "revision" ? ("reviser" as const) : (Goal.safeParse(prefs?.goal).data ?? "comprendre"),
@@ -277,4 +300,37 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
 /** Ancien repère (V3), conservé pour les tests de compatibilité. */
 export function pagesForLength(chars: number): number {
   return planPages(chars, "claire");
+}
+
+type Entitlements = Awaited<ReturnType<typeof getEntitlements>>;
+
+/**
+ * Droits de l'offre pour `count` nouveaux Limpid : préparations simultanées, Limpid conservés,
+ * limite hebdomadaire du gratuit, crédits pour au moins un rapport court chacun.
+ */
+async function assertCanCreate(userId: string, ent: Entitlements, count: number) {
+  const usage = await accountUsage(userId);
+  if (usage.active >= ent.limits.concurrentJobs) {
+    throw new CreateError("limit", "Un rapport est déjà en préparation. Attendez qu'il soit prêt pour en lancer un autre.");
+  }
+  if (usage.kept + count > ent.limits.keptReports) {
+    throw new CreateError("plan_reports", "Limite de Limpid conservés atteinte.", undefined, undefined, { limit: ent.limits.keptReports });
+  }
+  const weekly = ent.wallet.weekly;
+  if (weekly && weekly.used + count > weekly.limit) {
+    throw new CreateError("weekly", "Limite hebdomadaire atteinte.", undefined, undefined, { nextAt: weekly.nextAt, limit: weekly.limit });
+  }
+  const needed = ACTION_PRICES.report_short * count;
+  if (ent.wallet.available < needed) {
+    throw new CreateError("credits", "Crédits insuffisants.", undefined, undefined, { needed, available: ent.wallet.available });
+  }
+}
+
+function creditFailure(e: unknown): CreateError {
+  if (e instanceof CreditError) {
+    if (e.code === "insufficient") return new CreateError("credits", e.message, undefined, undefined, e.detail);
+    if (e.code === "weekly") return new CreateError("weekly", e.message, undefined, undefined, e.detail);
+    return new CreateError("storage", e.message);
+  }
+  throw e;
 }

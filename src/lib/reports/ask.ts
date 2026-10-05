@@ -9,7 +9,7 @@ import { blockEvidenceIds, type SourceSegment } from "@/lib/contracts/schemas";
 import { getProvider } from "@/lib/engine";
 import type { AIProvider } from "@/lib/engine/provider";
 import { describeLocator } from "@/lib/render/sources";
-import { guardReaderCall, providerFailure, ReaderAIError, recordReaderUsage } from "./ai-call";
+import { guardReaderCall, providerFailure, ReaderAIError, recordReaderUsage, withCredits } from "./ai-call";
 import { explanationText } from "./explanation-text";
 import { loadReport } from "./load";
 
@@ -125,18 +125,21 @@ export async function askDocument(userId: string, reportId: string, input: AskRe
   );
   const passages = pickSegments(report.segments, input.question, preferred);
   const explanation = section ? explanationText(report.explanation, [section.id], 6_000) : explanationText(report.explanation, undefined, 6_000);
-  try {
-    const res = await askModel(getProvider(), input, explanation, passages, AbortSignal.timeout(65_000));
-    await recordReaderUsage(userId, STAGE, res.usage);
-    const segs = new Map(passages.map((s) => [s.id, s]));
-    return {
-      answer: res.value.answer,
-      inDocument: res.value.in_document,
-      citations: verifyCitations(res.value.citations, segs),
-      beyond: res.value.beyond || null,
-      followups: res.value.followups,
-    };
-  } catch (e) {
-    return providerFailure(userId, STAGE, e, "La réponse n'a pas pu être préparée. Réessayez.");
-  }
+  // 1 crédit par question, consommé seulement si la réponse est livrée.
+  return withCredits(userId, "ask", reportId, async () => {
+    try {
+      const res = await askModel(getProvider(), input, explanation, passages, AbortSignal.timeout(65_000));
+      await recordReaderUsage(userId, STAGE, res.usage);
+      const segs = new Map(passages.map((s) => [s.id, s]));
+      return {
+        answer: res.value.answer,
+        inDocument: res.value.in_document,
+        citations: verifyCitations(res.value.citations, segs),
+        beyond: res.value.beyond || null,
+        followups: res.value.followups,
+      };
+    } catch (e) {
+      return providerFailure(userId, STAGE, e, "La réponse n'a pas pu être préparée. Réessayez.");
+    }
+  });
 }

@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { adminClient } from "@/lib/supabase/admin";
+import { finishJobReservation } from "@/lib/billing/wallet";
 
 export async function deleteReport(ownerId: string, reportId: string): Promise<"done" | "partial" | "not_found"> {
   const db = adminClient();
@@ -24,6 +25,10 @@ export async function deleteReport(ownerId: string, reportId: string): Promise<"
 
   await db.from("reports").update({ deleted_at: new Date().toISOString() }).eq("id", reportId);
   await db.from("jobs").update({ cancel_requested: true }).eq("report_id", reportId);
+  // Préparation pas encore démarrée : ses crédits sont rendus tout de suite (une tâche en
+  // cours les rend elle-même en s'arrêtant).
+  const { data: queued } = await db.from("jobs").select("id").eq("report_id", reportId).eq("status", "queued");
+  for (const j of queued ?? []) await finishJobReservation(j.id as string, false);
 
   const steps: Record<string, boolean> = {};
   // Fichiers privés éventuels (exports, original) : effacés avant les lignes qui les référencent.
