@@ -8,6 +8,7 @@ import { intentByRef, reconcileIntent } from "@/lib/billing/purchase";
 import { getWallet } from "@/lib/billing/wallet";
 import { getLang, getT } from "@/lib/i18n/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { nowMs } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function PaymentReturnPage({ searchParams }: { searchParams
       const { data: sub } = await adminClient().from("subscriptions").select("starts_at").eq("sale_id", intent.sale_id ?? "").maybeSingle();
       const start = sub?.starts_at ? new Date(sub.starts_at as string) : null;
       message =
-        start && start.getTime() > Date.now()
+        start && start.getTime() > nowMs()
           ? r.succeededPlanLater(t.billing.planNames[p.plan]!, start.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", timeZone: "Africa/Abidjan" }))
           : r.succeededPlan(t.billing.planNames[p.plan]!);
     }

@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { deleteAccount } from "@/lib/account/delete";
+import { recentlyAuthenticated } from "@/lib/auth/password";
+import { getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
 
 export interface DeleteAccountState {
@@ -16,6 +18,9 @@ export async function deleteMyAccount(_prev: DeleteAccountState, form: FormData)
   const supabase = await createUserClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/connexion");
+  // Opération irréversible : connexion de moins de 15 minutes (un cookie volé ne suffit pas).
+  const { data: session } = await supabase.auth.getSession();
+  if (!recentlyAuthenticated(session.session?.access_token)) return { error: (await getT()).auth.reauth };
 
   const result = await deleteAccount(data.user.id);
   if (!result.steps.auth_user) {

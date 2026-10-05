@@ -5,8 +5,14 @@
  */
 export type MfaStep = "ok" | "verify" | "enroll";
 
+let warned = false;
 export function adminMfaRequired(env: Record<string, string | undefined> = process.env): boolean {
-  return env.LIMPID_ADMIN_MFA !== "off";
+  const on = env.LIMPID_ADMIN_MFA !== "off";
+  if (!on && !warned) {
+    warned = true;
+    console.warn("SÉCURITÉ : LIMPID_ADMIN_MFA=off, l'administration n'exige pas la double authentification.");
+  }
+  return on;
 }
 
 /** Étape à franchir selon le niveau de la session et l'existence d'un facteur vérifié. */

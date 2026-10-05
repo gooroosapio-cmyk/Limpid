@@ -94,7 +94,7 @@ Référence complète et commentée : `.env.example`. Secrets à définir unique
 
 - Modèles : `LIMPID_MODEL_FAST`, `LIMPID_MODEL_QUALITY`, **`LIMPID_MODEL_FALLBACKS`**, `LIMPID_IMAGE_MODEL` ; rôles V4 **`AI_REPORT_MODEL`** (rapports, exercices) et **`AI_CHAT_MODEL`** (Discuter, corrections), prioritaires quand définis.
 - Contrôles : `LIMPID_VERIFY_CLAIMS`, limites de fichiers, d'OCR et de texte.
-- Budgets et limites : `LIMPID_MONTHLY_CAP_CENTS`, `LIMPID_REPORT_CAP_CENTS`, `LIMPID_ACCOUNT_DAILY_CAP_CENTS`, `LIMPID_DAILY_REPORTS`, `LIMPID_ACTIVE_JOBS_PER_ACCOUNT`, `LIMPID_GENERATED_IMAGES_PER_MONTH`.
+- Budgets et limites : `LIMPID_MONTHLY_CAP_CENTS`, `LIMPID_REPORT_CAP_CENTS`, `LIMPID_ACCOUNT_DAILY_CAP_CENTS`, `LIMPID_GENERATED_IMAGES_PER_MONTH` (plafonds de rapports : par offre, `src/lib/billing/catalog.ts`).
 - Illustrations : `LIMPID_ILLUSTRATIONS_COMMONS` (actif), `LIMPID_ILLUSTRATIONS_UNSPLASH`, `LIMPID_ILLUSTRATIONS_GEMINI` (coupés).
 
 ## Versions

@@ -10,6 +10,8 @@ export function InstallPanel() {
   const [state, setState] = useState<"checking" | "installed" | "prompt" | "ios" | "other" | "done">("checking");
 
   useEffect(() => {
+    // État de l'appareil (installation), connu seulement dans le navigateur après l'hydratation.
+    /* eslint-disable react-hooks/set-state-in-effect */
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
     if (standalone) return setState("installed");
     if (window.__limpidInstall) return setState("prompt");
@@ -18,6 +20,7 @@ export function InstallPanel() {
     const on = () => setState("prompt");
     window.addEventListener("limpid-installable", on);
     return () => window.removeEventListener("limpid-installable", on);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   if (state === "checking") return <div className="skeleton skeleton-row" aria-hidden="true" />;

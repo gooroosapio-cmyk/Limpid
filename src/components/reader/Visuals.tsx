@@ -192,7 +192,6 @@ export function VisualFigure({
 
 /** Visuel incrusté dans un bloc : le texte l'entoure puis continue sous son pied. */
 export function WrapFigure({ visual: v, asset, side }: { visual: VisualSpec; asset?: AssetView; side: "left" | "right" }) {
-  const t = useT();
   const cls = `wrap-fig wrap-${side} wrap-${v.size ?? "thumb"}`;
   if (v.kind === "drawing") {
     const d = DrawingData.safeParse(v.data);

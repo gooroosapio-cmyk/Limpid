@@ -5,8 +5,14 @@
 export type SessionStatus = "ok" | "inactive" | "inactive_admin" | "absolute" | "revoked";
 
 /** Désactivation de secours : LIMPID_SESSION_POLICY=off. */
+let warned = false;
 export function sessionPolicyOn(env: Record<string, string | undefined> = process.env): boolean {
-  return env.LIMPID_SESSION_POLICY !== "off";
+  const on = env.LIMPID_SESSION_POLICY !== "off";
+  if (!on && !warned) {
+    warned = true;
+    console.warn("SÉCURITÉ : LIMPID_SESSION_POLICY=off, les sessions d'appareil ne sont pas contrôlées.");
+  }
+  return on;
 }
 
 /** Identifiant de session Supabase (claim session_id du jeton d'accès), sans vérifier la signature : le jeton vient d'être validé par getUser(). */

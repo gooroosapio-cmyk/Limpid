@@ -1,6 +1,6 @@
 "use server";
 
-import { passwordProblem } from "@/lib/auth/password";
+import { passwordProblem, recentlyAuthenticated } from "@/lib/auth/password";
 import { getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -15,6 +15,9 @@ export async function setPassword(_prev: PasswordState, form: FormData): Promise
   const supabase = await createUserClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user?.email) return { status: "error", message: t.expired };
+  // Opération sensible : connexion de moins de 15 minutes (un cookie volé ne suffit pas).
+  const { data: session } = await supabase.auth.getSession();
+  if (!recentlyAuthenticated(session.session?.access_token)) return { status: "error", message: t.reauth };
   const password = String(form.get("password") ?? "");
   if (password !== String(form.get("confirm") ?? "")) return { status: "error", message: t.mismatch };
   const problem = passwordProblem(password, data.user.email, t.rules);

@@ -12,6 +12,8 @@ export function OfflineSave({ account, path, title }: { account: string; path: s
 
   useEffect(() => {
     if (!offlineSupported()) {
+      // Capacité du navigateur, connue seulement après l'hydratation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState("unsupported");
       return;
     }

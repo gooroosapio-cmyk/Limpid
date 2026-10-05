@@ -84,3 +84,12 @@ describe("plafonds jour et semaine (UTC)", () => {
     expect(quotaBlock(quotaState([], { day: 2, week: 5 }, now))).toBeNull();
   });
 });
+
+describe("réservations de rapports", () => {
+  it("retrouve la clé de la tâche à partir de la clé de réservation", async () => {
+    const { jobKeyOf } = await import("./wallet");
+    expect(jobKeyOf("report:abc12345")).toBe("abc12345");
+    expect(jobKeyOf("version:k-1")).toBe("k-1");
+    expect(jobKeyOf("ask:uuid")).toBeNull();
+  });
+});

@@ -114,13 +114,22 @@ export async function sweepReservations(userId: string) {
   const db = adminClient();
   const { data } = await db
     .from("credit_reservations")
-    .select("id, job_id, jobs(status, cancel_requested)")
+    .select("id, job_id, idempotency_key, jobs(status, cancel_requested)")
     .eq("owner_id", userId)
     .eq("status", "reserved")
     .lt("created_at", new Date(Date.now() - 20 * 60_000).toISOString())
     .limit(20);
   for (const r of data ?? []) {
-    const job = r.jobs as unknown as { status: string; cancel_requested: boolean } | null;
+    let job = r.jobs as unknown as { status: string; cancel_requested: boolean } | null;
+    // Lien vers la tâche jamais posé (écriture interrompue) : la tâche est retrouvée par sa clé.
+    const jobKey = !r.job_id ? jobKeyOf(r.idempotency_key as string) : null;
+    if (jobKey) {
+      const { data: j } = await db.from("jobs").select("id, status, cancel_requested").eq("owner_id", userId).eq("idempotency_key", jobKey).maybeSingle();
+      if (j) {
+        await db.from("credit_reservations").update({ job_id: j.id }).eq("id", r.id).is("job_id", null);
+        job = { status: j.status as string, cancel_requested: j.cancel_requested as boolean };
+      }
+    }
     const status = job?.status ?? null;
     // Une tâche en file dont l'annulation est demandée (rapport supprimé) ne démarrera jamais.
     if (status === "running" || (status === "queued" && !job?.cancel_requested)) continue;
@@ -202,8 +211,10 @@ export async function reserveCredits(
 ): Promise<{ reservationId: string; amount: number }> {
   const amount = ACTION_PRICES[action];
   const db = adminClient();
-  const { data: existing } = await db.from("credit_reservations").select("id, amount, action").eq("owner_id", userId).eq("idempotency_key", key).maybeSingle();
-  if (existing) {
+  const { data: existing } = await db.from("credit_reservations").select("id, amount, action, status").eq("owner_id", userId).eq("idempotency_key", key).maybeSingle();
+  // Seule une réservation encore en cours est réutilisée (double envoi). Rendue ou consommée,
+  // elle ne vaut plus rien : la base en crée une nouvelle (nouveau débit, nouveaux plafonds).
+  if (existing && existing.status === "reserved") {
     if (existing.action !== action || existing.amount !== amount) throw new CreditError("key_reused", "Cette demande a déjà été utilisée pour une autre action.");
     return { reservationId: existing.id as string, amount };
   }
@@ -237,16 +248,30 @@ export async function reserveCredits(
   return { reservationId: data as string, amount };
 }
 
+/** Clé de la tâche d'une réservation de rapport (« report:K » ou « version:K » → K). */
+export function jobKeyOf(reservationKey: string): string | null {
+  const m = /^(?:report|version):(.+)$/.exec(reservationKey);
+  return m ? m[1]! : null;
+}
+
+/** Relie la réservation à sa tâche ; réessayé, car sans ce lien le débit ne suivrait pas la livraison. */
 export async function attachReservation(reservationId: string, refs: { jobId?: string; reportId?: string }) {
-  await adminClient()
-    .from("credit_reservations")
-    .update({ ...(refs.jobId ? { job_id: refs.jobId } : {}), ...(refs.reportId ? { report_id: refs.reportId } : {}) })
-    .eq("id", reservationId);
+  const patch = { ...(refs.jobId ? { job_id: refs.jobId } : {}), ...(refs.reportId ? { report_id: refs.reportId } : {}) };
+  for (let i = 0; i < 3; i++) {
+    const { error } = await adminClient().from("credit_reservations").update(patch).eq("id", reservationId);
+    if (!error) return;
+    console.error("attach_reservation", error.code);
+  }
+  // Rattrapé par sweepReservations (tâche retrouvée par sa clé) et par finishJobReservation.
 }
 
 export async function settleReservation(reservationId: string) {
-  const { error } = await adminClient().rpc("settle_reservation", { p_reservation: reservationId });
-  if (error) console.error("settle_reservation", error.code);
+  for (let i = 0; i < 3; i++) {
+    const { error } = await adminClient().rpc("settle_reservation", { p_reservation: reservationId });
+    if (!error) return;
+    console.error("settle_reservation", error.code);
+  }
+  // Toujours « réservée » : sweepReservations la consomme si sa tâche a été livrée.
 }
 
 export async function releaseReservation(reservationId: string) {
@@ -256,7 +281,16 @@ export async function releaseReservation(reservationId: string) {
 
 /** Fin d'une tâche : livrée → consommée ; échec ou annulation → libérée (une seule fois). */
 export async function finishJobReservation(jobId: string, delivered: boolean) {
-  const { data } = await adminClient().from("credit_reservations").select("id").eq("job_id", jobId).eq("status", "reserved");
+  const db = adminClient();
+  let { data } = await db.from("credit_reservations").select("id").eq("job_id", jobId).eq("status", "reserved");
+  if (!data?.length) {
+    // Lien jamais posé : la réservation est retrouvée par la clé de la tâche.
+    const { data: job } = await db.from("jobs").select("owner_id, kind, idempotency_key").eq("id", jobId).maybeSingle();
+    if (job) {
+      const key = `${job.kind === "reexplain_section" ? "version" : "report"}:${job.idempotency_key}`;
+      ({ data } = await db.from("credit_reservations").select("id").eq("owner_id", job.owner_id).eq("idempotency_key", key).eq("status", "reserved").is("job_id", null));
+    }
+  }
   for (const r of data ?? []) await (delivered ? settleReservation(r.id as string) : releaseReservation(r.id as string));
 }
 

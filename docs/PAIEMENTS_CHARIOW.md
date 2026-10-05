@@ -53,7 +53,7 @@ Redéployez ensuite.
 
 Dans `/admin`, section **Paiements et crédits**, cochez « Inscriptions publiques ouvertes ». Fermées par défaut, elles permettent alors à n'importe qui de créer un compte sur `/inscription` : rôle utilisateur, offre gratuite.
 
-L'offre gratuite donne 80 crédits par cycle mensuel, au plus 2 rapports par semaine. Les crédits ne sont versés qu'après confirmation de l'adresse email.
+L'offre gratuite donne 80 crédits par cycle mensuel, au plus 2 rapports par jour et 5 par semaine. Les crédits ne sont versés qu'après confirmation de l'adresse email.
 
 ## 5. Premier essai réel
 
