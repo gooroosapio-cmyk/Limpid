@@ -6,7 +6,9 @@ import { getT } from "@/lib/i18n/server";
 import Link from "next/link";
 import { signupOpen } from "@/lib/auth/password";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { Icon } from "@/components/Icon";
 import { LoginForm } from "./LoginForm";
+import { Illustration } from "@/components/Illustration";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -21,8 +23,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <div className="page page-enter login-page stagger">
       <div className="login-brand"><Logo /></div>
-      <h1>{t.login.title}</h1>
-      <p className="lede">{t.login.subtitle}</p>
+      <Illustration name="connexion" fallback="lumiere" className="login-art" eager />
+      <div className="page-title">
+        <h1>{t.login.v2Title}</h1>
+        <p>{t.login.v2Subtitle}</p>
+      </div>
       {!open && <p className="muted">{t.login.alpha}</p>}
       {compte === "supprime" && <p className="notice" role="status">{t.account.deleted}</p>}
       {session && session in t.devices.expired && (
@@ -41,6 +46,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {!open && <p className="muted small">{t.signup.closed}</p>}
       </section>
       <p className="center"><Link href="/offres" className="btn-link">{t.billing.seeOffers}</Link></p>
+      <p className="login-private"><Icon name="lock" size={20} /> {t.login.private}</p>
     </div>
   );
 }

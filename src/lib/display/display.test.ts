@@ -26,8 +26,10 @@ describe("préférences d'affichage", () => {
 
   it("traduit les cookies en attributs de <html>", () => {
     const p = readDisplayPrefs(
-      (n) => ({ "limpid-mode": "dark", "limpid-text": "grand", "limpid-motion": "reduit", "limpid-contrast": "fort" })[n],
+      (n) => ({ "limpid-mode": "light", "limpid-text": "grand", "limpid-motion": "reduit", "limpid-contrast": "fort" })[n],
     );
-    expect(htmlAttributes(p)).toEqual({ "data-mode": "dark", "data-text": "grand", "data-motion": "reduit", "data-contrast": "fort" });
+    // Galerie sombre par défaut : seul le mode Papier (light) pose un attribut.
+    expect(htmlAttributes(p)).toEqual({ "data-mode": "light", "data-text": "grand", "data-motion": "reduit", "data-contrast": "fort" });
+    expect(htmlAttributes({ ...p, mode: "dark" })["data-mode"]).toBeUndefined();
   });
 });

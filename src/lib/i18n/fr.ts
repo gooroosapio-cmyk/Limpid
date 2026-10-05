@@ -32,6 +32,19 @@ export const fr = {
     addSource: "Créer une leçon avec d'autres sources",
     ask: "Demander à Limpid",
   },
+  profile: {
+    title: "Votre espace",
+    me: "Mon profil",
+    creditsAvailable: "crédits disponibles",
+    seeOffer: "Voir mon offre",
+    preferences: "Préférences",
+    explanations: "Explications",
+    explanationsSub: "Approche, niveau et longueur",
+    comfortSub: "Taille du texte, contraste et thème",
+    language: "Langue",
+    privacy: "Confidentialité et données",
+    account: "Compte et sécurité",
+  },
   shell: {
     createLabel: "Créer",
     create: {
@@ -609,6 +622,11 @@ export const fr = {
     } as Record<string, string>,
   },
   login: {
+    v2Title: "Retrouvez vos idées.",
+    v2Subtitle: "Vos leçons vous attendent.",
+    emailPlaceholder: "vous@exemple.com",
+    passwordPlaceholder: "Votre mot de passe",
+    private: "Vos documents restent privés.",
     noAccount: "Pas encore de compte ?",
     oauth: {
       google: "Continuer avec Google",
@@ -1101,8 +1119,10 @@ export const fr = {
     quizCost: "Nouveau test : 3 crédits",
     versionCost: "Nouvelle version : 8 crédits",
     offers: {
-      title: "Choisissez votre rythme avec Limpid",
-      lede: "Plus de crédits pour comprendre, réviser et créer vos supports.",
+      title: "À votre rythme.",
+      lede: "Choisissez l'espace pour vos idées. Prix en FCFA, accès prépayé, sans renouvellement automatique.",
+      yourPlan: "Votre offre",
+      alreadyPaid: ["J'ai déjà payé", "Retrouver un paiement fait sur la boutique Chariow"] as [string, string],
       monthly: "Mensuel",
       yearly: "Annuel",
       twoMonths: "2 mois offerts",

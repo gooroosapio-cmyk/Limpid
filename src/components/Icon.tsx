@@ -123,6 +123,12 @@ const PATHS = {
   "trash": (
     <><path d="M3 6h18M6 6l1 15h10l1-15M9 6V3h6v3M10 10v7M14 10v7" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
   ),
+  "mail": (
+    <><path d="M3 6h18v12H3Zm0 0 9 7 9-7" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
+  "lock": (
+    <><path d="M6 11h12v10H6Zm2.5 0V7.5a3.5 3.5 0 0 1 7 0V11" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
   "plus-circle": (
     <><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 8v8M8 12h8" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
   ),

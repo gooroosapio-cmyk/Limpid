@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { OffersGrid } from "@/components/billing/OffersGrid";
+import { LinkRow } from "@/components/LinkRow";
 import { Screen } from "@/components/shell/Screen";
 import { currentUser } from "@/lib/auth";
 import { ACTION_PRICES, formatXof, PAID_PLANS, PLANS, reportsFor, TOPUPS, type PlanCode } from "@/lib/billing/catalog";
@@ -24,8 +25,10 @@ export default async function OffersPage() {
 
   return (
     <Screen wide>
-      <h1>{o.title}</h1>
-      <p className="lede">{o.lede}</p>
+      <div className="page-title offers-title">
+        <h1>{o.title}</h1>
+        <p>{o.lede}</p>
+      </div>
       <OffersGrid lang={lang} current={wallet ? { plan: wallet.plan, mode: wallet.mode } : null} scheduleFrom={scheduleFrom} />
       <p className="muted">{o.note}</p>
       <p className="muted">{o.capsNote}</p>
@@ -76,6 +79,10 @@ export default async function OffersPage() {
         <h3>{o.expiryTitle}</h3>
         <p>{o.expiry}</p>
       </details>
+
+      <ul className="rows">
+        <LinkRow href={user ? "/compte/credits#paid-h" : "/connexion"} icon="key" title={o.alreadyPaid[0]} sub={o.alreadyPaid[1]} />
+      </ul>
 
       <section aria-labelledby="faq-h">
         <h2 id="faq-h">{o.faqTitle}</h2>

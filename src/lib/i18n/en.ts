@@ -36,6 +36,19 @@ export const en: Dict = {
     addSource: "Create a lesson with other sources",
     ask: "Ask Limpid",
   },
+  profile: {
+    title: "Your space",
+    me: "My profile",
+    creditsAvailable: "credits available",
+    seeOffer: "See my plan",
+    preferences: "Preferences",
+    explanations: "Explanations",
+    explanationsSub: "Approach, level and length",
+    comfortSub: "Text size, contrast and theme",
+    language: "Language",
+    privacy: "Privacy and data",
+    account: "Account and security",
+  },
   shell: {
     createLabel: "Create",
     create: {
@@ -611,6 +624,11 @@ export const en: Dict = {
     },
   },
   login: {
+    v2Title: "Find your ideas again.",
+    v2Subtitle: "Your lessons are waiting.",
+    emailPlaceholder: "you@example.com",
+    passwordPlaceholder: "Your password",
+    private: "Your documents stay private.",
     noAccount: "No account yet?",
     oauth: {
       google: "Continue with Google",
@@ -1130,8 +1148,10 @@ export const en: Dict = {
     quizCost: "New test: 3 credits",
     versionCost: "New version: 8 credits",
     offers: {
-      title: "Choose your pace with Limpid",
-      lede: "More credits to understand, revise and create your materials.",
+      title: "At your own pace.",
+      lede: "Choose the space for your ideas. Prices in FCFA, prepaid access, no automatic renewal.",
+      yourPlan: "Your plan",
+      alreadyPaid: ["I've already paid", "Find a payment made on the Chariow store"] as [string, string],
       monthly: "Monthly",
       yearly: "Yearly",
       twoMonths: "2 months free",

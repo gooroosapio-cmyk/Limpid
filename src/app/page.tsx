@@ -8,13 +8,13 @@ import { LibraryMemory } from "@/components/library/LibraryMemory";
 import { LibraryBrowser, type ResumeItem } from "@/components/library/LibraryBrowser";
 import { Preparations } from "@/components/library/Preparations";
 import { type RowData } from "@/components/library/ReportRow";
-import { Cover } from "@/components/library/Cover";
 import { requireUser } from "@/lib/auth";
 import { demoBlueprint } from "@/lib/demo/cycle-eau";
 import { getLang, getT } from "@/lib/i18n/server";
 import { coverFor, coverView } from "@/lib/library/covers";
 import { loadLibrary, whenLabel, type LibraryItem } from "@/lib/library/load";
 import { createUserClient } from "@/lib/supabase/server";
+import { Illustration } from "@/components/Illustration";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -161,7 +161,7 @@ export default async function HomeLibraryPage({
           <p>{v.subtitle}</p>
         </div>
         <section className="lib-empty-v2 stagger">
-          <Cover cover={coverView("lumiere")} className="lib-empty-cover" eager />
+          <Illustration name="bibliotheque-vide" fallback="lumiere" className="lib-empty-cover" eager />
           <h2>{v.emptyTitle}</h2>
           <p className="muted">{v.emptyText}</p>
           <Link href="/ajouter" className="btn btn-primary btn-block">{t.library.emptyCta} <Icon name="arrow" /></Link>

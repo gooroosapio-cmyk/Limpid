@@ -88,3 +88,26 @@ export function ModeSettings({ initial }: { initial: Mode }) {
     </fieldset>
   );
 }
+
+/** Ligne « Réduire les animations » du profil : icône, libellé, interrupteur (respecte aussi l'OS). */
+export function MotionRow({ initial }: { initial: boolean }) {
+  const t = useT();
+  const [motion, setMotion] = useState(initial);
+  return (
+    <label className="row settings-row settings-switch">
+      <span className="row-icon"><Icon name="eye-off" /></span>
+      <span className="row-text"><b>{t.compte.motion[0]}</b><small>{t.compte.motion[1]}</small></span>
+      <span className="switch">
+        <input
+          type="checkbox"
+          checked={motion}
+          onChange={(e) => {
+            setMotion(e.target.checked);
+            setDisplayPref(DISPLAY_COOKIES.motion, e.target.checked ? "reduit" : null, "data-motion", e.target.checked ? "reduit" : null);
+          }}
+        />
+        <i aria-hidden="true" />
+      </span>
+    </label>
+  );
+}

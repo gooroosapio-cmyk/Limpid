@@ -2,6 +2,7 @@
 
 import { useActionState, useId, useState } from "react";
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
 import { sendMagicLink, signInWithPassword, type LoginState } from "./actions";
 
@@ -20,21 +21,26 @@ export function LoginForm() {
   const pending = pwPending || linkPending;
 
   return (
-    <form action={pwAction} className="card login" aria-describedby={`${base}-status`}>
+    <form action={pwAction} className="login" aria-describedby={`${base}-status`}>
       <label htmlFor={`${base}-email`}>{t.login.email}</label>
-      <input id={`${base}-email`} name="email" type="email" autoComplete="username" inputMode="email" required />
+      <div className="field">
+        <Icon name="mail" />
+        <input id={`${base}-email`} name="email" type="email" autoComplete="username" inputMode="email" placeholder={t.login.emailPlaceholder} required />
+      </div>
 
       <label htmlFor={`${base}-password`}>{t.login.password}</label>
-      <div className="password-field">
-        <input id={`${base}-password`} name="password" type={show ? "text" : "password"} autoComplete="current-password" />
+      <div className="field password-field">
+        <Icon name="lock" />
+        <input id={`${base}-password`} name="password" type={show ? "text" : "password"} autoComplete="current-password" placeholder={t.login.passwordPlaceholder} />
         <button
           type="button"
-          className="password-toggle"
+          className="ib password-toggle"
           aria-pressed={show}
           aria-controls={`${base}-password`}
+          aria-label={show ? t.login.hide : t.login.show}
           onClick={() => setShow((s) => !s)}
         >
-          {show ? t.login.hide : t.login.show}
+          <Icon name={show ? "eye-off" : "eye"} />
         </button>
       </div>
       <p className="login-forgot">
@@ -48,8 +54,7 @@ export function LoginForm() {
       <button type="submit" className="btn btn-primary btn-block" disabled={pending} onClick={() => setLast("password")}>
         {pwPending ? t.login.signingIn : t.login.signIn}
       </button>
-      <p className="login-or" aria-hidden="true"><span>{t.login.or}</span></p>
-      <button type="submit" formAction={linkAction} formNoValidate className="btn btn-block" disabled={pending} onClick={() => setLast("link")}>
+      <button type="submit" formAction={linkAction} formNoValidate className="btn-link login-magic" disabled={pending} onClick={() => setLast("link")}>
         {linkPending ? t.login.sending : t.login.magicLink}
       </button>
     </form>
