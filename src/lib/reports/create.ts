@@ -9,6 +9,7 @@ import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, VisualMode } from 
 import { planPages } from "@/lib/engine/pipeline";
 import { assertCanStartJob, LimitError, recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
+import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient } from "@/lib/supabase/admin";
 import { effectiveVisualMode } from "@/lib/visuals/config";
 
@@ -29,6 +30,8 @@ const Settings = {
 
 export const CreateRequest = z.union([
   z.strictObject({ source_id: z.string().uuid(), ...Settings }),
+  // Limpid commun (V5) : plusieurs documents, dans l'ordre de lecture choisi.
+  z.strictObject({ source_ids: z.array(z.string().uuid()).min(1).max(MAX_SOURCES), ...Settings }),
   // Compatibilité : préparation et création en un seul envoi (ancien formulaire).
   z.preprocess(
     (v) => (v && typeof v === "object" && !("source" in v) && "text" in v ? { ...v, source: "text" } : v),
@@ -61,7 +64,12 @@ export class CreateError extends Error {
   }
 }
 
-export async function createReport(userId: string, input: CreateRequest): Promise<{ reportId: string }> {
+export async function createReport(
+  userId: string,
+  input: CreateRequest,
+  /** Lot « un Limpid par document » : limites déjà vérifiées pour tout le lot. */
+  opts: { limitsChecked?: boolean } = {},
+): Promise<{ reportId: string }> {
   const db = adminClient();
 
   // Double envoi : la même clé renvoie le même rapport, sans nouvelle tâche.
@@ -78,42 +86,59 @@ export async function createReport(userId: string, input: CreateRequest): Promis
     throw new CreateError("generation_disabled", "La génération est suspendue par l'administrateur.");
   }
   // Limites du compte vérifiées avant toute lecture du document (aucun travail perdu).
-  try {
-    await assertCanStartJob(userId, { newReport: true });
-  } catch (e) {
-    if (e instanceof LimitError) throw new CreateError("limit", e.message);
-    throw e;
+  if (!opts.limitsChecked) {
+    try {
+      await assertCanStartJob(userId, { newReport: true });
+    } catch (e) {
+      if (e instanceof LimitError) throw new CreateError("limit", e.message);
+      throw e;
+    }
   }
 
-  let sourceId: string;
-  if ("source_id" in input) {
-    sourceId = input.source_id;
+  let sourceIds: string[];
+  if ("source_ids" in input) {
+    sourceIds = [...new Set(input.source_ids)];
+  } else if ("source_id" in input) {
+    sourceIds = [input.source_id];
   } else {
     const { mode: _m, level: _l, goal: _g, target_pages: _t, template: _tp, theme: _th, visual_mode: _vm, idempotency_key: _k, ...source } = input;
     try {
-      sourceId = (await prepareSource(userId, source as PrepareRequest)).sourceId;
+      sourceIds = [(await prepareSource(userId, source as PrepareRequest)).sourceId];
     } catch (e) {
       if (e instanceof PrepareError) throw new CreateError(e.code, e.message, e.pages);
       throw e;
     }
   }
 
-  const { data: src } = await db
+  // Chaque document : au compte, lisible (ou en attente d'OCR), pas encore utilisé par un Limpid.
+  const { data: rows } = await db
     .from("sources")
     .select("id, title, status, coverage")
-    .eq("id", sourceId)
+    .in("id", sourceIds)
     .eq("owner_id", userId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  const pendingOcr = !!src && src.status === "extracting" && (src.coverage as { pending_ocr?: boolean } | null)?.pending_ocr === true;
-  if (!src || !(src.status === "extracted" || src.status === "partial" || pendingOcr)) {
-    throw new CreateError("source_missing", "Ce document n'est plus disponible. Ajoutez-le à nouveau.");
+    .is("deleted_at", null);
+  const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+  const ocrSources: string[] = [];
+  for (const id of sourceIds) {
+    const src = byId.get(id);
+    const pendingOcr = !!src && src.status === "extracting" && (src.coverage as { pending_ocr?: boolean } | null)?.pending_ocr === true;
+    if (!src || !(src.status === "extracted" || src.status === "partial" || pendingOcr)) {
+      throw new CreateError("source_missing", "Un document n'est plus disponible. Retirez-le ou ajoutez-le à nouveau.");
+    }
+    if (pendingOcr) ocrSources.push(id);
   }
-  // Une source, un rapport : supprimer le rapport supprime aussi sa source.
-  const { data: used } = await db.from("reports").select("id").eq("source_id", sourceId).is("deleted_at", null).limit(1).maybeSingle();
-  if (used) throw new CreateError("source_used", "Ce document a déjà son rapport.", undefined, used.id);
+  // Un document, un Limpid : supprimer le Limpid supprime aussi ses documents.
+  const [{ data: usedSet }, { data: usedLegacy }] = await Promise.all([
+    db.from("report_sources").select("report_id, reports!inner(deleted_at)").in("source_id", sourceIds).is("reports.deleted_at", null).limit(1).maybeSingle(),
+    db.from("reports").select("id").in("source_id", sourceIds).is("deleted_at", null).limit(1).maybeSingle(),
+  ]);
+  const used = (usedSet?.report_id as string | undefined) ?? usedLegacy?.id;
+  if (used) throw new CreateError("source_used", "Ce document a déjà son Limpid.", undefined, used);
+  const sourceId = sourceIds[0]!;
+  const first = byId.get(sourceId)!;
+  const title = sourceIds.length > 1 ? `${first.title} + ${sourceIds.length - 1}`.slice(0, 300) : first.title;
 
-  const auto = await automaticSettings(userId, sourceId, input.mode);
+  const auto = await automaticSettings(userId, sourceIds, input.mode);
   const mode = input.mode ?? auto.mode;
   const level = input.level ?? auto.level;
   const goal = input.goal ?? auto.goal;
@@ -122,10 +147,18 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
   const report = await db
     .from("reports")
-    .insert({ owner_id: userId, source_id: sourceId, title: src.title, theme_id: theme, visual_mode: visualMode, mode })
+    .insert({ owner_id: userId, source_id: sourceId, title, theme_id: theme, visual_mode: visualMode, mode })
     .select("id")
     .single();
   if (report.error || !report.data) throw new CreateError("storage", "Création du rapport impossible.");
+  // Ensemble de sources figé au lancement, dans l'ordre choisi.
+  const set = await db
+    .from("report_sources")
+    .insert(sourceIds.map((id, position) => ({ report_id: report.data.id, source_id: id, owner_id: userId, position })));
+  if (set.error) {
+    await db.from("reports").delete().eq("id", report.data.id);
+    throw new CreateError("storage", "Création du rapport impossible.");
+  }
 
   const job = await db.from("jobs").insert({
     owner_id: userId,
@@ -141,7 +174,8 @@ export async function createReport(userId: string, input: CreateRequest): Promis
       target_pages: targetPages,
       ...(input.template ? { template: input.template } : {}),
       visual_mode: visualMode,
-      ...(pendingOcr ? { ocr: true } : {}),
+      ...(sourceIds.length > 1 ? { source_ids: sourceIds } : {}),
+      ...(ocrSources.length ? { ocr: true, ocr_sources: ocrSources } : {}),
     },
   });
   if (job.error) {
@@ -164,6 +198,51 @@ export async function createReport(userId: string, input: CreateRequest): Promis
   return { reportId: report.data.id };
 }
 
+export const BatchRequest = z.strictObject({
+  source_ids: z.array(z.string().uuid()).min(1).max(MAX_SOURCES),
+  mode: Mode.optional(),
+  visual_mode: VisualMode.optional(),
+  idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,90}$/),
+});
+
+/**
+ * « Un Limpid par document » : générations indépendantes, une par document, avec la même
+ * approche. Les limites sont vérifiées pour tout le lot avant la première création ; les
+ * tâches sont mises en file et traitées une à une. Une reprise (même clé) ne recrée rien.
+ */
+export async function createBatch(userId: string, input: z.infer<typeof BatchRequest>): Promise<{ reportIds: string[] }> {
+  const ids = [...new Set(input.source_ids)];
+  const db = adminClient();
+  const keys = ids.map((_, i) => `${input.idempotency_key}-${i}`);
+  const { data: done } = await db.from("jobs").select("report_id, idempotency_key").eq("owner_id", userId).in("idempotency_key", keys);
+  const already = new Map((done ?? []).map((j) => [j.idempotency_key as string, j.report_id as string]));
+  const todo = keys.filter((k) => !already.has(k)).length;
+  if (todo > 0) {
+    try {
+      await assertCanStartJob(userId, { newReport: true, count: todo });
+    } catch (e) {
+      if (e instanceof LimitError) throw new CreateError("limit", e.message);
+      throw e;
+    }
+  }
+  const reportIds: string[] = [];
+  for (const [i, sourceId] of ids.entries()) {
+    const key = keys[i]!;
+    const existing = already.get(key);
+    if (existing) {
+      reportIds.push(existing);
+      continue;
+    }
+    const { reportId } = await createReport(
+      userId,
+      { source_id: sourceId, mode: input.mode, visual_mode: input.visual_mode, idempotency_key: key },
+      { limitsChecked: true },
+    );
+    reportIds.push(reportId);
+  }
+  return { reportIds };
+}
+
 const LEVEL_BY_FAMILIARITY: Record<string, z.infer<typeof Level>> = { aucune: "grand_public", bases: "grand_public", maitrise: "etudiant" };
 
 /** Niveau rédactionnel d'une approche : très simple impose le niveau le plus simple. */
@@ -177,11 +256,12 @@ export function levelFor(mode: Mode, familiarity: string | null | undefined): z.
  * claire), niveau selon l'approche et la familiarité, objectif selon les préférences, plan
  * de pages selon la taille du texte lu, langue des explications.
  */
-export async function automaticSettings(userId: string, sourceId: string, chosen?: Mode) {
+export async function automaticSettings(userId: string, sourceIds: string | string[], chosen?: Mode) {
   const db = adminClient();
+  const ids = Array.isArray(sourceIds) ? sourceIds : [sourceIds];
   const [{ data: prefs }, { data: segs }] = await Promise.all([
     db.from("reader_preferences").select("familiarity, goal, default_mode, explanation_lang").eq("owner_id", userId).maybeSingle(),
-    db.from("source_segments").select("text").eq("source_id", sourceId).limit(3_000),
+    db.from("source_segments").select("text").in("source_id", ids).limit(6_000),
   ]);
   const chars = (segs ?? []).reduce((n, x) => n + (x.text as string).length, 0);
   const mode: Mode = chosen ?? Mode.safeParse(prefs?.default_mode).data ?? "claire";

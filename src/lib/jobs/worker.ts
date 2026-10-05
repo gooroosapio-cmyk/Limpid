@@ -41,6 +41,7 @@ import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } f
 import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { assemble, ExtractionError } from "@/lib/extract";
+import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/source-set";
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
 import { BUCKET, purgeOriginal } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
@@ -66,6 +67,10 @@ interface JobRow {
     reasons?: ReformulateReason[];
     comment?: string | null;
     ocr?: boolean;
+    /** Limpid commun (V5) : documents dans l'ordre de lecture (absent : source unique). */
+    source_ids?: string[];
+    /** Documents à lire par OCR dans la tâche (absent : `ocr` vaut pour la source unique). */
+    ocr_sources?: string[];
     /** Organisation imposée par le lecteur. */
     template?: z.infer<typeof TemplateId>;
     /** Nouvelle version d'un rapport existant. */
@@ -152,14 +157,33 @@ async function preferencesOf(ownerId: string): Promise<PreferencesSnapshot> {
     : { aids: [], minutes: null, density: null, example_domain: null, familiarity: null };
 }
 
-async function loadSegments(sourceId: string): Promise<SourceSegment[]> {
-  const { data, error } = await adminClient()
-    .from("source_segments")
-    .select("id, source_version, locator, text, content_hash, extraction_warnings")
-    .eq("source_id", sourceId)
-    .order("ordinal");
-  if (error || !data?.length) throw new JobFailure("source_missing");
-  return data.map((r) => SourceSegment.parse({ ...r, source_id: `src_${sourceId}` }));
+
+/** Segments de tous les documents du Limpid, dans l'ordre de lecture, identifiants du moteur. */
+async function loadSourceSet(sourceIds: string[]): Promise<SourceSegment[]> {
+  const db = adminClient();
+  const bySource = await Promise.all(
+    sourceIds.map(async (sourceId) => {
+      const { data, error } = await db
+        .from("source_segments")
+        .select("id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
+        .eq("source_id", sourceId)
+        .order("ordinal");
+      if (error || !data?.length) throw new JobFailure("source_missing");
+      return { sourceId, rows: data };
+    }),
+  );
+  return engineSegments(bySource);
+}
+
+/** Documents du Limpid : paramètres de la tâche, sinon ensemble enregistré, sinon source unique. */
+async function jobSourceIds(job: JobRow): Promise<string[]> {
+  if (job.params.source_ids?.length) return job.params.source_ids;
+  if (job.report_id) {
+    const { data } = await adminClient().from("report_sources").select("source_id, position").eq("report_id", job.report_id).order("position");
+    if (data?.length) return data.map((r) => r.source_id as string);
+  }
+  if (!job.source_id) throw new JobFailure("job_invalid");
+  return [job.source_id];
 }
 
 async function setStage(jobId: string, stage: JobStage) {
@@ -222,16 +246,28 @@ async function checkBudget(ownerId: string) {
   }
 }
 
-async function runOcr(job: JobRow, controller: AbortController) {
+/**
+ * Lecture OCR d'un document dans la tâche. Document entièrement visuel (image, PDF scanné) :
+ * toutes les pages. Document mixte : seules les pages sans texte natif (schémas, pages
+ * scannées) sont lues, puis rejoignent leur place dans l'ordre des pages. Déjà lu : rien.
+ */
+async function runOcr(job: JobRow, sourceId: string, controller: AbortController) {
   const db = adminClient();
-  const sourceId = job.source_id!;
-  const { count } = await db.from("source_segments").select("id", { count: "exact", head: true }).eq("source_id", sourceId);
-  if ((count ?? 0) > 0) return;
+  const { data: src } = await db.from("sources").select("kind, storage_path, page_count, coverage").eq("id", sourceId).single();
+  const coverage = (src?.coverage ?? {}) as Record<string, unknown> & { pending_ocr?: boolean; pending_ocr_pages?: number[] };
+  const pages = Array.isArray(coverage.pending_ocr_pages) ? coverage.pending_ocr_pages.filter((n) => Number.isInteger(n) && n >= 1) : null;
+  if (!pages) {
+    const { count } = await db.from("source_segments").select("id", { count: "exact", head: true }).eq("source_id", sourceId);
+    if ((count ?? 0) > 0) return;
+  } else if (pages.length === 0) return;
 
   await setStage(job.id, "extraction");
   await checkBudget(job.owner_id);
-  const { data: src } = await db.from("sources").select("kind, storage_path, page_count").eq("id", sourceId).single();
-  if (!src?.storage_path || !(src.kind in OCR_MIME)) throw new JobFailure("ocr_source_missing");
+  if (!src?.storage_path || !(src.kind in OCR_MIME)) {
+    // Document mixte dont l'original a disparu : on garde le texte natif, pages signalées.
+    if (pages) return;
+    throw new JobFailure("ocr_source_missing");
+  }
   const kind = src.kind as keyof typeof OCR_MIME;
 
   try {
@@ -246,13 +282,58 @@ async function runOcr(job: JobRow, controller: AbortController) {
         data: new Uint8Array(await file.data.arrayBuffer()),
         pageCount,
         maxPages: limits.maxOcrPages,
+        pages: pages ?? undefined,
         signal: controller.signal,
         budget: { tier: "fast", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
         onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
       });
     } catch (e) {
+      // Pages complémentaires illisibles : le texte natif reste, les pages restent signalées.
+      if (e instanceof ExtractionError && pages) {
+        await db.from("sources").update({ coverage: { ...coverage, pending_ocr_pages: [], ocr_unreadable_pages: pages } }).eq("id", sourceId);
+        return;
+      }
       if (e instanceof ExtractionError) throw new JobFailure("ocr_unreadable");
       throw e;
+    }
+
+    if (pages) {
+      // Pages lues en complément : segments propres, identifiants distincts du texte natif.
+      const { data: first } = await db.from("source_segments").select("source_version").eq("source_id", sourceId).limit(1).maybeSingle();
+      const out = assemble(result.blocks, `src_${sourceId}`, { maxChars: limits.maxSourceChars, pageCount, pagesRead: pageCount, emptyPages: [], ocr: true });
+      const perPage = new Map<number, number>();
+      const rows = out.extracted.segments.map((seg, i) => {
+        const page = (seg.locator as { physical_index?: number }).physical_index ?? 0;
+        const k = (perPage.get(page) ?? 0) + 1;
+        perPage.set(page, k);
+        return {
+          id: `seg_p${page}-${k}`,
+          source_id: sourceId,
+          owner_id: job.owner_id,
+          // Même version de source que le texte natif : une seule version figée du document.
+          source_version: first?.source_version ?? seg.source_version,
+          ordinal: 100_000 + i,
+          locator: seg.locator,
+          text: seg.text,
+          content_hash: seg.content_hash,
+          extraction_warnings: seg.extraction_warnings,
+        };
+      });
+      if (rows.length) {
+        const ins = await db.from("source_segments").upsert(rows, { onConflict: "source_id,id", ignoreDuplicates: true });
+        if (ins.error) throw new JobFailure("persist_segments");
+      }
+      // Remarques de couverture à jour : les pages lues ne sont plus « sans texte ».
+      const notes = ((coverage.notes as string[] | undefined) ?? []).filter((n) => !n.startsWith("Pages sans texte lisible"));
+      if (result.unreadablePages.length) notes.push(`Pages illisibles, même lues comme des images : ${result.unreadablePages.join(", ")}.`);
+      notes.push(`Pages lues comme des images (OCR) : ${pages.join(", ")}.`);
+      await db
+        .from("sources")
+        .update({
+          coverage: { ...coverage, notes: notes.slice(0, 10), empty_pages: result.unreadablePages, pending_ocr_pages: [], ocr_pages: pages, partial: result.unreadablePages.length > 0 },
+        })
+        .eq("id", sourceId);
+      return;
     }
 
     const out = assemble(result.blocks, `src_${sourceId}`, {
@@ -263,16 +344,16 @@ async function runOcr(job: JobRow, controller: AbortController) {
       ocr: true,
     });
     const segs = await db.from("source_segments").insert(
-      out.extracted.segments.map((s, i) => ({
-        id: s.id,
+      out.extracted.segments.map((seg, i) => ({
+        id: seg.id,
         source_id: sourceId,
         owner_id: job.owner_id,
-        source_version: s.source_version,
+        source_version: seg.source_version,
         ordinal: i,
-        locator: s.locator,
-        text: s.text,
-        content_hash: s.content_hash,
-        extraction_warnings: s.extraction_warnings,
+        locator: seg.locator,
+        text: seg.text,
+        content_hash: seg.content_hash,
+        extraction_warnings: seg.extraction_warnings,
       })),
     );
     if (segs.error) throw new JobFailure("persist_segments");
@@ -290,8 +371,8 @@ async function runOcr(job: JobRow, controller: AbortController) {
       .update({ original_purge_at: new Date(Date.now() + retention.originalHours * 3600_000).toISOString() })
       .eq("id", sourceId);
   } catch (e) {
-    // Échec de lecture : l'original n'est pas gardé, l'utilisateur l'enverra à nouveau.
-    await purgeOriginal(sourceId, src.storage_path);
+    // Échec de lecture d'un document entièrement visuel : l'original n'est pas gardé.
+    if (!pages) await purgeOriginal(sourceId, src.storage_path);
     throw e;
   }
 }
@@ -308,8 +389,16 @@ async function requeue(jobId: string) {
 async function runGenerate(job: JobRow, controller: AbortController, claimedAt: number): Promise<string> {
   if (!job.source_id || !job.report_id) throw new JobFailure("job_invalid");
   const db = adminClient();
-  if (job.params.ocr) {
-    await runOcr(job, controller);
+  const sourceIds = await jobSourceIds(job);
+  const ocrTargets = job.params.ocr_sources ?? (job.params.ocr ? [job.source_id] : []);
+  // Documents mixtes : pages sans texte natif à compléter (marquées à l'import).
+  const { data: mixed } = await db.from("sources").select("id, coverage").in("id", sourceIds);
+  for (const m of mixed ?? []) {
+    const p = (m.coverage as { pending_ocr_pages?: number[] } | null)?.pending_ocr_pages;
+    if (Array.isArray(p) && p.length && !ocrTargets.includes(m.id)) ocrTargets.push(m.id);
+  }
+  if (ocrTargets.length) {
+    for (const id of sourceIds.filter((x) => ocrTargets.includes(x))) await runOcr(job, id, controller);
     // Lecture longue : la génération repart avec un budget de temps complet.
     if (Date.now() - claimedAt > REQUEUE_AFTER_MS) {
       await requeue(job.id);
@@ -318,12 +407,13 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
   }
   await setStage(job.id, "validation");
   await checkBudget(job.owner_id);
-  const segments = await loadSegments(job.source_id);
+  const segments = await loadSourceSet(sourceIds);
   const preferences = await preferencesOf(job.owner_id);
   const provider = getProvider();
 
   const out = await generateReport(provider, {
-    sourceId: `src_${job.source_id}`,
+    sourceId: `src_${sourceIds[0]}`,
+    sourceIds: sourceIds.map((id) => `src_${id}`),
     segments,
     level: job.params.level,
     goal: job.params.goal,
@@ -365,16 +455,19 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
 
   if (out.evidence.length) {
     const ev = await db.from("evidence").insert(
-      out.evidence.map((e) => ({
-        id: e.id,
-        knowledge_id: ko.data.id,
-        owner_id: job.owner_id,
-        source_id: job.source_id,
-        segment_id: e.segment_id,
-        start_offset: e.start_offset,
-        end_offset: e.end_offset,
-        quote: e.quote,
-      })),
+      out.evidence.map((e) => {
+        const stored = storedEvidence(e, sourceIds);
+        return {
+          id: e.id,
+          knowledge_id: ko.data.id,
+          owner_id: job.owner_id,
+          source_id: stored.source_id,
+          segment_id: stored.segment_id,
+          start_offset: e.start_offset,
+          end_offset: e.end_offset,
+          quote: e.quote,
+        };
+      }),
     );
     if (ev.error) throw new JobFailure("persist_evidence");
   }
@@ -502,7 +595,14 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
 
 /** Nouvelle version (« Plus simple », « Un autre exemple ») à partir de la connaissance validée. */
 /** Enregistre une connaissance revérifiée (nouvel objet, mêmes preuves recopiées). */
-async function persistKnowledge(job: JobRow, knowledge: KnowledgeObject, evidence: Evidence[], sourceVersion: string, previousId: string): Promise<string> {
+async function persistKnowledge(
+  job: JobRow,
+  knowledge: KnowledgeObject,
+  evidence: Evidence[],
+  sourceVersion: string,
+  previousId: string,
+  sourceIds: string[],
+): Promise<string> {
   const db = adminClient();
   const { data: prev } = await db.from("knowledge_objects").select("validation, model").eq("id", previousId).single();
   const ko = await db
@@ -522,7 +622,7 @@ async function persistKnowledge(job: JobRow, knowledge: KnowledgeObject, evidenc
   if (ko.error || !ko.data) throw new JobFailure("persist_knowledge");
   if (evidence.length) {
     const ev = await db.from("evidence").insert(
-      evidence.map((e) => ({ ...e, knowledge_id: ko.data.id, owner_id: job.owner_id, source_id: job.source_id })),
+      evidence.map((e) => ({ ...storedEvidence(e, sourceIds), knowledge_id: ko.data.id, owner_id: job.owner_id })),
     );
     if (ev.error) throw new JobFailure("persist_evidence");
   }
@@ -545,11 +645,16 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
   if (!base?.knowledge_id) throw new JobFailure("version_missing");
   const [{ data: ko }, { data: ev }] = await Promise.all([
     db.from("knowledge_objects").select("body").eq("id", base.knowledge_id).single(),
-    db.from("evidence").select("id, segment_id, start_offset, end_offset, quote").eq("knowledge_id", base.knowledge_id),
+    db.from("evidence").select("id, segment_id, source_id, start_offset, end_offset, quote").eq("knowledge_id", base.knowledge_id),
   ]);
   if (!ko) throw new JobFailure("version_missing");
   let knowledge = KnowledgeObject.parse(ko.body);
-  const evidence = (ev ?? []).map((e) => Evidence.parse(e));
+  // Preuves stockées (source, segment local) → identifiants du moteur pour l'ensemble de sources.
+  const sourceIds = await jobSourceIds(job);
+  const evidence = (ev ?? []).map((e) => {
+    const { source_id: _s, ...row } = engineEvidence(e, sourceIds);
+    return Evidence.parse(row);
+  });
   const previous = ExplanationObject.parse(base.explanation);
   const provider = getProvider();
 
@@ -573,9 +678,9 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
   // Information signalée comme incorrecte : la connaissance est d'abord confrontée à la source.
   let knowledgeId = base.knowledge_id;
   if (variation === "reformulate" && job.params.reasons?.includes("incorrect") && job.source_id) {
-    const segments = await loadSegments(job.source_id);
+    const segments = await loadSourceSet(sourceIds);
     knowledge = await reverifyKnowledge(provider, { ...generation, segments }, knowledge, evidence);
-    knowledgeId = await persistKnowledge(job, knowledge, evidence, segments[0]!.source_version, base.knowledge_id);
+    knowledgeId = await persistKnowledge(job, knowledge, evidence, segments[0]!.source_version, base.knowledge_id, sourceIds);
   }
   const regenerated = sectionId
     ? await regenerateSection(provider, generation, knowledge, evidence, previous, baseBlueprint, sectionId, variation)

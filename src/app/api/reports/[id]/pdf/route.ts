@@ -62,6 +62,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     variant,
     exercises: report.exercises,
     watermark: profile?.plan !== "premium",
+    documents: report.documentTitles,
   });
   const suffix = variant === "key" ? ` (${dictFor(lang).pdf.answerKey})` : "";
   return new NextResponse(new Uint8Array(pdf), { headers: pdfHeaders(`${report.blueprint.title}${suffix}`) });

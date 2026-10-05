@@ -11,21 +11,12 @@ import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { OfflineSave } from "../OfflineSave";
 
-export interface SourceItem {
-  n: number;
-  location: string;
-  quote: string;
-}
-
 export interface OptionsData {
   reportId: string | null;
   title: string;
   pdfHref: string;
   hasExercises: boolean;
   sourceTitle: string;
-  originalHref: string | null;
-  sources: SourceItem[];
-  glossary: { term: string; definition: string }[];
   mode: Mode | null;
   versions: { href: string; number: number; mode: Mode | null; createdAt: string; current: boolean; shown: boolean }[];
   /** Clé hors connexion du compte (null : démonstration). */
@@ -33,7 +24,7 @@ export interface OptionsData {
   display: DisplayPrefs;
 }
 
-type View = "menu" | "export" | "display" | "sources" | "glossary" | "version" | "versions";
+type View = "menu" | "export" | "display" | "version" | "versions";
 
 function Row({ icon, title, sub, onClick, href, danger, external }: { icon: IconName; title: string; sub?: string; onClick?: () => void; href?: string; danger?: boolean; external?: boolean }) {
   const inner = (
@@ -46,7 +37,22 @@ function Row({ icon, title, sub, onClick, href, danger, external }: { icon: Icon
   return (
     <li>
       {href ? (
-        <a className={danger ? "row row-danger" : "row"} href={href} {...(external ? { target: "_blank", rel: "noopener" } : {})}>{inner}</a>
+        <a
+          className={danger ? "row row-danger" : "row"}
+          href={href}
+          {...(external ? { target: "_blank", rel: "noopener" } : {})}
+          onClick={
+            onClick
+              ? (e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                  e.preventDefault();
+                  onClick();
+                }
+              : undefined
+          }
+        >
+          {inner}
+        </a>
       ) : (
         <button type="button" className={danger ? "row row-danger" : "row"} onClick={onClick}>{inner}</button>
       )}
@@ -60,11 +66,16 @@ export function OptionsPanel({
   continuous,
   onContinuous,
   onNavigate,
+  annexHref,
+  onAnnex,
 }: {
   data: OptionsData;
   continuous: boolean;
   onContinuous: (on: boolean) => void;
   onNavigate: () => void;
+  /** Page Annexes du rapport, à une ancre (Annexes, Sources, Glossaire). */
+  annexHref: (hash: string) => string;
+  onAnnex: (hash: string) => void;
 }) {
   const t = useT();
   const lang = useLang();
@@ -148,43 +159,6 @@ export function OptionsPanel({
       </div>
     );
 
-  if (view === "sources")
-    return (
-      <div className="stagger" key="sources">
-        {back(t.lim.optSources)}
-        <p className="muted small">{data.sourceTitle}</p>
-        <ol className="sources-list">
-          {data.sources.map((s) => (
-            <li key={s.n}>
-              <span className="src-n">{s.n}</span>
-              <span><small>{s.location}</small><q>{s.quote}</q></span>
-            </li>
-          ))}
-        </ol>
-        {data.originalHref ? (
-          <a className="btn btn-block" href={data.originalHref} target="_blank" rel="noopener noreferrer nofollow"><Icon name="file" /> {t.lim.original}</a>
-        ) : (
-          <p className="notice">{t.lim.originalMissing}</p>
-        )}
-      </div>
-    );
-
-  if (view === "glossary")
-    return (
-      <div className="stagger" key="glossary">
-        {back(t.lim.optGlossary)}
-        {data.glossary.length ? (
-          <dl className="glossary">
-            {data.glossary.map((g) => (
-              <div key={g.term}><dt>{g.term}</dt><dd>{g.definition}</dd></div>
-            ))}
-          </dl>
-        ) : (
-          <p className="muted">{t.lim.noGlossary}</p>
-        )}
-      </div>
-    );
-
   if (view === "version")
     return (
       <div className="stagger" key="version">
@@ -232,8 +206,9 @@ export function OptionsPanel({
       <ul className="rows">
         <Row icon="download" title={t.lim.optExport} sub={t.lim.optExportSub} onClick={() => setView("export")} />
         <Row icon="eye" title={t.lim.optDisplay} sub={t.lim.optDisplaySub} onClick={() => setView("display")} />
-        <Row icon="file" title={t.lim.optSources} sub={data.sourceTitle} onClick={() => setView("sources")} />
-        <Row icon="book" title={t.lim.optGlossary} onClick={() => setView("glossary")} />
+        <Row icon="list" title={t.lim.optAnnexes} sub={t.lim.optAnnexesSub} href={annexHref("annexes")} onClick={() => onAnnex("annexes")} />
+        <Row icon="file" title={t.lim.optSources} sub={data.sourceTitle} href={annexHref("sources")} onClick={() => onAnnex("sources")} />
+        <Row icon="book" title={t.lim.optGlossary} href={annexHref("glossaire")} onClick={() => onAnnex("glossaire")} />
         {data.reportId && <Row icon="spark" title={t.lim.optNewVersion} sub={t.lim.optNewVersionSub} onClick={() => setView("version")} />}
         {data.versions.length > 1 && <Row icon="clock" title={t.lim.optVersions} sub={t.options.versionsSub(data.versions.length)} onClick={() => setView("versions")} />}
         {data.offlineAccount && data.reportId && <OfflineSave account={data.offlineAccount} path={`/rapports/${data.reportId}`} title={data.title} />}

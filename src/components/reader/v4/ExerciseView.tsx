@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { clearDrafts, useDraft } from "./draft";
 import { Icon } from "@/components/Icon";
 import type { Exercise } from "@/lib/contracts/schemas";
 import { grade, shuffled, type Answer } from "@/lib/exercises/grade";
@@ -44,15 +45,17 @@ export function ExerciseView({
 }) {
   const t = useT();
   const base = useId();
-  const [single, setSingle] = useState<number | null>(null);
-  const [multi, setMulti] = useState<number[]>([]);
-  const [truth, setTruth] = useState<boolean | null>(null);
+  // Réponses non validées gardées pour l'onglet (aller consulter une annexe puis revenir).
+  const draft = `limpid-draft-${reportId ?? "demo"}-${versionId ?? ""}-${ex.id}`;
+  const [single, setSingle] = useDraft<number | null>(`${draft}-s`, null);
+  const [multi, setMulti] = useDraft<number[]>(`${draft}-m`, []);
+  const [truth, setTruth] = useDraft<boolean | null>(`${draft}-t`, null);
   const initialOrder = useMemo(() => shuffled(ex.items, ex.id), [ex.items, ex.id]);
-  const [order, setOrder] = useState<string[]>(initialOrder);
+  const [order, setOrder] = useDraft<string[]>(`${draft}-o`, initialOrder);
   const rights = useMemo(() => shuffled(ex.pairs.map((p) => p.right), `${ex.id}-r`), [ex.pairs, ex.id]);
-  const [pairs, setPairs] = useState<Record<string, string>>({});
-  const [blanks, setBlanks] = useState<string[]>(ex.blanks.map(() => ""));
-  const [text, setText] = useState("");
+  const [pairs, setPairs] = useDraft<Record<string, string>>(`${draft}-p`, {});
+  const [blanks, setBlanks] = useDraft<string[]>(`${draft}-b`, ex.blanks.map(() => ""));
+  const [text, setText] = useDraft(`${draft}-x`, "");
   const [result, setResult] = useState<{ correct: boolean | null; ratio: number | null; feedback?: string; error?: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -67,6 +70,7 @@ export function ExerciseView({
 
   async function validate() {
     if (!answer || result) return;
+    clearDrafts(`${draft}-`);
     if (answer.kind !== "short") {
       const g = grade(ex, answer);
       const r = { correct: g?.correct ?? false, ratio: g?.ratio ?? 0 };

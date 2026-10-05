@@ -204,4 +204,33 @@ do $$ begin
   end if;
 end $$;
 
+-- V5 : sources d'un rapport (Limpid commun) — lecture par le propriétaire, écriture serveur
+do $$ begin
+  if not exists (select 1 from public.report_sources where report_id = '20000000-0000-0000-0000-00000000000b' and position = 0) then
+    -- Rapports créés par la recette après la migration : rattachement explicite.
+    insert into public.report_sources (report_id, source_id, owner_id, position)
+      select id, source_id, owner_id, 0 from public.reports where id = '20000000-0000-0000-0000-00000000000b' and source_id is not null;
+  end if;
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$ begin
+  if exists (select 1 from public.report_sources where report_id = '20000000-0000-0000-0000-00000000000b') then
+    raise exception 'ECHEC : A voit les sources du rapport de B';
+  end if;
+end $$;
+do $$ begin
+  insert into public.report_sources (report_id, source_id, owner_id, position)
+    select '20000000-0000-0000-0000-00000000000b', id, '00000000-0000-0000-0000-00000000000a', 5 from public.sources limit 1;
+  raise exception 'ECHEC : source rattachée par le client';
+exception when insufficient_privilege then null;
+end $$;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+do $$ begin
+  if not exists (select 1 from public.report_sources where report_id = '20000000-0000-0000-0000-00000000000b') then
+    raise exception 'ECHEC : B ne voit pas les sources de son rapport';
+  end if;
+end $$;
+reset role;
+
 select 'RECETTE SQL : OK' as resultat;

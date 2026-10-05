@@ -3,27 +3,47 @@
 import type { VisualSpec } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
 import { barRatios, ChartData, ComparisonData, DrawingData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
+import { fitLabel } from "@/lib/render/wrap";
 import { DrawingSvg } from "./Drawing";
 
 export type { AssetView };
 import { FlowDiagram } from "./FlowDiagram";
 
+/**
+ * Barres horizontales lisibles à 320 px : libellé au-dessus de sa barre, valeur (forme du
+ * document) à côté ; libellés et valeurs coupés sur plusieurs lignes, jamais hors du cadre.
+ */
 function BarChart({ data, labelledBy }: { data: ChartData; labelledBy: string }) {
-  const row = 44;
-  const labelW = 110;
-  const barW = 150;
+  const width = 320;
+  const barMax = 190;
   const ratios = barRatios(data.bars.map((b) => b.value));
-  const height = data.bars.length * row;
+  const rows = data.bars.map((b, i) => {
+    const w = Math.max(2, Math.round(ratios[i]! * barMax));
+    const label = fitLabel(b.label, width - 4, [14, 13], 2);
+    const value = fitLabel(b.source_form, width - w - 10, [14, 12], 4);
+    const labelH = label.lines.length * Math.round(label.size * 1.25);
+    const valueH = value.lines.length * Math.round(value.size * 1.2);
+    return { b, w, label, value, labelH, valueH, h: labelH + Math.max(26, valueH + 6) + 14 };
+  });
+  const height = rows.reduce((sum, r) => sum + r.h, 0);
+  let y = 0;
   return (
-    <svg viewBox={`0 0 320 ${height}`} role="img" aria-labelledby={labelledBy}>
-      {data.bars.map((b, i) => {
-        const y = i * row;
-        const w = Math.max(2, Math.round(ratios[i]! * barW));
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={labelledBy}>
+      {rows.map((r, i) => {
+        const top = y;
+        y += r.h;
+        const lh = Math.round(r.label.size * 1.25);
+        const vh = Math.round(r.value.size * 1.2);
+        const barY = top + r.labelH + 4;
         return (
-          <g key={b.claim_id + i}>
-            <text x={labelW - 8} y={y + 26} textAnchor="end" fontSize="14" className="chart-label">{b.label}</text>
-            <rect x={labelW} y={y + 10} width={w} height={22} rx="4" className="chart-bar" />
-            <text x={labelW + w + 6} y={y + 26} fontSize="14" fontWeight="600" className="chart-label">{b.source_form}</text>
+          <g key={r.b.claim_id + i}>
+            <text x={0} y={top + lh * 0.8} fontSize={r.label.size} className="chart-label">
+              {r.label.lines.map((l, k) => <tspan key={k} x={0} dy={k === 0 ? 0 : lh}>{l}</tspan>)}
+            </text>
+            <rect x={0} y={barY} width={r.w} height={22} rx="4" className="chart-bar" />
+            <text x={r.w + 6} y={barY + 16} fontSize={r.value.size} fontWeight="600" className="chart-label">
+              {r.value.lines.map((l, k) => <tspan key={k} x={r.w + 6} dy={k === 0 ? 0 : vh}>{l}</tspan>)}
+            </text>
           </g>
         );
       })}
@@ -113,7 +133,7 @@ export function VisualFigure({
       if (!d.success) return null;
       return (
         <figure className="visual">
-          <FlowDiagram data={d.data} labelledBy={altId} />
+          <FlowDiagram data={d.data} labelledBy={altId} cycleLabel={t.pdf.cycle.replace(/^↺\s*/, "… ")} />
           <figcaption>{v.caption} {refs}</figcaption>
           {alternative}
         </figure>

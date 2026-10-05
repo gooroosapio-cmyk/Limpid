@@ -8,9 +8,8 @@ import { composeLimpid } from "@/components/reader/v4/Pieces";
 import { LimpidScreen } from "@/components/reader/v4/LimpidScreen";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
-import { retention } from "@/lib/config";
 import { readDisplayPrefs } from "@/lib/display/prefs";
-import { getLang, getT } from "@/lib/i18n/server";
+import { getT } from "@/lib/i18n/server";
 import { offlineKey } from "@/lib/offline-key";
 import { loadReport } from "@/lib/reports/load";
 
@@ -26,7 +25,7 @@ export default async function ReportPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ version?: string }>;
 }) {
-  const [t, lang, jar] = await Promise.all([getT(), getLang(), cookies()]);
+  const [t, jar] = await Promise.all([getT(), cookies()]);
   const { id } = await params;
   const { version } = await searchParams;
   const user = await requireUser();
@@ -49,7 +48,6 @@ export default async function ReportPage({
   const lastFailed = !!job && (job.status === "failed" || job.status === "uncertain") && report.versions.length >= 1;
   const pdfHref = `/api/reports/${id}/pdf${report.isCurrent ? "" : `?version=${report.shownVersion}`}`;
   const modeLabel = report.mode ? (t.add.modes[report.mode]?.title ?? null) : null;
-  const locale = lang === "en" ? "en-GB" : "fr-FR";
 
   const status = (
     <>
@@ -88,12 +86,7 @@ export default async function ReportPage({
     modeLabel,
     status,
     canReformulate: report.isCurrent && !preparing,
-    expiry: report.expiresAt
-      ? t.reader.expires(
-          report.expiresAt.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }),
-          retention.reportDays,
-        )
-      : null,
+    documents: report.documentTitles,
   });
 
   return (
@@ -104,15 +97,14 @@ export default async function ReportPage({
       initialAnchor={report.progressAnchor}
       bilan={report.exercises?.bilan.length ? report.exercises.bilan : null}
       insufficient={report.exercises?.insufficient ?? false}
+      annexBase={`/rapports/${id}/annexes${report.isCurrent ? "" : `?version=${report.shownVersion}`}`}
+      originalHref={report.originalHref}
       options={{
         reportId: report.isCurrent ? id : null,
         title: report.title,
         pdfHref,
         hasExercises: !!report.exercises?.bilan.length,
         sourceTitle: report.sourceTitle,
-        originalHref: report.originalHref,
-        sources: doc.entries.map((e) => ({ n: e.n, location: e.location, quote: e.quote })),
-        glossary: report.explanation.glossary.map((g) => ({ term: g.term, definition: g.definition })),
         mode: report.mode,
         versions: report.versions.map((v) => ({
           href: v.current ? `/rapports/${id}` : `/rapports/${id}?version=${v.number}`,

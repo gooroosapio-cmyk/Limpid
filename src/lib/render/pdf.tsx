@@ -348,6 +348,8 @@ export interface PdfReportInput {
   exercises?: ExerciseSet | null;
   /** Filigrane discret des exports gratuits (décidé par le serveur selon l'offre du compte). */
   watermark?: boolean;
+  /** Titre de chaque document (Limpid commun). */
+  documents?: Record<string, string>;
 }
 
 const LETTERS = "ABCDEFGHIJ";
@@ -439,7 +441,7 @@ function ReportDocument(input: PdfReportInput) {
   const d = dictFor(lang);
   const variant = input.variant ?? "content";
   const watermark = !!input.watermark;
-  const { numbers, entries } = sourceEntries(blueprint, input.evidence, input.segments);
+  const { numbers, entries } = sourceEntries(blueprint, input.evidence, input.segments, input.documents);
   const sections = new Map(explanation.sections.map((x) => [x.id, x]));
   const visuals = new Map(blueprint.visual_specs.map((v) => [v.id, v]));
   const date = (input.generatedAt ?? new Date()).toLocaleDateString(lang === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "long", year: "numeric" });

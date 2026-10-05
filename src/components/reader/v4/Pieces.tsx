@@ -1,7 +1,7 @@
 /**
  * Moteur éditorial de Limpid (V4, § 6-7) : le document structuré devient une suite de
  * « pièces » (couverture, titre de partie, bloc, élément de liste, visuel, point de contrôle,
- * annexe). Le lecteur mesure leurs hauteurs réelles et compose les vues sans débordement :
+ * fin). Les annexes sont une page à part, hors du carrousel. Le lecteur mesure leurs hauteurs réelles et compose les vues sans débordement :
  * aucune pièce n'est tronquée, réduite ou masquée. Rendu serveur, sans HTML injecté.
  */
 import { Fragment } from "react";
@@ -17,10 +17,8 @@ import { Checkpoint } from "./Checkpoint";
 import { EndActions } from "./EndActions";
 import { ExampleBlock } from "./ExampleBlock";
 
-/** Taille des groupes d'annexes et des longues listes (une pièce = un groupe insécable). */
+/** Taille des groupes des longues listes (une pièce = un groupe insécable). */
 const CHUNK = 5;
-/** Sources : extraits longs, groupes plus petits pour tenir dans une vue de petit écran. */
-const SOURCE_CHUNK = 3;
 
 interface Terms {
   matcher: RegExp | null;
@@ -229,8 +227,8 @@ export function composeLimpid({
   modeLabel,
   status = null,
   canReformulate,
-  expiry = null,
   isDemo = false,
+  documents,
 }: {
   t: Dict;
   blueprint: ReportBlueprint;
@@ -242,10 +240,11 @@ export function composeLimpid({
   modeLabel: string | null;
   status?: React.ReactNode;
   canReformulate: boolean;
-  expiry?: string | null;
   isDemo?: boolean;
+  /** Titre de chaque document (Limpid commun) : les références nomment leur document. */
+  documents?: Record<string, string>;
 }): LimpidDoc {
-  const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
+  const { numbers, entries } = sourceEntries(blueprint, evidence, segments, documents);
   const notions = buildNotions(explanation, numbers);
   const termList = notions.map((n) => n.term);
   const ctx: Ctx = { t, numbers, terms: { matcher: termMatcher(termList), list: termList, used: new Set() } };
@@ -337,53 +336,7 @@ export function composeLimpid({
     </section>,
   );
 
-  // Annexes : limites, glossaire, sources, conservation.
-  out.push(
-    <div key="annex-h" id="lim_annexes" className="piece annex-head" {...attrs({ keep: true, breakBefore: true })}>
-      <h2>{t.lim.annexes}</h2>
-    </div>,
-  );
-  if (explanation.limitations.length) {
-    chunks(explanation.limitations, CHUNK).forEach((list, i) =>
-      out.push(
-        <div key={`lim-${i}`} id={`ann_lim_${i}`} className="piece annex" {...attrs({})}>
-          {i === 0 && <h3>{t.lim.limits}</h3>}
-          <ul>{list.map((l) => <li key={l}>{l}</li>)}</ul>
-        </div>,
-      ),
-    );
-  }
-  if (explanation.glossary.length) {
-    chunks(explanation.glossary, CHUNK).forEach((list, i) =>
-      out.push(
-        <div key={`glo-${i}`} id={`ann_glo_${i}`} className="piece annex" {...attrs({})}>
-          {i === 0 && <h3>{t.lim.optGlossary}</h3>}
-          <dl className="glossary">
-            {list.map((g) => <div key={g.term}><dt>{g.term}</dt><dd>{g.definition}</dd></div>)}
-          </dl>
-        </div>,
-      ),
-    );
-  }
-  if (entries.length) {
-    chunks(entries, SOURCE_CHUNK).forEach((list, i) =>
-      out.push(
-        <div key={`src-${i}`} id={`ann_src_${i}`} className="piece annex" {...attrs({})}>
-          {i === 0 && <h3>{t.lim.optSources}</h3>}
-          <ol className="sources-list" start={i * SOURCE_CHUNK + 1}>
-            {list.map((e) => (
-              <li key={e.evidenceId}><small>{e.location}</small> <q>{e.quote}</q></li>
-            ))}
-          </ol>
-        </div>,
-      ),
-    );
-  }
-  if (expiry) {
-    out.push(
-      <p key="expiry" id="ann_expiry" className="piece annex muted small reader-expiry" {...attrs({})}>{expiry}</p>,
-    );
-  }
+  // Annexes (glossaire, sources, limites) : page continue à part, hors du carrousel (§ 14).
 
   return { chapters, notions, entries, pieces: out };
 }

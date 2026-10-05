@@ -152,7 +152,7 @@ export const Coverage = z.strictObject({
 export const KnowledgeObject = z.strictObject({
   schema_version: schemaVersion,
   id,
-  source_ids: ids(1).min(1), // V1 : une seule source
+  source_ids: ids(10).min(1), // V5 : jusqu'à 10 documents (Limpid commun)
   concepts: z.array(Concept).max(100),
   claims: z.array(Claim).max(500),
   relations: z.array(Relation).max(300),

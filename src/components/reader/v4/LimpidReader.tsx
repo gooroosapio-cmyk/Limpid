@@ -7,6 +7,7 @@ import type { Exercise } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
 import { paginate, viewOf, type View } from "@/lib/reader/paginate";
 import { AskPanel } from "../AskPanel";
+import { ANCHOR_RE, progressKey, useAnnex } from "../annex-link";
 import { Bilan } from "./Bilan";
 import { ReaderCtx, type ReaderApi } from "./context";
 import { OptionsPanel, type OptionsData } from "./OptionsPanel";
@@ -14,7 +15,6 @@ import { ReformulatePanel } from "./ReformulatePanel";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 
 const CONTINUOUS_KEY = "limpid-continuous";
-const progressKey = (id: string) => `limpid-progress-${id}`;
 
 export interface Chapter {
   id: string;
@@ -47,6 +47,7 @@ export function LimpidReader({
 }) {
   const t = useT();
   const router = useRouter();
+  const annex = useAnnex();
   const deckRef = useRef<HTMLDivElement>(null);
   const viewsRef = useRef<View[]>([]);
   const piecesRef = useRef<HTMLElement[]>([]);
@@ -152,6 +153,15 @@ export function LimpidReader({
     try {
       saved = localStorage.getItem(progressKey(reportId ?? "demo")) ?? initialAnchor;
     } catch {}
+    // Retour d'annexe : l'adresse porte l'ancre exacte de lecture (`?a=`), puis en est retirée.
+    const url = new URL(window.location.href);
+    const back = url.searchParams.get("a");
+    if (back && ANCHOR_RE.test(back)) {
+      saved = back;
+      anchorRef.current = back;
+      url.searchParams.delete("a");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
     let cancelled = false;
     void document.fonts.ready.then(() => {
       if (cancelled) return;
@@ -364,7 +374,14 @@ export function LimpidReader({
 
       <dialog ref={dialogs.options} className="sheet side" aria-labelledby="opt-h">
         {head("opt-h", t.lim.options, dialogs.options)}
-        <OptionsPanel data={options} continuous={continuous} onContinuous={toggleContinuous} onNavigate={() => dialogs.options.current?.close()} />
+        <OptionsPanel
+          data={options}
+          continuous={continuous}
+          onContinuous={toggleContinuous}
+          onNavigate={() => dialogs.options.current?.close()}
+          annexHref={(hash) => annex?.href(hash, anchorRef.current) ?? `#${hash}`}
+          onAnnex={(hash) => annex?.open(hash, anchorRef.current)}
+        />
       </dialog>
 
       <dialog ref={dialogs.ask} className="sheet side ask-sheet" aria-labelledby="ask-h">

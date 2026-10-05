@@ -36,11 +36,21 @@ export async function deleteReport(ownerId: string, reportId: string): Promise<"
   const assetPaths = (assets ?? []).map((x) => x.storage_path as string);
   steps.asset_files = assetPaths.length === 0 || !(await db.storage.from("exports").remove(assetPaths)).error;
 
-  if (report.source_id) {
-    const { data: src } = await db.from("sources").select("storage_path").eq("id", report.source_id).maybeSingle();
-    steps.source_file = !src?.storage_path || !(await db.storage.from("sources").remove([src.storage_path])).error;
+  // Documents du Limpid (un ou plusieurs) : effacés, sauf s'ils servent encore un autre Limpid.
+  const { data: set } = await db.from("report_sources").select("source_id").eq("report_id", reportId);
+  const sourceIds = [...new Set([...(set ?? []).map((r) => r.source_id as string), ...(report.source_id ? [report.source_id] : [])])];
+  for (const sourceId of sourceIds) {
+    const [{ data: other }, { data: otherLegacy }] = await Promise.all([
+      db.from("report_sources").select("report_id, reports!inner(deleted_at)").eq("source_id", sourceId).neq("report_id", reportId).is("reports.deleted_at", null).limit(1).maybeSingle(),
+      db.from("reports").select("id").eq("source_id", sourceId).neq("id", reportId).is("deleted_at", null).limit(1).maybeSingle(),
+    ]);
+    if (other || otherLegacy) continue;
+    const { data: src } = await db.from("sources").select("storage_path").eq("id", sourceId).maybeSingle();
+    const fileOk = !src?.storage_path || !(await db.storage.from("sources").remove([src.storage_path])).error;
     // Cascade : segments, preuves, objets de connaissance.
-    steps.source_rows = !(await db.from("sources").delete().eq("id", report.source_id).eq("owner_id", ownerId)).error;
+    const rowsOk = !(await db.from("sources").delete().eq("id", sourceId).eq("owner_id", ownerId)).error;
+    steps.source_file = (steps.source_file ?? true) && fileOk;
+    steps.source_rows = (steps.source_rows ?? true) && rowsOk;
   }
   // Cascade : versions, tâches, exports.
   steps.report_rows = !(await db.from("reports").delete().eq("id", reportId).eq("owner_id", ownerId)).error;

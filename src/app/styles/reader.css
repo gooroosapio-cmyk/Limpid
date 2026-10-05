@@ -215,7 +215,15 @@ figure.illustration figcaption { padding: var(--s3) var(--s4) var(--s4); }
 .symbols dt { font-family: var(--font-mono); font-weight: 600; min-width: 2.5em; }
 .symbols dd { margin: 0; color: var(--muted); }
 .refs { white-space: nowrap; }
-.lim .ref { min-width: 24px; min-height: 24px; padding: 0 5px; font-size: 11px; border-radius: 6px; vertical-align: 2px; margin-left: 2px; }
+/* Indices discrets (V5, § 14) : un petit exposant, sans pastille ; zone tactile de 44 px. */
+.lim .ref, .annex-glossary .ref {
+  position: relative; min-width: 0; min-height: 0; margin-left: 1px; padding: 0 2px; border: 0; border-radius: 3px; background: none;
+  color: var(--green); font-family: var(--font); font-size: 0.68em; font-weight: 700; line-height: 1; vertical-align: super; text-decoration: none;
+}
+.lim .ref + .ref::before, .annex-glossary .ref + .ref::before { content: ","; position: static; margin-right: 1px; color: var(--muted); }
+.lim .ref::after, .annex-glossary .ref::after { content: ""; position: absolute; left: 50%; top: 50%; width: 32px; height: 40px; transform: translate(-50%, -50%); }
+.lim .ref:hover, .annex-glossary .ref:hover { transform: none; background: var(--pale); }
+.lim .ref:focus-visible, .annex-glossary .ref:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 
 /* Exemples et variantes préchargées */
 .example-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: 6px; }
@@ -297,11 +305,42 @@ figure.illustration figcaption { padding: var(--s3) var(--s4) var(--s4); }
 .end-cta:active { transform: scale(0.99); }
 .end-cta-quiet { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 .end-cta-quiet .row-text small { color: var(--muted); }
-.annex-head h2 { font-size: 22px; margin: 0; }
-.annex h3 { font-size: 16px; margin: 0 0 var(--s2); }
-.annex ul, .annex ol { margin: 0; padding-left: 1.3em; }
-.annex li { margin: 6px 0; font-size: 15px; line-height: 1.5; }
-.annex .glossary dt { margin-top: var(--s3); }
+.end-annexes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin-top: var(--s3); color: var(--muted); font-size: 14px; }
+.end-annexes a { display: inline-flex; align-items: center; min-height: var(--cible); padding: 0 6px; color: var(--green); font-weight: 600; }
+
+/* Page Annexes (V5, § 14) : lecture continue, hors du carrousel */
+.annex-page { max-width: 720px; margin: 0 auto; }
+.annex-top { position: sticky; top: calc(var(--header) + 4px); z-index: 3; margin: 0 0 var(--s4); }
+.annex-top .annex-back { box-shadow: var(--shadow); background: var(--surface); }
+.annex-bottom { position: static; margin: var(--s7) 0 0; }
+.annex-head h1 { font-size: clamp(26px, 7vw, 34px); line-height: 1.15; margin: var(--s1) 0 var(--s2); overflow-wrap: anywhere; hyphens: manual; text-wrap: balance; }
+.annex-nav { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s4) 0 0; }
+.annex-nav a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; }
+.annex-section { margin-top: var(--s8); }
+.annex-section h2 { font-size: clamp(24px, 6vw, 28px); line-height: 1.2; margin: 0 0 var(--s3); }
+.annex-section h3 { font-size: 17px; margin: var(--s5) 0 var(--s2); }
+.annex-section ul { padding-left: 1.3em; }
+.annex-section li { margin: 6px 0; font-size: 17px; line-height: 1.55; }
+.annex-target { scroll-margin-top: calc(var(--header) + 72px); }
+.annex-target:target { animation: annex-flash 1.6s ease-out both; border-radius: 10px; }
+@keyframes annex-flash { 0% { background: var(--pale); box-shadow: 0 0 0 6px var(--pale); } 100% { background: transparent; box-shadow: 0 0 0 6px transparent; } }
+@media (prefers-reduced-motion: reduce) { .annex-target:target { animation: none; background: var(--pale); box-shadow: 0 0 0 6px var(--pale); } }
+.annex-filter { margin: 0 0 var(--s3); }
+.annex-glossary > div { padding: var(--s2) 0; border-bottom: 1px solid var(--line); }
+.annex-glossary dt { margin-top: 0; font-size: 17px; }
+.annex-glossary dd { font-size: 16px; line-height: 1.55; }
+.annex-doc + .annex-doc { margin-top: var(--s6); }
+.annex-doc-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px var(--s3); padding-bottom: var(--s2); border-bottom: 2px solid var(--ink); }
+.annex-doc-title { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.annex-doc-head p.muted { margin: 0; }
+.annex-sources { list-style: none; margin: 0; padding: 0; }
+.annex-sources li { display: flex; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--line); }
+.annex-sources li > div { min-width: 0; }
+.annex-sources .src-n { padding-top: 3px; }
+.annex-loc { margin: 0 0 4px; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.annex-quote { margin: 0; font-family: var(--font-serif); font-size: 17px; line-height: 1.55; overflow-wrap: anywhere; }
+.annex-quote mark { background: var(--pale); color: inherit; }
+.notion-glossary { display: inline-flex; align-items: center; gap: 6px; min-height: var(--cible); margin-top: var(--s2); }
 .sources-list { padding-left: 1.4em; }
 .sources-list small { display: block; color: var(--muted); }
 .sources-list q { font-family: var(--font-serif); }

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Evidence, ExerciseSet, ExplanationObject, Mode, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import type { AssetView } from "@/lib/render/visuals";
 import { reportExpiresAt } from "./retention";
+import { engineEvidence, engineSegments } from "./source-set";
 import { autoTheme } from "@/lib/display/themes";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -47,6 +48,10 @@ export type LoadedReport =
       sourceUrl: string | null;
       /** Original consultable (fichier gardé 30 jours ou page d'origine), servi par Limpid après contrôle du propriétaire. */
       originalHref: string | null;
+      /** Documents du Limpid, dans l'ordre (plusieurs : Limpid commun). */
+      documents: { sourceId: string; title: string; originalHref: string | null }[];
+      /** Titre de chaque document par identifiant du moteur (références nommées). */
+      documentTitles: Record<string, string>;
       sourceKind: string | null;
       notes: string[];
       /** Couverture partielle (sinon les remarques sont informatives, ex. lecture OCR). */
@@ -119,13 +124,21 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     .eq("id", shown.id)
     .single();
   if (!version) return null;
+  // Documents du Limpid (ensemble enregistré ; anciens Limpid : leur source unique).
+  const { data: setRows } = await supabase
+    .from("report_sources")
+    .select("source_id, position, sources(title, kind, original_url, storage_path, coverage)")
+    .eq("report_id", id)
+    .order("position");
+  const sourceIds = setRows?.length ? setRows.map((r) => r.source_id as string) : report.source_id ? [report.source_id as string] : [];
   const [{ data: ev }, { data: segs }, { data: ans }, { data: assetRows }, { data: quizRow }, { data: progress }] = await Promise.all([
-    supabase.from("evidence").select("id, segment_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id),
+    supabase.from("evidence").select("id, segment_id, source_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id),
     supabase
       .from("source_segments")
-      .select("id, source_version, locator, text, content_hash, extraction_warnings")
-      .eq("source_id", report.source_id)
-      .order("ordinal"),
+      .select("id, source_id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
+      .in("source_id", sourceIds)
+      .order("ordinal")
+      .limit(10_000),
     supabase
       .from("comprehension_answers")
       .select("check_id, answer, feedback")
@@ -170,6 +183,22 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     storage_path: string | null;
   } | null;
   const hasOriginal = !!source && (source.kind === "url" ? !!source.original_url : !!source.storage_path);
+  type DocRow = { title: string; kind: string; original_url: string | null; storage_path: string | null; coverage: unknown } | null;
+  const documents = (setRows?.length ? setRows : [{ source_id: report.source_id, sources: source }]).flatMap((r) => {
+    const d = r.sources as unknown as DocRow;
+    if (!r.source_id || !d) return [];
+    const has = d.kind === "url" ? !!d.original_url : !!d.storage_path;
+    return [{ sourceId: r.source_id as string, title: d.title, originalHref: has ? `/api/sources/${r.source_id}/original` : null }];
+  });
+  // Remarques de couverture de chaque document (nommé quand il y en a plusieurs).
+  const allNotes = (setRows?.length ? setRows : [{ source_id: report.source_id, sources: source }]).flatMap((r) => {
+    const d = r.sources as unknown as DocRow;
+    const notes = CoverageNotes.safeParse(d?.coverage).data?.notes ?? [];
+    return (setRows?.length ?? 0) > 1 ? notes.map((n) => `${d?.title ?? ""} : ${n}`) : notes;
+  });
+  const anyPartial = (setRows?.length ? setRows : [{ source_id: report.source_id, sources: source }]).some(
+    (r) => CoverageNotes.safeParse((r.sources as unknown as DocRow)?.coverage).data?.partial === true,
+  );
   return {
     state: "ready",
     id,
@@ -178,15 +207,25 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     title: report.title,
     explanation: ExplanationObject.parse(version.explanation),
     blueprint: ReportBlueprint.parse(version.blueprint),
-    evidence: (ev ?? []).map((e) => Evidence.parse(e)),
-    segments: (segs ?? []).map((s) => SourceSegment.parse({ ...s, source_id: `src_${report.source_id}` })),
+    evidence: (ev ?? []).map((e) => {
+      const { source_id: _s, ...row } = engineEvidence(e, sourceIds);
+      return Evidence.parse(row);
+    }),
+    segments: engineSegments(
+      sourceIds.map((sid) => ({
+        sourceId: sid,
+        rows: (segs ?? []).filter((x) => x.source_id === sid).map(({ source_id: _s, ...x }) => x),
+      })),
+    ),
+    documents,
+    documentTitles: Object.fromEntries(documents.map((d) => [`src_${d.sourceId}`, d.title])),
     checkStatus: version.check_status,
-    sourceTitle: source?.title ?? report.title,
+    sourceTitle: documents.length > 1 ? documents.map((d) => d.title).join(" · ").slice(0, 300) : (source?.title ?? report.title),
     sourceUrl: source?.original_url ?? null,
     originalHref: hasOriginal ? `/api/sources/${report.source_id}/original` : null,
     sourceKind: source?.kind ?? null,
-    notes: CoverageNotes.safeParse(source?.coverage).data?.notes ?? [],
-    partial: CoverageNotes.safeParse(source?.coverage).data?.partial ?? false,
+    notes: allNotes.slice(0, 10),
+    partial: anyPartial,
     createdAt: new Date(version.created_at),
     versions: versions.map((v) => ({
       number: v.version_number,

@@ -33,7 +33,7 @@ export class LimitError extends Error {
   }
 }
 
-export async function assertCanStartJob(userId: string, opts: { newReport: boolean }) {
+export async function assertCanStartJob(userId: string, opts: { newReport: boolean; count?: number }) {
   const db = adminClient();
   const { count: active } = await db
     .from("jobs")
@@ -51,10 +51,14 @@ export async function assertCanStartJob(userId: string, opts: { newReport: boole
     (await db.from("audit_log").select("id", { count: "exact", head: true }).eq("actor_id", userId).eq("action", action).gte("created_at", since))
       .count ?? 0;
   const today = (await count(REPORT_CREATED)) - (await count(CREDIT_RETURNED));
-  if (today >= ACCOUNT_LIMITS.dailyReports) {
+  const wanted = Math.max(1, opts.count ?? 1);
+  if (today + wanted > ACCOUNT_LIMITS.dailyReports) {
+    const left = Math.max(0, ACCOUNT_LIMITS.dailyReports - today);
     throw new LimitError(
       "daily_reports",
-      `Vous avez lancé ${ACCOUNT_LIMITS.dailyReports} rapports ces dernières 24 heures, le maximum pendant l'alpha. Réessayez plus tard.`,
+      wanted > 1 && left > 0
+        ? `Il vous reste ${left} Limpid sur ${ACCOUNT_LIMITS.dailyReports} pour ces 24 heures : retirez des documents ou choisissez « Un Limpid commun ».`
+        : `Vous avez lancé ${ACCOUNT_LIMITS.dailyReports} rapports ces dernières 24 heures, le maximum pendant l'alpha. Réessayez plus tard.`,
     );
   }
 }

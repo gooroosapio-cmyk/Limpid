@@ -144,3 +144,5 @@ dialog.drawer::backdrop { background: var(--backdrop); animation: fade-in var(--
 .toast-ok .icon:first-child { color: var(--yellow); }
 .app:has(.fab) ~ .toasts { bottom: calc(96px + env(safe-area-inset-bottom)); }
 .app:has(.reader-immersive) ~ .toasts { bottom: calc(132px + env(safe-area-inset-bottom)); }
+.toast-action { flex: none; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--yellow); font: inherit; font-weight: 700; cursor: pointer; }
+.toast-action:hover { background: rgb(255 255 255 / 10%); }
