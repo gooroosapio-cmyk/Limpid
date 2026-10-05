@@ -17,7 +17,7 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "introuvable" }, { status: 404 });
   const db = adminClient();
-  const { data: src } = await db.from("sources").select("id, storage_path, reports(id)").eq("id", id).eq("owner_id", user.id).is("deleted_at", null).maybeSingle();
+  const { data: src } = await db.from("sources").select("id, storage_path, reports!report_sources(id)").eq("id", id).eq("owner_id", user.id).is("deleted_at", null).maybeSingle();
   if (!src) return NextResponse.json({ error: "introuvable" }, { status: 404 });
   if (((src.reports as unknown as { id: string }[] | null) ?? []).length > 0) return NextResponse.json({ error: "utilise" }, { status: 409 });
   await db.from("sources").update({ deleted_at: new Date().toISOString() }).eq("id", id).eq("owner_id", user.id);

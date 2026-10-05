@@ -982,4 +982,9 @@ export const fr = {
     back: "Retour aux options",
     retention: "Consultez la durée de conservation de ce Limpid dans Confidentialité et données.",
   },
+  notFound: {
+    title: "Page introuvable",
+    text: "Ce Limpid ou cette page n'existe pas, ou n'est plus disponible.",
+    back: "Retour à la bibliothèque",
+  },
 } as const;

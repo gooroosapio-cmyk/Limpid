@@ -27,8 +27,9 @@ const LONG_PRESS = 500;
 const MOVE_TOLERANCE = 10;
 
 /**
- * Un Limpid de la bibliothèque. Appui long : mode sélection. Bouton ⋯ : Ouvrir, Sélectionner,
- * Déplacer vers…, Supprimer. En sélection, toucher la ligne la coche au lieu de l'ouvrir.
+ * Un Limpid de la bibliothèque. Appui long (ou clic droit, ou touche Menu / Maj+F10) : menu
+ * Ouvrir, Sélectionner, Déplacer vers…, Supprimer. Aucun bouton ⋯ visible : il n'apparaît
+ * qu'au clavier. En sélection, toucher la ligne la coche au lieu de l'ouvrir.
  * En échec : explication, Réessayer et Supprimer.
  */
 export function ReportRow({
@@ -84,6 +85,9 @@ export function ReportRow({
     router.push(`/rapports/${row.id}`);
   }
 
+  const openMenu = () => {
+    if (menu.current && !menu.current.open) menu.current.showModal();
+  };
   const cancelPress = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -104,7 +108,7 @@ export function ReportRow({
         };
         document.addEventListener("click", swallow, { capture: true, once: true });
         setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 800);
-        onStartSelect?.(row.id);
+        openMenu();
       }, LONG_PRESS);
     },
     // Le défilement annule l'appui long avant son déclenchement.
@@ -114,7 +118,18 @@ export function ReportRow({
     onPointerUp: cancelPress,
     onPointerLeave: cancelPress,
     onPointerCancel: cancelPress,
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    // Clic droit (bureau) : même menu. Sur mobile, l'appui long l'a déjà ouvert.
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!selecting) openMenu();
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (selecting) return;
+      if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+        e.preventDefault();
+        openMenu();
+      }
+    },
   };
 
   const text = (
@@ -170,7 +185,7 @@ export function ReportRow({
           </ReportLink>
         )}
         {!selecting && (
-          <button type="button" className="ib lib-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(row.title)} onClick={() => menu.current?.showModal()}>
+          <button type="button" className="ib lib-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(row.title)} onClick={openMenu}>
             <Icon name="more" />
           </button>
         )}

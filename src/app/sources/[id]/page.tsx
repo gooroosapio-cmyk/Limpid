@@ -39,7 +39,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
   // Lectures via RLS : la source d'un autre compte est introuvable.
   const { data: src } = await supabase
     .from("sources")
-    .select("id, title, kind, status, page_count, byte_size, coverage, original_url, storage_path, original_purge_at, reports(id)")
+    .select("id, title, kind, status, page_count, byte_size, coverage, original_url, storage_path, original_purge_at, reports!report_sources(id)")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();

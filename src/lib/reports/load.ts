@@ -86,7 +86,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   const supabase = await createUserClient();
   const { data: report } = await supabase
     .from("reports")
-    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources(title, kind, coverage, original_url, storage_path)")
+    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources!reports_source_id_fkey(title, kind, coverage, original_url, storage_path)")
     .eq("id", id)
     .maybeSingle();
   if (!report) return null;

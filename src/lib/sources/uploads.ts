@@ -142,7 +142,7 @@ export async function purgeUnusedSources(limit = 100): Promise<number> {
   const before = new Date(Date.now() - 24 * 3600_000).toISOString();
   const { data } = await db
     .from("sources")
-    .select("id, storage_path, reports(id)")
+    .select("id, storage_path, reports!report_sources(id)")
     .in("status", ["extracted", "partial", "extracting"])
     .lt("created_at", before)
     .limit(limit);
