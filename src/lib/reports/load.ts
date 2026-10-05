@@ -5,7 +5,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import { Evidence, ExplanationObject, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
+import { Evidence, ExerciseSet, ExplanationObject, Mode, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import type { AssetView } from "@/lib/render/visuals";
 import { reportExpiresAt } from "./retention";
 import { autoTheme } from "@/lib/display/themes";
@@ -25,6 +25,8 @@ export interface VersionInfo {
   changeReason: string | null;
   level: string;
   current: boolean;
+  mode: Mode | null;
+  createdAt: string;
 }
 
 export type LoadedReport =
@@ -63,6 +65,12 @@ export type LoadedReport =
       visualMode: VisualMode;
       /** Date d'effacement automatique (conservation), ou null si illimitée. */
       expiresAt: Date | null;
+      /** Exercices pré-générés de la version affichée (null : génération antérieure ou échec). */
+      exercises: ExerciseSet | null;
+      /** Dernière position de lecture enregistrée (identifiant de pièce). */
+      progressAnchor: string | null;
+      /** Approche de la version affichée. */
+      mode: Mode | null;
       /** Illustrations du rapport, par identifiant d'actif (avec chemin privé pour l'export). */
       assets: Record<string, AssetView & { storagePath: string | null; mime: string | null }>;
     };
@@ -90,7 +98,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   }
 
   const [{ data: list }, { data: latestJob }] = await Promise.all([
-    supabase.from("report_versions").select("id, version_number, change_reason, level").eq("report_id", id).order("version_number"),
+    supabase.from("report_versions").select("id, version_number, change_reason, level, mode, created_at").eq("report_id", id).order("version_number"),
     supabase
       .from("jobs")
       .select("status, stage, error_code")
@@ -111,7 +119,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     .eq("id", shown.id)
     .single();
   if (!version) return null;
-  const [{ data: ev }, { data: segs }, { data: ans }, { data: assetRows }] = await Promise.all([
+  const [{ data: ev }, { data: segs }, { data: ans }, { data: assetRows }, { data: quizRow }, { data: progress }] = await Promise.all([
     supabase.from("evidence").select("id, segment_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id),
     supabase
       .from("source_segments")
@@ -128,6 +136,8 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
       .select("id, provider, source_url, remote_url, storage_path, mime, width, height, author, license, license_url, modifications, model")
       .eq("report_id", id)
       .limit(20),
+    supabase.from("report_quizzes").select("questions").eq("report_version_id", shown.id).eq("scope_key", "exercises").maybeSingle(),
+    supabase.from("report_progress").select("anchor").eq("report_id", id).maybeSingle(),
   ]);
   const assets: Record<string, AssetView & { storagePath: string | null; mime: string | null }> = {};
   for (const a of assetRows ?? []) {
@@ -183,6 +193,8 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
       changeReason: v.change_reason,
       level: v.level,
       current: v.id === report.current_version_id,
+      mode: Mode.safeParse(v.mode).data ?? null,
+      createdAt: v.created_at,
     })),
     shownVersion: shown.version_number,
     isCurrent: shown.id === report.current_version_id,
@@ -191,6 +203,9 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     theme: ThemeId.safeParse(report.theme_id).data ?? autoTheme(ReportBlueprint.parse(version.blueprint).template_id),
     visualMode: VisualMode.safeParse(report.visual_mode).data ?? "auto",
     expiresAt: reportExpiresAt(new Date(report.created_at)),
+    exercises: ExerciseSet.safeParse(quizRow?.questions).data ?? null,
+    progressAnchor: typeof progress?.anchor === "string" ? progress.anchor : null,
+    mode: Mode.safeParse(ExplanationObject.parse(version.explanation).mode).data ?? null,
     assets,
   };
 }

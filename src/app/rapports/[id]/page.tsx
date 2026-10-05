@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { DeleteReport } from "@/components/DeleteReport";
-import { Icon } from "@/components/Icon";
-import { Immersive } from "@/components/reader/Immersive";
 import { JobProgress } from "@/components/JobProgress";
-import { ThemePicker } from "@/components/ThemePicker";
-import { Reader } from "@/components/reader/Reader";
-import { OfflineSave } from "@/components/reader/OfflineSave";
-import { ReportOptions } from "@/components/reader/ReportOptions";
-import { VersionActions } from "@/components/reader/VersionActions";
+import { composeLimpid } from "@/components/reader/v4/Pieces";
+import { LimpidScreen } from "@/components/reader/v4/LimpidScreen";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import { retention } from "@/lib/config";
-import { getT } from "@/lib/i18n/server";
-import { LEVEL_LABELS } from "@/lib/labels";
-import type { Level } from "@/lib/contracts/schemas";
+import { readDisplayPrefs } from "@/lib/display/prefs";
+import { getLang, getT } from "@/lib/i18n/server";
 import { offlineKey } from "@/lib/offline-key";
 import { loadReport } from "@/lib/reports/load";
 
@@ -31,7 +26,7 @@ export default async function ReportPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ version?: string }>;
 }) {
-  const t = await getT();
+  const [t, lang, jar] = await Promise.all([getT(), getLang(), cookies()]);
   const { id } = await params;
   const { version } = await searchParams;
   const user = await requireUser();
@@ -53,12 +48,11 @@ export default async function ReportPage({
   const preparing = !!job && (job.status === "queued" || job.status === "running");
   const lastFailed = !!job && (job.status === "failed" || job.status === "uncertain") && report.versions.length >= 1;
   const pdfHref = `/api/reports/${id}/pdf${report.isCurrent ? "" : `?version=${report.shownVersion}`}`;
-  const themeName = t.themes.names[report.theme] ?? report.theme;
-  const themeLabel = report.themeChoice ? themeName : `${themeName} · ${t.options.auto}`;
+  const modeLabel = report.mode ? (t.add.modes[report.mode]?.title ?? null) : null;
+  const locale = lang === "en" ? "en-GB" : "fr-FR";
 
-  return (
-    <Immersive>
-      <div className="page page-reader">
+  const status = (
+    <>
       {!report.isCurrent && (
         <p className="notice" role="status">
           {t.versions.older} <Link href={`/rapports/${id}`}>{t.versions.backToCurrent}</Link>
@@ -72,9 +66,7 @@ export default async function ReportPage({
         </div>
       )}
       {report.checkStatus !== "validated" && (
-        <p className="notice notice-warn" role="status">
-          {t.reports.status.incomplete_check} : certaines vérifications n'ont pas abouti. Lisez ce rapport avec prudence.
-        </p>
+        <p className="notice notice-warn" role="status">{t.reader.incompleteCheck}</p>
       )}
       {report.notes.length > 0 && (
         <div className="notice notice-warn" role="status">
@@ -82,58 +74,57 @@ export default async function ReportPage({
           <ul>{report.notes.map((n) => <li key={n}>{n}</li>)}</ul>
         </div>
       )}
-      <Reader
-        t={t}
-        blueprint={report.blueprint}
-        explanation={report.explanation}
-        evidence={report.evidence}
-        segments={report.segments}
-        sourceTitle={report.sourceTitle}
-        sourceUrl={report.sourceUrl}
-        originalHref={report.originalHref}
-        isDemo={false}
-        reportId={report.isCurrent ? id : null}
-        answers={report.answers}
-        actions={<VersionActions reportId={id} disabled={preparing || !report.isCurrent} />}
-        actionsNote={report.isCurrent ? t.reader.reportCost : null}
-        theme={report.theme}
-        assets={report.assets}
-        sectionActions={
-          report.isCurrent && !preparing
-            ? (sectionId) => (
-                <>
-                  <VersionActions reportId={id} disabled={false} sectionId={sectionId} />
-                  <p className="muted small section-cost">{t.reader.sectionCost}</p>
-                </>
-              )
-            : undefined
-        }
-        options={
-          <ReportOptions
-            reportId={id}
-            pdfHref={pdfHref}
-            originalHref={report.originalHref}
-            sourceTitle={report.sourceTitle}
-            themeLabel={themeLabel}
-            themeControl={<ThemePicker initial={report.themeChoice} target={{ reportId: id }} />}
-            versions={report.versions.map((v) => ({
-              href: v.current ? `/rapports/${id}` : `/rapports/${id}?version=${v.number}`,
-              label: `${v.number} · ${t.versions.reasons[v.changeReason ?? ""] ?? LEVEL_LABELS[v.level as Level] ?? v.level}`,
-              current: v.number === report.shownVersion,
-            }))}
-            offline={report.isCurrent ? <OfflineSave account={offlineKey(user.id)} path={`/rapports/${id}`} title={report.title} /> : undefined}
-          />
-        }
-        footer={
-          report.expiresAt ? (
-            <p className="muted small reader-expiry">
-              <Icon name="clock" size={16} />{" "}
-              {t.reader.expires(report.expiresAt.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }), retention.reportDays)}
-            </p>
-          ) : null
-        }
-      />
-      </div>
-    </Immersive>
+    </>
+  );
+
+  const doc = composeLimpid({
+    t,
+    blueprint: report.blueprint,
+    explanation: report.explanation,
+    evidence: report.evidence,
+    segments: report.segments,
+    exercises: report.exercises,
+    assets: report.assets,
+    modeLabel,
+    status,
+    canReformulate: report.isCurrent && !preparing,
+    expiry: report.expiresAt
+      ? t.reader.expires(
+          report.expiresAt.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }),
+          retention.reportDays,
+        )
+      : null,
+  });
+
+  return (
+    <LimpidScreen
+      doc={doc}
+      reportId={report.isCurrent ? id : null}
+      versionId={report.versionId}
+      initialAnchor={report.progressAnchor}
+      bilan={report.exercises?.bilan.length ? report.exercises.bilan : null}
+      insufficient={report.exercises?.insufficient ?? false}
+      options={{
+        reportId: report.isCurrent ? id : null,
+        title: report.title,
+        pdfHref,
+        hasExercises: !!report.exercises?.bilan.length,
+        sourceTitle: report.sourceTitle,
+        originalHref: report.originalHref,
+        sources: doc.entries.map((e) => ({ n: e.n, location: e.location, quote: e.quote })),
+        glossary: report.explanation.glossary.map((g) => ({ term: g.term, definition: g.definition })),
+        mode: report.mode,
+        versions: report.versions.map((v) => ({
+          href: v.current ? `/rapports/${id}` : `/rapports/${id}?version=${v.number}`,
+          number: v.number,
+          mode: v.mode,
+          createdAt: v.createdAt,
+          current: v.current,
+          shown: v.number === report.shownVersion,
+        })),
+        offlineAccount: report.isCurrent ? offlineKey(user.id) : null,
+        display: readDisplayPrefs((n) => jar.get(n)?.value),
+      }}
+    />
   );
 }

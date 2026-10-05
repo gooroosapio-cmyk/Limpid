@@ -834,9 +834,8 @@ export async function reverifyKnowledge(
 
 export type Variation = "simpler" | "other_example" | "mode" | "reformulate";
 
-/** Motifs de « Essayer une autre formulation » (V4). */
-export const REFORMULATE_REASONS = ["trop_complique", "trop_court", "trop_long", "pas_concret", "incorrect", "autre"] as const;
-export type ReformulateReason = (typeof REFORMULATE_REASONS)[number];
+import { REFORMULATE_REASONS, type ReformulateReason } from "./reasons";
+export { REFORMULATE_REASONS, type ReformulateReason };
 
 const REASON_GUIDE: Record<ReformulateReason, string> = {
   trop_complique: "plus simple : phrases plus courtes, moins de termes techniques (chacun défini), une idée par phrase",
