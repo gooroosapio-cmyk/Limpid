@@ -23,8 +23,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     await retryReport(user.id, id, body.data.idempotency_key);
   } catch (e) {
     if (e instanceof RetryError) {
-      if (e.code === "credits" || e.code === "weekly") return billingResponse(await getT(), await getLang(), e.code, e.detail);
-      const status = { not_found: 404, not_failed: 409, limit: 429, disabled: 503, storage: 500, credits: 402, weekly: 429 }[e.code];
+      if (e.code === "credits" || e.code === "quota") return billingResponse(await getT(), await getLang(), e.code, e.detail);
+      const status = { not_found: 404, not_failed: 409, limit: 429, disabled: 503, storage: 500, credits: 402, quota: 429 }[e.code];
       return NextResponse.json({ error: e.code, message: e.message }, { status });
     }
     throw e;

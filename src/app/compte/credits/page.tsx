@@ -42,11 +42,17 @@ export default async function CreditsPage() {
         {wallet.mode === "topup" && <p>{w.topupMode}</p>}
         {wallet.accessEndsAt && wallet.mode === "subscription" && <p className="muted small">{w.accessEnds(day(wallet.accessEndsAt))}</p>}
         {wallet.nextGrant && <p className="muted small">{w.nextGrant(wallet.nextGrant.credits, day(wallet.nextGrant.at))}</p>}
-        {wallet.weekly && (
-          <p className="muted small">
-            {w.weekly(wallet.weekly.used, wallet.weekly.limit)}
-            {wallet.weekly.nextAt ? ` · ${w.weeklyNext(when(wallet.weekly.nextAt))}` : ""}
-          </p>
+        {wallet.quotas && (
+          <ul className="quota-list">
+            <li>
+              {w.today(wallet.quotas.day.used, wallet.quotas.day.limit)}
+              {wallet.quotas.day.used >= wallet.quotas.day.limit ? ` · ${w.resetAt(when(wallet.quotas.day.resetAt))}` : ""}
+            </li>
+            <li>
+              {w.thisWeek(wallet.quotas.week.used, wallet.quotas.week.limit)}
+              {wallet.quotas.week.used >= wallet.quotas.week.limit ? ` · ${w.resetAt(when(wallet.quotas.week.resetAt))}` : ""}
+            </li>
+          </ul>
         )}
         {!user.email_confirmed_at && <p className="notice notice-warn">{w.verify}</p>}
         <p className="muted small">{w.monthlyNoCarry}</p>

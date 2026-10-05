@@ -11,7 +11,7 @@ export interface WalletView {
   plan: string;
   mode: "free" | "topup" | "subscription";
   next_grant: { at: string; credits: number } | null;
-  weekly: { used: number; limit: number; nextAt: string | null } | null;
+  quotas: { day: { used: number; limit: number; resetAt: string }; week: { used: number; limit: number; resetAt: string } } | null;
   at: string;
 }
 

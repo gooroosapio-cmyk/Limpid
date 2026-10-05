@@ -27,9 +27,9 @@ export const VersionRequest = z.strictObject({
 
 export class VersionError extends Error {
   constructor(
-    public readonly code: "not_found" | "busy" | "limit" | "storage" | "credits",
+    public readonly code: "not_found" | "busy" | "limit" | "storage" | "credits" | "quota",
     message: string,
-    public readonly detail: { needed?: number; available?: number } = {},
+    public readonly detail: { needed?: number; available?: number; nextAt?: string | null; dayLimit?: number; weekLimit?: number } = {},
   ) {
     super(message);
   }
@@ -84,6 +84,7 @@ export async function requestVersion(userId: string, reportId: string, input: z.
     ({ reservationId } = await reserveCredits(userId, "report_version", `version:${input.idempotency_key}`, { reportId }, { wallet: ent.wallet }));
   } catch (e) {
     if (e instanceof CreditError && e.code === "insufficient") throw new VersionError("credits", e.message, e.detail);
+    if (e instanceof CreditError && e.code === "quota") throw new VersionError("quota", e.message, e.detail);
     throw e;
   }
   const job = await db.from("jobs").insert({

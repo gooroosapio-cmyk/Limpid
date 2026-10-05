@@ -18,7 +18,7 @@ export async function GET() {
       mode: w.mode,
       access_ends_at: w.accessEndsAt,
       next_grant: w.nextGrant,
-      weekly: w.weekly,
+      quotas: w.quotas,
       at: new Date().toISOString(),
     },
     { headers: { "Cache-Control": "no-store, private" } },

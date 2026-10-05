@@ -28,6 +28,7 @@ export default async function OffersPage() {
       <p className="lede">{o.lede}</p>
       <OffersGrid lang={lang} current={wallet ? { plan: wallet.plan, mode: wallet.mode } : null} scheduleFrom={scheduleFrom} />
       <p className="muted">{o.note}</p>
+      <p className="muted">{o.capsNote}</p>
       <p className="muted">{o.prepaid}</p>
 
       <section id="recharges" aria-labelledby="topups-h">
@@ -56,7 +57,8 @@ export default async function OffersPage() {
               <tr><th scope="row">{c.yearly}</th>{all.map((p) => <td key={p}>{p === "free" ? c.none : formatXof(PLANS[p].yearlyXof, lang)}</td>)}</tr>
               <tr><th scope="row">{c.credits}</th>{all.map((p) => <td key={p}>{PLANS[p].monthlyCredits.toLocaleString(lang)}</td>)}</tr>
               <tr><th scope="row">{c.reports}</th>{all.map((p) => <td key={p}>{reportsFor(PLANS[p].monthlyCredits)}</td>)}</tr>
-              <tr><th scope="row">{c.weekly}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.weeklyReports ?? c.noLimit}</td>)}</tr>
+              <tr><th scope="row">{c.daily}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.dailyReports}</td>)}</tr>
+              <tr><th scope="row">{c.weekly}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.weeklyReports}</td>)}</tr>
               <tr><th scope="row">{c.kept}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.keptReports}</td>)}</tr>
               <tr><th scope="row">{c.sources}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.sourcesPerReport}</td>)}</tr>
               <tr><th scope="row">{c.concurrent}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.concurrentJobs}</td>)}</tr>

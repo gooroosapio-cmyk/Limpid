@@ -100,6 +100,42 @@ begin
   end;
 end $$;
 
+-- Plafonds jour/semaine (V2 T62-T65) : vérifiés sous le verrou, avant le solde ; un échec rendu
+-- ne compte pas ; une question n'est pas une unité rapport ; sans limite, rien ne bloque.
+insert into public.allowed_emails (email, role) values ('q@test.fr', 'user');
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a9', 'q@test.fr');
+do $$
+declare
+  c uuid := '00000000-0000-0000-0000-0000000000a9';
+  r uuid;
+begin
+  perform public.grant_credits(c, 'compensation', 'quota-test', 500, now() + interval '1 day');
+  r := public.reserve_credits(c, 8, 'report_short', 'quota-0000001', null, null, 2, 5);
+  perform public.settle_reservation(r);
+  r := public.reserve_credits(c, 8, 'report_short', 'quota-0000002', null, null, 2, 5);
+  perform public.release_reservation(r);
+  r := public.reserve_credits(c, 8, 'report_version', 'quota-0000003', null, null, 2, 5);
+  begin
+    perform public.reserve_credits(c, 8, 'report_short', 'quota-0000004', null, null, 2, 5);
+    raise exception 'ECHEC : troisième rapport du jour accepté (limite 2)';
+  exception when others then
+    if sqlerrm like 'ECHEC%' then raise; end if;
+    if sqlerrm not like 'quota_atteint:2:2:%' then raise; end if;
+  end;
+  -- Une question n'est pas un rapport : pas bloquée par le plafond.
+  perform public.reserve_credits(c, 1, 'ask', 'quota-ask-0001', null, null, 2, 5);
+  -- Limite hebdomadaire seule.
+  begin
+    perform public.reserve_credits(c, 8, 'report_short', 'quota-0000005', null, null, null, 2);
+    raise exception 'ECHEC : limite hebdomadaire ignorée';
+  exception when others then
+    if sqlerrm like 'ECHEC%' then raise; end if;
+    if sqlerrm not like 'quota_atteint:%:-1:%:2' then raise; end if;
+  end;
+  -- Sans plafond (administrateur) : seule la limite de crédits s'applique.
+  perform public.reserve_credits(c, 8, 'report_short', 'quota-0000006');
+end $$;
+
 -- T27 : cycles du 31 janvier et du 29 février sans dérive.
 do $$
 declare b record;
@@ -202,7 +238,7 @@ reset role;
 
 -- Fonctions de crédit : jamais appelables par un client.
 do $$ begin
-  if has_function_privilege('authenticated', 'public.reserve_credits(uuid, integer, text, text, uuid, uuid)', 'execute')
+  if has_function_privilege('authenticated', 'public.reserve_credits(uuid, integer, text, text, uuid, uuid, integer, integer)', 'execute')
      or has_function_privilege('authenticated', 'public.grant_credits(uuid, text, text, integer, timestamptz, text)', 'execute')
      or has_function_privilege('anon', 'public.fulfill_purchase(uuid, text, text, text, text, integer, integer)', 'execute')
      or has_function_privilege('authenticated', 'public.ensure_allocations(uuid, integer)', 'execute') then

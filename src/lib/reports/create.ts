@@ -9,7 +9,7 @@ import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, VisualMode } from 
 import { planPages } from "@/lib/engine/pipeline";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { ACTION_PRICES, reportAction } from "@/lib/billing/catalog";
-import { accountUsage, attachReservation, CreditError, getEntitlements, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
+import { accountUsage, attachReservation, CreditError, getEntitlements, quotaBlock, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient } from "@/lib/supabase/admin";
@@ -57,7 +57,7 @@ export class CreateError extends Error {
       | "source_missing"
       | "source_used"
       | "credits"
-      | "weekly"
+      | "quota"
       | "plan_reports"
       | "plan_sources",
     message: string,
@@ -66,7 +66,7 @@ export class CreateError extends Error {
     /** Rapport déjà créé pour cette source. */
     public readonly reportId?: string,
     /** Crédits manquants, limite atteinte : de quoi expliquer la limite exacte (§ 11). */
-    public readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number } = {},
+    public readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number; dayLimit?: number; weekLimit?: number } = {},
   ) {
     super(message);
   }
@@ -316,9 +316,14 @@ async function assertCanCreate(userId: string, ent: Entitlements, count: number)
   if (usage.kept + count > ent.limits.keptReports) {
     throw new CreateError("plan_reports", "Limite de Limpid conservés atteinte.", undefined, undefined, { limit: ent.limits.keptReports });
   }
-  const weekly = ent.wallet.weekly;
-  if (weekly && weekly.used + count > weekly.limit) {
-    throw new CreateError("weekly", "Limite hebdomadaire atteinte.", undefined, undefined, { nextAt: weekly.nextAt, limit: weekly.limit });
+  // Plafonds de rythme pour tout le lot (revérifiés à la réservation, sous verrou).
+  const q = ent.wallet.quotas;
+  if (q) {
+    const block = quotaBlock({
+      day: { ...q.day, used: q.day.used + count - 1 },
+      week: { ...q.week, used: q.week.used + count - 1 },
+    });
+    if (block) throw new CreateError("quota", "Plafond de rapports atteint.", undefined, undefined, block);
   }
   const needed = ACTION_PRICES.report_short * count;
   if (ent.wallet.available < needed) {
@@ -329,7 +334,7 @@ async function assertCanCreate(userId: string, ent: Entitlements, count: number)
 function creditFailure(e: unknown): CreateError {
   if (e instanceof CreditError) {
     if (e.code === "insufficient") return new CreateError("credits", e.message, undefined, undefined, e.detail);
-    if (e.code === "weekly") return new CreateError("weekly", e.message, undefined, undefined, e.detail);
+    if (e.code === "quota") return new CreateError("quota", e.message, undefined, undefined, e.detail);
     return new CreateError("storage", e.message);
   }
   throw e;
