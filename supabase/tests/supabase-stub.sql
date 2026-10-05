@@ -14,3 +14,6 @@ grant usage on schema public, auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to authenticated, anon;
 -- Comme Supabase : toute nouvelle fonction du schéma public est exécutable par les rôles de l'API.
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+-- Colonnes d'auth.users lues par la migration des crédits.
+alter table auth.users add column if not exists email_confirmed_at timestamptz default now();
+alter table auth.users add column if not exists created_at timestamptz not null default now();

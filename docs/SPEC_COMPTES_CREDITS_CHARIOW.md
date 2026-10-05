@@ -3,7 +3,7 @@
 
 Version proposée : 5 octobre 2026, révision tarifaire. Ce document est une spécification à implémenter, pas une attestation de déploiement ni de tests réalisés sur Limpid.
 
-Révision tarifaire : Gratuit 2 rapports par mois ; Essentiel 2 900 FCFA (12 rapports) ; Plus 5 900 FCFA (30 rapports) ; Pro 11 900 FCFA (75 rapports) ; annuel au prix de dix mensualités ; recharges ponctuelles à partir de 500 FCFA. Un « rapport » s'entend d'un rapport standard à 20 crédits : les allocations sont donc 40, 240, 600 et 1 500 crédits par mois.
+Révision tarifaire : Gratuit, bonus mensuel de 80 crédits (4 rapports) avec au plus 2 rapports par semaine ; Essentiel 2 900 FCFA (12 rapports) ; Plus 5 900 FCFA (30 rapports) ; Pro 11 900 FCFA (75 rapports) ; annuel au prix de dix mensualités ; recharges de 1 000, 2 500 et 5 000 FCFA (3, 9 et 25 rapports). Un « rapport » s'entend d'un rapport standard à 20 crédits : les allocations sont donc 80, 240, 600 et 1 500 crédits par mois.
 
 ## 0. Mission et règles de priorité
 
@@ -29,7 +29,7 @@ N’expose jamais au client les tokens d’entrée, de sortie, de raisonnement, 
 
 | Code interne | Nom public | Mensuel | Annuel | Allocation |
 |---|---|---:|---:|---|
-| free | Découverte — Gratuit | 0 FCFA | — | 40 crédits par cycle mensuel (2 rapports standard), le premier cycle étant ouvert après vérification du compte |
+| free | Découverte — Gratuit | 0 FCFA | — | Bonus de 80 crédits par cycle mensuel (4 rapports standard), le premier cycle étant ouvert après vérification du compte ; au plus 2 rapports par semaine glissante |
 | essential | Essentiel | 2 900 FCFA | 29 000 FCFA | 240 crédits par mois (12 rapports standard) |
 | plus | Plus | 5 900 FCFA | 59 000 FCFA | 600 crédits par mois (30 rapports standard) |
 | pro | Pro | 11 900 FCFA | 119 000 FCFA | 1 500 crédits par mois (75 rapports standard) |
@@ -38,18 +38,17 @@ Devise commerciale : XOF, affichée « FCFA ». Les prix sont les totaux catalog
 
 L’annuel couvre douze mois pour le prix de dix mensualités : 29 000, 59 000 et 119 000 FCFA. L’allocation reste mensuelle : 240, 600 ou 1 500 crédits, jamais douze fois cette quantité au paiement. Afficher le total annuel payé en une fois. Les équivalents mensuels facultatifs sont environ 2 417, 4 917 et 9 917 FCFA, explicitement présentés comme des équivalents et non comme un paiement mensuel.
 
-Le nombre de rapports annoncé est un équivalent, pas un compteur séparé : un forfait utilisé uniquement pour des rapports standard à 20 crédits donne exactement 2 rapports en Découverte, 12 en Essentiel, 30 en Plus et 75 en Pro. Une utilisation mixte (questions, QCM, images, rapports longs) réduit ce nombre ; des rapports courts à 8 crédits l’augmentent. Formulation publique : « l’équivalent de 12 rapports standard par mois », jamais « 12 rapports + questions illimitées ». Ne pas additionner plusieurs maxima marketing comme s’ils étaient tous inclus séparément.
+Le nombre de rapports annoncé est un équivalent, pas un compteur séparé : un forfait utilisé uniquement pour des rapports standard à 20 crédits donne exactement 4 rapports en Découverte (2 par semaine au plus), 12 en Essentiel, 30 en Plus et 75 en Pro. Une utilisation mixte (questions, QCM, images, rapports longs) réduit ce nombre ; des rapports courts à 8 crédits l’augmentent. Formulation publique : « l’équivalent de 12 rapports standard par mois », jamais « 12 rapports + questions illimitées ». Ne pas additionner plusieurs maxima marketing comme s’ils étaient tous inclus séparément.
 
 ### Recharges ponctuelles
 
 | Code | Prix | Allocation | Validité |
 |---|---:|---:|---|
-| topup_30 | 500 FCFA | 30 crédits (1 rapport standard + 10 crédits) | 12 mois après attribution |
 | topup_70 | 1 000 FCFA | 70 crédits (3 rapports standard + 10 crédits) | 12 mois après attribution |
 | topup_180 | 2 500 FCFA | 180 crédits (9 rapports standard) | 12 mois après attribution |
-| topup_380 | 5 000 FCFA | 380 crédits (19 rapports standard) | 12 mois après attribution |
+| topup_500 | 5 000 FCFA | 500 crédits (25 rapports standard) | 12 mois après attribution |
 
-Le crédit rechargé reste plus cher que le crédit d’abonnement (16,7 à 13,2 FCFA contre 12,1 FCFA en Essentiel, 9,8 en Plus et 7,9 en Pro) : l’abonnement demeure l’offre la plus avantageuse pour un usage régulier. Avant d’ouvrir la recharge à 500 FCFA, vérifier les frais Chariow réellement prélevés sur un petit panier (frais minimum éventuel, moyen de paiement) ; si la contribution devient insuffisante, relever le prix d’entrée plutôt que réduire les crédits annoncés.
+Prix du crédit rechargé : 14,3 FCFA (1 000), 13,9 FCFA (2 500) et 10 FCFA (5 000), contre 12,1 FCFA en Essentiel, 9,8 en Plus et 7,9 en Pro. La recharge de 5 000 FCFA est volontairement généreuse : son crédit coûte moins cher que celui d’Essentiel, mais il n’ouvre ni les droits d’abonnement, ni l’allocation mensuelle, et il expire après 12 mois. Pas de recharge en dessous de 1 000 FCFA.
 
 Une recharge ne renouvelle pas l’abonnement et ne transforme pas un compte en Plus ou Pro. Pas de recharge automatique ni de prélèvement automatique activé implicitement.
 
@@ -57,7 +56,8 @@ Une recharge ne renouvelle pas l’abonnement et ne transforme pas un compte en 
 
 | Limite | Découverte | Essentiel | Plus | Pro |
 |---|---:|---:|---:|---:|
-| Rapports conservés dans le quota actif | 3 | 30 | 100 | 300 |
+| Limpid générés conservés (documents produits, hors sources) | 3 | 30 | 100 | 300 |
+| Nouveaux rapports par semaine glissante | 2 | — | — | — |
 | Sources par rapport | 1 | 5 | 10 | 20 |
 | Pages sources cumulées par rapport | 20 | 100 | 300 | 1 000 |
 | Taille maximale par fichier | 10 Mo | 25 Mo | 40 Mo | 50 Mo |
@@ -159,7 +159,7 @@ Calcul : 0,005 USD × 1,30 × 650 = 4,225 FCFA par crédit au plafond, réserve 
 
 Pour l’annuel, la contribution mensuelle correspondante devient environ 1 040,17 / 1 644,17 / 2 091,67 FCFA. Le Pro est le palier le plus sensible : un Pro annuel qui consomme toute son allocation ne laisse qu’environ 21 % de la recette nette. Surveiller en priorité son coût réel par crédit.
 
-Recharges, au plafond : 500 FCFA → 298,25 ; 1 000 FCFA → 554,25 ; 2 500 FCFA → 1 364,50 ; 5 000 FCFA → 2 644,50 FCFA de contribution, avant frais Chariow minimum éventuels. Ce n’est pas une marge nette : hébergement, OCR hors Gemini, rendu/export, stockage, emails, files d’attente, support, fiscalité, acquisition, remboursements et fraude restent à financer.
+Recharges, au plafond : 1 000 FCFA → 554,25 ; 2 500 FCFA → 1 364,50 ; 5 000 FCFA → 2 137,50 FCFA de contribution. Ce n’est pas une marge nette : hébergement, OCR hors Gemini, rendu/export, stockage, emails, files d’attente, support, fiscalité, acquisition, remboursements et fraude restent à financer.
 
 Les tarifs fournisseur doivent être versionnés avec date d’effet, modèle, modalité et mode de traitement. Ne pas dimensionner un abonnement annuel exclusivement sur une remise fournisseur temporaire. Les prix officiels consultés le 5 octobre 2026 affichent notamment des tarifs Flash différents à compter du 1er janvier 2027. Vérifier de nouveau au déploiement. [R1]
 
@@ -199,7 +199,7 @@ Conserver les crédits par lots : allocation gratuite (dont celle du premier cyc
 
 Consommer d’abord ce qui expire le plus tôt. À échéance égale, préférer les allocations à la recharge payée. Les crédits mensuels inutilisés expirent à la fin du cycle sans report. Les recharges expirent douze mois après attribution. Montrer ces dates avant achat et dans le portefeuille.
 
-L’allocation gratuite du premier cycle (40 crédits) n’est attribuée qu’une fois, après vérification du compte ; il n’existe pas de bonus de bienvenue distinct qui s’y ajouterait. Les allocations gratuites suivantes (40 crédits par cycle) ne sont pas versées pendant un abonnement payant. Un éventuel lot gratuit restant lors du premier achat garde son échéance sans créer de nouvelle allocation.
+Le bonus gratuit du premier cycle (80 crédits) n’est attribué qu’une fois, après vérification du compte ; il n’existe pas de bonus de bienvenue distinct qui s’y ajouterait. Les bonus gratuits suivants (80 crédits par cycle, sans report) ne sont pas versées pendant un abonnement payant. Un éventuel lot gratuit restant lors du premier achat garde son échéance sans créer de nouvelle allocation.
 
 Une réservation effectuée avant expiration peut être honorée après expiration si sa tâche était valablement engagée. Une restitution remet les crédits dans leurs lots et à leur échéance d’origine. En cas d’échec imputable à Limpid après cette échéance, une compensation distincte de sept jours peut être accordée une seule fois, plafonnée à la somme affectée. Ne pas permettre de prolonger les crédits par des annulations volontaires répétées.
 
@@ -241,7 +241,7 @@ Créer ou corriger les parcours publics /inscription et /connexion, en conservan
 
 Utiliser le fournisseur d’identité éprouvé déjà intégré. Si email/mot de passe est supporté, prévoir affichage/masquage, gestionnaire de mots de passe, vérification email et réinitialisation sécurisée. Conserver le lien magique lorsque pertinent. N’afficher une connexion Google que si elle est réellement configurée et testée.
 
-État initial : rôle user, offre free, vérification en attente, aucun droit payant et aucun crédit dépensable avant validation. Après vérification serveur, exécuter un bootstrap idempotent qui garantit profil + préférences de base + portefeuille + allocation unique du premier cycle gratuit (40 crédits). Une reprise de callback, un trigger ou une deuxième connexion ne redonne aucune allocation.
+État initial : rôle user, offre free, vérification en attente, aucun droit payant et aucun crédit dépensable avant validation. Après vérification serveur, exécuter un bootstrap idempotent qui garantit profil + préférences de base + portefeuille + allocation unique du premier cycle gratuit (80 crédits). Une reprise de callback, un trigger ou une deuxième connexion ne redonne aucune allocation.
 
 Prévoir la réparation idempotente d’un compte authentifié dont le profil applicatif est incomplet. Ne pas contourner l’email non vérifié pour « réparer » l’onboarding. Une erreur d’écriture doit conduire à une reprise sûre et un message utile.
 
@@ -272,7 +272,7 @@ Séparer développement, tests, staging et production : comptes, bases, clés AP
 ### Inscription
 
 Titre : « Créez votre compte Limpid ».
-Sous-titre : « Commencez gratuitement : 2 rapports par mois pour rendre vos documents plus clairs. »
+Sous-titre : « Commencez gratuitement : 80 crédits offerts chaque mois pour rendre vos documents plus clairs. »
 Bouton principal : « Créer mon compte gratuit ».
 Lien secondaire : « J’ai déjà un compte ».
 Mention : « Sans carte bancaire. Votre compte reste gratuit tant que vous ne choisissez pas une offre payante. »
@@ -280,7 +280,7 @@ Mention : « Sans carte bancaire. Votre compte reste gratuit tant que vous ne ch
 ### Vérification
 
 Titre : « Vérifiez votre adresse email ».
-Texte : « Confirmez votre adresse pour activer vos 40 crédits gratuits (2 rapports). »
+Texte : « Confirmez votre adresse pour activer vos 80 crédits gratuits (4 rapports). »
 Actions : « Renvoyer le lien » et « Corriger mon adresse ».
 Afficher un délai de renvoi réel et contrôlé côté serveur ; ne pas le confier uniquement à un compteur navigateur.
 
@@ -288,14 +288,14 @@ Afficher un délai de renvoi réel et contrôlé côté serveur ; ne pas le conf
 
 Badge : « Découverte · Gratuit ».
 Titre : « Votre espace est prêt ».
-Texte : « Vous disposez de 40 crédits, soit 2 rapports. Ensuite, 40 crédits seront ajoutés à chaque nouveau cycle mensuel. »
+Texte : « Vous disposez de 80 crédits, soit 4 rapports, à utiliser à raison de 2 rapports par semaine au plus. Un nouveau bonus de 80 crédits arrive à chaque cycle mensuel. »
 Détail : « Les crédits mensuels ne se cumulent pas. »
 Actions : « Importer mon premier document » et lien discret « Voir les offres ».
 
 ### En-tête et Compte
 
 Badge permanent mais discret « Gratuit », « Essentiel », « Plus » ou « Pro ».
-Pour le gratuit : « 32 crédits disponibles » ; « Prochains crédits : 40, le [date] » ; bouton « Découvrir Premium ».
+Pour le gratuit : « 32 crédits disponibles » ; « Prochains crédits : 80, le [date] » ; si la limite hebdomadaire est atteinte : « Limite de 2 rapports cette semaine atteinte. Prochain rapport possible le [date]. » (pas de recharge proposée comme solution à cette limite, seulement les offres) ; bouton « Découvrir Premium ».
 Pour le payant : allocation, solde disponible/réservé, date de fin d’accès et prochaine attribution distinctes. Dans l’annuel, ne pas confondre la prochaine allocation mensuelle et la fin des douze mois.
 
 ### Solde insuffisant
@@ -317,7 +317,7 @@ Titre : « Choisissez votre rythme avec Limpid ».
 Sous-titre : « Plus de crédits pour comprendre, réviser et créer vos supports. »
 Sélecteur Mensuel / Annuel ; mention « 2 mois offerts » pour l’annuel, avec total annuel clairement visible : 29 000, 59 000 et 119 000 FCFA.
 
-Découverte : « Pour essayer Limpid à votre rythme. » Prix 0 FCFA. Mention « 40 crédits par mois · l’équivalent de 2 rapports ». Bouton « Continuer gratuitement » ou « Offre actuelle ».
+Découverte : « Pour essayer Limpid à votre rythme. » Prix 0 FCFA. Mention « 80 crédits par mois · l’équivalent de 4 rapports · 2 par semaine au plus ». Bouton « Continuer gratuitement » ou « Offre actuelle ».
 
 Essentiel : « Pour comprendre vos documents régulièrement. » 2 900 FCFA/mois, 240 crédits/mois, l’équivalent de 12 rapports. Mettre en avant PDF sans filigrane, plusieurs sources et accès aux images à la demande. Bouton « Choisir Essentiel ».
 
@@ -325,7 +325,7 @@ Plus : « Pour étudier et avancer plus souvent. » 5 900 FCFA/mois, 600 crédit
 
 Pro : « Pour vos documents volumineux et un usage soutenu. » 11 900 FCFA/mois, 1 500 crédits/mois, l’équivalent de 75 rapports. Mettre en avant narration, gros volumes et file prioritaire. Bouton « Choisir Pro ».
 
-Sous les offres : « Les crédits sont communs à toutes vos générations. Un rapport standard utilise 20 crédits ; le prix de chaque action est indiqué avant de commencer. » Puis « Besoin d’un coup de pouce ? Recharges dès 500 FCFA, sans abonnement. » Puis « Images génératives et audio consomment des crédits supplémentaires lorsqu’ils sont demandés. »
+Sous les offres : « Les crédits sont communs à toutes vos générations. Un rapport standard utilise 20 crédits ; le prix de chaque action est indiqué avant de commencer. » Puis « Besoin d’un coup de pouce ? Recharges dès 1 000 FCFA, sans abonnement. » Puis « Images génératives et audio consomment des crédits supplémentaires lorsqu’ils sont demandés. »
 
 Ajouter un comparatif détaillé repliable comprenant toutes les limites du tableau, les coûts des actions, l’expiration des crédits, la validité des recharges et le mode de renouvellement. Pas de mot « illimité ».
 
@@ -350,7 +350,7 @@ L’API Checkout documente product_id, email, first_name, last_name, redirect_ur
 
 Recueillir les champs réellement requis par l’API et la configuration du produit avant l’appel ; ne pas inventer le nom, le prénom ou le téléphone du client pour satisfaire un schéma. Le prénom et le nom ne deviennent pas obligatoires pour l’inscription gratuite simplement parce qu’ils le sont au checkout.
 
-Configurer dix références catalogue : trois offres mensuelles, trois annuelles et quatre recharges. Exemples de codes INTERNES : essential_monthly (2 900), essential_yearly (29 000), plus_monthly (5 900), plus_yearly (59 000), pro_monthly (11 900), pro_yearly (119 000), topup_30 (500), topup_70 (1 000), topup_180 (2 500), topup_380 (5 000). Les véritables product_id Chariow sont à charger depuis la boutique ; ne jamais publier des identifiants fictifs ou un lien générique présenté comme un checkout opérationnel.
+Configurer neuf références catalogue : trois offres mensuelles, trois annuelles et trois recharges. Exemples de codes INTERNES : essential_monthly (2 900), essential_yearly (29 000), plus_monthly (5 900), plus_yearly (59 000), pro_monthly (11 900), pro_yearly (119 000), topup_70 (1 000), topup_180 (2 500), topup_500 (5 000). Les véritables product_id Chariow sont à charger depuis la boutique ; ne jamais publier des identifiants fictifs ou un lien générique présenté comme un checkout opérationnel.
 
 Privilégier des produits licence adaptés aux achats répétés. La licence peut servir de justificatif/récupération, mais l’utilisateur connecté ne doit pas recopier une clé à chaque recharge. Le compte utilisateur reste l’autorité de rattachement des avantages dans Limpid.
 
@@ -481,7 +481,7 @@ Lutter contre les comptes multiples : allocation gratuite seulement après véri
 
 La réinscription, le changement d’email, le passage premium/gratuit ou une reconnexion sociale ne doivent pas régénérer l’allocation du premier cycle. Prévoir une politique de suppression/rétention minimale permettant les obligations de sécurité et de paiement sans conserver inutilement les documents personnels.
 
-Réserver un budget d’acquisition distinct au gratuit. Au plafond de simulation retenu, 1 000 comptes gratuits consommant toute leur allocation de 40 crédits représentent 169 000 FCFA avec réserve, à chaque cycle mensuel (premier cycle compris). Ce sont des enveloppes, pas des dépenses mesurées. Comme l’allocation gratuite est désormais la même chaque mois, le coût du gratuit croît avec la base active : suivre la part de comptes gratuits actifs et le taux de conversion avant d’élargir l’acquisition.
+Réserver un budget d’acquisition distinct au gratuit. Au plafond de simulation retenu, 1 000 comptes gratuits consommant tout leur bonus de 80 crédits représentent 338 000 FCFA avec réserve, à chaque cycle mensuel (premier cycle compris). Ce sont des enveloppes, pas des dépenses mesurées. Comme l’allocation gratuite est désormais la même chaque mois, le coût du gratuit croît avec la base active : suivre la part de comptes gratuits actifs et le taux de conversion avant d’élargir l’acquisition.
 
 Séparer chiffre d’affaires encaissé, reversements disponibles, engagements de crédits, mois d’accès restant dus et budget fournisseur financé. Un webhook Chariow n’alimente pas automatiquement le compte de facturation Gemini. Le préfinancement des crédits déjà vendus reste une responsabilité de Limpid. Les contrôles et données de facturation fournisseur ne remplacent pas l’enveloppe locale. [R7]
 
@@ -530,7 +530,7 @@ Produire des tests unitaires, d’intégration, de concurrence et de parcours mo
 ### Identité et accès
 
 T01. Un nouvel inscrit devient user/free, jamais admin, même avec role=admin dans le payload.
-T02. Le bootstrap répété dix fois n’attribue qu’une seule allocation de premier cycle (40 crédits).
+T02. Le bootstrap répété dix fois n’attribue qu’une seule allocation de premier cycle (80 crédits).
 T03. Un compte non vérifié ne peut dépenser ni payer sans le parcours requis.
 T04. La réparation d’un profil manquant n’accorde pas une nouvelle allocation.
 T05. Un utilisateur Pro ne peut accéder à aucune mutation admin.
@@ -557,6 +557,7 @@ T22. Le dernier crédit d’une recharge ne casse pas la livraison déjà autori
 
 ### Cycles et offres
 
+T23a. Un compte gratuit ne peut lancer un troisième rapport dans la même semaine glissante, même avec des crédits disponibles ; le message donne la date du prochain rapport possible.
 T23. L’allocation du premier cycle gratuit n’est versée qu’une fois et ne se cumule avec aucune autre allocation gratuite du même cycle.
 T24. Une allocation gratuite n’est pas ajoutée au cycle premium.
 T25. L’achat annuel crée douze allocations, pas une allocation douze fois plus grande.
@@ -609,13 +610,13 @@ T65. Limitation anti-abus n’exclut pas arbitrairement plusieurs utilisateurs d
 
 ## 23. Déploiement et livrables attendus
 
-Commencer par une sauvegarde et un état des lieux non destructif. Identifier les anciens crédits, unités, allocations et droits. Ne pas interpréter un ancien compteur de tokens API comme un solde de crédits Limpid. Produire un mapping de migration explicite, versionné et réexécutable sans duplication. Marquer correctement les allocations déjà accordées aux comptes existants afin que ensureUserBootstrap ne redistribue pas 40 crédits à toute la base après migration.
+Commencer par une sauvegarde et un état des lieux non destructif. Identifier les anciens crédits, unités, allocations et droits. Ne pas interpréter un ancien compteur de tokens API comme un solde de crédits Limpid. Produire un mapping de migration explicite, versionné et réexécutable sans duplication. Marquer correctement les allocations déjà accordées aux comptes existants afin que ensureUserBootstrap ne redistribue pas 80 crédits à toute la base après migration.
 
 Déployer par étapes : schéma et rôles ; comptes gratuits ; journal/réservations ; moteur borné ; temps réel ; catalogue et écrans ; paiement de test ; rapprochement ; activation progressive. Utiliser des feature flags distincts pour nouvelles ventes, nouvelles inscriptions promotionnelles et nouvelles générations. Un incident paiement ne doit pas bloquer la lecture de la bibliothèque.
 
 Mesurer les coûts avant/après sur un corpus représentatif : PDF texte, scans, graphiques, tableaux, documents longs et plusieurs sources. Évaluer coût médian et haut percentile, erreurs et fidélité, pas uniquement la moyenne des cas simples. La promotion commerciale « plus de générations » n’est validée que si le nouveau moteur tient le budget avec une qualité satisfaisante.
 
-Livrer : modifications réellement exécutées, migrations et rollback, configuration tarifaire centralisée, contrats du registre, dix produits Chariow à mapper/créer, variables manquantes, écrans et textes finalisés, tests et résultats, suivi des coûts, procédure de rapprochement et guide admin mobile.
+Livrer : modifications réellement exécutées, migrations et rollback, configuration tarifaire centralisée, contrats du registre, neuf produits Chariow à mapper/créer, variables manquantes, écrans et textes finalisés, tests et résultats, suivi des coûts, procédure de rapprochement et guide admin mobile.
 
 Si une clé, une permission ou un accès externe manque, terminer les parties locales testables et indiquer précisément ce qui bloque l’étape externe. Ne pas inventer un paiement confirmé, un webhook fonctionnel, une fonctionnalité premium ou un test exécuté. Les endpoints de vente non configurés doivent échouer proprement plutôt que rediriger vers un faux checkout.
 
