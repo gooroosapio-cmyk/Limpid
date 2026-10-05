@@ -11,7 +11,7 @@ import { Bilan } from "./Bilan";
 import { ReaderCtx, type ReaderApi } from "./context";
 import { OptionsPanel, type OptionsData } from "./OptionsPanel";
 import { ReformulatePanel } from "./ReformulatePanel";
-import { useDialogHistory } from "./useDialogHistory";
+import { useDialogHistory } from "@/components/shell/useDialogHistory";
 
 const CONTINUOUS_KEY = "limpid-continuous";
 const progressKey = (id: string) => `limpid-progress-${id}`;

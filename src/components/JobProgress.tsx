@@ -14,19 +14,6 @@ interface JobView {
   error_code: string | null;
 }
 
-const ERRORS: Record<string, string> = {
-  budget_monthly: "Le plafond mensuel de dépense IA est atteint.",
-  budget_daily: "Le plafond quotidien de ce compte est atteint. Réessayez demain.",
-  generation_disabled: "La génération est suspendue par l'administrateur.",
-  provider_refused: "Le fournisseur IA a refusé de traiter ce contenu.",
-  provider_unavailable: "Le fournisseur IA est indisponible pour le moment.",
-  provider_rate_limited: "Le fournisseur IA limite les demandes. Réessayez dans quelques minutes.",
-  provider_quota_exhausted: "Le quota quotidien de l'IA est atteint. Réessayez demain.",
-  provider_timeout: "Le fournisseur IA n'a pas répondu à temps.",
-  provider_truncated: "La réponse du fournisseur IA était incomplète (document trop long ?).",
-  ocr_unreadable: "Aucun texte lisible n'a été trouvé dans ce document.",
-  ocr_source_missing: "Le fichier à lire n'est plus disponible. Envoyez-le à nouveau.",
-};
 
 /** Étapes du kit (4), dérivées de l'étape réelle de la tâche : jamais du temps écoulé. */
 /** Étapes affichées (V4) : lecture, explications, visuels, vérification et mise en page. */
@@ -108,7 +95,7 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
     );
   }
 
-  const message = `${t.reports.status[job.status] ?? job.status}${job.error_code ? ` : ${ERRORS[job.error_code] ?? "une erreur est survenue."}` : ""}`;
+  const message = `${t.reports.status[job.status] ?? job.status}${job.error_code ? ` : ${t.jobErrors[job.error_code] ?? t.jobErrors.unknown}` : ""}`;
   if (compact) return <p className="notice notice-error" role="alert">{message}</p>;
   return (
     <div className="prep prep-error">

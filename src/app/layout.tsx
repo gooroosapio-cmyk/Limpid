@@ -4,8 +4,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { Pwa } from "@/components/shell/Pwa";
+import { Toaster } from "@/components/shell/Toasts";
 import { currentUser } from "@/lib/auth";
-import { isUrlImportEnabled } from "@/lib/config";
 import { htmlAttributes, readDisplayPrefs } from "@/lib/display/prefs";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLang, getT } from "@/lib/i18n/server";
@@ -51,12 +51,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="app">
           {user && (
             <Suspense>
-              <AppShell email={user.email ?? ""} urlEnabled={isUrlImportEnabled()} />
+              <AppShell email={user.email ?? ""} />
             </Suspense>
           )}
           <main id="contenu" className="app-content">{children}</main>
         </div>
         <Pwa account={user ? offlineKey(user.id) : null} />
+        <Toaster closeLabel={t.reader.close} />
         </I18nProvider>
       </body>
     </html>

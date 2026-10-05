@@ -63,3 +63,7 @@ alter table public.report_quizzes add constraint report_quizzes_questions_check 
 
 -- Offre du compte : décide côté serveur du filigrane des exports.
 alter table public.profiles add column plan text not null default 'free' check (plan in ('free', 'premium'));
+
+-- Bibliothèque : 5 recherches récentes par compte (les plus récentes en premier).
+alter table public.reader_preferences add column recent_searches jsonb not null default '[]'::jsonb
+  check (jsonb_typeof(recent_searches) = 'array' and jsonb_array_length(recent_searches) <= 5);

@@ -255,7 +255,7 @@ export function composeLimpid({
 
   const out: React.ReactNode[] = [];
   out.push(
-    <header key="cover" id="cover" className="piece cover" {...attrs({ breakAfter: true })}>
+    <header key="cover" id="lim_cover" className="piece cover" {...attrs({ breakAfter: true })}>
       <p className="eyebrow cover-eyebrow">
         {isDemo && <span className="badge badge-demo">{t.demo.badge}</span>} {modeLabel ? `${modeLabel} · ` : ""}{t.reader.eyebrow(chapters.length, notions.length)}
       </p>
@@ -315,14 +315,14 @@ export function composeLimpid({
 
   // Annexes : limites, glossaire, sources, conservation.
   out.push(
-    <div key="annex-h" id="annexes" className="piece annex-head" {...attrs({ keep: true, breakBefore: true })}>
+    <div key="annex-h" id="lim_annexes" className="piece annex-head" {...attrs({ keep: true, breakBefore: true })}>
       <h2>{t.lim.annexes}</h2>
     </div>,
   );
   if (explanation.limitations.length) {
     chunks(explanation.limitations, CHUNK).forEach((list, i) =>
       out.push(
-        <div key={`lim-${i}`} className="piece annex" {...attrs({})}>
+        <div key={`lim-${i}`} id={`ann_lim_${i}`} className="piece annex" {...attrs({})}>
           {i === 0 && <h3>{t.lim.limits}</h3>}
           <ul>{list.map((l) => <li key={l}>{l}</li>)}</ul>
         </div>,
@@ -332,7 +332,7 @@ export function composeLimpid({
   if (explanation.glossary.length) {
     chunks(explanation.glossary, CHUNK).forEach((list, i) =>
       out.push(
-        <div key={`glo-${i}`} className="piece annex" {...attrs({})}>
+        <div key={`glo-${i}`} id={`ann_glo_${i}`} className="piece annex" {...attrs({})}>
           {i === 0 && <h3>{t.lim.optGlossary}</h3>}
           <dl className="glossary">
             {list.map((g) => <div key={g.term}><dt>{g.term}</dt><dd>{g.definition}</dd></div>)}
@@ -344,7 +344,7 @@ export function composeLimpid({
   if (entries.length) {
     chunks(entries, SOURCE_CHUNK).forEach((list, i) =>
       out.push(
-        <div key={`src-${i}`} className="piece annex" {...attrs({})}>
+        <div key={`src-${i}`} id={`ann_src_${i}`} className="piece annex" {...attrs({})}>
           {i === 0 && <h3>{t.lim.optSources}</h3>}
           <ol className="sources-list" start={i * SOURCE_CHUNK + 1}>
             {list.map((e) => (
@@ -357,7 +357,7 @@ export function composeLimpid({
   }
   if (expiry) {
     out.push(
-      <p key="expiry" className="piece annex muted small reader-expiry" {...attrs({})}>{expiry}</p>,
+      <p key="expiry" id="ann_expiry" className="piece annex muted small reader-expiry" {...attrs({})}>{expiry}</p>,
     );
   }
 

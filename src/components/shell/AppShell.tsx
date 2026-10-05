@@ -10,7 +10,13 @@ import { useT } from "@/lib/i18n/client";
 interface DrawerReport {
   id: string;
   title: string;
-  state: "ready" | "updating" | "preparing" | "failed";
+  state: "ready" | "updating" | "preparing";
+  unread: boolean;
+  folderId: string | null;
+}
+interface DrawerData {
+  folders: { id: string; name: string }[];
+  reports: DrawerReport[];
 }
 
 function initials(email: string): string {
@@ -30,26 +36,15 @@ function Brand() {
 }
 
 /** Contenu du menu latéral (identique en volet et en barre latérale). */
-function DrawerPanel({
-  email,
-  urlEnabled,
-  reports,
-  onClose,
-}: {
-  email: string;
-  urlEnabled: boolean;
-  reports: DrawerReport[] | null;
-  onClose?: () => void;
-}) {
+function DrawerPanel({ email, data, onClose }: { email: string; data: DrawerData | null; onClose?: () => void }) {
   const t = useT();
   const pathname = usePathname();
   const search = useSearchParams();
-  const mode = pathname === "/ajouter" ? (search.get("mode") ?? "") : null;
+  const atLibrary = pathname === "/" && !search.get("dossier") && !search.get("vue");
   const items: { href: string; label: string; icon: IconName; current: boolean }[] = [
-    { href: "/ajouter", label: t.nav.home, icon: "home", current: mode === "" },
-    { href: "/ajouter?mode=texte", label: t.nav.addText, icon: "list", current: mode === "texte" },
-    { href: "/ajouter?mode=fichier", label: t.nav.addPdf, icon: "file", current: mode === "fichier" },
-    ...(urlEnabled ? [{ href: "/ajouter?mode=lien", label: t.nav.addLink, icon: "link" as IconName, current: mode === "lien" }] : []),
+    { href: "/", label: t.nav.home, icon: "home", current: atLibrary },
+    { href: "/ajouter", label: t.nav.newLimpid, icon: "plus", current: pathname === "/ajouter" },
+    { href: "/?nouveau-dossier=1", label: t.nav.newFolder, icon: "folder-plus", current: false },
     { href: "/parametres", label: t.nav.settings, icon: "settings", current: pathname === "/parametres" },
   ];
   return (
@@ -69,21 +64,38 @@ function DrawerPanel({
           </Link>
         ))}
       </nav>
-      <Link href="/" className="drawer-title" aria-current={pathname === "/" ? "page" : undefined}>
+      {data && data.folders.length > 0 && (
+        <>
+          <p className="drawer-title drawer-label">{t.nav.folders}</p>
+          <ul className="drawer-list drawer-folders" aria-label={t.nav.folders}>
+            {data.folders.map((f) => (
+              <li key={f.id}>
+                <Link href={`/?dossier=${f.id}`} aria-current={search.get("dossier") === f.id ? "page" : undefined}>
+                  <Icon name="folder" size={18} /> <span className="t">{f.name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <Link href="/" className="drawer-title" aria-current={atLibrary ? "page" : undefined}>
         {t.nav.library} <span>{t.nav.seeAll}</span>
       </Link>
       <ul className="drawer-list" aria-label={t.nav.library}>
-        {reports === null ? (
+        {data === null ? (
           <li aria-hidden="true"><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line short" /></li>
-        ) : reports.length === 0 ? (
+        ) : data.reports.length === 0 ? (
           <li className="drawer-empty">{t.nav.libraryEmpty}</li>
         ) : (
-          reports.map((r) => (
+          data.reports.map((r) => (
             <li key={r.id}>
               <Link href={`/rapports/${r.id}`} aria-current={pathname === `/rapports/${r.id}` ? "page" : undefined}>
                 <span className="t">{r.title}</span>
-                {(r.state === "preparing" || r.state === "updating") && <span className="dot" role="img" aria-label={t.nav.preparing} />}
-                {r.state === "failed" && <span className="dot ko" role="img" aria-label={t.nav.failed} />}
+                {r.state !== "ready" ? (
+                  <span className="drawer-state" role="img" aria-label={t.nav.preparing}><Icon name="hourglass" size={16} /></span>
+                ) : (
+                  r.unread && <span className="unread-dot" role="img" aria-label={t.nav.unread} />
+                )}
               </Link>
             </li>
           ))
@@ -104,19 +116,19 @@ function DrawerPanel({
  * menu latéral en volet (< 1200 px) ou en barre fixe (≥ 1200 px). Pas de flèche de retour :
  * le retour est celui du téléphone ou du navigateur.
  */
-export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boolean }) {
+export function AppShell({ email }: { email: string }) {
   const t = useT();
   const pathname = usePathname();
   const search = useSearchParams();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [reports, setReports] = useState<DrawerReport[] | null>(null);
+  const [data, setData] = useState<DrawerData | null>(null);
   const [scrolled, setScrolled] = useState(false);
 
   const load = useCallback(() => {
     fetch("/api/reports", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { reports: [] }))
-      .then((d: { reports: DrawerReport[] }) => setReports(d.reports))
-      .catch(() => setReports((prev) => prev ?? []));
+      .then((r) => (r.ok ? r.json() : { folders: [], reports: [] }))
+      .then((d: DrawerData) => setData(d))
+      .catch(() => setData((prev) => prev ?? { folders: [], reports: [] }));
   }, []);
 
   // La liste suit les créations et suppressions : rechargée à chaque changement d'écran.
@@ -158,7 +170,7 @@ export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boo
         </div>
       </header>
       <aside className="sidebar" aria-label={t.nav.main}>
-        <DrawerPanel email={email} urlEnabled={urlEnabled} reports={reports} />
+        <DrawerPanel email={email} data={data} />
       </aside>
       <dialog
         ref={dialogRef}
@@ -169,7 +181,7 @@ export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boo
           if (e.target === e.currentTarget) dialogRef.current?.close();
         }}
       >
-        <DrawerPanel email={email} urlEnabled={urlEnabled} reports={reports} onClose={() => dialogRef.current?.close()} />
+        <DrawerPanel email={email} data={data} onClose={() => dialogRef.current?.close()} />
       </dialog>
     </>
   );
