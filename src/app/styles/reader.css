@@ -351,3 +351,32 @@ ol.sources-list:not([start]) { list-style: none; padding: 0; }
   .rbar { padding-right: calc(var(--gutter) + 150px); }
   .discuss { bottom: calc(env(safe-area-inset-bottom) + 4px); height: 48px; box-shadow: none; }
 }
+
+/* Dessins pédagogiques (SVG du moteur, sans fond, couleurs du thème) */
+svg.drawing { display: block; width: 100%; height: auto; overflow: visible; }
+.drawing .dr { fill: none; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.drawing .dr-ink { stroke: var(--ink); }
+.drawing .dr-accent { stroke: #c9a800; }
+.drawing .dr-green { stroke: var(--green); }
+.drawing .dr-muted { stroke: var(--muted); }
+.drawing .dr-soft { stroke: var(--line); }
+.drawing .dr-fill.dr-ink { fill: var(--ink); }
+.drawing .dr-fill.dr-accent { fill: var(--yellow); stroke: var(--yellow); }
+.drawing .dr-fill.dr-green { fill: var(--green); }
+.drawing .dr-fill.dr-muted { fill: var(--muted); }
+.drawing .dr-fill.dr-soft { fill: var(--pale); stroke: var(--pale); }
+.drawing .dr-text { font-family: var(--font); font-size: 7px; font-weight: 600; fill: var(--ink); }
+.drawing .dr-t-green { fill: var(--green); }
+.drawing .dr-t-muted { fill: var(--muted); }
+figure.visual-drawing { max-width: 320px; margin-inline: auto; background: transparent; border: 0; padding: 0; }
+
+/* Incrustation : le visuel flotte dans le bloc, le texte l'entoure puis continue sous son pied */
+.wrap-host { display: flow-root; }
+.wrap-fig { margin: 4px 0 8px; width: 38%; max-width: 200px; min-width: 104px; }
+.wrap-fig.wrap-compact { width: 46%; max-width: 280px; }
+.wrap-right { float: right; margin-left: 14px; }
+.wrap-left { float: left; margin-right: 14px; }
+.wrap-fig img { display: block; width: 100%; height: auto; }
+.wrap-fig figcaption { margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--muted); }
+.wrap-fig .credit { font-size: 11px; }
+@media (min-width: 600px) { .wrap-fig { width: 34%; } .wrap-fig.wrap-compact { width: 42%; } }

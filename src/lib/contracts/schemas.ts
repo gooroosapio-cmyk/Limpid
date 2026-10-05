@@ -250,7 +250,7 @@ export type ExplanationObject = z.infer<typeof ExplanationObject>;
 
 /* ---------- ReportBlueprint ---------- */
 
-export const VISUAL_KINDS = ["timeline", "flow", "comparison_table", "bar_chart", "concept_map", "steps", "illustration"] as const;
+export const VISUAL_KINDS = ["timeline", "flow", "comparison_table", "bar_chart", "concept_map", "steps", "illustration", "drawing"] as const;
 
 export const VisualSpec = z.strictObject({
   id,
@@ -265,7 +265,8 @@ export const VisualSpec = z.strictObject({
   illustrative_only: z.boolean(),
   /** Intentions de composition traduites par le moteur en dispositions adaptatives. */
   size: z.enum(["thumb", "compact", "wide"]).optional(),
-  placement: z.enum(["center", "before", "after", "margin"]).optional(),
+  // « wrap » : incrusté dans le texte d'un bloc (le texte l'entoure puis continue dessous).
+  placement: z.enum(["center", "before", "after", "margin", "wrap"]).optional(),
 });
 export type VisualSpec = z.infer<typeof VisualSpec>;
 

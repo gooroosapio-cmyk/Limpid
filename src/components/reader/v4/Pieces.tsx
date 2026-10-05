@@ -12,7 +12,7 @@ import { sourceEntries, type SourceEntry } from "@/lib/render/sources";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { NotionTerm, type Notion } from "../Notions";
 import { SourceRef } from "../Sources";
-import { VisualFigure, type AssetView } from "../Visuals";
+import { VisualFigure, WrapFigure, type AssetView } from "../Visuals";
 import { Checkpoint } from "./Checkpoint";
 import { EndActions } from "./EndActions";
 import { ExampleBlock } from "./ExampleBlock";
@@ -81,17 +81,23 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 /** Une pièce par bloc ; une liste longue est découpée en groupes (numérotation conservée). */
-function blockPieces(b: Block, section: string, ctx: Ctx): React.ReactNode[] {
+/**
+ * `float` : visuel incrusté dans le bloc (le texte l'entoure puis continue sous son pied) ;
+ * le bloc reste alors une seule pièce.
+ */
+function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNode): React.ReactNode[] {
   const { t } = ctx;
   const refs = <Refs ids={b.evidence_ids} ctx={ctx} />;
   const piece = (cls: string, body: React.ReactNode, a: PieceAttrs = {}) => (
-    <div key={b.id} id={b.id} className={`piece ${cls}`} {...attrs({ section, ...a })}>
+    <div key={b.id} id={b.id} className={`piece ${cls}${float ? " wrap-host" : ""}`} {...attrs({ section, ...a })}>
+      {float}
       {body}
     </div>
   );
   switch (b.type) {
     case "fact":
       if (b.emphasis === "key") return [piece("block block-key", <><Label>{t.lim.keyIdea}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
+      if (float) return [piece("block", <p><Rich text={b.text} ctx={ctx} /> {refs}</p>)];
       // Long paragraphe : paragraphes successifs (fins de phrase), références après la dernière.
       return splitParagraph(b.text).map((part, k, all) => (
         <div key={`${b.id}-${k}`} id={k === 0 ? b.id : `${b.id}-${k}`} className="piece block" {...attrs({ section })}>
@@ -153,9 +159,10 @@ function blockPieces(b: Block, section: string, ctx: Ctx): React.ReactNode[] {
           <div
             key={`${b.id}-${g}`}
             id={g === 0 ? b.id : `${b.id}-${g}`}
-            className={`piece block block-list list-${b.style}`}
+            className={`piece block block-list list-${b.style}${g === 0 && float ? " wrap-host" : ""}`}
             {...attrs({ section })}
           >
+            {g === 0 && float}
             {g === 0 && intro}
             <Tag {...(ordered ? { start } : {})}>
               {items.map((it, k) => (
@@ -269,19 +276,36 @@ export function composeLimpid({
     </header>,
   );
 
+  let wrapCount = 0;
   ordered.forEach(({ s, bs }, si) => {
     const placed = bs.visual_ids.flatMap((id) => (visuals.get(id) ? [visuals.get(id)!] : []));
     const where = (v: VisualSpec) => v.placement ?? (v.kind === "illustration" ? "before" : "after");
     out.push(
-      <div key={`h-${s.id}`} id={s.id} className="piece section-head" {...attrs({ keep: true, section: s.id, breakBefore: si > 0 })}>
+      <div key={`h-${s.id}`} id={s.id} className="piece section-head" {...attrs({ keep: true, section: s.id })}>
         <p className="eyebrow section-n">{si + 1} / {ordered.length}</p>
         <h2>{s.question}</h2>
       </div>,
     );
     for (const v of placed.filter((v) => where(v) === "before")) out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
     const margins = placed.filter((v) => where(v) === "margin");
+    // Incrustations : chaque visuel « wrap » rejoint un bloc de texte de la partie (celui que
+    // vise le dessin, sinon le plus long), côtés alternés ; sans bloc adapté, il suit la partie.
+    const floats = new Map<string, React.ReactNode>();
+    const unplaced: VisualSpec[] = [];
+    for (const v of placed.filter((x) => where(x) === "wrap")) {
+      const asset = v.kind === "illustration" ? assets[String((v.data as { asset_id?: unknown }).asset_id ?? "")] : undefined;
+      if (v.kind === "illustration" && !asset) continue;
+      const wanted = String((v.data as { block_id?: unknown }).block_id ?? "");
+      const textual = s.blocks.filter((b) => !floats.has(b.id) && ["fact", "definition", "inference", "caution", "list", "complement"].includes(b.type));
+      const anchor = textual.find((b) => b.id === wanted) ?? [...textual].sort((a, c) => c.text.length - a.text.length).find((b) => b.text.length >= 140);
+      if (!anchor) {
+        unplaced.push(v);
+        continue;
+      }
+      floats.set(anchor.id, <WrapFigure key={v.id} visual={v} asset={asset} side={wrapCount++ % 2 === 0 ? "right" : "left"} />);
+    }
     s.blocks.forEach((b, bi) => {
-      const pieces = blockPieces(b, s.id, ctx);
+      const pieces = blockPieces(b, s.id, ctx, floats.get(b.id));
       const margin = bi === 0 ? margins.shift() : undefined;
       // Visuel « en marge » : associé au premier bloc (côte à côte sur grand écran, empilé sur mobile).
       if (margin && pieces.length === 1) {
@@ -292,7 +316,7 @@ export function composeLimpid({
         out.push(...pieces);
       }
     });
-    for (const v of [...placed.filter((v) => where(v) === "after" || where(v) === "center"), ...margins]) {
+    for (const v of [...placed.filter((v) => where(v) === "after" || where(v) === "center"), ...margins, ...unplaced]) {
       out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
     }
     const ckp = checkpoints.get(s.id);

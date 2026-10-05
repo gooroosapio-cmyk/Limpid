@@ -53,6 +53,8 @@ export const IllustrationData = z.strictObject({
   query: z.string().trim().min(2).max(60),
   subject: z.string().trim().min(1).max(120),
   asset_id: z.string().uuid().nullable(),
+  /** Bloc dans lequel l'image est incrustée (facultatif : sinon un bloc de la partie). */
+  block_id: z.string().max(80).nullable().optional(),
 });
 export type IllustrationData = z.infer<typeof IllustrationData>;
 
@@ -99,4 +101,49 @@ export function safeHref(url: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/* ---------- Dessins vectoriels (planche générée en une fois) ---------- */
+
+/**
+ * Petit dessin pédagogique décrit par des formes simples, sans fond. Le modèle ne fournit
+ * jamais de SVG : le moteur dessine lui-même ces formes (aucun script, aucun lien, aucun
+ * style injecté), avec les couleurs du thème.
+ */
+export const DRAW_TONES = ["ink", "accent", "green", "muted", "soft"] as const;
+export const DRAW_RATIOS = { "1:1": [100, 100], "4:3": [100, 75], "3:4": [75, 100] } as const;
+/** Chemin restreint : commandes M, L, H, V, Q, C, S, T, A, Z et nombres uniquement. */
+export const PATH_RE = /^(?:[MLHVQCSTAZmlhvqcstaz]|[\s,]|-?\d{1,3}(?:\.\d{1,2})?)+$/;
+const coord = z.number().finite().min(-5).max(105);
+const size = z.number().finite().min(0).max(105);
+
+export const DrawShape = z.strictObject({
+  t: z.enum(["circle", "ellipse", "rect", "line", "arrow", "path", "text"]),
+  /** Centre (cercle, ellipse, texte), coin haut gauche (rectangle), départ (trait, flèche). */
+  x: coord,
+  y: coord,
+  w: size.nullable(),
+  h: size.nullable(),
+  r: z.number().finite().min(0).max(60).nullable(),
+  x2: coord.nullable(),
+  y2: coord.nullable(),
+  d: z.string().max(400).regex(PATH_RE).nullable(),
+  text: z.string().trim().max(24).nullable(),
+  tone: z.enum(DRAW_TONES),
+  fill: z.boolean(),
+});
+export type DrawShape = z.infer<typeof DrawShape>;
+
+export const DrawingData = z.strictObject({
+  block_id: z.string().max(80),
+  ratio: z.enum(["1:1", "4:3", "3:4"]),
+  shapes: z.array(DrawShape).min(2).max(30),
+});
+export type DrawingData = z.infer<typeof DrawingData>;
+
+/** Pointe de flèche (triangle) au bout d'un trait, en coordonnées du dessin. */
+export function arrowHead(x1: number, y1: number, x2: number, y2: number, len = 5): string {
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  const p = (ang: number) => `${(x2 - len * Math.cos(ang)).toFixed(1)},${(y2 - len * Math.sin(ang)).toFixed(1)}`;
+  return `${x2.toFixed(1)},${y2.toFixed(1)} ${p(a - 0.45)} ${p(a + 0.45)}`;
 }

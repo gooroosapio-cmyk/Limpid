@@ -2,7 +2,8 @@
 
 import type { VisualSpec } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
-import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
+import { barRatios, ChartData, ComparisonData, DrawingData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
+import { DrawingSvg } from "./Drawing";
 
 export type { AssetView };
 import { FlowDiagram } from "./FlowDiagram";
@@ -154,7 +155,47 @@ export function VisualFigure({
         </figure>
       );
     }
+    case "drawing": {
+      const d = DrawingData.safeParse(v.data);
+      if (!d.success) return null;
+      return (
+        <figure className="visual visual-drawing">
+          <DrawingSvg data={d.data} label={v.alt_text} />
+          <figcaption><span className="eyebrow">{t.visuals.illustration}</span> {v.caption}</figcaption>
+        </figure>
+      );
+    }
     default:
       return null;
   }
+}
+
+/** Visuel incrusté dans un bloc : le texte l'entoure puis continue sous son pied. */
+export function WrapFigure({ visual: v, asset, side }: { visual: VisualSpec; asset?: AssetView; side: "left" | "right" }) {
+  const t = useT();
+  const cls = `wrap-fig wrap-${side} wrap-${v.size ?? "thumb"}`;
+  if (v.kind === "drawing") {
+    const d = DrawingData.safeParse(v.data);
+    if (!d.success) return null;
+    return (
+      <figure className={`${cls} wrap-ratio-${d.data.ratio.replace(":", "-")}`}>
+        <DrawingSvg data={d.data} label={v.alt_text} />
+        <figcaption>{v.caption}</figcaption>
+      </figure>
+    );
+  }
+  if (v.kind === "illustration" && asset) {
+    return (
+      <figure className={cls}>
+        {/* Actif vérifié (type, taille, dimensions) et servi par Limpid ou l'hébergeur autorisé. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={asset.src} alt={v.alt_text} width={asset.width} height={asset.height} loading="lazy" decoding="async" />
+        <figcaption>
+          {v.caption}
+          <span className="credit"> · <Credit asset={asset} /></span>
+        </figcaption>
+      </figure>
+    );
+  }
+  return null;
 }

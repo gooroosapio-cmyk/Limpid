@@ -123,7 +123,7 @@ export const ExplanationDraft = z.preprocess(repairDraftBlocks, z.strictObject({
         alt_text: z.string().trim().min(1).max(300),
       }),
     )
-    .max(2)
+    .max(4)
     .optional(),
 }));
 export type ExplanationDraft = z.infer<typeof ExplanationDraft>;
@@ -194,6 +194,7 @@ Approche : ${MODE_GUIDE[mode]}
 Principe : autant de mots que nécessaire pour comprendre, aucun mot uniquement pour remplir.
 Profil : niveau « ${level} » (${LEVEL_GUIDE[level]}) ; objectif « ${goal} » ; aides préférées : ${aids} ; domaine d'exemples : ${prefs.example_domain ?? "neutre"} ; densité : ${prefs.density ?? "équilibrée"}.
 Longueur : environ ${targetPages} pages pédagogiques de contenu, soit environ ${targetPages} sections (une section ≈ une page ≈ une idée développée : 120 à 220 mots, ou un visuel avec un texte court). Développe chaque notion importante de la source dans sa propre section plutôt que de tout regrouper. Chaque section compte 2 à 5 blocs et environ 100 à 220 mots : l'idée expliquée simplement (quoi, pourquoi, comment)${mode === "resume" ? ", ses éléments clés" : ", un exemple concret ou une analogie quand cela aide"}, puis sa conséquence ou sa limite.${mode === "tres_simple" ? " En mode très simple, la plupart des sections ont une analogie ou un exemple du quotidien (avec ses variants)." : ""} Les quiz, annexes et sources ne comptent pas. Seulement si la source est vraiment trop pauvre, fais moins de sections plutôt que de remplir ou d'inventer.
+Densité (pages mises en forme sur téléphone) : ni grands vides ni surcharge. Paragraphes de 2 à 4 phrases ; pas de mur de texte. Une notion trop mince pour remplir une page (moins de 60 mots) est regroupée avec une notion voisine dans la même section ; une notion très riche est découpée en blocs courts (liste, étapes, idée clé) plutôt qu'en un long paragraphe.
 Règles :
 - title : informatif et court (pas de slogan). key_points : 3 à 5 points clés réellement utiles, une phrase chacun, sans répéter le titre.
 - Le niveau change l'effort d'explication, jamais le sens : garde toutes les réserves, conditions, exceptions, unités et nombres qui changent la conclusion.
@@ -216,7 +217,7 @@ ${templates}
 - flow : si la source décrit un processus en étapes, 2 à 8 étapes (label ≤ 40 caractères, claim_id existant) ; sinon null.
 - chart : seulement si au moins 2 valeurs comparables de même unité figurent dans des affirmations "supported" : une barre par valeur (label court, claim_id, source_form = l'écriture exacte du nombre dans l'affirmation) ; sinon null.
 - comparison : seulement si la source compare des options : critères identiques pour chaque option, une cellule par critère (texte ≤ 80 caractères et claim_id "supported", ou text et claim_id null si la source ne dit rien) ; sinon null.
-- illustrations : ${noExamples ? "[] (aucune)" : "0 à 2 idées d'illustration générique utiles à la compréhension (section_id, query = 2 à 5 mots-clés EN ANGLAIS décrivant une scène ou un objet courant, sans nom propre, sans chiffre, sans donnée du document ; subject = sujet ; alt_text). Aucune illustration ne porte un fait."}
+- illustrations : ${noExamples ? "[] (aucune)" : "0 à 4 idées d'illustration générique qui simplifient une notion complexe (section_id, query = 2 à 5 mots-clés EN ANGLAIS décrivant une scène ou un objet courant, sans nom propre, sans chiffre, sans donnée du document ; subject = sujet ; alt_text). Aucune illustration ne porte un fait."}
 - Langue : ${language === "en" ? "anglais (English), quelle que soit la langue de la source" : language === "fr" ? "français, quelle que soit la langue de la source" : "celle des affirmations"}.`;
 }
 
@@ -541,7 +542,9 @@ const VISUAL_LAYOUT: Record<VisualSpec["kind"], Pick<VisualSpec, "size" | "place
   concept_map: { size: "wide", placement: "center" },
   comparison_table: { size: "wide", placement: "after" },
   bar_chart: { size: "compact", placement: "after" },
-  illustration: { size: "compact", placement: "margin" },
+  // Images et dessins incrustés dans le texte : il les entoure puis continue sous leur pied.
+  illustration: { size: "compact", placement: "wrap" },
+  drawing: { size: "thumb", placement: "wrap" },
 };
 
 /** Mise en page déterministe : ordre des sections, schémas validés, illustrations, index des sources. */
@@ -659,7 +662,7 @@ export function buildBlueprint(
       const sec = ex.sections.find((x) => x.id === idea.section_id);
       const query = safeImageQuery(idea.query);
       const claimIds = sec ? [...new Set(sec.blocks.flatMap(blockClaimIds))].filter(supported).slice(0, 5) : [];
-      if (!sec || !query || claimIds.length === 0 || n >= 2) continue;
+      if (!sec || !query || claimIds.length === 0 || n >= 4) continue;
       const id = `vis_ill_${++n}`;
       visuals.push({
         id,

@@ -7,14 +7,14 @@
  */
 import "server-only";
 import path from "node:path";
-import { Document, Font, Image, Link, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Circle, Document, Ellipse, Font, Image, Line, Link, Page, Path, Polygon, Rect, renderToBuffer, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { Evidence, Exercise, ExerciseSet, ExplanationObject, ReportBlueprint, SourceSegment, VisualSpec } from "@/lib/contracts/schemas";
 import { shuffled } from "@/lib/exercises/grade";
 import { dictFor, type Dict, type Lang } from "@/lib/i18n";
 import { stripRich } from "@/lib/reader/rich";
 import { sourceEntries } from "./sources";
-import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, safeHref } from "./visuals";
+import { arrowHead, barRatios, ChartData, ComparisonData, DRAW_RATIOS, DrawingData, FlowData, IllustrationData, safeHref } from "./visuals";
 
 const FONT_DIR = path.join(process.cwd(), "src/assets/fonts");
 let fontsReady = false;
@@ -268,11 +268,53 @@ function VisualPdf({ v, numbers, d, images }: { v: VisualSpec; numbers: Map<stri
     const td = ComparisonData.safeParse(v.data);
     return td.success ? <View><ComparisonPdf data={td.data} notStated={d.visuals.notStated} />{caption}</View> : null;
   }
+  if (v.kind === "drawing") {
+    const dd = DrawingData.safeParse(v.data);
+    if (!dd.success) return null;
+    const [W, H] = DRAW_RATIOS[dd.data.ratio];
+    const width = 150;
+    const col = { ink: C.encre, accent: C.jaune, green: C.vert, muted: C.gris, soft: C.jauneDoux } as const;
+    return (
+      <View wrap={false} style={{ alignItems: "center", marginVertical: 8 }}>
+        <Svg viewBox={`0 0 ${W} ${H}`} style={{ width, height: (width * H) / W }}>
+          {dd.data.shapes.map((sh, i) => {
+            const stroke = col[sh.tone];
+            const fill = sh.fill ? stroke : "none";
+            const sw = 1.4;
+            switch (sh.t) {
+              case "circle":
+                return <Circle key={i} cx={sh.x} cy={sh.y} r={sh.r ?? 0} stroke={stroke} strokeWidth={sw} fill={fill} />;
+              case "ellipse":
+                return <Ellipse key={i} cx={sh.x} cy={sh.y} rx={(sh.w ?? 0) / 2} ry={(sh.h ?? 0) / 2} stroke={stroke} strokeWidth={sw} fill={fill} />;
+              case "rect":
+                return <Rect key={i} x={sh.x} y={sh.y} width={sh.w ?? 0} height={sh.h ?? 0} rx={sh.r ?? 0} stroke={stroke} strokeWidth={sw} fill={fill} />;
+              case "line":
+                return <Line key={i} x1={sh.x} y1={sh.y} x2={sh.x2 ?? sh.x} y2={sh.y2 ?? sh.y} stroke={stroke} strokeWidth={sw} />;
+              case "arrow":
+                return [
+                  <Line key={`${i}l`} x1={sh.x} y1={sh.y} x2={sh.x2 ?? sh.x} y2={sh.y2 ?? sh.y} stroke={stroke} strokeWidth={sw} />,
+                  <Polygon key={`${i}h`} points={arrowHead(sh.x, sh.y, sh.x2 ?? sh.x, sh.y2 ?? sh.y)} fill={stroke} />,
+                ];
+              case "path":
+                return <Path key={i} d={sh.d ?? ""} stroke={stroke} strokeWidth={sw} fill={fill} />;
+              default:
+                return null;
+            }
+          })}
+        </Svg>
+        {/* Étiquettes reprises sous le dessin (le texte SVG n'est pas sélectionnable dans un PDF). */}
+        {dd.data.shapes.some((sh) => sh.t === "text") && (
+          <Text style={[s.caption, { fontSize: 8 }]}>{dd.data.shapes.flatMap((sh) => (sh.t === "text" && sh.text ? [sh.text] : [])).join(" · ")}</Text>
+        )}
+        <Text style={s.caption}>{d.visuals.illustration} : {v.caption}</Text>
+      </View>
+    );
+  }
   if (v.kind === "illustration") {
     const id = IllustrationData.safeParse(v.data);
     const img = id.success && id.data.asset_id ? images[id.data.asset_id] : undefined;
     if (!img) return null;
-    const width = 300;
+    const width = 200;
     return (
       <View wrap={false} style={{ alignItems: "center", marginVertical: 8 }}>
         <Image src={{ data: img.data, format: img.format }} style={{ width, height: Math.round((width * img.height) / img.width) }} />

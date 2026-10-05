@@ -182,12 +182,32 @@ describe("orchestration des illustrations", () => {
       calls++;
       return { bytes: png(1024, 768), mime: "image/png", usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null } };
     };
-    const ok = await illustrate(blueprint(), "gemini", config, deps({ generateImage: gen, generatedThisMonth: async () => 19 }));
+    const cutPlate = async (_b: Buffer, n: number) => Array.from({ length: n }, () => checkImage(png(400, 300)));
+    const ok = await illustrate(blueprint(), "gemini", config, deps({ generateImage: gen, cutPlate, generatedThisMonth: async () => 19 }));
     expect(calls).toBe(1);
     expect(ok.added).toBe(1);
-    const full = await illustrate(blueprint(), "gemini", config, deps({ generateImage: gen, generatedThisMonth: async () => 20 }));
+    const full = await illustrate(blueprint(), "gemini", config, deps({ generateImage: gen, cutPlate, generatedThisMonth: async () => 20 }));
     expect(calls).toBe(1);
     expect(full.added).toBe(0);
+  });
+
+  it("génère toutes les illustrations en une seule planche, découpée sans fond", async () => {
+    const config = { ...configOff, commons: false, geminiImage: true, imageModel: "img", monthlyGenerated: 20 };
+    const prompts: string[] = [];
+    const ratios: string[] = [];
+    const gen = async (prompt: string, ratio: string) => {
+      prompts.push(prompt);
+      ratios.push(ratio);
+      return { bytes: png(1600, 900), mime: "image/png", usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null } };
+    };
+    const d = deps({ generateImage: gen, cutPlate: async (_b, n) => Array.from({ length: n }, () => checkImage(png(400, 300))) });
+    const out = await illustrate(blueprint(), "auto", config, d);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("2 illustrations distinctes");
+    expect(prompts[0]).toContain("Fond blanc pur");
+    expect(ratios).toEqual(["16:9"]);
+    expect(out.added).toBe(2);
+    expect(d.rows.map((r) => r.modifications)).toEqual(["Découpée d'une planche, fond rendu transparent", "Découpée d'une planche, fond rendu transparent"]);
   });
 
   it("ne cherche rien en mode schémas ou aucun", async () => {
@@ -210,8 +230,9 @@ describe("panne de la génération d'image", () => {
     const config = { ...configOff, geminiImage: true, imageModel: "img" };
     const usages: number[] = [];
     const err = Object.assign(new Error("HTTP 500"), { usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 0, durationMs: 5, requestId: null } });
-    const out = await illustrate(blueprint(), "gemini", config, deps({ generateImage: async () => { throw err; }, onImageUsage: (a) => void usages.push(a) }));
+    const out = await illustrate(blueprint(), "gemini", config, deps({ generateImage: async () => { throw err; }, cutPlate: async () => [], onImageUsage: (a) => void usages.push(a) }));
     expect(out.blueprint.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1"]);
-    expect(usages).toEqual([1, 2]);
+    // Une seule génération (la planche), journalisée même en échec.
+    expect(usages).toEqual([1]);
   });
 });

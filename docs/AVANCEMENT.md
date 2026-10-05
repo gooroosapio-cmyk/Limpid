@@ -1,5 +1,16 @@
 # Avancement
 
+## Phase 12.1 — Illustrations incrustées et pages plus denses (5 octobre 2026)
+
+### FAIT
+- **Planche de dessins vectoriels** : en **une seule génération**, le modèle propose de petits dessins simples (environ un pour deux parties, 6 au plus, 2 en résumé fidèle), chacun ancré sur le bloc dont il rend visible une notion complexe ou une observation. Le moteur valide chaque forme (repère borné, chemins restreints, **aucun fond**, étiquettes courtes sans chiffre inventé) et dessine lui-même le SVG aux couleurs du thème (clair et sombre). Jamais une preuve : légendé « Illustration ». Désactivable (`LIMPID_DRAWINGS=off`) et coupé en « texte seul ».
+- **Planche d'images** (quand la génération d'images est activée) : toutes les illustrations du rapport en **une seule image**, en grille sur fond blanc ; le serveur découpe chaque case, **rend le fond transparent**, recadre et stocke des PNG prêts à incruster, sans chevauchement (`sharp`, dépendance explicite).
+- **Incrustation** : dessins et images flottent dans un bloc de texte (côtés alternés), le texte les longe à hauteur du visuel (ratio respecté) puis **continue sous leur pied** ; légende sous le visuel. PDF : dessin vectoriel centré avec sa légende.
+- **Pages plus denses** : deux notions peuvent partager une vue (plus de saut de vue imposé à chaque partie ; un titre reste toujours avec son premier bloc) ; consignes de rédaction contre les vides et les murs de texte (paragraphes de 2 à 4 phrases, notions minces regroupées).
+
+### EN TEST
+- 207 tests (validation des formes, ancrage, rendu SVG sans script, export PDF, planche découpée sur une vraie image avec fond transparent et recadrage, une seule génération pour toute la planche).
+
 ## Phase 12 — Refonte V4 « LIMPID » et interface en anglais (5 octobre 2026)
 
 ### FAIT

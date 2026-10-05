@@ -8,10 +8,11 @@ import type { ReportBlueprint, VisualMode } from "@/lib/contracts/schemas";
 import type { UsageReport } from "@/lib/engine/provider";
 import { IllustrationData } from "@/lib/render/visuals";
 import type { VisualConfig } from "./config";
-import { checkImage, rankCandidates, type Candidate, type StoredImage } from "./sources";
+import { plateGrid, platePrompt, PLATE_MAX } from "./plate-prompt";
+import { rankCandidates, type Candidate, type StoredImage } from "./sources";
 
-/** Illustrations par rapport (cahier : 2 au plus). */
-export const MAX_ILLUSTRATIONS = 2;
+/** Illustrations par rapport (V4.1 : jusqu'à 4, générées si besoin en une seule planche). */
+export const MAX_ILLUSTRATIONS = 4;
 /** Temps total accordé à la recherche d'images (cahier : 8 s). */
 export const SEARCH_BUDGET_MS = 8_000;
 
@@ -39,7 +40,9 @@ export interface IllustrateDeps {
   downloadCommons(c: Candidate, timeoutMs: number): Promise<StoredImage | null>;
   searchUnsplash?(query: string, timeoutMs: number): Promise<Candidate[]>;
   trackUnsplash?(location: string): Promise<void>;
-  generateImage?(prompt: string): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }>;
+  generateImage?(prompt: string, aspectRatio: "1:1" | "16:9" | "3:2" | "4:3"): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }>;
+  /** Découpe une planche en images à fond transparent (une par case). */
+  cutPlate?(bytes: Buffer, n: number): Promise<(StoredImage | null)[]>;
   onImageUsage?(attempt: number, usage: UsageReport): Promise<void> | void;
   /** Images générées ce mois-ci par le compte. */
   generatedThisMonth(): Promise<number>;
@@ -98,84 +101,24 @@ export async function illustrate(
   let generated = useGemini ? await deps.generatedThisMonth() : 0;
   let imageAttempt = 0;
 
-  for (const { spec, data } of pending.slice(0, MAX_ILLUSTRATIONS)) {
-    let assetId: string | null = null;
+  const items = pending.slice(0, MAX_ILLUSTRATIONS);
+  const found = new Map<string, string>();
 
-    // En mode « gemini », la banque reste le repli ; en mode auto, elle passe d'abord.
-    const tryWeb = async () => {
-      // Banque autorisée : Commons d'abord (stocké, PDF possible), Unsplash ensuite (web seulement).
-      if (config.commons && now() < deadline) {
-        const found = await deps.searchCommons(data.query, Math.max(500, deadline - now())).catch(() => []);
-        for (const c of rankCandidates(data.query, found).slice(0, 2)) {
-          if (now() >= deadline) break;
-          const img = await deps.downloadCommons(c, Math.max(500, deadline - now())).catch(() => null);
-          if (!img) continue;
-          const path = await deps.store(img, img.mime === "image/png" ? "png" : "jpg");
-          if (!path) continue;
-          return deps.insertAsset({
-            provider: "commons",
-            kind: c.kind,
-            query: data.query,
-            source_url: c.sourceUrl,
-            remote_url: null,
-            storage_path: path,
-            mime: img.mime,
-            width: img.width,
-            height: img.height,
-            byte_size: img.bytes.length,
-            sha256: img.sha256,
-            author: c.author,
-            license: c.license,
-            license_url: c.licenseUrl,
-            modifications: c.modifications,
-            model: null,
-          });
-        }
-      }
-      if (config.unsplash && deps.searchUnsplash && now() < deadline) {
-        const found = await deps.searchUnsplash(data.query, Math.max(500, deadline - now())).catch(() => []);
-        const c = rankCandidates(data.query, found)[0];
-        if (c) {
-          if (c.downloadLocation) await deps.trackUnsplash?.(c.downloadLocation);
-          return deps.insertAsset({
-            provider: "unsplash",
-            kind: c.kind,
-            query: data.query,
-            source_url: c.sourceUrl,
-            remote_url: c.imageUrl,
-            storage_path: null,
-            mime: null,
-            width: c.width,
-            height: c.height,
-            byte_size: null,
-            sha256: null,
-            author: c.author,
-            license: c.license,
-            license_url: c.licenseUrl,
-            modifications: null,
-            model: null,
-          });
-        }
-      }
-      return null;
-    };
-
-    const tryGemini = async () => {
-      if (!useGemini || generated >= config.monthlyGenerated || imageAttempt >= MAX_ILLUSTRATIONS) return null;
-      imageAttempt++;
-      try {
-        const out = await deps.generateImage!(imagePrompt(data.subject, spec.purpose, spec.alt_text));
-        await deps.onImageUsage?.(imageAttempt, out.usage);
-        generated++;
-        const img = checkImage(out.bytes);
-        if (!img) return null;
+  // Banque autorisée : Commons d'abord (stocké, PDF possible), Unsplash ensuite (web seulement).
+  const tryWeb = async ({ data }: (typeof items)[number]): Promise<string | null> => {
+    if (config.commons && now() < deadline) {
+      const candidates = await deps.searchCommons(data.query, Math.max(500, deadline - now())).catch(() => []);
+      for (const c of rankCandidates(data.query, candidates).slice(0, 2)) {
+        if (now() >= deadline) break;
+        const img = await deps.downloadCommons(c, Math.max(500, deadline - now())).catch(() => null);
+        if (!img) continue;
         const path = await deps.store(img, img.mime === "image/png" ? "png" : "jpg");
-        if (!path) return null;
+        if (!path) continue;
         return deps.insertAsset({
-          provider: "gemini",
-          kind: "generated",
+          provider: "commons",
+          kind: c.kind,
           query: data.query,
-          source_url: null,
+          source_url: c.sourceUrl,
           remote_url: null,
           storage_path: path,
           mime: img.mime,
@@ -183,21 +126,97 @@ export async function illustrate(
           height: img.height,
           byte_size: img.bytes.length,
           sha256: img.sha256,
+          author: c.author,
+          license: c.license,
+          license_url: c.licenseUrl,
+          modifications: c.modifications,
+          model: null,
+        });
+      }
+    }
+    if (config.unsplash && deps.searchUnsplash && now() < deadline) {
+      const candidates = await deps.searchUnsplash(data.query, Math.max(500, deadline - now())).catch(() => []);
+      const c = rankCandidates(data.query, candidates)[0];
+      if (c) {
+        if (c.downloadLocation) await deps.trackUnsplash?.(c.downloadLocation);
+        return deps.insertAsset({
+          provider: "unsplash",
+          kind: c.kind,
+          query: data.query,
+          source_url: c.sourceUrl,
+          remote_url: c.imageUrl,
+          storage_path: null,
+          mime: null,
+          width: c.width,
+          height: c.height,
+          byte_size: null,
+          sha256: null,
+          author: c.author,
+          license: c.license,
+          license_url: c.licenseUrl,
+          modifications: null,
+          model: null,
+        });
+      }
+    }
+    return null;
+  };
+
+  // Planche : toutes les illustrations restantes en UNE génération, découpées sans fond.
+  const tryPlate = async (todo: typeof items) => {
+    if (!useGemini || !deps.cutPlate || todo.length === 0 || generated >= config.monthlyGenerated) return;
+    const batch = todo.slice(0, Math.min(PLATE_MAX, config.monthlyGenerated - generated));
+    imageAttempt++;
+    try {
+      const prompt = platePrompt(batch.map(({ spec, data }) => ({ subject: data.subject, purpose: spec.purpose, altText: spec.alt_text })));
+      const out = await deps.generateImage!(prompt, plateGrid(batch.length).aspectRatio);
+      await deps.onImageUsage?.(imageAttempt, out.usage);
+      const cells = await deps.cutPlate(out.bytes, batch.length);
+      for (const [k, cell] of cells.entries()) {
+        const item = batch[k];
+        if (!cell || !item) continue;
+        const path = await deps.store(cell, "png");
+        if (!path) continue;
+        const id = await deps.insertAsset({
+          provider: "gemini",
+          kind: "generated",
+          query: item.data.query,
+          source_url: null,
+          remote_url: null,
+          storage_path: path,
+          mime: cell.mime,
+          width: cell.width,
+          height: cell.height,
+          byte_size: cell.bytes.length,
+          sha256: cell.sha256,
           author: null,
           license: null,
           license_url: null,
-          modifications: null,
+          modifications: "Découpée d'une planche, fond rendu transparent",
           model: out.usage.model,
         });
-      } catch (e) {
-        // Un appel image échoué peut quand même être facturé : il est journalisé.
-        const usage = (e as { usage?: UsageReport }).usage;
-        if (usage) await deps.onImageUsage?.(imageAttempt, usage);
-        return null;
+        if (id) {
+          found.set(item.spec.id, id);
+          generated++;
+        }
       }
-    };
+    } catch (e) {
+      // Un appel image échoué peut quand même être facturé : il est journalisé.
+      const usage = (e as { usage?: UsageReport }).usage;
+      if (usage) await deps.onImageUsage?.(imageAttempt, usage);
+    }
+  };
 
-    assetId = mode === "gemini" ? ((await tryGemini()) ?? (await tryWeb())) : ((await tryWeb()) ?? (await tryGemini()));
+  if (mode === "gemini") {
+    await tryPlate(items);
+    for (const it of items) if (!found.has(it.spec.id)) { const id = await tryWeb(it); if (id) found.set(it.spec.id, id); }
+  } else {
+    for (const it of items) { const id = await tryWeb(it); if (id) found.set(it.spec.id, id); }
+    await tryPlate(items.filter((it) => !found.has(it.spec.id)));
+  }
+
+  for (const { spec, data } of items) {
+    const assetId = found.get(spec.id);
     if (assetId) {
       bp = withAsset(bp, spec.id, assetId);
       added++;
