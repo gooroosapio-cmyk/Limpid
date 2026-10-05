@@ -12,6 +12,12 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
+  // Refus renvoyé par le fournisseur ou par Supabase (ex. inscription fermée pour cette adresse).
+  const providerError = url.searchParams.get("error");
+  if (providerError && !code) {
+    const closed = /autoris|database error saving new user/i.test(url.searchParams.get("error_description") ?? "");
+    return NextResponse.redirect(new URL(`/connexion?erreur=${closed ? "oauth_ferme" : "oauth"}`, url.origin));
+  }
   const supabase = await createUserClient();
 
   let token: string | undefined;

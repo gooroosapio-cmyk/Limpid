@@ -5,6 +5,7 @@ import { Screen } from "@/components/shell/Screen";
 import { currentUser } from "@/lib/auth";
 import { signupOpen } from "@/lib/auth/password";
 import { getT } from "@/lib/i18n/server";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { SignupForm } from "./SignupForm";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,7 +23,10 @@ export default async function SignupPage() {
       <h1>{t.signup.title}</h1>
       <p className="lede">{t.signup.lede}</p>
       {open ? (
-        <SignupForm />
+        <>
+          <OAuthButtons t={t} />
+          <SignupForm />
+        </>
       ) : (
         <>
           <p className="notice">{t.signup.closed}</p>
