@@ -9,20 +9,6 @@ import { useReader } from "./context";
 export function EndActions({ canReformulate }: { canReformulate: boolean }) {
   const t = useT();
   const reader = useReader();
-  const annex = useAnnex();
-  const link = (hash: string, label: string) =>
-    annex && (
-      <a
-        href={annex.href(hash, "end_bilan")}
-        onClick={(e) => {
-          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-          e.preventDefault();
-          annex.open(hash, "end_bilan");
-        }}
-      >
-        {label}
-      </a>
-    );
   return (
     <div className="end-actions">
       <button type="button" className="end-cta" aria-haspopup="dialog" onClick={reader.openBilan}>
@@ -37,11 +23,31 @@ export function EndActions({ canReformulate }: { canReformulate: boolean }) {
           <Icon name="chevron" className="row-chevron" />
         </button>
       )}
-      {annex && (
-        <nav className="end-annexes" aria-label={t.lim.annexLinks}>
-          {link("annexes", t.lim.optAnnexes)} · {link("sources", t.lim.optSources)} · {link("glossaire", t.lim.optGlossary)}
-        </nav>
-      )}
     </div>
+  );
+}
+
+/** Liens de fin vers la page Annexes (hors du carrousel). */
+export function AnnexLinks() {
+  const t = useT();
+  const annex = useAnnex();
+  const link = (hash: string, label: string) =>
+    annex && (
+      <a
+        href={annex.href(hash, "end_more")}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+          e.preventDefault();
+          annex.open(hash, "end_more");
+        }}
+      >
+        {label}
+      </a>
+    );
+  if (!annex) return null;
+  return (
+    <nav className="end-annexes" aria-label={t.lim.annexLinks}>
+      {link("annexes", t.lim.optAnnexes)} · {link("sources", t.lim.optSources)} · {link("glossaire", t.lim.optGlossary)}
+    </nav>
   );
 }

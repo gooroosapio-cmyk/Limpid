@@ -14,7 +14,7 @@ import { NotionTerm, type Notion } from "../Notions";
 import { SourceRef } from "../Sources";
 import { VisualFigure, WrapFigure, type AssetView } from "../Visuals";
 import { Checkpoint } from "./Checkpoint";
-import { EndActions } from "./EndActions";
+import { AnnexLinks, EndActions } from "./EndActions";
 import { ExampleBlock } from "./ExampleBlock";
 
 /** Taille des groupes des longues listes (une pièce = un groupe insécable). */
@@ -261,19 +261,34 @@ export function composeLimpid({
 
   const out: React.ReactNode[] = [];
   out.push(
-    <header key="cover" id="lim_cover" className="piece cover" {...attrs({ breakAfter: true })}>
+    // Couverture puis points clés, en pièces distinctes : ce qui ne tient pas dans l'écran
+    // passe à la vue suivante au lieu d'être coupé.
+    <header key="cover" id="lim_cover" className="piece cover" {...attrs({})}>
       <p className="eyebrow cover-eyebrow">
         {isDemo && <span className="badge badge-demo">{t.demo.badge}</span>} {modeLabel ? `${modeLabel} · ` : ""}{t.reader.eyebrow(chapters.length, notions.length)}
       </p>
       <h1 className="cover-title">{blueprint.title}</h1>
       {status}
-      <section className="keypoints" aria-labelledby="kp-h">
-        <h2 id="kp-h" className="keypoints-title">{t.lim.keyPoints}</h2>
-        <ul>{keyPoints.map((k, i) => <li key={i}><Rich text={k} ctx={ctx} linkTerms={false} /></li>)}</ul>
-      </section>
-      {explanation.short_result && <p className="notice short-result" role="note">{t.lim.shortResult}</p>}
     </header>,
   );
+  // Points clés par groupes de 3 : un long encadré passe sur deux vues au lieu d'être coupé.
+  const kpGroups = chunks(keyPoints, 3);
+  kpGroups.forEach((group, g) => {
+    const last = g === kpGroups.length - 1;
+    out.push(
+      <section
+        key={`keypoints-${g}`}
+        id={g === 0 ? "lim_keypoints" : `lim_keypoints_${g + 1}`}
+        className={`piece keypoints${g > 0 ? " keypoints-cont" : ""}`}
+        aria-labelledby="kp-h"
+        {...attrs({ breakAfter: last })}
+      >
+        {g === 0 && <h2 id="kp-h" className="keypoints-title">{t.lim.keyPoints}</h2>}
+        <ul>{group.map((k, i) => <li key={g * 3 + i}><Rich text={k} ctx={ctx} linkTerms={false} /></li>)}</ul>
+        {last && explanation.short_result && <p className="notice short-result" role="note">{t.lim.shortResult}</p>}
+      </section>,
+    );
+  });
 
   let wrapCount = 0;
   ordered.forEach(({ s, bs }, si) => {
@@ -334,6 +349,9 @@ export function composeLimpid({
       <h2 id="end-h" className="end-title">{blueprint.title}</h2>
       <EndActions canReformulate={canReformulate} />
     </section>,
+    <div key="end-annexes" id="end_more" className="piece" {...attrs({})}>
+      <AnnexLinks />
+    </div>,
   );
 
   // Annexes (glossaire, sources, limites) : page continue à part, hors du carrousel (§ 14).

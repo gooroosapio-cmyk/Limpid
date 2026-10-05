@@ -69,7 +69,7 @@ export const en: Dict = {
     heading: "What do you want to understand?",
     tabsLabel: "Document type",
     tabs: { file: "File", link: "Link", text: "Text" },
-    choose: "Choose a file",
+    choose: "Choose one or more files",
     drop: "or drop it here",
     formats: "PDF, DOCX, TXT or image",
     limits: (mb: number, pages: number) => `${mb} MB · ${pages} pages max`,

@@ -67,7 +67,7 @@ export const fr = {
     heading: "Que voulez-vous comprendre ?",
     tabsLabel: "Type de document",
     tabs: { file: "Fichier", link: "Lien", text: "Texte" },
-    choose: "Choisir un fichier",
+    choose: "Choisir un ou plusieurs fichiers",
     drop: "ou le déposer ici",
     formats: "PDF, DOCX, TXT ou image",
     limits: (mb: number, pages: number) => `${mb} Mo · ${pages} pages maximum`,

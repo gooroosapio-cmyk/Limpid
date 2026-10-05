@@ -345,6 +345,7 @@ export function LibraryBrowser({
           </ul>
         )}
       </section>
+      {selecting && <div className="lib-selbar-space" aria-hidden="true" />}
       {footer}
 
       <MovePanel

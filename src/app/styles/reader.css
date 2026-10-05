@@ -187,6 +187,7 @@ figure.illustration figcaption { padding: var(--s3) var(--s4) var(--s4); }
 .keypoints-title { font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; margin: 0 0 var(--s2); }
 .keypoints ul { margin: 0; padding-left: var(--s5); }
 .keypoints li { margin: 6px 0; line-height: 1.55; }
+.keypoints-cont ul { counter-reset: none; }
 @media (max-width: 359px) { .cover-title { font-size: 28px; letter-spacing: -0.8px; } }
 
 /* Parties */
@@ -220,7 +221,8 @@ figure.illustration figcaption { padding: var(--s3) var(--s4) var(--s4); }
   position: relative; min-width: 0; min-height: 0; margin-left: 1px; padding: 0 2px; border: 0; border-radius: 3px; background: none;
   color: var(--green); font-family: var(--font); font-size: 0.68em; font-weight: 700; line-height: 1; vertical-align: super; text-decoration: none;
 }
-.lim .ref + .ref::before, .annex-glossary .ref + .ref::before { content: ","; position: static; margin-right: 1px; color: var(--muted); }
+.lim .ref + .ref, .annex-glossary .ref + .ref { margin-left: 0; padding-left: 0; }
+.lim .ref + .ref::before, .annex-glossary .ref + .ref::before { content: ","; position: static; margin-right: 2px; color: var(--muted); }
 .lim .ref::after, .annex-glossary .ref::after { content: ""; position: absolute; left: 50%; top: 50%; width: 32px; height: 40px; transform: translate(-50%, -50%); }
 .lim .ref:hover, .annex-glossary .ref:hover { transform: none; background: var(--pale); }
 .lim .ref:focus-visible, .annex-glossary .ref:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
@@ -419,3 +421,10 @@ figure.visual-drawing { max-width: 320px; margin-inline: auto; background: trans
 .wrap-fig figcaption { margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--muted); }
 .wrap-fig .credit { font-size: 11px; }
 @media (min-width: 600px) { .wrap-fig { width: 34%; } .wrap-fig.wrap-compact { width: 42%; } }
+.annex-doc-head .btn-link { display: inline-flex; align-items: center; min-height: var(--cible); }
+/* Schéma dans le lecteur : jamais plus haut que l'écran de lecture (il garde ses proportions). */
+.lim figure.visual svg { max-height: max(150px, calc(100dvh - var(--rtop) - var(--rbar) - var(--fab-strip, 0px) - 190px)); }
+@media (max-height: 500px) {
+  .lim figure.visual { padding: var(--s3); }
+  .lim figure.visual svg { max-height: max(130px, calc(100dvh - var(--rtop) - var(--rbar) - var(--fab-strip, 0px) - 150px)); }
+}

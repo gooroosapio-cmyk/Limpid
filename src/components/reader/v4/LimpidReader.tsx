@@ -72,6 +72,10 @@ export function LimpidReader({
   useDialogHistory(dialogs.reform);
   const markedRead = useRef(false);
   const anchorRef = useRef<string | null>(initialAnchor);
+  /** Ancre de retour d'annexe (`?a=`) : undefined = pas encore lue. */
+  const backAnchor = useRef<string | null | undefined>(undefined);
+  /** Première composition faite : avant, une position de défilement n'est pas une lecture. */
+  const laidOut = useRef(false);
   const titles = useMemo(() => Object.fromEntries(chapters.map((c) => [c.id, c.title])), [chapters]);
 
   useEffect(() => {
@@ -153,20 +157,27 @@ export function LimpidReader({
     try {
       saved = localStorage.getItem(progressKey(reportId ?? "demo")) ?? initialAnchor;
     } catch {}
-    // Retour d'annexe : l'adresse porte l'ancre exacte de lecture (`?a=`), puis en est retirée.
-    const url = new URL(window.location.href);
-    const back = url.searchParams.get("a");
-    if (back && ANCHOR_RE.test(back)) {
-      saved = back;
-      anchorRef.current = back;
-      url.searchParams.delete("a");
-      window.history.replaceState(window.history.state, "", url.toString());
+    // Retour d'annexe : l'adresse porte l'ancre exacte de lecture (`?a=`), lue une seule fois
+    // puis retirée de l'adresse une fois la vue rétablie.
+    if (backAnchor.current === undefined) {
+      const back = new URL(window.location.href).searchParams.get("a");
+      backAnchor.current = back && ANCHOR_RE.test(back) ? back : null;
+    }
+    if (backAnchor.current) {
+      saved = backAnchor.current;
+      anchorRef.current = backAnchor.current;
     }
     let cancelled = false;
     void document.fonts.ready.then(() => {
       if (cancelled) return;
       sizeRef.current = { w: deck.clientWidth, h: deck.clientHeight };
       layout(saved);
+      laidOut.current = true;
+      if (backAnchor.current) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("a");
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
     });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const relayout = () => {
@@ -213,6 +224,7 @@ export function LimpidReader({
         const y = deck.scrollTop + deck.clientHeight * 0.35;
         let idx = 0;
         for (let i = 0; i < views.length; i++) if ((pieces[views[i]!.start]?.offsetTop ?? 0) <= y) idx = i;
+        if (!laidOut.current) return;
         setCurrent(idx);
         const start = pieces[views[idx]!.start];
         anchorRef.current = start?.id ?? null;

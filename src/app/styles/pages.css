@@ -156,7 +156,7 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .modes legend { font-size: 14px; font-weight: 700; margin-bottom: var(--s2); padding: 0; }
 .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
 .mode-card {
-  position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 14px 12px 12px;
+  position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; padding: 14px 12px 12px;
   border: 1.5px solid var(--line); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow);
   cursor: pointer; transition: border-color var(--t-press) ease, transform var(--t-press) var(--ease-spring), box-shadow var(--t-press) ease;
 }
@@ -234,11 +234,16 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .lib-select { cursor: pointer; }
 .lib-select input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .lib-select:has(input:focus-visible) { outline: 3px solid var(--green); outline-offset: 2px; border-radius: 10px; }
+/* Barre flottante en bas : son apparition ne décale pas la liste sous le doigt. */
 .lib-selbar {
-  position: sticky; top: calc(var(--header) + var(--s2)); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
-  margin: var(--s3) 0; padding: var(--s2) var(--s3); border-radius: var(--r-control); background: var(--surface); box-shadow: var(--shadow-lift);
+  position: fixed; left: var(--s4); right: var(--s4); bottom: calc(var(--s4) + env(safe-area-inset-bottom)); z-index: 30;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); max-width: 640px; margin: 0 auto;
+  padding: var(--s2) var(--s3); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-lift);
   animation: rise-in var(--t-panel) var(--ease-spring) both;
 }
+@media (min-width: 1200px) { .lib-selbar { left: calc(var(--sidebar) + var(--s6)); } }
+.app:has(.lib-selbar) .fab { display: none; }
+.lib-selbar-space { height: 128px; }
 .lib-selbar-n { flex: 1 1 100%; font-size: 14px; font-weight: 650; }
 .lib-selbar .btn { flex: 1 1 140px; min-height: 44px; }
 @media (min-width: 480px) { .lib-selbar-n { flex: 1 1 auto; } .lib-selbar .btn { flex: 0 0 auto; } }

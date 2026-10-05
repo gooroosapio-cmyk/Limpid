@@ -97,6 +97,13 @@ export function ReportRow({
       timer.current = setTimeout(() => {
         pressed.current = true;
         navigator.vibrate?.(10);
+        // Le relâchement du doigt produit un clic : il ne doit rien ouvrir.
+        const swallow = (ev: Event) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+        };
+        document.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 800);
         onStartSelect?.(row.id);
       }, LONG_PRESS);
     },
