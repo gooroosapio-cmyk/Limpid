@@ -17,6 +17,16 @@ export const en: Dict = {
     privacyLink: "Privacy and data",
     contact: "A question or a remark? Write to us from your account.",
   },
+  shell: {
+    createLabel: "Create",
+    create: {
+      title: "Create",
+      import: ["Import documents", "PDF, Word, images, text"] as [string, string],
+      link: ["From a link", "A web page to explain"] as [string, string],
+      text: ["From a text", "Paste a text to explain"] as [string, string],
+      folder: ["New folder", "Organise your Limpid by topic"] as [string, string],
+    },
+  },
   nav: {
     menu: "Open the menu",
     closeMenu: "Close the menu",
@@ -391,7 +401,7 @@ export const en: Dict = {
     appearanceHeading: "Appearance",
     appearanceLede: "Light, dark, or following your device.",
     mode: "Display mode",
-    modes: { light: "Light", dark: "Dark", system: "System" },
+    modes: { dark: "Dark", light: "Paper" },
     defaultTheme: "Default theme for new reports",
     themeNote: "Themes change typography, rhythm and layout; never the facts.",
     subscriptionHeading: "Subscription",

@@ -1,0 +1,180 @@
+/*
+ * Limpid V2 « Galerie éditoriale » : composants partagés et écrans. Chargée après les feuilles
+ * historiques, elle redéfinit leurs composants (mêmes classes) au lieu de les dupliquer.
+ * Grille : marges 24 px (16 px sous 360 px), espacements 4/8/12/16/24/32/48, colonnes à 12 px.
+ */
+
+/* ---------- Boutons : 48 px, rayon 16, 15/20 en 600 ---------- */
+.btn {
+  min-height: var(--btn-h); padding: 0 20px; gap: 8px; border-radius: var(--r-control); border: 1px solid var(--line-strong);
+  background: var(--elevated); color: var(--ink); font-size: 15px; line-height: 20px; font-weight: 600;
+  transition: transform var(--t-release) var(--ease-out), background var(--t-press) ease, border-color var(--t-press) ease;
+}
+.btn:hover { background: color-mix(in srgb, var(--elevated) 82%, var(--ink)); }
+.btn:active { transform: scale(0.985); transition-duration: var(--t-press); }
+.btn-primary { background: var(--yellow); border-color: transparent; color: var(--on-yellow); }
+.btn-primary:hover { background: var(--yellow); box-shadow: none; filter: brightness(1.04); }
+.btn-primary:active { background: var(--yellow-hover); }
+.btn-danger { background: var(--danger); color: #1b0f0c; }
+.btn .icon { width: 22px; height: 22px; }
+.btn-link { font-size: 15px; font-weight: 500; color: var(--ink); }
+.btn-arrow { justify-content: space-between; }
+.ib { border-radius: 14px; color: var(--ink); }
+.ib:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.ib:active { transform: scale(0.985); }
+.ib[aria-current="page"] { background: var(--pale); }
+.ib-round { border-radius: 50%; background: rgb(14 17 15 / 55%); color: #f5f4ec; backdrop-filter: blur(8px); }
+.ib-round:hover { background: rgb(14 17 15 / 70%); }
+
+/* ---------- Surfaces ---------- */
+.card { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s5); box-shadow: none; }
+.card-elevated { background: var(--elevated); }
+.notice, .note { border-radius: var(--r-control); border-left: 0; background: var(--surface); padding: 14px 16px; font-size: 15px; line-height: 22px; }
+.notice-warn { background: var(--pale); }
+.notice-error, .note-danger { background: var(--danger-pale); color: var(--ink); }
+.notice-ok, .note-green { background: var(--green-pale); }
+.chip, .badge { border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; line-height: 16px; letter-spacing: 1px; font-weight: 600; border-color: var(--line); }
+.chip-yellow, .badge { background: var(--pale); color: var(--yellow); }
+:root[data-mode="light"] .chip-yellow, :root[data-mode="light"] .badge { color: var(--ink); }
+
+/* ---------- Lignes de réglages (SettingsRow) : colonne d'icône 24 px, chevrons alignés à droite ---------- */
+.row { gap: 16px; min-height: 64px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.row-icon { width: 24px; height: 24px; color: var(--sage); }
+.row-icon .icon { width: 24px; height: 24px; }
+.row-text b { font-size: 16px; line-height: 22px; font-weight: 500; }
+.row-text small { font-size: 13px; line-height: 18px; }
+.row-chevron { width: 20px; height: 20px; margin-left: auto; }
+
+/* ---------- Onglets soulignés (UnderlineTabs) et contrôle segmenté (SegmentedControl) ---------- */
+.utabs { position: relative; display: flex; gap: var(--s6); margin: var(--s4) 0 var(--s5); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.utabs::-webkit-scrollbar { display: none; }
+.utabs > a, .utabs > button {
+  position: relative; flex: none; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted);
+  font-size: 16px; line-height: 24px; font-weight: 500; text-decoration: none; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center;
+}
+.utabs > [aria-current="page"], .utabs > [aria-current="true"], .utabs > [aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.utabs > [aria-current="page"]::after, .utabs > [aria-current="true"]::after, .utabs > [aria-selected="true"]::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 3px; background: var(--yellow);
+  animation: tab-in var(--t-tab) var(--ease-out) both;
+}
+@keyframes tab-in { from { transform: scaleX(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.seg, .tabs { gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface); margin: var(--s4) 0; }
+.seg > *, .tabs button { min-height: 44px; border-radius: 12px; font-size: 15px; font-weight: 500; color: var(--muted); gap: 8px; }
+.seg > [aria-current="page"], .seg > [aria-selected="true"], .tabs button[aria-selected="true"] {
+  background: var(--yellow); color: var(--on-yellow); font-weight: 600; box-shadow: none;
+}
+
+/* ---------- Champs (FormField, SearchField) ---------- */
+label { font-size: 15px; font-weight: 500; margin: var(--s4) 0 var(--s2); }
+input[type="text"], input[type="url"], input[type="email"], input[type="number"], input[type="password"], input[type="search"], textarea, select {
+  min-height: 52px; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink); font-size: 16px; line-height: 24px;
+}
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
+input:focus, textarea:focus, select:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px rgb(241 217 78 / 18%); }
+.field { position: relative; }
+.field > .icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; color: var(--muted); pointer-events: none; }
+.field > input { padding-left: 52px; }
+.field-error { display: flex; align-items: flex-start; gap: 8px; margin: var(--s2) 0 0; color: var(--danger); font-size: 13px; line-height: 18px; }
+.searchbox .icon { left: 16px; width: 22px; height: 22px; }
+.searchbox input { padding-left: 52px; min-height: 52px; border-radius: var(--r-control); }
+
+/* ---------- Interrupteur ---------- */
+.switch { width: 52px; height: 32px; }
+.switch i { background: var(--elevated); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.switch i::after { top: 4px; left: 4px; background: var(--ink); }
+.switch input:checked + i { background: var(--yellow); box-shadow: none; }
+.switch input:checked + i::after { background: var(--on-yellow); }
+
+/* ---------- Choix en cartes (approches, offres) ---------- */
+.choice, .option { border-radius: var(--r-control); background: var(--surface); border-color: var(--line); }
+.choice:has(input:checked), .option:has(input:checked) { border: 1px solid var(--sage); background: var(--green-pale); padding: 14px 16px; }
+.modecards { grid-template-columns: repeat(2, 1fr); }
+.modecards label { background: var(--surface); border-radius: var(--r-control); }
+.modecards label:has(input:checked) { box-shadow: inset 0 0 0 2px var(--yellow); }
+
+/* ---------- Feuille d'action (BottomSheet) : 28 px en haut, translation 24 px + fondu 240 ms ---------- */
+dialog.sheet { background: var(--surface); }
+dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation: sheet-v2 var(--t-panel) var(--ease-out) both; }
+@keyframes sheet-v2 { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+.sheet-grip { background: var(--line-strong); }
+.sheet-head h2 { font-size: 17px; line-height: 23px; font-weight: 600; }
+
+/* ---------- Toast : au-dessus de la navigation ---------- */
+.toast { background: var(--elevated); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-control); box-shadow: var(--shadow); }
+.toasts { bottom: calc(var(--bottomnav) + 28px + env(safe-area-inset-bottom)); }
+.toast-ok .icon:first-child { color: var(--sage); }
+.toast-error .icon:first-child { color: var(--danger); }
+
+/* ---------- États (StatusLabel) : toujours une icône et un libellé ---------- */
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--muted); }
+.status .icon { width: 18px; height: 18px; }
+.status-ready .icon { color: var(--sage); }
+.status-running .icon { color: var(--yellow); }
+.status-failed { color: var(--danger); }
+.status-failed .icon { color: var(--danger); }
+
+/* ---------- Titres de page (PageTitle) ---------- */
+.page-title { margin: var(--s4) 0 var(--s5); }
+.page-title h1 { margin: 0; }
+.page-title p { margin: 4px 0 0; color: var(--muted); font-size: 16px; line-height: 24px; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin: var(--s7) 0 var(--s3); }
+.section-head h2 { margin: 0; font-size: 22px; line-height: 28px; }
+.section-head a { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: var(--ink); font-size: 15px; font-weight: 500; text-decoration: none; }
+.section-head a .icon { width: 18px; height: 18px; }
+
+/* ---------- Coquille : en-tête compact et barre basse flottante ---------- */
+.sidebar, dialog.drawer, .fab { display: none !important; }
+.app-content { margin-left: 0 !important; }
+.appbar {
+  position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  min-height: calc(var(--header) + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--pad) 0;
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-bottom: 0; max-width: 100%;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .appbar { background: var(--bg); } }
+.brand-link { padding: 0; margin-left: -2px; border-radius: 12px; }
+.brand { gap: 10px; }
+.brand b { font-size: 26px; letter-spacing: -1px; font-weight: 600; }
+.appbar-avatar { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; text-decoration: none; }
+.avatar { background: var(--elevated); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); font-weight: 600; }
+.appbar .avatar { width: 40px; height: 40px; font-size: 14px; }
+.appbar-avatar[aria-current="page"] .avatar { box-shadow: inset 0 0 0 2px var(--yellow); }
+
+.page { max-width: 760px; padding: 0 var(--pad) calc(var(--bottomnav) + 32px + env(safe-area-inset-bottom)); }
+.page-wide { max-width: 1120px; }
+.with-fab { padding-bottom: calc(var(--bottomnav) + 32px + env(safe-area-inset-bottom)); }
+
+.bottomnav {
+  position: fixed; z-index: 30; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  width: min(520px, calc(100% - 2 * var(--pad))); height: var(--bottomnav); display: grid; grid-template-columns: repeat(3, 1fr);
+  border-radius: var(--r-nav); background: var(--glass); border: 1px solid var(--line);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .bottomnav { background: var(--surface); } }
+.bottomnav-item {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-width: 44px; border: 0; background: none; color: var(--muted); text-decoration: none; cursor: pointer;
+  font-size: 11px; line-height: 16px; font-weight: 500; border-radius: var(--r-nav);
+  transition: color var(--t-press) ease, transform var(--t-release) var(--ease-out);
+}
+.bottomnav-item:active { transform: scale(0.985); }
+.bottomnav-item .icon { width: 24px; height: 24px; }
+.bottomnav-item[aria-current="page"] { color: var(--yellow); font-weight: 600; }
+.bottomnav-item[aria-current="page"]::before {
+  content: ""; position: absolute; inset: auto 22% 2px; height: 18px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgb(241 217 78 / 22%), transparent); filter: blur(4px);
+}
+:root[data-mode="light"] .bottomnav-item[aria-current="page"] { color: #6a5a00; }
+.bottomnav-item:focus-visible { outline-offset: -4px; }
+/* Clavier ouvert (appareil tactile) : la barre se retire, le champ et l'action restent visibles. */
+@media (pointer: coarse) { .app:has(input:focus, textarea:focus) ~ .bottomnav, .app:has(input:focus, textarea:focus) .bottomnav { display: none; } }
+/* Lecture et aperçu de leçon : navigation propre à l'écran. */
+.app:has(.reader-immersive) .appbar, .app:has(.reader-immersive) .bottomnav,
+.app:has(.lesson) .appbar, .app:has(.lesson) .bottomnav { display: none; }
+.create-sheet .rows .row:last-child { border-bottom: 0; }
+@media (min-width: 700px) {
+  dialog.create-sheet[open] { inset: auto 0 calc(var(--bottomnav) + 24px) 0; margin: 0 auto; width: min(480px, calc(100% - 48px)); border-radius: var(--r-sheet); }
+}

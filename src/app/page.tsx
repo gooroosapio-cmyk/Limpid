@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { Fab } from "@/components/shell/AppShell";
 import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";
 import { FolderActions, NewFolder } from "@/components/library/FolderDialogs";
@@ -98,7 +97,6 @@ export default async function HomeLibraryPage({
             </div>
           </section>
         )}
-        <Fab />
       </Screen>
     );
   }
@@ -152,7 +150,6 @@ export default async function HomeLibraryPage({
           <NewFolder />
           <Link href="/rapports/demo" className="btn-link">{t.library.example}</Link>
         </div>
-        <Fab />
       </Screen>
     );
   }
@@ -211,7 +208,6 @@ export default async function HomeLibraryPage({
           ) : undefined
         }
       />
-      <Fab />
     </Screen>
   );
 }

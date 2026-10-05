@@ -13,6 +13,16 @@ export const fr = {
     privacyLink: "Confidentialité et données",
     contact: "Une question ou une remarque ? Écrivez-nous depuis votre compte.",
   },
+  shell: {
+    createLabel: "Créer",
+    create: {
+      title: "Créer",
+      import: ["Importer des documents", "PDF, Word, images, texte"] as [string, string],
+      link: ["Depuis un lien", "Une page web à expliquer"] as [string, string],
+      text: ["Depuis un texte", "Coller un texte à expliquer"] as [string, string],
+      folder: ["Nouveau dossier", "Ranger vos Limpid par thème"] as [string, string],
+    },
+  },
   nav: {
     menu: "Ouvrir le menu",
     closeMenu: "Fermer le menu",
@@ -389,7 +399,7 @@ export const fr = {
     appearanceHeading: "Apparence",
     appearanceLede: "Clair, sombre, ou selon votre appareil.",
     mode: "Mode d'affichage",
-    modes: { light: "Clair", dark: "Sombre", system: "Système" } as Record<string, string>,
+    modes: { dark: "Sombre", light: "Papier" } as Record<string, string>,
     defaultTheme: "Thème par défaut des nouveaux rapports",
     themeNote: "Les thèmes changent la typographie, le rythme et la composition ; jamais les faits.",
     subscriptionHeading: "Abonnement",

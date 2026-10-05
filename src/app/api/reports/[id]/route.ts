@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/auth";
 import { drainQueue } from "@/lib/jobs/worker";
 import { ThemeId } from "@/lib/contracts/schemas";
 import { moveReport } from "@/lib/library/folders";
+import { COVERS } from "@/lib/library/covers";
 import { deleteReport } from "@/lib/reports/delete";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
@@ -55,6 +56,14 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 
 const ThemeChange = z.strictObject({ theme_id: ThemeId.nullable() });
 const FolderMove = z.strictObject({ folder_id: z.string().uuid().nullable() });
+/** Personnalisation (V2) : favori, couverture de la banque, titre. */
+const Personalize = z
+  .strictObject({
+    favorite: z.boolean().optional(),
+    cover_id: z.enum(COVERS).nullable().optional(),
+    title: z.string().trim().min(1).max(160).optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0);
 
 /** Changement de présentation (null = automatique) : même contenu validé, nouveau rendu, aucun appel IA. */
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -71,6 +80,19 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     return (await moveReport(user.id, id, move.data.folder_id))
       ? NextResponse.json({ folder_id: move.data.folder_id })
       : NextResponse.json({ error: "introuvable" }, { status: 404 });
+  }
+  const custom = Personalize.safeParse(raw);
+  if (custom.success) {
+    const { data, error } = await adminClient()
+      .from("reports")
+      .update(custom.data)
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .is("deleted_at", null)
+      .select("id, favorite, cover_id, title");
+    if (error) return NextResponse.json({ error: "stockage" }, { status: 500 });
+    if (!data?.length) return NextResponse.json({ error: "introuvable" }, { status: 404 });
+    return NextResponse.json(data[0]);
   }
   const body = ThemeChange.safeParse(raw);
   if (!body.success) return NextResponse.json({ error: "requete" }, { status: 400 });

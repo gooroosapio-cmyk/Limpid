@@ -57,13 +57,13 @@ export function ComfortSettings({ initial }: { initial: DisplayPrefs }) {
   );
 }
 
-const MODE_ICONS: Record<Mode, "sun" | "moon" | "settings"> = { light: "sun", dark: "moon", system: "settings" };
+const MODE_ICONS: Record<Mode, "sun" | "moon"> = { light: "sun", dark: "moon" };
 
-/** Mode clair / sombre / système (indépendant du thème du rapport). */
+/** Galerie sombre (défaut) ou Papier (indépendant du thème du rapport). */
 export function ModeSettings({ initial }: { initial: Mode }) {
   const t = useT();
   const [mode, setMode] = useState<Mode>(initial);
-  const order: Mode[] = ["light", "dark", "system"];
+  const order: Mode[] = ["dark", "light"];
   return (
     <fieldset className="modecards-field">
       <legend className="eyebrow">{t.compte.mode}</legend>
@@ -77,7 +77,7 @@ export function ModeSettings({ initial }: { initial: Mode }) {
               checked={mode === m}
               onChange={() => {
                 setMode(m);
-                setDisplayPref(DISPLAY_COOKIES.mode, m === "system" ? null : m, "data-mode", m === "system" ? null : m);
+                setDisplayPref(DISPLAY_COOKIES.mode, m === "dark" ? null : m, "data-mode", m === "dark" ? null : m);
               }}
             />
             <Icon name={MODE_ICONS[m]} />
