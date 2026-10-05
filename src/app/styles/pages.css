@@ -251,3 +251,22 @@ h1.display, .prep h1 { font-size: 34px; line-height: 1.1; letter-spacing: -1.3px
 .move-new { margin: 0 0 var(--s4); }
 .move-new-row { display: flex; gap: var(--s2); }
 .move-new-row input { flex: 1; min-width: 0; }
+
+/* Administration : traitements lisibles sur mobile (V5) */
+.job-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s3); }
+@media (min-width: 900px) { .job-cards { grid-template-columns: 1fr 1fr; } }
+.job-card { padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); min-width: 0; }
+.job-card.job-failed, .job-card.job-uncertain { border-color: var(--danger); }
+.job-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s2); margin-bottom: var(--s2); }
+.job-head b { flex: 1; min-width: 0; }
+.job-status { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: var(--r-pill); background: var(--soft); font-size: 13px; font-weight: 700; }
+.job-status-running, .job-status-queued { background: var(--pale); }
+.job-status-succeeded { background: var(--green-pale); color: var(--green); }
+.job-status-failed, .job-status-uncertain { background: var(--danger-pale); color: var(--danger); }
+.job-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px var(--s3); margin: 0; font-size: 14px; }
+.job-facts div { min-width: 0; }
+.job-facts dt { color: var(--muted); font-size: 12px; }
+.job-facts dd { margin: 0; overflow-wrap: anywhere; }
+.job-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.job-actions form { flex: 1 1 140px; }
+.job-actions .btn { width: 100%; min-height: 44px; }

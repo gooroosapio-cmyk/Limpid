@@ -362,7 +362,8 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
       .update({
         status: out.coverage.partial ? "partial" : "extracted",
         content_hash: out.extracted.sourceVersion,
-        coverage: out.coverage,
+        // Document entièrement lu comme des images : compté en pages OCR dans l'administration.
+        coverage: { ...out.coverage, ocr_all: true },
       })
       .eq("id", sourceId);
     // Lu : l'original reste consultable pendant la conservation du rapport.

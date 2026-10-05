@@ -2,11 +2,21 @@ import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
-import { addAllowedEmail, removeAllowedEmail, setGeneration, setMonthlyCap } from "@/app/admin/actions";
+import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, setGeneration, setMonthlyCap } from "@/app/admin/actions";
+import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 
 const euros = (cents: number) => `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const when = (iso: string) =>
   new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+
+/** Âge en minutes, durée lisible : pas de date brute sur mobile. */
+const age = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+function duration(ms: number) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  return m < 60 ? `${m} min ${s % 60} s` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
 
 const STAGES: Record<string, string> = {
   comprehension: "Compréhension",
@@ -26,8 +36,10 @@ export async function AdminView({
   perf,
   userEmail,
   message,
+  jobs,
 }: {
   o: AdminOverview;
+  jobs: AdminJob[];
   perf: Awaited<ReturnType<typeof performance>> | null;
   userEmail: string | null;
   message?: string;
@@ -161,22 +173,49 @@ export async function AdminView({
 
       <section className="admin-section" aria-labelledby="adm-jobs">
         <h2 id="adm-jobs">{t.admin.jobs}</h2>
-        {o.jobs.length === 0 ? <p className="muted">{t.admin.none}</p> : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label={t.admin.jobsTable}>
-            <table className="admin-table">
-              <thead><tr><th scope="col">{t.admin.date}</th><th scope="col">{t.admin.kind}</th><th scope="col">{t.admin.status}</th><th scope="col">{t.admin.error}</th></tr></thead>
-              <tbody>
-                {o.jobs.map((j) => (
-                  <tr key={j.id}>
-                    <td>{when(j.created_at)}</td>
-                    <td>{t.admin.kinds[j.kind] ?? j.kind}</td>
-                    <td>{t.reports.status[j.status] ?? j.status}</td>
-                    <td><code>{j.error_code ?? "—"}</code></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <p className="muted small">{t.admin.jobsIntro}</p>
+        {jobs.length === 0 ? <p className="muted">{t.admin.none}</p> : (
+          <ul className="job-cards">
+            {jobs.map((j) => {
+              const end = j.finishedAt ? new Date(j.finishedAt).getTime() : null;
+              const start = j.startedAt ? new Date(j.startedAt).getTime() : null;
+              return (
+                <li key={j.id} className={`job-card job-${j.status}`}>
+                  <div className="job-head">
+                    <span className={`job-status job-status-${j.status}`}>{t.reports.status[j.status] ?? j.status}</span>
+                    <b>{t.admin.kinds[j.kind] ?? j.kind}</b>
+                    <span className="muted small">{t.admin.age(age(j.createdAt))}</span>
+                  </div>
+                  <dl className="job-facts">
+                    <div><dt>{t.admin.phase}</dt><dd>{j.stage ? (t.admin.stages[j.stage] ?? j.stage) : "—"}</dd></div>
+                    <div><dt>{t.admin.documents}</dt><dd>{j.sources}</dd></div>
+                    <div><dt>{t.admin.pages}</dt><dd>{t.admin.pagesSplit(j.nativePages, j.ocrPages)}</dd></div>
+                    <div><dt>{t.admin.duration}</dt><dd>{start ? duration((end ?? Date.now()) - start) : "—"}{start && !end ? ` ${t.admin.ongoing}` : ""}</dd></div>
+                    <div><dt>{t.admin.aiTime}</dt><dd>{j.calls ? `${duration(j.aiMs)} · ${t.admin.callCount(j.calls)}` : "—"}</dd></div>
+                    <div><dt>{t.admin.attempts}</dt><dd>{j.attempt}</dd></div>
+                    <div><dt>{t.admin.cost}</dt><dd>{euros(j.costCents)}</dd></div>
+                    <div><dt>{t.admin.error}</dt><dd><code>{j.errorCode ?? "—"}</code>{j.cancelRequested && j.status === "running" ? ` · ${t.admin.cancelPending}` : ""}</dd></div>
+                  </dl>
+                  {(RETRYABLE.includes(j.status) || CANCELLABLE.includes(j.status)) && (
+                    <div className="job-actions">
+                      {RETRYABLE.includes(j.status) && (
+                        <form action={retryJobAction}>
+                          <input type="hidden" name="job_id" value={j.id} />
+                          <button type="submit" className="btn">{t.admin.retry}</button>
+                        </form>
+                      )}
+                      {CANCELLABLE.includes(j.status) && !(j.status === "running" && j.cancelRequested) && (
+                        <form action={cancelJobAction}>
+                          <input type="hidden" name="job_id" value={j.id} />
+                          <button type="submit" className="btn btn-danger">{t.admin.cancel}</button>
+                        </form>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
 
