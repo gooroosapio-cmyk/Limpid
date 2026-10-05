@@ -14,6 +14,7 @@ export function OffersGrid({
   current,
   scheduleFrom,
   period: controlled,
+  hideFree = false,
 }: {
   lang: "fr" | "en";
   /** Offre active (null : visiteur non connecté). */
@@ -22,6 +23,8 @@ export function OffersGrid({
   scheduleFrom: string | null;
   /** Période choisie plus haut sur la page (sélecteur partagé) ; sinon sélecteur propre. */
   period?: Period;
+  /** L'offre gratuite est déjà présentée plus haut (carte « Votre offre »). */
+  hideFree?: boolean;
 }) {
   const t = useT();
   const o = t.billing.offers;
@@ -43,7 +46,7 @@ export function OffersGrid({
       </div>}
 
       <ul className="offers">
-        <li className={`offer${current?.mode === "free" ? " is-current" : ""}`}>
+        {!hideFree && <li className={`offer${current?.mode === "free" ? " is-current" : ""}`}>
           {current?.mode === "free" && <p className="offer-eyebrow">{o.yourPlan}</p>}
           <h2>{t.billing.planNames.free}</h2>
           <p className="muted">{o.taglines.free}</p>
@@ -57,7 +60,7 @@ export function OffersGrid({
           ) : (
             <Link href="/" className="btn btn-block">{o.continueFree}</Link>
           )}
-        </li>
+        </li>}
         {PAID_PLANS.map((code: PaidPlan) => {
           const plan = PLANS[code];
           const price = period === "yearly" ? plan.yearlyXof : plan.monthlyXof;

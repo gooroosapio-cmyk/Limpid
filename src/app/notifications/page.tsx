@@ -8,6 +8,7 @@ import { getLang, getT } from "@/lib/i18n/server";
 import { whenLabel } from "@/lib/library/load";
 import { listNotifications, markAllRead } from "@/lib/notifications";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { nowMs } from "@/lib/time";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -23,7 +24,7 @@ export default async function NotificationsPage() {
   await markAllRead(user.id);
   const day = (iso: string) => new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", timeZone: "Africa/Abidjan" });
   // Offre bientôt terminée (3 jours) : calculée à la lecture, jamais stockée.
-  const ending = wallet?.mode === "subscription" && wallet.accessEndsAt && new Date(wallet.accessEndsAt).getTime() - Date.now() < 3 * 86_400_000 ? wallet.accessEndsAt : null;
+  const ending = wallet?.mode === "subscription" && wallet.accessEndsAt && new Date(wallet.accessEndsAt).getTime() - nowMs() < 3 * 86_400_000 ? wallet.accessEndsAt : null;
 
   const rows: { key: string; icon: IconName; text: string; when: string | null; href: string | null; unread: boolean; tone?: string }[] = [
     ...(ending ? [{ key: "ending", icon: "clock" as IconName, text: n.planExpiring(day(ending)), when: null, href: "/offres", unread: true }] : []),

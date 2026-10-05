@@ -1,5 +1,14 @@
 # Avancement
 
+## Phase 16.1 — Écrans alignés sur les maquettes, notifications, couvertures générées (6 octobre 2026)
+
+- Cadrage par QCM : barre basse Bibliothèque / Créer (import direct) / Paramètres ; profil par l'avatar en haut à droite et en tête des Paramètres ; cloche = vraies notifications ; initiales et nom affiché modifiable ; « J'ai une clé d'accès » mène à la récupération par email ; couvertures générées par Gemini, sans crédit ; recherche rétractable (loupe), filtres visibles ; date et heure sur chaque Limpid ; thème qui suit l'appareil (clair ou sombre), choix possible.
+- Notifications : préparation prête ou interrompue, crédits ajoutés, offre activée (table `notifications`, une seule par fait) ; offre bientôt terminée calculée à la lecture. Page `/notifications`, pastille jaune sur la cloche.
+- Couvertures : générées à la livraison d'un nouveau Limpid (`LIMPID_IMAGE_MODEL`, coupure `LIMPID_COVERS_GEMINI=off`), WebP 900 × 1200 en stockage privé, servies par `/api/reports/[id]/cover` au seul propriétaire ; « Générer une couverture » dans le menu ⋯ (1 fois / 10 min).
+- Écrans refaits d'après les maquettes : bibliothèque (accueil et Prêts), leçon (barre « Demander à Limpid » avec champ), import, Votre espace, offres, connexion.
+- Migration `20261015000000_notifications_covers.sql` appliquée en production.
+- Ressources à fournir : `docs/RESSOURCES_V2.md`.
+
 ## Phase 16 — Refonte V2 « Galerie éditoriale » (5 octobre 2026)
 
 - **Système** : palette sombre par défaut (#0E110F…), option **Papier** (claire), Inter seule (400/500/600), échelle 32/22/17/16/15/13/11, rayons 16/20/28, boutons 48 px, icônes 24 px trait 1,75, mouvements courts (200 ms, cascade de 4 éléments, appui 0,985), réduction du mouvement respectée. Feuille `src/app/styles/v2.css` chargée en dernier : elle redéfinit les composants partagés au lieu de les dupliquer.

@@ -45,7 +45,7 @@ export function StatusLabel({ state, sources, sourcesFirst = false }: { state: R
   const count = t.library.v2.sources(sources);
   return (
     <span className={`status status-${state}`}>
-      <Icon name={icon} />
+      {state === "ready" ? <span className="status-ok" aria-hidden="true"><Icon name="check" size={13} /></span> : <Icon name={icon} />}
       <span>{sourcesFirst ? count : label}</span>
       <span aria-hidden="true">·</span>
       <span>{sourcesFirst ? label.toLowerCase() : count}</span>

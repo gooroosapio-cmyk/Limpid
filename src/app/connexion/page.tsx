@@ -21,14 +21,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { erreur, compte, session } = await searchParams;
   const open = await signupOpen();
   return (
-    <div className="page page-enter login-page stagger">
-      <div className="login-brand"><Logo /></div>
-      <Illustration name="connexion" fallback="lumiere" className="login-art" eager />
-      <div className="page-title">
+    <div className="page page-enter login-page">
+      <div className="login-hero">
+        <Illustration name="connexion" fallback="lumiere" className="login-art" eager />
+        <div className="login-brand"><Logo /></div>
+      </div>
+      <div className="page-title login-title">
         <h1>{t.login.v2Title}</h1>
         <p>{t.login.v2Subtitle}</p>
       </div>
-      {!open && <p className="muted">{t.login.alpha}</p>}
       {compte === "supprime" && <p className="notice" role="status">{t.account.deleted}</p>}
       {session && session in t.devices.expired && (
         <p className="notice" role="status">{t.devices.expired[session as keyof typeof t.devices.expired]}</p>
@@ -40,13 +41,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       )}
       <OAuthButtons t={t} />
       <LoginForm />
-      <section className="login-signup" aria-labelledby="signup-h">
-        <h2 id="signup-h" className="small">{t.login.noAccount}</h2>
-        <Link href="/inscription" className="btn btn-block">{t.signup.create}</Link>
-        {!open && <p className="muted small">{t.signup.closed}</p>}
-      </section>
-      <p className="center"><Link href="/offres" className="btn-link">{t.billing.seeOffers}</Link></p>
-      <p className="login-private"><Icon name="lock" size={20} /> {t.login.private}</p>
+      <p className="login-signup-line">
+        {t.login.noAccount} <Link href="/inscription">{t.signup.create}</Link>
+        {!open && <span className="muted"> · {t.signup.closed}</span>}
+      </p>
+      <p className="login-private"><Icon name="lock" size={22} /> {t.login.private}</p>
     </div>
   );
 }

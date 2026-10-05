@@ -660,6 +660,8 @@ export const en: Dict = {
   },
   login: {
     v2Title: "Find your ideas again.",
+    v2Magic: "Get a sign-in link",
+    v2Email: "Email address",
     v2Subtitle: "Your lessons are waiting.",
     emailPlaceholder: "you@example.com",
     passwordPlaceholder: "Your password",

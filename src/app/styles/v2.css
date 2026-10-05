@@ -538,11 +538,14 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 .lesson-grid .lesson-hit { aspect-ratio: 395 / 360; border-radius: 16px; }
 .lesson-grid-home .lesson-hit { aspect-ratio: 395 / 432; }
 .lesson-grid .lesson-text { left: 14px; right: 14px; bottom: 12px; gap: 3px; }
-.lesson-grid .lesson-title { font-size: 20px; line-height: 25px; font-weight: 600; }
-.lesson-grid .status { font-size: 15px; line-height: 20px; color: #e3e7e1; }
-.status-ready .icon { color: #0e110f; background: var(--sage); border-radius: 50%; padding: 3px; width: 20px; height: 20px; }
-.status-ready .icon path { stroke-width: 3; }
-.lesson-date { font-size: 13px; line-height: 18px; color: #c3c9c1; }
+.lesson-grid .lesson-title { font-size: 18px; line-height: 23px; font-weight: 600; }
+.lesson-grid .status { font-size: 13px; line-height: 18px; color: #e3e7e1; gap: 5px; }
+.lesson-grid .lesson-hit::after { inset: 30% 0 0; }
+.status { white-space: nowrap; min-width: 0; }
+.status-ok { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--sage); color: #0e110f; }
+.status .status-ok .icon { width: 12px; height: 12px; color: #0e110f; }
+.status-ok .icon path { stroke-width: 3.4; }
+.lesson-date { font-size: 12px; line-height: 16px; color: #c3c9c1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lesson-list .lesson-date { color: var(--muted); }
 .lesson-actions { inset: 10px 10px auto; }
 .lesson-actions .ib-round { width: 40px; height: 40px; flex: 0 0 40px; background: rgb(14 17 15 / 55%); }
@@ -653,3 +656,35 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 .plan-key a { font-size: 16px; color: var(--ink); }
 .plan-details { scroll-margin-top: 16px; }
 .plan-details h2 { font-size: 24px; font-weight: 700; }
+
+/* Connexion (maquette 08) */
+.login-page { padding-top: 0; max-width: 520px; }
+.login-hero { position: relative; margin: 0 calc(-1 * var(--pad)) 4px; height: 290px; }
+.login-hero .login-art { position: absolute; inset: 0; height: auto; margin: 0; border-radius: 0; -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent); mask-image: linear-gradient(180deg, #000 60%, transparent); }
+.login-hero .login-brand { position: absolute; top: calc(18px + env(safe-area-inset-top)); left: var(--pad); margin: 0; color: #f5f4ec; }
+.login-hero .login-brand .brand { color: #f5f4ec; }
+.login-hero .login-brand .brand b { font-size: 28px; font-weight: 700; }
+@media (max-height: 600px) { .login-hero { height: 150px; } }
+.login-title { margin: 0 0 var(--s5); }
+.login-title h1 { font-size: 38px; line-height: 44px; letter-spacing: -1.4px; }
+.login-title p { font-size: 20px; line-height: 28px; }
+.oauth-google { min-height: 54px; border-radius: 16px; font-size: 17px; font-weight: 600; }
+.oauth-buttons .divider { margin: var(--s5) 0 var(--s2); font-size: 16px; }
+.login label { font-size: 16px; font-weight: 600; }
+.login .field input { min-height: 54px; border-radius: 16px; }
+.login-forgot a { text-decoration: underline; text-decoration-color: var(--line-strong); }
+.login .btn-primary { min-height: 54px; font-size: 18px; border-radius: 16px; }
+.login-magic { min-height: 48px; font-size: 16px; color: var(--ink); opacity: 0.9; }
+.login-signup-line { text-align: center; margin: var(--s4) 0 0; font-size: 14px; color: var(--muted); }
+.login-signup-line a { color: var(--ink); }
+.login-private { margin: var(--s7) 0 var(--s4); font-size: 15px; }
+
+/* Ajustements après recette */
+.mode-grid { gap: 10px; }
+.mode-card { gap: 10px; padding: 12px 12px; min-height: 66px; }
+.mode-ic .icon { width: 26px; height: 26px; }
+.mode-card strong { font-size: 15px; line-height: 20px; }
+.mode-desc { font-size: 13px; line-height: 17px; }
+@media (max-width: 359px) { .mode-grid { grid-template-columns: 1fr; } }
+.offers-page { overflow-x: clip; }
+.offers-hero-art { right: 0; }

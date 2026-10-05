@@ -74,7 +74,7 @@ export function OffersView({
 
       <section id="details" aria-labelledby="details-h" className="plan-details">
         <h2 id="details-h">{v.detailsTitle}</h2>
-        <OffersGrid lang={lang} current={current ? { plan: current.plan, mode: current.mode } : null} scheduleFrom={scheduleFrom} period={period} />
+        <OffersGrid lang={lang} current={current ? { plan: current.plan, mode: current.mode } : null} scheduleFrom={scheduleFrom} period={period} hideFree={current?.mode === "free"} />
       </section>
     </>
   );

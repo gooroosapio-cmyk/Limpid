@@ -658,6 +658,8 @@ export const fr = {
   },
   login: {
     v2Title: "Retrouvez vos idées.",
+    v2Magic: "Recevoir un lien de connexion",
+    v2Email: "Adresse e-mail",
     v2Subtitle: "Vos leçons vous attendent.",
     emailPlaceholder: "vous@exemple.com",
     passwordPlaceholder: "Votre mot de passe",
