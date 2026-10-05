@@ -233,4 +233,12 @@ do $$ begin
 end $$;
 reset role;
 
+-- Fonctions privilégiées : aucune n'est appelable par un client (RPC)
+do $$ begin
+  if has_function_privilege('authenticated', 'public.is_admin()', 'execute')
+     or has_function_privilege('anon', 'public.is_admin()', 'execute') then
+    raise exception 'ECHEC : is_admin() appelable par un client';
+  end if;
+end $$;
+
 select 'RECETTE SQL : OK' as resultat;
