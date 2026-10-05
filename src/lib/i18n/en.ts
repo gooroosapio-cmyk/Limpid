@@ -532,6 +532,12 @@ export const en: Dict = {
     },
   },
   login: {
+    oauth: {
+      google: "Continue with Google",
+      apple: "Continue with Apple",
+      error: "Signing in with this service did not work. Try again, or use your email address.",
+      closed: "Signing in with this service did not work: sign-ups are not open yet for this address.",
+    },
     linkInvalid: "This link is no longer valid. Request a new one.",
     title: "Sign in",
     subtitle: "Find your reports.",

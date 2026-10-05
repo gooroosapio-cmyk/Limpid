@@ -530,6 +530,12 @@ export const fr = {
     } as Record<string, string>,
   },
   login: {
+    oauth: {
+      google: "Continuer avec Google",
+      apple: "Continuer avec Apple",
+      error: "La connexion avec ce service n'a pas abouti. Réessayez, ou utilisez votre adresse email.",
+      closed: "La connexion avec ce service n'a pas abouti : les inscriptions ne sont pas encore ouvertes pour cette adresse.",
+    },
     linkInvalid: "Ce lien n'est plus valable. Demandez-en un nouveau.",
     title: "Connexion",
     subtitle: "Retrouvez vos rapports.",

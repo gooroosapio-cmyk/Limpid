@@ -5,11 +5,12 @@ import { Logo } from "@/components/Logo";
 import { getT } from "@/lib/i18n/server";
 import Link from "next/link";
 import { signupOpen } from "@/lib/auth/password";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { LoginForm } from "./LoginForm";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
-  return { title: "Connexion" };
+  return { title: t.login.title };
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ erreur?: string; compte?: string; session?: string }> }) {
@@ -29,9 +30,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       )}
       {erreur && (
         <p className="notice notice-warn" role="alert">
-          {t.login.linkInvalid}
+          {erreur === "oauth" ? t.login.oauth.error : erreur === "oauth_ferme" ? t.login.oauth.closed : t.login.linkInvalid}
         </p>
       )}
+      <OAuthButtons t={t} />
       <LoginForm />
       {open && (
         <p className="center">
