@@ -5,11 +5,14 @@ import { LinkRow } from "@/components/LinkRow";
 import { Screen } from "@/components/shell/Screen";
 import { isAdmin } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
-import { fr } from "@/lib/i18n/fr";
+import { getT } from "@/lib/i18n/server";
 import { usageToday } from "@/lib/jobs/limits";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 
-export const metadata: Metadata = { title: fr.nav.profile };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t.nav.profile };
+}
 
 function initials(email: string): string {
   const name = email.split("@")[0] ?? "";
@@ -19,6 +22,7 @@ function initials(email: string): string {
 
 /** Profil (kit V3, écran 29) : identité, utilisation réelle, abonnement, données et sécurité. */
 export default async function AccountPage() {
+  const t = await getT();
   const user = await requireUser();
   const email = user.email ?? "";
   const [admin, usage] = await Promise.all([
@@ -26,30 +30,30 @@ export default async function AccountPage() {
     isAdminConfigured() ? usageToday(user.id).catch(() => null) : Promise.resolve(null),
   ]);
   const left = usage ? Math.max(0, usage.limit - usage.used) : null;
-  const r = fr.compte.rows;
+  const r = t.compte.rows;
 
   return (
     <Screen>
       <div className="stagger">
-        <h1>{fr.nav.profile}</h1>
+        <h1>{t.nav.profile}</h1>
         <div className="profile">
           <span className="avatar avatar-lg" aria-hidden="true">{initials(email)}</span>
           <div>
             <h2>{email}</h2>
-            <p>{admin ? `${fr.compte.profile} · ${fr.compte.admin}` : fr.compte.profile}</p>
+            <p>{admin ? `${t.compte.profile} · ${t.compte.admin}` : t.compte.profile}</p>
           </div>
         </div>
 
         {usage && left !== null && (
           <section className="card usage-card" aria-labelledby="usage-h">
             <div className="head">
-              <h2 id="usage-h" className="small">{fr.compte.usageTitle}</h2>
-              <span className="chip">{fr.compte.usageBadge}</span>
+              <h2 id="usage-h" className="small">{t.compte.usageTitle}</h2>
+              <span className="chip">{t.compte.usageBadge}</span>
             </div>
-            <p className="big">{fr.compte.usageBig(left)}</p>
-            <progress value={usage.used} max={usage.limit} aria-label={fr.compte.usageNote(usage.used, usage.limit)} />
-            <p className="muted small">{fr.compte.usageNote(usage.used, usage.limit)}</p>
-            <p className="center"><Link href="/compte/utilisation" className="btn-link">{fr.compte.usageLink}</Link></p>
+            <p className="big">{t.compte.usageBig(left)}</p>
+            <progress value={usage.used} max={usage.limit} aria-label={t.compte.usageNote(usage.used, usage.limit)} />
+            <p className="muted small">{t.compte.usageNote(usage.used, usage.limit)}</p>
+            <p className="center"><Link href="/compte/utilisation" className="btn-link">{t.compte.usageLink}</Link></p>
           </section>
         )}
 
@@ -63,7 +67,7 @@ export default async function AccountPage() {
           {admin && <LinkRow href="/admin" icon="shield" title={r.admin![0]} sub={r.admin![1]} />}
         </ul>
         <form action="/auth/deconnexion" method="post" className="logout-form">
-          <button type="submit" className="btn btn-block"><Icon name="logout" /> {fr.compte.logout}</button>
+          <button type="submit" className="btn btn-block"><Icon name="logout" /> {t.compte.logout}</button>
         </form>
       </div>
     </Screen>

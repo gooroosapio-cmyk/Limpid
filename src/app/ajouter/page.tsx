@@ -4,10 +4,13 @@ import { ImportForm } from "@/components/ImportForm";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import { isDemoMode, isUrlImportEnabled, limits } from "@/lib/config";
-import { fr } from "@/lib/i18n/fr";
+import { getT } from "@/lib/i18n/server";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 
-export const metadata: Metadata = { title: fr.nav.home };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t.nav.home };
+}
 
 const TABS = { fichier: "file", lien: "link", texte: "text" } as const;
 
@@ -16,6 +19,7 @@ const TABS = { fichier: "file", lien: "link", texte: "text" } as const;
  * de pages ni de modèle. `?mode=texte|fichier|lien` ouvre directement le bon onglet (menu).
  */
 export default async function AddPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const t = await getT();
   await requireUser();
   const { mode } = await searchParams;
   const tab = TABS[mode as keyof typeof TABS] ?? "file";
@@ -23,11 +27,11 @@ export default async function AddPage({ searchParams }: { searchParams: Promise<
   return (
     <Screen className="hero">
       <div className="stagger">
-        <span className="eyebrow">{fr.home.eyebrow}</span>
-        <h1>{fr.home.title}</h1>
-        <p className="lede">{fr.add.lede}</p>
+        <span className="eyebrow">{t.home.eyebrow}</span>
+        <h1>{t.home.title}</h1>
+        <p className="lede">{t.add.lede}</p>
         <DemoBanner />
-        {!enabled && <p className="notice notice-warn">{fr.create.notConfigured}</p>}
+        {!enabled && <p className="notice notice-warn">{t.create.notConfigured}</p>}
       </div>
       <ImportForm
         key={tab}

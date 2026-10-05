@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 export interface Feedback {
   verdict: "correct" | "partial" | "incorrect";
@@ -36,6 +36,7 @@ export function CheckQuiz({
   refs: React.ReactNode;
   initial?: { answer: string; feedback: Feedback } | null;
 }) {
+  const t = useT();
   const [answer, setAnswer] = useState(initial?.answer ?? "");
   const [result, setResult] = useState<Feedback | null>(initial?.feedback ?? null);
   const [pending, setPending] = useState(false);
@@ -54,10 +55,10 @@ export function CheckQuiz({
         body: JSON.stringify({ check_id: checkId, answer }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : fr.quiz.failed);
+      if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : t.quiz.failed);
       setResult(data as Feedback);
     } catch (err) {
-      setError((err as Error).message || fr.quiz.failed);
+      setError((err as Error).message || t.quiz.failed);
     } finally {
       setPending(false);
     }
@@ -68,18 +69,18 @@ export function CheckQuiz({
       <p className="quiz-question" id={`${base}-q`}>{question}</p>
       {reportId && (
         <form onSubmit={submit} aria-labelledby={`${base}-q`}>
-          <label htmlFor={`${base}-a`} className="sr-only">{fr.quiz.answerLabel}</label>
+          <label htmlFor={`${base}-a`} className="sr-only">{t.quiz.answerLabel}</label>
           <textarea
             id={`${base}-a`}
             className="quiz-answer"
             value={answer}
             maxLength={2_000}
-            placeholder={fr.quiz.placeholder}
+            placeholder={t.quiz.placeholder}
             onChange={(e) => setAnswer(e.target.value)}
             disabled={pending}
           />
           <button type="submit" className="btn btn-block" disabled={pending || answer.trim().length < 2}>
-            {pending ? fr.quiz.grading : result ? fr.quiz.retry : fr.quiz.submit}
+            {pending ? t.quiz.grading : result ? t.quiz.retry : t.quiz.submit}
           </button>
         </form>
       )}
@@ -87,22 +88,22 @@ export function CheckQuiz({
       <div aria-live="polite">
         {result && !pending && (
           <div className="quiz-result">
-            <p className={VERDICT_CLASS[result.verdict]}>{fr.quiz.verdicts[result.verdict]}</p>
+            <p className={VERDICT_CLASS[result.verdict]}>{t.quiz.verdicts[result.verdict]}</p>
             <p>{result.feedback}</p>
             {result.misconception && (
-              <p className="block-caution quiz-misconception"><strong>{fr.quiz.misconception}</strong> {result.misconception}</p>
+              <p className="block-caution quiz-misconception"><strong>{t.quiz.misconception}</strong> {result.misconception}</p>
             )}
           </div>
         )}
       </div>
       <details open={!!result && !pending}>
-        <summary>{fr.quiz.expected}</summary>
+        <summary>{t.quiz.expected}</summary>
         <ul className="quiz-points">
           {expectedPoints.map((p, i) => {
             const covered = result?.points.find((x) => x.index === i + 1)?.covered;
             return (
               <li key={p} className={covered === undefined ? undefined : covered ? "point-ok" : "point-missing"}>
-                {covered !== undefined && <span className="sr-only">{covered ? fr.quiz.covered : fr.quiz.missing} : </span>}
+                {covered !== undefined && <span className="sr-only">{covered ? t.quiz.covered : t.quiz.missing} : </span>}
                 {p}
               </li>
             );

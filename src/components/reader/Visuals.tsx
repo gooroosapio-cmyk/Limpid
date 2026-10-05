@@ -1,5 +1,7 @@
+"use client";
+
 import type { VisualSpec } from "@/lib/contracts/schemas";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { barRatios, ChartData, ComparisonData, FlowData, IllustrationData, safeHref, type AssetView } from "@/lib/render/visuals";
 
 export type { AssetView };
@@ -29,6 +31,7 @@ function BarChart({ data, labelledBy }: { data: ChartData; labelledBy: string })
 }
 
 function ComparisonTable({ data, caption }: { data: ComparisonData; caption: React.ReactNode }) {
+  const t = useT();
   return (
     <div className="table-scroll">
       <table className="compare">
@@ -45,7 +48,7 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
               <th scope="row">{o.name}</th>
               {data.criteria.map((c, i) => {
                 const cell = o.cells[i];
-                return <td key={c}>{cell?.text ?? <span className="muted">{fr.visuals.notStated}</span>}</td>;
+                return <td key={c}>{cell?.text ?? <span className="muted">{t.visuals.notStated}</span>}</td>;
               })}
             </tr>
           ))}
@@ -56,7 +59,8 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
 }
 
 export function Credit({ asset }: { asset: AssetView }) {
-  if (asset.provider === "gemini") return <span className="credit">{fr.visuals.generated(asset.model)}</span>;
+  const t = useT();
+  if (asset.provider === "gemini") return <span className="credit">{t.visuals.generated(asset.model)}</span>;
   const via = asset.provider === "commons" ? "Wikimedia Commons" : "Unsplash";
   const licenseUrl = safeHref(asset.licenseUrl);
   const sourceUrl = safeHref(asset.sourceUrl);
@@ -94,10 +98,11 @@ export function VisualFigure({
   asset?: AssetView;
   showIllustrations: boolean;
 }) {
+  const t = useT();
   const altId = `${v.id}-alt`;
   const alternative = (
     <details>
-      <summary>{fr.reader.textAlternative}</summary>
+      <summary>{t.reader.textAlternative}</summary>
       <p id={altId}>{v.alt_text}</p>
     </details>
   );
@@ -142,7 +147,7 @@ export function VisualFigure({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset.src} alt={v.alt_text} width={asset.width} height={asset.height} loading="lazy" decoding="async" />
           <figcaption>
-            <span className="eyebrow">{fr.visuals.illustration}</span> {v.caption}
+            <span className="eyebrow">{t.visuals.illustration}</span> {v.caption}
             <br />
             <Credit asset={asset} />
           </figcaption>

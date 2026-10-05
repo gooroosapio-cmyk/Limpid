@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { savePreferenceField } from "@/app/preferences/actions";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 type Field = "familiarity" | "goal";
 
 /** Préférences pédagogiques directes : chaque choix est enregistré et vaut pour les prochains rapports. */
 export function ReadingPrefs({ familiarity, goal, concrete }: { familiarity: string | null; goal: string | null; concrete: boolean }) {
+  const t = useT();
   const [values, setValues] = useState<Record<Field, string | null>>({ familiarity, goal });
   const [isConcrete, setConcrete] = useState(concrete);
   const [status, setStatus] = useState<"" | "saved" | "failed">("");
@@ -45,10 +46,10 @@ export function ReadingPrefs({ familiarity, goal, concrete }: { familiarity: str
 
   return (
     <>
-      {group("familiarity", fr.compte.familiarity, fr.compte.familiarities)}
-      {group("goal", fr.compte.goal, fr.compte.goals)}
+      {group("familiarity", t.compte.familiarity, t.compte.familiarities)}
+      {group("goal", t.compte.goal, t.compte.goals)}
       <label className="setting">
-        <span><b>{fr.compte.concrete[0]}</b><small>{fr.compte.concrete[1]}</small></span>
+        <span><b>{t.compte.concrete[0]}</b><small>{t.compte.concrete[1]}</small></span>
         <span className="switch">
           <input
             type="checkbox"
@@ -64,7 +65,7 @@ export function ReadingPrefs({ familiarity, goal, concrete }: { familiarity: str
         </span>
       </label>
       <p role="status" aria-live="polite" className="small muted">
-        {status === "saved" ? fr.compte.saved : status === "failed" ? fr.compte.failed : ""}
+        {status === "saved" ? t.compte.saved : status === "failed" ? t.compte.failed : ""}
       </p>
     </>
   );

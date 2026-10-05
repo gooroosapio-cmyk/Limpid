@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 /** Installation : bouton natif seulement s'il est proposé ; sinon, les étapes du navigateur. */
 export function InstallPanel() {
+  const t = useT();
   const [state, setState] = useState<"checking" | "installed" | "prompt" | "ios" | "other" | "done">("checking");
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export function InstallPanel() {
 
   if (state === "checking") return <div className="skeleton skeleton-row" aria-hidden="true" />;
   if (state === "installed" || state === "done")
-    return <p className="notice notice-ok" role="status">{state === "done" ? fr.pwa.installDone : fr.pwa.installed}</p>;
+    return <p className="notice notice-ok" role="status">{state === "done" ? t.pwa.installDone : t.pwa.installed}</p>;
   if (state === "prompt")
     return (
       <button
@@ -34,20 +35,20 @@ export function InstallPanel() {
           setState("done");
         }}
       >
-        <Icon name="download" /> {fr.pwa.installButton}
+        <Icon name="download" /> {t.pwa.installButton}
       </button>
     );
   if (state === "ios")
     return (
       <section className="card" aria-labelledby="ios-h">
-        <h2 id="ios-h" className="small">{fr.pwa.iosTitle}</h2>
-        <ol className="install-steps">{fr.pwa.iosSteps.map((s) => <li key={s}>{s}</li>)}</ol>
+        <h2 id="ios-h" className="small">{t.pwa.iosTitle}</h2>
+        <ol className="install-steps">{t.pwa.iosSteps.map((s) => <li key={s}>{s}</li>)}</ol>
       </section>
     );
   return (
     <section className="card" aria-labelledby="other-h">
-      <h2 id="other-h" className="small">{fr.pwa.otherTitle}</h2>
-      <p>{fr.pwa.otherText}</p>
+      <h2 id="other-h" className="small">{t.pwa.otherTitle}</h2>
+      <p>{t.pwa.otherText}</p>
     </section>
   );
 }

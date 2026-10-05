@@ -4,7 +4,7 @@ import { sourceEntries } from "@/lib/render/sources";
 import { showsIllustrations } from "@/lib/display/themes";
 import { safeHref } from "@/lib/render/visuals";
 import { LEVEL_LABELS } from "@/lib/labels";
-import { fr } from "@/lib/i18n/fr";
+import { dictFor, type Dict } from "@/lib/i18n";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { VisualFigure, type AssetView } from "./Visuals";
 import { CheckQuiz } from "./CheckQuiz";
@@ -50,7 +50,7 @@ function Linked({ text, terms }: { text: string; terms: Terms }) {
   );
 }
 
-function BlockView({ block, numbers, terms }: { block: Block; numbers: Map<string, number>; terms: Terms }) {
+function BlockView({ block, numbers, terms, t }: { block: Block; numbers: Map<string, number>; terms: Terms; t: Dict }) {
   const refs = <Refs ids={block.evidence_ids} numbers={numbers} />;
   switch (block.type) {
     case "fact":
@@ -58,7 +58,7 @@ function BlockView({ block, numbers, terms }: { block: Block; numbers: Map<strin
     case "definition":
       return (
         <p className="block block-definition">
-          <span className="block-label">{fr.reader.definition}</span>
+          <span className="block-label">{t.reader.definition}</span>
           <br />
           <dfn>{block.term}</dfn> — <Linked text={block.text} terms={terms} /> {refs}
         </p>
@@ -66,22 +66,22 @@ function BlockView({ block, numbers, terms }: { block: Block; numbers: Map<strin
     case "analogy":
       return (
         <div className="block block-analogy">
-          <span className="block-label">{fr.reader.analogy}</span>
+          <span className="block-label">{t.reader.analogy}</span>
           <p>{block.text}</p>
-          <p className="limit"><strong>{fr.reader.analogyLimit}</strong> {block.limit}</p>
+          <p className="limit"><strong>{t.reader.analogyLimit}</strong> {block.limit}</p>
         </div>
       );
     case "fictional_example":
       return (
         <div className="block block-example">
-          <span className="block-label">{fr.reader.fictional}</span>
+          <span className="block-label">{t.reader.fictional}</span>
           <p>{block.text}</p>
         </div>
       );
     case "inference":
       return (
         <p className="block">
-          <span className="block-label">{fr.reader.inference}</span>
+          <span className="block-label">{t.reader.inference}</span>
           <br />
           <Linked text={block.text} terms={terms} /> {refs}
         </p>
@@ -89,7 +89,7 @@ function BlockView({ block, numbers, terms }: { block: Block; numbers: Map<strin
     case "caution":
       return (
         <div className="block block-caution">
-          <span className="block-label">{fr.reader.caution}</span>
+          <span className="block-label">{t.reader.caution}</span>
           <p><Linked text={block.text} terms={terms} /> {refs}</p>
         </div>
       );
@@ -114,6 +114,7 @@ export function Reader({
   assets = {},
   footer = null,
   options = null,
+  t = dictFor("fr"),
 }: {
   blueprint: ReportBlueprint;
   explanation: ExplanationObject;
@@ -141,6 +142,8 @@ export function Reader({
   footer?: React.ReactNode;
   /** Options du rapport (export, présentation, source…), dans le volet Sommaire. */
   options?: React.ReactNode;
+  /** Textes de l'interface (langue du lecteur). */
+  t?: Dict;
 }) {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments);
   const originalLink = originalHref ?? safeHref(sourceUrl);
@@ -161,14 +164,14 @@ export function Reader({
       <NotionsProvider notions={notions} checkHref={hasChecks ? "#verifier" : null}>
       <article aria-labelledby="report-title" className={`reader theme-${theme}`}>
         <p className="eyebrow reader-eyebrow">
-          {isDemo && <span className="badge badge-demo">{fr.demo.badge}</span>} {LEVEL_LABELS[explanation.level]} · {fr.reader.eyebrow(toc.length, notions.length)}
+          {isDemo && <span className="badge badge-demo">{t.demo.badge}</span>} {LEVEL_LABELS[explanation.level]} · {t.reader.eyebrow(toc.length, notions.length)}
         </p>
         <h1 id="report-title" className="reader-title">{blueprint.title}</h1>
         {first && <p className="reader-dek">{first.question}</p>}
 
         {first && (
-          <aside className="takeaway" aria-label={fr.reader.essential}>
-            <strong>{fr.reader.essential}</strong>
+          <aside className="takeaway" aria-label={t.reader.essential}>
+            <strong>{t.reader.essential}</strong>
             <ul>
               {explanation.sections.map((s) => <li key={s.id}>{s.takeaway}</li>)}
             </ul>
@@ -181,9 +184,9 @@ export function Reader({
           return (
             <section key={s.id} id={s.id} className="reader-section" aria-labelledby={`${s.id}-h`}>
               <h2 id={`${s.id}-h`}>{s.question}</h2>
-              {s.blocks.map((b) => <BlockView key={b.id} block={b} numbers={numbers} terms={terms} />)}
+              {s.blocks.map((b) => <BlockView key={b.id} block={b} numbers={numbers} terms={terms} t={t} />)}
               {sectionActions && (
-                <div className="section-actions" role="group" aria-label={fr.reader.sectionActions(s.question)}>
+                <div className="section-actions" role="group" aria-label={t.reader.sectionActions(s.question)}>
                   {sectionActions(s.id, s.question)}
                 </div>
               )}
@@ -208,7 +211,7 @@ export function Reader({
 
         {explanation.glossary.length > 0 && (
           <section className="reader-section" aria-labelledby="glossary-h">
-            <h2 id="glossary-h">{fr.reader.glossary}</h2>
+            <h2 id="glossary-h">{t.reader.glossary}</h2>
             <dl className="glossary">
               {explanation.glossary.map((g) => (
                 <div key={g.term}>
@@ -222,8 +225,8 @@ export function Reader({
 
         {explanation.checks.length > 0 && (
           <section id="verifier" className="reader-section" aria-labelledby="check-h">
-            <h2 id="check-h">{fr.reader.check}</h2>
-            {reportId && <p className="muted">{fr.reader.checkIntro}</p>}
+            <h2 id="check-h">{t.reader.check}</h2>
+            {reportId && <p className="muted">{t.reader.checkIntro}</p>}
             {explanation.checks.map((c) => {
               const prior = answers?.[c.id];
               const fb = prior ? FeedbackSchema.safeParse(prior.feedback) : null;
@@ -243,18 +246,18 @@ export function Reader({
         )}
 
         <section className="reader-section" aria-labelledby="limits-h">
-          <h2 id="limits-h">{fr.reader.limits}</h2>
+          <h2 id="limits-h">{t.reader.limits}</h2>
           <ul>{explanation.limitations.map((l) => <li key={l}>{l}</li>)}</ul>
         </section>
 
         <section className="reader-section" aria-labelledby="sources-h">
-          <h2 id="sources-h">{fr.reader.sources}</h2>
+          <h2 id="sources-h">{t.reader.sources}</h2>
           <p className="muted">
             {sourceTitle}
             {originalLink && (
               <>
                 {" — "}
-                <a href={originalLink} rel="noopener noreferrer nofollow" target="_blank">{fr.reader.openOriginal}</a>
+                <a href={originalLink} rel="noopener noreferrer nofollow" target="_blank">{t.reader.openOriginal}</a>
               </>
             )}
           </p>
@@ -269,7 +272,7 @@ export function Reader({
 
         {actions && (
           <section className="reader-section" aria-labelledby="notclear-h">
-            <h2 id="notclear-h">{fr.reader.notClear}</h2>
+            <h2 id="notclear-h">{t.reader.notClear}</h2>
             <div className="reader-actions" role="group" aria-labelledby="notclear-h">{actions}</div>
             {actionsNote && <p className="muted small">{actionsNote}</p>}
           </section>

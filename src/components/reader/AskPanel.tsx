@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 interface Answer {
   answer: string;
@@ -18,6 +18,7 @@ type Turn = { q: string; a: Answer | null; error?: string };
  * avec extraits vérifiés, suites proposées. L'échange reste sur cet écran (non enregistré).
  */
 export function AskPanel({ reportId, section }: { reportId: string; section: { id: string; title: string } | null }) {
+  const L = useT();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
   const [scope, setScope] = useState<{ id: string; title: string } | null>(section);
@@ -41,10 +42,10 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
         body: JSON.stringify({ question: q, section_id: scope?.id ?? null, history }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || typeof data.answer !== "string") throw new Error(typeof data.message === "string" ? data.message : fr.ask.failed);
+      if (!res.ok || typeof data.answer !== "string") throw new Error(typeof data.message === "string" ? data.message : L.ask.failed);
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a: data as Answer } : x)));
     } catch (e) {
-      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: (e as Error).message || fr.ask.failed } : x)));
+      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: (e as Error).message || L.ask.failed } : x)));
     } finally {
       setPending(false);
     }
@@ -53,37 +54,37 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
   return (
     <div className="ask-panel">
       <p className="ask-scope">
-        <span className="muted small">{fr.ask.about} :</span>{" "}
+        <span className="muted small">{L.ask.about} :</span>{" "}
         {scope ? (
-          <button type="button" className="chip chip-yellow" onClick={() => setScope(null)} aria-label={`${scope.title} — ${fr.ask.whole}`}>
+          <button type="button" className="chip chip-yellow" onClick={() => setScope(null)} aria-label={`${scope.title} — ${L.ask.whole}`}>
             {scope.title} <Icon name="close" size={14} />
           </button>
         ) : (
-          <span className="chip">{fr.ask.whole}</span>
+          <span className="chip">{L.ask.whole}</span>
         )}
       </p>
 
       <div className="ask-thread" aria-live="polite">
         {turns.length === 0 && (
           <div className="ask-suggest stagger">
-            {fr.ask.suggestions.map((s) => (
+            {L.ask.suggestions.map((s) => (
               <button key={s} type="button" className="filterchip" onClick={() => ask(s)}>{s}</button>
             ))}
           </div>
         )}
         {turns.map((t, i) => (
           <div key={i} className="ask-turn">
-            <p className="ask-q"><span className="sr-only">{fr.ask.you} : </span>{t.q}</p>
+            <p className="ask-q"><span className="sr-only">{L.ask.you} : </span>{t.q}</p>
             {t.error ? (
               <p className="notice notice-error" role="alert">{t.error}</p>
             ) : !t.a ? (
               <p className="ask-a ask-wait" role="status">
-                <span className="loader-inline" aria-hidden="true"><span className="dot" /><span className="dot" /><span className="dot" /></span> {fr.ask.thinking}
+                <span className="loader-inline" aria-hidden="true"><span className="dot" /><span className="dot" /><span className="dot" /></span> {L.ask.thinking}
               </p>
             ) : (
               <div className="ask-a">
-                <span className="sr-only">{fr.ask.limpid} : </span>
-                {!t.a.inDocument && <p className="chip">{fr.ask.notInDoc}</p>}
+                <span className="sr-only">{L.ask.limpid} : </span>
+                {!t.a.inDocument && <p className="chip">{L.ask.notInDoc}</p>}
                 <p>{t.a.answer}</p>
                 {t.a.citations.map((c, k) => (
                   <blockquote key={k} className="quote ask-quote">
@@ -92,12 +93,12 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
                 ))}
                 {t.a.beyond && (
                   <div className="note">
-                    <b>{fr.ask.beyond}</b>
+                    <b>{L.ask.beyond}</b>
                     <p>{t.a.beyond}</p>
                   </div>
                 )}
                 {i === turns.length - 1 && t.a.followups.length > 0 && (
-                  <div className="ask-follow" role="group" aria-label={fr.ask.followups}>
+                  <div className="ask-follow" role="group" aria-label={L.ask.followups}>
                     {t.a.followups.map((f) => (
                       <button key={f} type="button" className="filterchip" onClick={() => ask(f)} disabled={pending}>{f}</button>
                     ))}
@@ -117,13 +118,13 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
           void ask(text);
         }}
       >
-        <label htmlFor="ask-input" className="sr-only">{fr.ask.label}</label>
+        <label htmlFor="ask-input" className="sr-only">{L.ask.label}</label>
         <textarea
           id="ask-input"
           rows={1}
           maxLength={500}
           value={text}
-          placeholder={fr.ask.placeholder}
+          placeholder={L.ask.placeholder}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -132,11 +133,11 @@ export function AskPanel({ reportId, section }: { reportId: string; section: { i
             }
           }}
         />
-        <button type="submit" className="ask-send" aria-label={fr.ask.send} disabled={pending || text.trim().length < 2}>
+        <button type="submit" className="ask-send" aria-label={L.ask.send} disabled={pending || text.trim().length < 2}>
           <Icon name="arrow" />
         </button>
       </form>
-      <p className="muted small ask-private">{fr.ask.private}</p>
+      <p className="muted small ask-private">{L.ask.private}</p>
     </div>
   );
 }

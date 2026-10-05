@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import type { SavedReport } from "@/lib/offline";
 
 /** Liste des rapports enregistrés sur l'appareil (lue dans les caches, sans réseau). */
 export function OfflineList() {
+  const t = useT();
   const [items, setItems] = useState<SavedReport[] | null>(null);
   useEffect(() => {
     (async () => {
@@ -21,7 +22,7 @@ export function OfflineList() {
     })().catch(() => setItems([]));
   }, []);
   if (items === null) return <div className="skeleton skeleton-row" aria-hidden="true" />;
-  if (items.length === 0) return <p className="muted">{fr.pwa.none}</p>;
+  if (items.length === 0) return <p className="muted">{t.pwa.none}</p>;
   return (
     <ul className="rows stagger">
       {items.map((r) => (

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { SourceRef } from "./Sources";
 
 export interface Notion {
@@ -22,6 +22,7 @@ const Ctx = createContext<{ open: (term: string, opener: HTMLElement) => void; c
  * ordinateur. La position de lecture est préservée et le focus revient au mot à la fermeture.
  */
 export function NotionsProvider({ notions, checkHref, children }: { notions: Notion[]; checkHref: string | null; children: React.ReactNode }) {
+  const t = useT();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
@@ -47,19 +48,19 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
       >
         <div className="sheet-grip" aria-hidden="true" />
         <div className="sheet-head">
-          <h2>{fr.reader.notionTitle}</h2>
+          <h2>{t.reader.notionTitle}</h2>
           <form method="dialog">
-            <button className="ib" aria-label={fr.reader.close}><Icon name="close" /></button>
+            <button className="ib" aria-label={t.reader.close}><Icon name="close" /></button>
           </form>
         </div>
         {notion && (
           <div className="stagger" key={notion.term}>
-            <p className="eyebrow">{fr.reader.inReport}</p>
+            <p className="eyebrow">{t.reader.inReport}</p>
             <h3 id="notion-title" className="notion-term">{notion.term}</h3>
             <p className="notion-def">{notion.definition}</p>
             {notion.refs.length > 0 && (
               <p className="citation">
-                <Icon name="file" /> {fr.reader.source}
+                <Icon name="file" /> {t.reader.source}
                 {notion.refs.map((r) => <SourceRef key={r.evidenceId} n={r.n} evidenceId={r.evidenceId} />)}
               </p>
             )}
@@ -72,7 +73,7 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
                     window.location.hash = checkHref;
                   }}
                 >
-                  <Icon name="quiz" /> {fr.reader.checkUnderstanding}
+                  <Icon name="quiz" /> {t.reader.checkUnderstanding}
                 </button>
               </form>
             )}
@@ -85,6 +86,7 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
 
 /** Mot souligné ouvrant l'explication locale. */
 export function NotionTerm({ term, children }: { term: string; children: React.ReactNode }) {
+  const t = useT();
   const { open, current } = useContext(Ctx);
   return (
     <button
@@ -92,7 +94,7 @@ export function NotionTerm({ term, children }: { term: string; children: React.R
       className="term"
       aria-haspopup="dialog"
       aria-expanded={current?.toLowerCase() === term.toLowerCase()}
-      aria-label={fr.reader.openNotion(term)}
+      aria-label={t.reader.openNotion(term)}
       onClick={(e) => open(term, e.currentTarget)}
     >
       {children}

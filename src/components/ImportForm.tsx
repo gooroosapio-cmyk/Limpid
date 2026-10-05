@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
 type Tab = "file" | "link" | "text";
@@ -43,6 +43,7 @@ async function postJson(url: string, body: unknown): Promise<Record<string, unkn
 
 /** Envoi direct vers le stockage privé par URL signée, avec suivi de progression. */
 function putFile(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {
+  const t = useT();
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
@@ -50,8 +51,8 @@ function putFile(url: string, file: File, onProgress: (percent: number) => void)
     xhr.setRequestHeader("x-upsert", "false");
     xhr.setRequestHeader("content-type", file.type || "application/octet-stream");
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new FormError(fr.create.uploadFailed)));
-    xhr.onerror = () => reject(new FormError(fr.create.uploadFailed));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new FormError(t.create.uploadFailed)));
+    xhr.onerror = () => reject(new FormError(t.create.uploadFailed));
     xhr.send(file);
   });
 }
@@ -71,6 +72,7 @@ export function ImportForm({
   maxFileMb?: number;
   maxPages?: number;
 }) {
+  const t = useT();
   const MAX_FILE_BYTES = maxFileMb * 1024 * 1024;
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>(initialTab === "link" && !urlEnabled ? "file" : initialTab);
@@ -115,7 +117,7 @@ export function ImportForm({
     try {
       await create({ source: "upload", upload_id: uploadId, allow_ocr: true });
     } catch (err) {
-      setError(err instanceof FormError ? err.message : fr.create.networkError);
+      setError(err instanceof FormError ? err.message : t.create.networkError);
       setPhase({ step: "idle" });
     }
   }
@@ -141,15 +143,15 @@ export function ImportForm({
       }
       await create(body);
     } catch (err) {
-      setError(err instanceof FormError ? err.message : fr.create.networkError);
+      setError(err instanceof FormError ? err.message : t.create.networkError);
       setPhase({ step: "idle" });
     }
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "file", label: fr.create.tabs.file },
-    { id: "link", label: fr.create.tabs.link },
-    { id: "text", label: fr.create.tabs.text },
+    { id: "file", label: t.create.tabs.file },
+    { id: "link", label: t.create.tabs.link },
+    { id: "text", label: t.create.tabs.text },
   ];
 
   function onKey(e: React.KeyboardEvent, i: number) {
@@ -201,9 +203,9 @@ export function ImportForm({
             }}
           >
             <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={26} /></span>
-            <h2>{file ? fr.create.changeFile : fr.add.choose}</h2>
-            <p>{fr.add.formats}</p>
-            <p className="micro">{fr.add.limits(maxFileMb, maxPages)}</p>
+            <h2>{file ? t.create.changeFile : t.add.choose}</h2>
+            <p>{t.add.formats}</p>
+            <p className="micro">{t.add.limits(maxFileMb, maxPages)}</p>
           </label>
           <input
             id={`${base}-file`}
@@ -226,7 +228,7 @@ export function ImportForm({
           {isImage && (
             <label className="consent">
               <input type="checkbox" checked={imageConsent} onChange={(e) => setImageConsent(e.target.checked)} disabled={pending} />
-              <span>{fr.create.imageConsent}</span>
+              <span>{t.create.imageConsent}</span>
             </label>
           )}
         </div>
@@ -234,7 +236,7 @@ export function ImportForm({
 
       {tab === "link" && (
         <div role="tabpanel" id={`${base}-panel-link`} aria-labelledby={`${base}-tab-link`}>
-          <label htmlFor={`${base}-url`}>{fr.create.linkLabel}</label>
+          <label htmlFor={`${base}-url`}>{t.create.linkLabel}</label>
           <input
             id={`${base}-url`}
             type="url"
@@ -245,13 +247,13 @@ export function ImportForm({
             disabled={pending || !urlEnabled}
             aria-describedby={`${base}-url-hint`}
           />
-          <p id={`${base}-url-hint`} className="muted">{urlEnabled ? fr.create.linkHint : fr.create.linkDisabled}</p>
+          <p id={`${base}-url-hint`} className="muted">{urlEnabled ? t.create.linkHint : t.create.linkDisabled}</p>
         </div>
       )}
 
       {tab === "text" && (
         <div role="tabpanel" id={`${base}-panel-text`} aria-labelledby={`${base}-tab-text`}>
-          <label htmlFor={`${base}-text`}>{fr.create.textLabel}</label>
+          <label htmlFor={`${base}-text`}>{t.create.textLabel}</label>
           <textarea
             id={`${base}-text`}
             maxLength={MAX_PASTED}
@@ -261,7 +263,7 @@ export function ImportForm({
             aria-describedby={`${base}-text-hint`}
           />
           <p id={`${base}-text-hint`} className="muted">
-            {fr.create.textHint} {text.length.toLocaleString("fr-FR")} / {MAX_PASTED.toLocaleString("fr-FR")}
+            {t.create.textHint} {text.length.toLocaleString("fr-FR")} / {MAX_PASTED.toLocaleString("fr-FR")}
           </p>
         </div>
       )}
@@ -270,10 +272,10 @@ export function ImportForm({
       {phase.step === "consent" && (
         <div className="notice notice-warn" role="alertdialog" aria-labelledby={`${base}-consent`}>
           <p id={`${base}-consent`}>{phase.message}</p>
-          <p className="muted">{fr.create.ocrInfo}</p>
+          <p className="muted">{t.create.ocrInfo}</p>
           <div className="consent-actions">
-            <button type="button" className="btn btn-primary" onClick={confirmOcr}>{fr.create.ocrAccept}</button>
-            <button type="button" className="btn" onClick={() => setPhase({ step: "idle" })}>{fr.create.ocrDecline}</button>
+            <button type="button" className="btn btn-primary" onClick={confirmOcr}>{t.create.ocrAccept}</button>
+            <button type="button" className="btn" onClick={() => setPhase({ step: "idle" })}>{t.create.ocrDecline}</button>
           </div>
         </div>
       )}
@@ -281,22 +283,22 @@ export function ImportForm({
         <div role="status" aria-live="polite" className="submit-status">
           {phase.step === "upload" ? (
             <>
-              <label htmlFor={`${base}-progress`}>{fr.create.uploading(phase.percent)}</label>
+              <label htmlFor={`${base}-progress`}>{t.create.uploading(phase.percent)}</label>
               <progress id={`${base}-progress`} max={100} value={phase.percent} />
             </>
           ) : (
-            <p>{tab === "text" ? fr.create.submitting : fr.create.reading}</p>
+            <p>{tab === "text" ? t.create.submitting : t.create.reading}</p>
           )}
         </div>
       )}
       <div className="note">
-        <b>{fr.add.nothingTitle}</b>
-        <p>{fr.add.nothing}</p>
+        <b>{t.add.nothingTitle}</b>
+        <p>{t.add.nothing}</p>
       </div>
       <button type="submit" className={pending ? "btn btn-primary btn-block busy" : "btn btn-primary btn-block"} disabled={!canSubmit} aria-disabled={!canSubmit}>
-        {pending ? fr.create.reading : <>{fr.create.next} <Icon name="arrow" size={20} /></>}
+        {pending ? t.create.reading : <>{t.create.next} <Icon name="arrow" size={20} /></>}
       </button>
-      <p className="muted small">{fr.create.privacy}</p>
+      <p className="muted small">{t.create.privacy}</p>
     </form>
   );
 }

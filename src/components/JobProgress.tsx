@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { LoaderBook } from "@/components/LoaderBook";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 interface JobView {
   status: string;
@@ -39,14 +39,16 @@ const STEP_OF_STAGE: Record<string, number> = {
 };
 
 function currentDetail(step: number, job: JobView): string {
-  if (job.status === "queued") return fr.prep.queued;
-  if (job.stage === "illustrations") return fr.prep.illustrations;
-  if (job.stage === "mise_en_page") return fr.prep.layout;
-  return fr.prep.steps[step]!.current;
+  const t = useT();
+  if (job.status === "queued") return t.prep.queued;
+  if (job.stage === "illustrations") return t.prep.illustrations;
+  if (job.stage === "mise_en_page") return t.prep.layout;
+  return t.prep.steps[step]!.current;
 }
 
 /** Suit la génération (interrogation légère), puis recharge la page quand le rapport est prêt. */
 export function JobProgress({ reportId, initial, compact = false }: { reportId: string; initial: JobView; compact?: boolean }) {
+  const t = useT();
   const [job, setJob] = useState(initial);
   const router = useRouter();
   const active = job.status === "queued" || job.status === "running";
@@ -69,13 +71,13 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
     return (
       <div className="card prep-compact" role="status" aria-live="polite">
         <span className="loader-inline" aria-hidden="true"><span className="dot" /><span className="dot" /><span className="dot" /></span>
-        <p><b>{fr.prep.newVersion}</b> · {fr.prep.steps[step]!.label}</p>
+        <p><b>{t.prep.newVersion}</b> · {t.prep.steps[step]!.label}</p>
       </div>
     );
   }
 
   if (active) {
-    const phase = fr.prep.phases[step <= 0 ? 0 : step <= 2 ? 1 : 2]!;
+    const phase = t.prep.phases[step <= 0 ? 0 : step <= 2 ? 1 : 2]!;
     return (
       <div className="prep">
         <LoaderBook />
@@ -83,9 +85,9 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
           <h1>{phase.heading}</h1>
           <p className="lede">{phase.lede}</p>
         </div>
-        <p className="sr-only" role="status" aria-live="polite">{fr.prep.steps[step]!.label} : {currentDetail(step, job)}</p>
+        <p className="sr-only" role="status" aria-live="polite">{t.prep.steps[step]!.label} : {currentDetail(step, job)}</p>
         <ol className="steps">
-          {fr.prep.steps.map((st, i) => {
+          {t.prep.steps.map((st, i) => {
             const state = i < step ? "done" : i === step ? "current" : "todo";
             return (
               <li key={st.label} className={`step step-${state}`} aria-current={state === "current" ? "step" : undefined}>
@@ -93,31 +95,31 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
                 <span>
                   <strong>{st.label}</strong>
                   <span className="step-detail">
-                    {state === "done" ? fr.prep.done : state === "current" ? currentDetail(i, job) : fr.prep.todo}
+                    {state === "done" ? t.prep.done : state === "current" ? currentDetail(i, job) : t.prep.todo}
                   </span>
                 </span>
               </li>
             );
           })}
         </ol>
-        <p className="muted">{fr.prep.later}</p>
-        <Link href="/" className="btn btn-block">{fr.prep.home}</Link>
-        <p className="prepare-foot">{fr.prep.foot}</p>
+        <p className="muted">{t.prep.later}</p>
+        <Link href="/" className="btn btn-block">{t.prep.home}</Link>
+        <p className="prepare-foot">{t.prep.foot}</p>
       </div>
     );
   }
 
-  const message = `${fr.reports.status[job.status] ?? job.status}${job.error_code ? ` : ${ERRORS[job.error_code] ?? "une erreur est survenue."}` : ""}`;
+  const message = `${t.reports.status[job.status] ?? job.status}${job.error_code ? ` : ${ERRORS[job.error_code] ?? "une erreur est survenue."}` : ""}`;
   if (compact) return <p className="notice notice-error" role="alert">{message}</p>;
   return (
     <div className="prep prep-error">
       <span className="icon-badge" aria-hidden="true"><Icon name="alert" size={30} /></span>
-      <h1>{fr.prep.errorTitle}</h1>
+      <h1>{t.prep.errorTitle}</h1>
       <p className="notice notice-error" role="alert">{message}</p>
-      <p className="muted">{fr.prep.kept}</p>
+      <p className="muted">{t.prep.kept}</p>
       <div className="actions-row">
-        <Link href="/" className="btn">{fr.prep.library}</Link>
-        <Link href="/ajouter" className="btn btn-primary">{fr.prep.addAgain}</Link>
+        <Link href="/" className="btn">{t.prep.library}</Link>
+        <Link href="/ajouter" className="btn btn-primary">{t.prep.addAgain}</Link>
       </div>
     </div>
   );

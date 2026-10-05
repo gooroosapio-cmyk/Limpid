@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 type Variation = "simpler" | "other_example";
 
@@ -17,6 +17,7 @@ export function VersionActions({
   /** Réécrire une seule partie (sinon tout le rapport). */
   sectionId?: string;
 }) {
+  const t = useT();
   const [pending, setPending] = useState<Variation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const keys = useRef<Partial<Record<Variation, string>>>({});
@@ -33,11 +34,11 @@ export function VersionActions({
         body: JSON.stringify({ variation, idempotency_key: keys.current[variation], ...(sectionId ? { section_id: sectionId } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : fr.versions.failed);
+      if (!res.ok) throw new Error(typeof data.message === "string" ? data.message : t.versions.failed);
       // La page affiche alors la préparation en cours, puis la nouvelle version.
       router.refresh();
     } catch (err) {
-      setError((err as Error).message || fr.versions.failed);
+      setError((err as Error).message || t.versions.failed);
       setPending(null);
       delete keys.current[variation];
     }
@@ -46,10 +47,10 @@ export function VersionActions({
   return (
     <>
       <button type="button" className="btn" onClick={() => ask("simpler")} disabled={disabled || !!pending}>
-        {pending === "simpler" ? fr.versions.asking : fr.reader.simpler}
+        {pending === "simpler" ? t.versions.asking : t.reader.simpler}
       </button>
       <button type="button" className="btn" onClick={() => ask("other_example")} disabled={disabled || !!pending}>
-        {pending === "other_example" ? fr.versions.asking : fr.reader.otherExample}
+        {pending === "other_example" ? t.versions.asking : t.reader.otherExample}
       </button>
       {error && <p className="notice notice-warn reader-actions-error" role="alert">{error}</p>}
     </>

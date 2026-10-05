@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { LoaderBook } from "@/components/LoaderBook";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 export interface QuizQuestionView {
   id: string;
@@ -37,6 +37,7 @@ export function QuizRunner({
   onClose: () => void;
   onGoTo: (sectionId: string) => void;
 }) {
+  const t = useT();
   const [questions, setQuestions] = useState<QuizQuestionView[]>([]);
   const [results, setResults] = useState<boolean[]>([]);
   const [phase, setPhase] = useState<Phase>({ step: "loading" });
@@ -50,12 +51,12 @@ export function QuizRunner({
         body: JSON.stringify({ scope, ...(sectionId ? { section_id: sectionId } : {}), ...(fresh ? { fresh: true } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !Array.isArray(data.questions)) throw new Error(typeof data.message === "string" ? data.message : fr.test.failed);
+      if (!res.ok || !Array.isArray(data.questions)) throw new Error(typeof data.message === "string" ? data.message : t.test.failed);
       setQuestions(data.questions);
       setResults([]);
       setPhase({ step: "question", i: 0, picked: null, checked: false });
     } catch (e) {
-      setPhase({ step: "error", message: (e as Error).message || fr.test.failed });
+      setPhase({ step: "error", message: (e as Error).message || t.test.failed });
     }
   }
 
@@ -69,15 +70,15 @@ export function QuizRunner({
     return (
       <div className="quiz-loading" role="status">
         <LoaderBook />
-        <p><b>{fr.test.loading}</b></p>
-        <p className="muted small">{fr.test.loadingSub}</p>
+        <p><b>{t.test.loading}</b></p>
+        <p className="muted small">{t.test.loadingSub}</p>
       </div>
     );
   if (phase.step === "error")
     return (
       <div className="quiz-error">
         <p className="notice notice-error" role="alert">{phase.message}</p>
-        <button type="button" className="btn btn-block" onClick={() => load()}>{fr.test.retry}</button>
+        <button type="button" className="btn btn-block" onClick={() => load()}>{t.test.retry}</button>
       </div>
     );
 
@@ -86,17 +87,17 @@ export function QuizRunner({
     const toReview = questions.filter((_, i) => !results[i]);
     return (
       <div className="quiz-done stagger">
-        <p className="eyebrow">{fr.test.doneTitle}</p>
+        <p className="eyebrow">{t.test.doneTitle}</p>
         <div className="quiz-score" role="status">
           <span className="big">{good}</span>
           <span className="of">/{questions.length}</span>
-          <span className="lbl">{fr.test.score}</span>
+          <span className="lbl">{t.test.score}</span>
         </div>
         {toReview.length === 0 ? (
-          <p className="quiz-verdict ok"><Icon name="check" /> {fr.test.allGood}</p>
+          <p className="quiz-verdict ok"><Icon name="check" /> {t.test.allGood}</p>
         ) : (
           <>
-            <h3 className="eyebrow">{fr.test.review}</h3>
+            <h3 className="eyebrow">{t.test.review}</h3>
             <ul className="rows">
               {[...new Map(toReview.map((q) => [q.sectionId, q])).values()].map((q) => (
                 <li key={q.sectionId}>
@@ -112,12 +113,12 @@ export function QuizRunner({
         )}
         <div className="actions-row">
           <button type="button" className="btn" onClick={() => { setResults([]); setPhase({ step: "question", i: 0, picked: null, checked: false }); }}>
-            {fr.test.retry}
+            {t.test.retry}
           </button>
-          <button type="button" className="btn" onClick={() => load(true)}>{fr.test.fresh}</button>
+          <button type="button" className="btn" onClick={() => load(true)}>{t.test.fresh}</button>
         </div>
-        <button type="button" className="btn btn-primary btn-block" onClick={onClose}>{fr.test.back}</button>
-        <p className="muted small">{fr.test.doneNote}</p>
+        <button type="button" className="btn btn-primary btn-block" onClick={onClose}>{t.test.back}</button>
+        <p className="muted small">{t.test.doneNote}</p>
       </div>
     );
   }
@@ -126,7 +127,7 @@ export function QuizRunner({
   const right = phase.checked && phase.picked === q.answer;
   return (
     <div className="quiz" key={q.id}>
-      <p className="quiz-progress">{fr.test.progress(phase.i + 1, questions.length)}</p>
+      <p className="quiz-progress">{t.test.progress(phase.i + 1, questions.length)}</p>
       <progress value={phase.i + (phase.checked ? 1 : 0)} max={questions.length} aria-hidden="true" />
       <p className="quiz-section muted small">{q.sectionTitle}</p>
       <fieldset className="choices quiz-options" disabled={phase.checked}>
@@ -151,7 +152,7 @@ export function QuizRunner({
       </fieldset>
       {phase.checked && (
         <p className={right ? "quiz-verdict ok" : "quiz-verdict again"} role="status">
-          <Icon name={right ? "check" : "refresh"} /> {right ? fr.test.right : fr.test.wrong}
+          <Icon name={right ? "check" : "refresh"} /> {right ? t.test.right : t.test.wrong}
         </p>
       )}
       {!phase.checked ? (
@@ -164,7 +165,7 @@ export function QuizRunner({
             setPhase({ ...phase, checked: true });
           }}
         >
-          {phase.picked === null ? fr.test.choose : fr.test.validate}
+          {phase.picked === null ? t.test.choose : t.test.validate}
         </button>
       ) : (
         <button
@@ -175,7 +176,7 @@ export function QuizRunner({
             phase.i + 1 < questions.length ? setPhase({ step: "question", i: phase.i + 1, picked: null, checked: false }) : setPhase({ step: "done" })
           }
         >
-          {phase.i + 1 < questions.length ? fr.test.next : fr.test.results} <Icon name="arrow" />
+          {phase.i + 1 < questions.length ? t.test.next : t.test.results} <Icon name="arrow" />
         </button>
       )}
     </div>

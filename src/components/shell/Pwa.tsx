@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { purgeOtherAccounts } from "@/lib/offline";
 
 declare global {
@@ -15,6 +15,7 @@ declare global {
  * (null = déconnecté : les rapports enregistrés sur l'appareil sont effacés).
  */
 export function Pwa({ account }: { account: string | null }) {
+  const t = useT();
   const [offline, setOffline] = useState(false);
   const [back, setBack] = useState(false);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
@@ -67,14 +68,14 @@ export function Pwa({ account }: { account: string | null }) {
     };
   }, []);
 
-  if (offline) return <p className="connectivity" role="status">{fr.pwa.offline}</p>;
+  if (offline) return <p className="connectivity" role="status">{t.pwa.offline}</p>;
   if (waiting)
     return (
       <div className="connectivity" role="status">
-        <span>{fr.pwa.update}</span>
-        <button type="button" className="btn btn-primary" onClick={() => waiting.postMessage({ type: "SKIP_WAITING" })}>{fr.pwa.reload}</button>
+        <span>{t.pwa.update}</span>
+        <button type="button" className="btn btn-primary" onClick={() => waiting.postMessage({ type: "SKIP_WAITING" })}>{t.pwa.reload}</button>
       </div>
     );
-  if (back) return <p className="connectivity" role="status">{fr.pwa.online}</p>;
+  if (back) return <p className="connectivity" role="status">{t.pwa.online}</p>;
   return null;
 }

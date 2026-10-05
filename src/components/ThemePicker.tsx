@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { THEMES, type ThemeId } from "@/lib/contracts/schemas";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 type Choice = ThemeId | "auto";
 
@@ -25,6 +25,7 @@ export function ThemePicker({
   onSave?: (theme: ThemeId | null) => Promise<{ ok: boolean }>;
   legend?: string;
 }) {
+  const L = useT();
   const start: Choice = initial ?? "auto";
   const [choice, setChoice] = useState<Choice>(start);
   const [saved, setSaved] = useState<Choice>(start);
@@ -65,13 +66,13 @@ export function ThemePicker({
   return (
     <section className="theme-picker" aria-labelledby={`${base}-h`}>
       <fieldset aria-describedby={`${base}-note`}>
-        <legend id={`${base}-h`}>{legend ?? fr.themes.label}</legend>
+        <legend id={`${base}-h`}>{legend ?? L.themes.label}</legend>
         {options.map((t) => (
           <label key={t} className="theme-option">
             <span className={`theme-swatch swatch-${t === "auto" ? "sciences" : t}`} aria-hidden="true">{SWATCH[t]}</span>
             <span>
-              <strong>{t === "auto" ? fr.themes.auto : fr.themes.names[t]}</strong>
-              <span className="desc">{t === "auto" ? fr.themes.autoDesc : fr.themes.descriptions[t]}</span>
+              <strong>{t === "auto" ? L.themes.auto : L.themes.names[t]}</strong>
+              <span className="desc">{t === "auto" ? L.themes.autoDesc : L.themes.descriptions[t]}</span>
             </span>
             <input
               type="radio"
@@ -88,14 +89,14 @@ export function ThemePicker({
           </label>
         ))}
       </fieldset>
-      <p id={`${base}-note`} className="muted small">{fr.themes.note}</p>
+      <p id={`${base}-note`} className="muted small">{L.themes.note}</p>
       {!isReport && (
         <button type="button" className="btn btn-primary btn-block" disabled={state === "saving" || choice === saved} onClick={() => save(choice)}>
-          {fr.themes.apply}
+          {L.themes.apply}
         </button>
       )}
       <p role="status" aria-live="polite" className="small">
-        {state === "saved" && !isReport ? fr.themes.saved : state === "error" ? fr.themes.failed : ""}
+        {state === "saved" && !isReport ? L.themes.saved : state === "error" ? L.themes.failed : ""}
       </p>
     </section>
   );

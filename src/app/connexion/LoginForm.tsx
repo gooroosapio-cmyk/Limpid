@@ -2,13 +2,14 @@
 
 import { useActionState, useId, useState } from "react";
 import Link from "next/link";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { sendMagicLink, signInWithPassword, type LoginState } from "./actions";
 
 const idle: LoginState = { status: "idle", message: "" };
 
 /** Connexion (maquette « Connexion ») : mot de passe, ou lien reçu par email. */
 export function LoginForm() {
+  const t = useT();
   const [pwState, pwAction, pwPending] = useActionState(signInWithPassword, idle);
   const [linkState, linkAction, linkPending] = useActionState(sendMagicLink, idle);
   const [show, setShow] = useState(false);
@@ -20,10 +21,10 @@ export function LoginForm() {
 
   return (
     <form action={pwAction} className="card login" aria-describedby={`${base}-status`}>
-      <label htmlFor={`${base}-email`}>{fr.login.email}</label>
+      <label htmlFor={`${base}-email`}>{t.login.email}</label>
       <input id={`${base}-email`} name="email" type="email" autoComplete="username" inputMode="email" required />
 
-      <label htmlFor={`${base}-password`}>{fr.login.password}</label>
+      <label htmlFor={`${base}-password`}>{t.login.password}</label>
       <div className="password-field">
         <input id={`${base}-password`} name="password" type={show ? "text" : "password"} autoComplete="current-password" />
         <button
@@ -33,11 +34,11 @@ export function LoginForm() {
           aria-controls={`${base}-password`}
           onClick={() => setShow((s) => !s)}
         >
-          {show ? fr.login.hide : fr.login.show}
+          {show ? t.login.hide : t.login.show}
         </button>
       </div>
       <p className="login-forgot">
-        <Link href="/connexion/mot-de-passe-oublie">{fr.login.forgot}</Link>
+        <Link href="/connexion/mot-de-passe-oublie">{t.login.forgot}</Link>
       </p>
 
       <p id={`${base}-status`} role="status" className={state.status === "error" ? "notice notice-warn" : state.message ? "notice" : "sr-only"}>
@@ -45,11 +46,11 @@ export function LoginForm() {
       </p>
 
       <button type="submit" className="btn btn-primary btn-block" disabled={pending} onClick={() => setLast("password")}>
-        {pwPending ? fr.login.signingIn : fr.login.signIn}
+        {pwPending ? t.login.signingIn : t.login.signIn}
       </button>
-      <p className="login-or" aria-hidden="true"><span>{fr.login.or}</span></p>
+      <p className="login-or" aria-hidden="true"><span>{t.login.or}</span></p>
       <button type="submit" formAction={linkAction} formNoValidate className="btn btn-block" disabled={pending} onClick={() => setLast("link")}>
-        {linkPending ? fr.login.sending : fr.login.magicLink}
+        {linkPending ? t.login.sending : t.login.magicLink}
       </button>
     </form>
   );

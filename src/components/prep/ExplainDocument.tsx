@@ -4,10 +4,11 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 /** « Expliquer mon document » : lancement direct, réglages déduits côté serveur (kit V3, écran 03). */
 export function ExplainDocument({ sourceId }: { sourceId: string }) {
+  const t = useT();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const key = useRef(crypto.randomUUID());
@@ -28,9 +29,9 @@ export function ExplainDocument({ sourceId }: { sourceId: string }) {
         router.push(`/rapports/${id}`);
         return;
       }
-      throw new Error(typeof data.message === "string" ? data.message : fr.added.failed);
+      throw new Error(typeof data.message === "string" ? data.message : t.added.failed);
     } catch (e) {
-      setError((e as Error).message || fr.added.failed);
+      setError((e as Error).message || t.added.failed);
       setPending(false);
     }
   }
@@ -39,10 +40,10 @@ export function ExplainDocument({ sourceId }: { sourceId: string }) {
     <>
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       <button type="button" className={`btn btn-primary btn-block${pending ? " busy" : ""}`} onClick={explain} disabled={pending} aria-busy={pending}>
-        <Icon name="spark" /> {pending ? fr.added.explaining : fr.added.explain}
+        <Icon name="spark" /> {pending ? t.added.explaining : t.added.explain}
       </button>
-      <p className="center muted small">{fr.added.cost}</p>
-      <p className="center"><Link href="/ajouter" className="btn-link">{fr.added.change}</Link></p>
+      <p className="center muted small">{t.added.cost}</p>
+      <p className="center"><Link href="/ajouter" className="btn-link">{t.added.change}</Link></p>
     </>
   );
 }

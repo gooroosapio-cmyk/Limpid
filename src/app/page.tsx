@@ -8,22 +8,26 @@ import { ThemeId } from "@/lib/contracts/schemas";
 import { requireUser } from "@/lib/auth";
 import { demoBlueprint } from "@/lib/demo/cycle-eau";
 import { autoTheme } from "@/lib/display/themes";
-import { fr } from "@/lib/i18n/fr";
+import type { Dict } from "@/lib/i18n";
+import { getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: fr.library.title };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t.library.title };
+}
 
 const FILTERS = ["tous", "prets", "en_cours", "a_revoir"] as const;
 type Filter = (typeof FILTERS)[number];
 const KIND_LABELS: Record<string, string> = { pdf: "PDF", docx: "DOCX", txt: "TXT", paste: "Texte", url: "Lien", png: "Image", jpeg: "Image", webp: "Image" };
 const THEME_ICONS: Record<string, IconName> = { sciences: "spark", recit: "book", dossier: "filter", guide: "list", confort: "eye" };
 
-function when(date: string): string {
+function when(date: string, t: Dict): string {
   const d = new Date(date);
   const day = (x: Date) => x.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
   const now = new Date();
-  if (day(d) === day(now)) return fr.library.today;
-  if (day(d) === day(new Date(now.getTime() - 86_400_000))) return fr.library.yesterday;
+  if (day(d) === day(now)) return t.library.today;
+  if (day(d) === day(new Date(now.getTime() - 86_400_000))) return t.library.yesterday;
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" });
 }
 
@@ -39,6 +43,7 @@ function href(params: { vue?: string; q?: string; filtre?: string }): string {
  * filtres effaçables, bouton flottant pour expliquer un nouveau document.
  */
 export default async function HomeLibraryPage({ searchParams }: { searchParams: Promise<{ vue?: string; q?: string; filtre?: string }> }) {
+  const t = await getT();
   await requireUser();
   const sp = await searchParams;
   const view = sp.vue === "sources" ? "sources" : "rapports";
@@ -47,9 +52,9 @@ export default async function HomeLibraryPage({ searchParams }: { searchParams: 
   const supabase = await createUserClient();
 
   const tabs = (
-    <nav className="seg lib-tabs" aria-label={fr.library.tabs}>
-      <Link href={href({})} aria-current={view === "rapports" ? "page" : undefined}>{fr.library.reports}</Link>
-      <Link href={href({ vue: "sources" })} aria-current={view === "sources" ? "page" : undefined}>{fr.library.sources}</Link>
+    <nav className="seg lib-tabs" aria-label={t.library.tabs}>
+      <Link href={href({})} aria-current={view === "rapports" ? "page" : undefined}>{t.library.reports}</Link>
+      <Link href={href({ vue: "sources" })} aria-current={view === "sources" ? "page" : undefined}>{t.library.sources}</Link>
     </nav>
   );
 
@@ -66,20 +71,20 @@ export default async function HomeLibraryPage({ searchParams }: { searchParams: 
       const hasOriginal = s.kind === "url" ? !!s.original_url : !!s.storage_path;
       const meta = [
         KIND_LABELS[s.kind] ?? s.kind,
-        s.page_count ? fr.added.pageCount(s.page_count) : null,
-        s.byte_size ? fr.added.size(s.byte_size) : null,
-        !hasOriginal && s.kind !== "paste" ? fr.library.originalGone : null,
-        !report ? fr.library.noReport : null,
+        s.page_count ? t.added.pageCount(s.page_count) : null,
+        s.byte_size ? t.added.size(s.byte_size) : null,
+        !hasOriginal && s.kind !== "paste" ? t.library.originalGone : null,
+        !report ? t.library.noReport : null,
       ].filter(Boolean).join(" · ");
       return { id: s.id, title: s.title, meta, href: report ? `/rapports/${report.id}` : `/sources/${s.id}`, gone: !hasOriginal && s.kind !== "paste", isUrl: s.kind === "url" };
     });
     return (
       <Screen fab>
-        <h1>{fr.library.title}</h1>
+        <h1>{t.library.title}</h1>
         {tabs}
-        <p className="lede">{fr.library.sourcesLede}</p>
+        <p className="lede">{t.library.sourcesLede}</p>
         {items.length === 0 ? (
-          <p className="muted">{fr.library.sourcesEmpty}</p>
+          <p className="muted">{t.library.sourcesEmpty}</p>
         ) : (
           <ul className="rows stagger">
             {items.map((s) => (
@@ -95,12 +100,12 @@ export default async function HomeLibraryPage({ searchParams }: { searchParams: 
         )}
         {items.some((s) => s.gone) && (
           <section aria-labelledby="recover-h">
-            <h2 className="eyebrow">{fr.library.recover}</h2>
+            <h2 className="eyebrow">{t.library.recover}</h2>
             <div className="card recover">
               <Icon name="alert" />
-              <h3 id="recover-h">{fr.library.recoverTitle}</h3>
-              <p>{fr.library.recoverText}</p>
-              <Link href="/ajouter" className="btn btn-block">{fr.library.recoverCta}</Link>
+              <h3 id="recover-h">{t.library.recoverTitle}</h3>
+              <p>{t.library.recoverText}</p>
+              <Link href="/ajouter" className="btn btn-block">{t.library.recoverCta}</Link>
             </div>
           </section>
         )}
@@ -126,10 +131,10 @@ export default async function HomeLibraryPage({ searchParams }: { searchParams: 
     const theme = ThemeId.safeParse(r.theme_id).data ?? autoTheme(version?.template_id);
     const state: Filter = failed || version?.check_status === "incomplete" ? "a_revoir" : !ready ? "en_cours" : "prets";
     const sub = failed
-      ? fr.library.failed
+      ? t.library.failed
       : !ready
-        ? fr.library.preparing
-        : `${fr.themes.names[theme] ?? theme} · ${when(r.created_at)}${version?.check_status === "incomplete" ? ` · ${fr.library.incomplete}` : ""}`;
+        ? t.library.preparing
+        : `${t.themes.names[theme] ?? theme} · ${when(r.created_at, t)}${version?.check_status === "incomplete" ? ` · ${t.library.incomplete}` : ""}`;
     return { id: r.id, title: r.title, sub, state, ready, icon: (failed ? "alert" : !ready ? "refresh" : (THEME_ICONS[theme] ?? "book")) as IconName, cls: failed ? "row error" : !ready ? "row running" : "row" };
   });
   const shown = filter === "tous" ? rows : rows.filter((r) => r.state === filter);
@@ -137,39 +142,39 @@ export default async function HomeLibraryPage({ searchParams }: { searchParams: 
 
   return (
     <Screen fab>
-      <h1>{fr.library.title}</h1>
+      <h1>{t.library.title}</h1>
       {tabs}
       {emptyLibrary ? (
         <div className="empty lib-empty stagger">
           <div className="empty-art" aria-hidden="true"><Icon name="book" size={56} /></div>
-          <h2>{fr.library.emptyTitle}</h2>
-          <p className="muted">{fr.library.empty}</p>
-          <Link href="/ajouter" className="btn btn-primary btn-block"><Icon name="plus" /> {fr.library.emptyCta}</Link>
-          <Link href="/rapports/demo" className="btn-link">{fr.library.example}</Link>
+          <h2>{t.library.emptyTitle}</h2>
+          <p className="muted">{t.library.empty}</p>
+          <Link href="/ajouter" className="btn btn-primary btn-block"><Icon name="plus" /> {t.library.emptyCta}</Link>
+          <Link href="/rapports/demo" className="btn-link">{t.library.example}</Link>
         </div>
       ) : (
         <>
           <form className="searchbox" role="search" action="/">
             <Icon name="search" />
-            <label htmlFor="lib-q" className="sr-only">{fr.library.searchLabel}</label>
-            <input id="lib-q" name="q" type="search" defaultValue={q} placeholder={fr.library.search} maxLength={80} autoComplete="off" />
+            <label htmlFor="lib-q" className="sr-only">{t.library.searchLabel}</label>
+            <input id="lib-q" name="q" type="search" defaultValue={q} placeholder={t.library.search} maxLength={80} autoComplete="off" />
             {filter !== "tous" && <input type="hidden" name="filtre" value={filter} />}
           </form>
-          <nav className="filters" aria-label={fr.library.filters}>
+          <nav className="filters" aria-label={t.library.filters}>
             {FILTERS.map((f) => (
               <Link key={f} href={href({ q, filtre: f === "tous" ? undefined : f })} className="filterchip" aria-current={filter === f ? "true" : undefined}>
-                {fr.library.filter[f]}
+                {t.library.filter[f]}
               </Link>
             ))}
           </nav>
           {q && (
             <p className="muted small" role="status">
-              {fr.library.results(shown.length, q)} · <Link href={href({ filtre: filter === "tous" ? undefined : filter })}>{fr.library.clear}</Link>
+              {t.library.results(shown.length, q)} · <Link href={href({ filtre: filter === "tous" ? undefined : filter })}>{t.library.clear}</Link>
             </p>
           )}
-          <h2 className="eyebrow">{fr.library.recent}</h2>
+          <h2 className="eyebrow">{t.library.recent}</h2>
           {shown.length === 0 ? (
-            <p className="muted">{fr.library.noResult}</p>
+            <p className="muted">{t.library.noResult}</p>
           ) : (
             <ul className="rows stagger">
               {shown.map((r) => (
@@ -187,7 +192,7 @@ export default async function HomeLibraryPage({ searchParams }: { searchParams: 
             <li>
               <ReportLink href="/rapports/demo" className="row" immersive>
                 <span className="row-icon"><Icon name="star" /></span>
-                <span className="row-text"><b>{demoBlueprint.title}</b><small>{fr.library.demoTitle} · {fr.demo.badge}</small></span>
+                <span className="row-text"><b>{demoBlueprint.title}</b><small>{t.library.demoTitle} · {t.demo.badge}</small></span>
                 <Icon name="chevron" className="row-chevron" />
               </ReportLink>
             </li>

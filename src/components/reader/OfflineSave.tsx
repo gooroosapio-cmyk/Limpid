@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { isSaved, offlineSupported, removeSaved, saveReport } from "@/lib/offline";
 
 /** Ligne « Enregistrer hors connexion » des options du rapport. */
 export function OfflineSave({ account, path, title }: { account: string; path: string; title: string }) {
+  const t = useT();
   const [state, setState] = useState<"unknown" | "unsupported" | "idle" | "saving" | "saved" | "failed">("unknown");
 
   useEffect(() => {
@@ -43,8 +44,8 @@ export function OfflineSave({ account, path, title }: { account: string; path: s
       >
         <span className="row-icon"><Icon name={saved ? "check" : "cloud"} /></span>
         <span className="row-text">
-          <b>{saved ? fr.pwa.savedRow : state === "saving" ? fr.pwa.saving : fr.pwa.save}</b>
-          <small role="status">{state === "failed" ? fr.pwa.saveFailed : saved ? fr.pwa.savedSub : fr.pwa.saveSub}</small>
+          <b>{saved ? t.pwa.savedRow : state === "saving" ? t.pwa.saving : t.pwa.save}</b>
+          <small role="status">{state === "failed" ? t.pwa.saveFailed : saved ? t.pwa.savedSub : t.pwa.saveSub}</small>
         </span>
         <Icon name="chevron" className="row-chevron" />
       </button>

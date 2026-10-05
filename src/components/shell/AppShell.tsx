@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 import { LogoMark } from "@/components/Logo";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 interface DrawerReport {
   id: string;
@@ -41,27 +41,28 @@ function DrawerPanel({
   reports: DrawerReport[] | null;
   onClose?: () => void;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const search = useSearchParams();
   const mode = pathname === "/ajouter" ? (search.get("mode") ?? "") : null;
   const items: { href: string; label: string; icon: IconName; current: boolean }[] = [
-    { href: "/ajouter", label: fr.nav.home, icon: "home", current: mode === "" },
-    { href: "/ajouter?mode=texte", label: fr.nav.addText, icon: "list", current: mode === "texte" },
-    { href: "/ajouter?mode=fichier", label: fr.nav.addPdf, icon: "file", current: mode === "fichier" },
-    ...(urlEnabled ? [{ href: "/ajouter?mode=lien", label: fr.nav.addLink, icon: "link" as IconName, current: mode === "lien" }] : []),
-    { href: "/parametres", label: fr.nav.settings, icon: "settings", current: pathname === "/parametres" },
+    { href: "/ajouter", label: t.nav.home, icon: "home", current: mode === "" },
+    { href: "/ajouter?mode=texte", label: t.nav.addText, icon: "list", current: mode === "texte" },
+    { href: "/ajouter?mode=fichier", label: t.nav.addPdf, icon: "file", current: mode === "fichier" },
+    ...(urlEnabled ? [{ href: "/ajouter?mode=lien", label: t.nav.addLink, icon: "link" as IconName, current: mode === "lien" }] : []),
+    { href: "/parametres", label: t.nav.settings, icon: "settings", current: pathname === "/parametres" },
   ];
   return (
     <div className="drawer-panel">
       <div className="drawer-head">
         {onClose && (
-          <button type="button" className="ib" aria-label={fr.nav.closeMenu} onClick={onClose}>
+          <button type="button" className="ib" aria-label={t.nav.closeMenu} onClick={onClose}>
             <Icon name="close" />
           </button>
         )}
         <Brand />
       </div>
-      <nav className="drawer-nav" aria-label={fr.nav.main}>
+      <nav className="drawer-nav" aria-label={t.nav.main}>
         {items.map((i) => (
           <Link key={i.href} href={i.href} className="drawer-link" aria-current={i.current ? "page" : undefined}>
             <Icon name={i.icon} /> {i.label}
@@ -69,20 +70,20 @@ function DrawerPanel({
         ))}
       </nav>
       <Link href="/" className="drawer-title" aria-current={pathname === "/" ? "page" : undefined}>
-        {fr.nav.library} <span>{fr.nav.seeAll}</span>
+        {t.nav.library} <span>{t.nav.seeAll}</span>
       </Link>
-      <ul className="drawer-list" aria-label={fr.nav.library}>
+      <ul className="drawer-list" aria-label={t.nav.library}>
         {reports === null ? (
           <li aria-hidden="true"><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line short" /></li>
         ) : reports.length === 0 ? (
-          <li className="drawer-empty">{fr.nav.libraryEmpty}</li>
+          <li className="drawer-empty">{t.nav.libraryEmpty}</li>
         ) : (
           reports.map((r) => (
             <li key={r.id}>
               <Link href={`/rapports/${r.id}`} aria-current={pathname === `/rapports/${r.id}` ? "page" : undefined}>
                 <span className="t">{r.title}</span>
-                {(r.state === "preparing" || r.state === "updating") && <span className="dot" role="img" aria-label={fr.nav.preparing} />}
-                {r.state === "failed" && <span className="dot ko" role="img" aria-label={fr.nav.failed} />}
+                {(r.state === "preparing" || r.state === "updating") && <span className="dot" role="img" aria-label={t.nav.preparing} />}
+                {r.state === "failed" && <span className="dot ko" role="img" aria-label={t.nav.failed} />}
               </Link>
             </li>
           ))
@@ -104,6 +105,7 @@ function DrawerPanel({
  * le retour est celui du téléphone ou du navigateur.
  */
 export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boolean }) {
+  const t = useT();
   const pathname = usePathname();
   const search = useSearchParams();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -136,7 +138,7 @@ export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boo
         <button
           type="button"
           className="ib menu-button"
-          aria-label={fr.nav.menu}
+          aria-label={t.nav.menu}
           aria-haspopup="dialog"
           onClick={() => {
             load();
@@ -147,21 +149,21 @@ export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boo
         </button>
         <Brand />
         <div className="appbar-end">
-          <Link href="/compte" className="ib" aria-label={fr.nav.profile} aria-current={pathname === "/compte" ? "page" : undefined}>
+          <Link href="/compte" className="ib" aria-label={t.nav.profile} aria-current={pathname === "/compte" ? "page" : undefined}>
             <span className="avatar" aria-hidden="true">{initials(email)}</span>
           </Link>
-          <Link href="/parametres" className="ib" aria-label={fr.nav.settings} aria-current={pathname === "/parametres" ? "page" : undefined}>
+          <Link href="/parametres" className="ib" aria-label={t.nav.settings} aria-current={pathname === "/parametres" ? "page" : undefined}>
             <Icon name="settings" />
           </Link>
         </div>
       </header>
-      <aside className="sidebar" aria-label={fr.nav.main}>
+      <aside className="sidebar" aria-label={t.nav.main}>
         <DrawerPanel email={email} urlEnabled={urlEnabled} reports={reports} />
       </aside>
       <dialog
         ref={dialogRef}
         className="drawer"
-        aria-label={fr.nav.main}
+        aria-label={t.nav.main}
         onClick={(e) => {
           // Toucher le fond ferme le menu.
           if (e.target === e.currentTarget) dialogRef.current?.close();
@@ -175,10 +177,11 @@ export function AppShell({ email, urlEnabled }: { email: string; urlEnabled: boo
 
 /** Bouton flottant : nouveau document à expliquer. */
 export function Fab() {
+  const t = useT();
   return (
     <Link href="/ajouter" className="fab">
       <Icon name="plus" />
-      <span className="fab-label">{fr.nav.fab}</span>
+      <span className="fab-label">{t.nav.fab}</span>
     </Link>
   );
 }

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import type { SourceEntry } from "@/lib/render/sources";
 
 
@@ -21,6 +21,7 @@ export function SourcesProvider({
   originalHref?: string | null;
   children: React.ReactNode;
 }) {
+  const t = useT();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const [current, setCurrent] = useState<SourceEntry | null>(null);
@@ -45,17 +46,17 @@ export function SourcesProvider({
       >
         <div className="sheet-grip" aria-hidden="true" />
         <div className="sheet-head">
-          <h2>{fr.reader.source}</h2>
+          <h2>{t.reader.source}</h2>
           <form method="dialog">
-            <button className="ib" aria-label={fr.reader.close}><Icon name="close" /></button>
+            <button className="ib" aria-label={t.reader.close}><Icon name="close" /></button>
           </form>
         </div>
         {current && (
           <div className="stagger" key={current.evidenceId}>
-            <p className="eyebrow">{fr.reader.sources} · [{current.n}]</p>
+            <p className="eyebrow">{t.reader.sources} · [{current.n}]</p>
             <h3 id="source-title" className="source-sheet-title">{sourceTitle}</h3>
             <p className="muted">
-              {fr.reader.location} : {current.location}
+              {t.reader.location} : {current.location}
             </p>
             <blockquote className="quote">
               {current.before && <span className="muted">… {current.before} </span>}
@@ -64,10 +65,10 @@ export function SourcesProvider({
             </blockquote>
             {originalHref ? (
               <a className="btn btn-block" href={originalHref} target="_blank" rel="noopener noreferrer nofollow">
-                <Icon name="file" /> {fr.reader.openOriginal}
+                <Icon name="file" /> {t.reader.openOriginal}
               </a>
             ) : (
-              <p className="notice">{fr.reader.originalMissing}</p>
+              <p className="notice">{t.reader.originalMissing}</p>
             )}
           </div>
         )}
@@ -77,13 +78,14 @@ export function SourcesProvider({
 }
 
 export function SourceRef({ n, evidenceId }: { n: number; evidenceId: string }) {
+  const t = useT();
   const open = useContext(Ctx);
   return (
     <button
       type="button"
       className="ref"
       aria-haspopup="dialog"
-      aria-label={fr.reader.seeSource(n)}
+      aria-label={t.reader.seeSource(n)}
       onClick={(e) => open(evidenceId, e.currentTarget)}
     >
       {n}

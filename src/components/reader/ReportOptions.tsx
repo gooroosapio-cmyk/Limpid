@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 
 interface VersionLink {
   href: string;
@@ -66,13 +66,14 @@ export function ReportOptions({
   /** Ferme le volet avant de changer de version. */
   onNavigate?: () => void;
 }) {
+  const t = useT();
   const [view, setView] = useState<"menu" | "theme" | "versions">("menu");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(false);
   const router = useRouter();
 
   async function remove() {
-    if (!reportId || !window.confirm(fr.reports.deleteConfirm)) return;
+    if (!reportId || !window.confirm(t.reports.deleteConfirm)) return;
     setDeleting(true);
     setError(false);
     const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" }).catch(() => null);
@@ -90,9 +91,9 @@ export function ReportOptions({
       <div className="stagger" key={view}>
         <div className="sheet-sub">
           <button type="button" className="btn-link" onClick={() => setView("menu")}>
-            <Icon name="back" size={18} /> {fr.options.back}
+            <Icon name="back" size={18} /> {t.options.back}
           </button>
-          <h3>{view === "theme" ? fr.options.presentation : fr.options.versions}</h3>
+          <h3>{view === "theme" ? t.options.presentation : t.options.versions}</h3>
         </div>
         {view === "theme" && themeControl}
         {view === "versions" && versions && (
@@ -114,24 +115,24 @@ export function ReportOptions({
   return (
     <div>
       <ul className="rows">
-        <Row icon="download" title={fr.options.export} sub={fr.options.exportSub} href={pdfHref} download />
-        {themeControl && <Row icon="settings" title={fr.options.presentation} sub={themeLabel} onClick={() => setView("theme")} />}
+        <Row icon="download" title={t.options.export} sub={t.options.exportSub} href={pdfHref} download />
+        {themeControl && <Row icon="settings" title={t.options.presentation} sub={themeLabel} onClick={() => setView("theme")} />}
         {originalHref ? (
-          <Row icon="file" title={fr.options.source} sub={sourceTitle} href={originalHref} />
+          <Row icon="file" title={t.options.source} sub={sourceTitle} href={originalHref} />
         ) : (
           <li className="row row-static">
             <span className="row-icon"><Icon name="file" /></span>
-            <span className="row-text"><b>{fr.options.sourceMissing}</b><small>{sourceTitle}</small></span>
+            <span className="row-text"><b>{t.options.sourceMissing}</b><small>{sourceTitle}</small></span>
           </li>
         )}
         {offline}
         {versions && versions.length > 1 && (
-          <Row icon="clock" title={fr.options.versions} sub={fr.options.versionsSub(versions.length)} onClick={() => setView("versions")} />
+          <Row icon="clock" title={t.options.versions} sub={t.options.versionsSub(versions.length)} onClick={() => setView("versions")} />
         )}
-        {reportId && <Row icon="trash" title={deleting ? fr.reports.deleting : fr.options.delete} sub={fr.options.deleteSub} onClick={remove} danger />}
+        {reportId && <Row icon="trash" title={deleting ? t.reports.deleting : t.options.delete} sub={t.options.deleteSub} onClick={remove} danger />}
       </ul>
       {error && <p className="notice notice-error" role="alert">La suppression a échoué. Réessayez.</p>}
-      <p className="muted small">{fr.options.retention}</p>
+      <p className="muted small">{t.options.retention}</p>
     </div>
   );
 }

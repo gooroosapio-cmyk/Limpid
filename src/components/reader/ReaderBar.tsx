@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { fr } from "@/lib/i18n/fr";
+import { useT } from "@/lib/i18n/client";
 import { AskPanel } from "./AskPanel";
 import { QuizRunner } from "./QuizRunner";
 
@@ -25,6 +25,7 @@ export function ReaderBar({
   reportId: string | null;
   options?: React.ReactNode;
 }) {
+  const t = useT();
   const sheets = { toc: useRef<HTMLDialogElement>(null), test: useRef<HTMLDialogElement>(null), ask: useRef<HTMLDialogElement>(null) };
   const [active, setActive] = useState<string | null>(toc[0]?.id ?? null);
   const [quiz, setQuiz] = useState<{ scope: "section" | "document"; sectionId: string | null; run: number } | null>(null);
@@ -62,7 +63,7 @@ export function ReaderBar({
       <div className="sheet-grip" aria-hidden="true" />
       <div className="sheet-head">
         <h2 id={id}>{title}</h2>
-        <button type="button" className="ib" aria-label={fr.reader.close} onClick={() => ref.current?.close()}>
+        <button type="button" className="ib" aria-label={t.reader.close} onClick={() => ref.current?.close()}>
           <Icon name="close" />
         </button>
       </div>
@@ -71,21 +72,21 @@ export function ReaderBar({
 
   return (
     <>
-      <nav className="readerbar" aria-label={fr.reader.toc}>
+      <nav className="readerbar" aria-label={t.reader.toc}>
         <button type="button" className="rb" aria-haspopup="dialog" onClick={() => open("toc")}>
-          <Icon name="list" /> <span>{fr.reader.toc}</span>
+          <Icon name="list" /> <span>{t.reader.toc}</span>
         </button>
         <button type="button" className="rb" aria-haspopup="dialog" onClick={() => open("test")}>
-          <Icon name="quiz" /> <span>{fr.test.button}</span>
+          <Icon name="quiz" /> <span>{t.test.button}</span>
         </button>
         <button type="button" className="ask" aria-haspopup="dialog" onClick={() => open("ask")}>
-          <Icon name="chat" /> <span>{fr.ask.button}</span>
+          <Icon name="chat" /> <span>{t.ask.button}</span>
         </button>
       </nav>
 
       <dialog ref={sheets.toc} className="sheet side" aria-labelledby="toc-sheet-title">
-        {head("toc-sheet-title", fr.reader.inThisReport, sheets.toc)}
-        <p className="muted small">{fr.reader.tocHint}</p>
+        {head("toc-sheet-title", t.reader.inThisReport, sheets.toc)}
+        <p className="muted small">{t.reader.tocHint}</p>
         <nav className="toc" aria-labelledby="toc-sheet-title">
           <ol>
             {toc.map((t) => (
@@ -99,11 +100,11 @@ export function ReaderBar({
         </nav>
         {options && (
           <section className="sheet-options" aria-labelledby="options-title">
-            <h3 id="options-title" className="eyebrow">{fr.options.open}</h3>
+            <h3 id="options-title" className="eyebrow">{t.options.open}</h3>
             {options}
           </section>
         )}
-        <Link href="/" className="btn btn-block">{fr.reader.toLibrary}</Link>
+        <Link href="/" className="btn btn-block">{t.reader.toLibrary}</Link>
       </dialog>
 
       <dialog
@@ -112,9 +113,9 @@ export function ReaderBar({
         aria-labelledby="test-sheet-title"
         onClose={() => setQuiz(null)}
       >
-        {head("test-sheet-title", quiz ? (quiz.scope === "section" ? fr.test.interro : fr.test.devoir) : fr.test.title, sheets.test)}
+        {head("test-sheet-title", quiz ? (quiz.scope === "section" ? t.test.interro : t.test.devoir) : t.test.title, sheets.test)}
         {!reportId ? (
-          <p className="notice">{fr.test.unavailable}</p>
+          <p className="notice">{t.test.unavailable}</p>
         ) : quiz ? (
           <QuizRunner
             key={`${quiz.scope}-${quiz.sectionId}-${quiz.run}`}
@@ -126,13 +127,13 @@ export function ReaderBar({
           />
         ) : (
           <div className="stagger">
-            <p className="lede small-lede">{fr.test.lede}</p>
+            <p className="lede small-lede">{t.test.lede}</p>
             <ul className="rows test-choices">
               {current && (
                 <li>
                   <button type="button" className="row" onClick={() => setQuiz({ scope: "section", sectionId: current.id, run: Date.now() })}>
                     <span className="row-icon"><Icon name="quiz" /></span>
-                    <span className="row-text"><b>{fr.test.interro}</b><small>{fr.test.interroSub(current.question)}</small></span>
+                    <span className="row-text"><b>{t.test.interro}</b><small>{t.test.interroSub(current.question)}</small></span>
                     <Icon name="chevron" className="row-chevron" />
                   </button>
                 </li>
@@ -140,7 +141,7 @@ export function ReaderBar({
               <li>
                 <button type="button" className="row" onClick={() => setQuiz({ scope: "document", sectionId: null, run: Date.now() })}>
                   <span className="row-icon"><Icon name="book" /></span>
-                  <span className="row-text"><b>{fr.test.devoir}</b><small>{fr.test.devoirSub}</small></span>
+                  <span className="row-text"><b>{t.test.devoir}</b><small>{t.test.devoirSub}</small></span>
                   <Icon name="chevron" className="row-chevron" />
                 </button>
               </li>
@@ -148,7 +149,7 @@ export function ReaderBar({
                 <li>
                   <button type="button" className="row" onClick={() => goTo("verifier")}>
                     <span className="row-icon"><Icon name="chat" /></span>
-                    <span className="row-text"><b>{fr.test.open}</b><small>{fr.test.openSub}</small></span>
+                    <span className="row-text"><b>{t.test.open}</b><small>{t.test.openSub}</small></span>
                     <Icon name="chevron" className="row-chevron" />
                   </button>
                 </li>
@@ -159,9 +160,9 @@ export function ReaderBar({
       </dialog>
 
       <dialog ref={sheets.ask} className="sheet side ask-sheet" aria-labelledby="ask-sheet-title">
-        {head("ask-sheet-title", fr.ask.title, sheets.ask)}
+        {head("ask-sheet-title", t.ask.title, sheets.ask)}
         {!reportId ? (
-          <p className="notice">{fr.ask.unavailable}</p>
+          <p className="notice">{t.ask.unavailable}</p>
         ) : (
           askOpened && <AskPanel reportId={reportId} section={current ? { id: current.id, title: current.question } : null} />
         )}
