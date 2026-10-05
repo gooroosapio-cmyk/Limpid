@@ -86,7 +86,7 @@ const inbox: { delivery_id: string | null; body_sha256: string; status: string }
 let failInsert = false;
 const handlePulse = vi.fn(async () => "processed" as const);
 
-vi.mock("@/lib/billing/purchase", () => ({ handlePulse: (...a: unknown[]) => handlePulse(...(a as [])) }));
+vi.mock("@/lib/billing/purchase", () => ({ handlePulse: (...a: unknown[]) => handlePulse(...(a as [])), reconcilePending: async () => 0 }));
 vi.mock("next/server", async (orig) => {
   const mod = (await orig()) as Record<string, unknown>;
   return { ...mod, after: (fn: () => Promise<void>) => void fn() };
