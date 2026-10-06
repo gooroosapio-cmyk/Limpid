@@ -1,7 +1,7 @@
 /**
  * Export PDF d'un Limpid (V4, § 12). Rendu déterministe côté serveur à partir du document
  * structuré : aucun appel IA, aucune ressource externe, police intégrée (Inter, OFL), style
- * unique. Même contenu et même numérotation des sources que le lecteur, annexes comprises.
+ * unique. Même contenu et même numérotation des sources que le lecteur, sans annexes ni glossaire développé (composé pour le papier).
  * Les exercices (sans réponses) et leur corrigé sont des exports distincts ; le filigrane
  * discret des exports gratuits est décidé par le serveur.
  */
@@ -344,7 +344,7 @@ export interface PdfReportInput {
   images?: Record<string, PdfImage>;
   /** Langue de l'interface (titres, mentions) ; le contenu reste dans sa langue. */
   lang?: Lang;
-  /** « content » : contenu et annexes ; « exercises » : avec les exercices sans réponses ; « key » : corrigé seul. */
+  /** « content » : contenu, limites et sources ; « exercises » : avec les exercices sans réponses ; « key » : corrigé seul. */
   variant?: "content" | "exercises" | "key";
   exercises?: ExerciseSet | null;
   /** Filigrane discret des exports gratuits (décidé par le serveur selon l'offre du compte). */
@@ -534,20 +534,12 @@ function ReportDocument(input: PdfReportInput) {
           </View>
         )}
 
+        {/* Composé pour le papier (Atlas § 05) : ni annexes ni glossaire développé ; limites et sources essentielles restent. */}
         <View break>
-          <Text style={[s.h2, { fontSize: 16 }]}>{d.lim.annexes}</Text>
           {explanation.limitations.length > 0 && (
             <View>
               <Text style={s.h2} minPresenceAhead={110}>{d.lim.limits}</Text>
               <Bullets items={explanation.limitations} />
-            </View>
-          )}
-          {explanation.glossary.length > 0 && (
-            <View>
-              <Text style={s.h2} minPresenceAhead={110}>{d.lim.optGlossary}</Text>
-              {explanation.glossary.map((g) => (
-                <Text key={g.term} style={s.p}><Text style={{ fontWeight: 700 }}>{g.term}</Text> — {g.definition}</Text>
-              ))}
             </View>
           )}
           <View>

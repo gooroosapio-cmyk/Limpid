@@ -35,6 +35,7 @@ export function ExerciseView({
   onDone,
   onGoTo,
   heading,
+  reveal = true,
 }: {
   ex: Exercise;
   reportId: string | null;
@@ -42,6 +43,8 @@ export function ExerciseView({
   onDone: (r: ExerciseResult) => void;
   onGoTo?: (sectionId: string) => void;
   heading?: string;
+  /** Évaluation : la réponse est enregistrée sans correction (bilan à la fin). */
+  reveal?: boolean;
 }) {
   const t = useT();
   const base = useId();
@@ -106,6 +109,8 @@ export function ExerciseView({
   }
 
   const done = !!result;
+  // Marques de correction visibles seulement en entraînement.
+  const shown = done && reveal;
   const move = (i: number, d: -1 | 1) =>
     setOrder((o) => {
       const j = i + d;
@@ -147,7 +152,7 @@ export function ExerciseView({
         <fieldset className="choices exercise-options" aria-labelledby={`${base}-q`} disabled={done}>
           {ex.options.map((o, i) => {
             const picked = ex.kind === "single" ? single === i : multi.includes(i);
-            const state = !done ? "" : o.correct ? " is-answer" : picked ? " is-picked" : " is-other";
+            const state = !shown ? "" : o.correct ? " is-answer" : picked ? " is-picked" : " is-other";
             return (
               <label key={i} className={`choice exercise-option${state}`}>
                 <input
@@ -158,7 +163,7 @@ export function ExerciseView({
                 />
                 <span>
                   <Rich text={o.text} />
-                  {done && (o.correct || picked) && <span className="exercise-why">{o.why}</span>}
+                  {shown && (o.correct || picked) && <span className="exercise-why">{o.why}</span>}
                 </span>
               </label>
             );
@@ -174,7 +179,7 @@ export function ExerciseView({
               type="button"
               role="radio"
               aria-checked={truth === v}
-              className={`btn tf-btn${truth === v ? " is-on" : ""}${done && ex.truth === v ? " is-answer" : ""}`}
+              className={`btn tf-btn${truth === v ? " is-on" : ""}${shown && ex.truth === v ? " is-answer" : ""}`}
               disabled={done}
               onClick={() => setTruth(v)}
             >
@@ -189,7 +194,7 @@ export function ExerciseView({
           <p className="exercise-hint">{t.lim.orderHint}</p>
           <ol className="order-list">
             {order.map((item, i) => (
-              <li key={item} className={done ? (ex.items[i] === item ? "is-answer" : "is-picked") : ""}>
+              <li key={item} className={shown ? (ex.items[i] === item ? "is-answer" : "is-picked") : ""}>
                 <span className="order-text"><Rich text={item} /></span>
                 <span className="order-moves">
                   <button type="button" className="ib" disabled={done || i === 0} aria-label={t.lim.up(item)} onClick={() => move(i, -1)}>
@@ -202,7 +207,7 @@ export function ExerciseView({
               </li>
             ))}
           </ol>
-          {done && !result?.correct && (
+          {shown && !result?.correct && (
             <p className="exercise-why"><strong>{t.lim.correctAnswer}</strong> {ex.items.join(" → ")}</p>
           )}
         </>
@@ -213,7 +218,7 @@ export function ExerciseView({
           <p className="exercise-hint">{t.lim.matchHint}</p>
           <div className="match-list">
             {ex.pairs.map((p) => (
-              <div key={p.left} className={`match-row${done ? (pairs[p.left] === p.right ? " is-answer" : " is-picked") : ""}`}>
+              <div key={p.left} className={`match-row${shown ? (pairs[p.left] === p.right ? " is-answer" : " is-picked") : ""}`}>
                 <label htmlFor={`${base}-m-${p.left}`}><Rich text={p.left} /></label>
                 <select id={`${base}-m-${p.left}`} value={pairs[p.left] ?? ""} disabled={done} onChange={(e) => setPairs((x) => ({ ...x, [p.left]: e.target.value }))}>
                   <option value="" disabled>{t.lim.choose}</option>
@@ -221,7 +226,7 @@ export function ExerciseView({
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
-                {done && pairs[p.left] !== p.right && <span className="exercise-why">→ {p.right}</span>}
+                {shown && pairs[p.left] !== p.right && <span className="exercise-why">→ {p.right}</span>}
               </div>
             ))}
           </div>
@@ -239,6 +244,8 @@ export function ExerciseView({
         <button type="button" className={`btn btn-primary btn-block${pending ? " busy" : ""}`} disabled={!answer || pending} onClick={validate}>
           {pending ? t.lim.grading : t.lim.validate}
         </button>
+      ) : !reveal ? (
+        <p className="exercise-result muted small" role="status">{t.lim.answerSaved}</p>
       ) : (
         <div className="exercise-result" role="status">
           {verdict && (

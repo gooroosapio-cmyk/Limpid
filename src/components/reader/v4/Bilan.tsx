@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { LoaderBook } from "@/components/LoaderBook";
 import type { Exercise } from "@/lib/contracts/schemas";
+import { formatOn20, notionSummary, scoreOn20 } from "@/lib/exercises/score";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { ExerciseView, type ExerciseResult } from "./ExerciseView";
@@ -73,6 +74,8 @@ export function Bilan({
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState<{ score: number; total: number; created_at: string }[]>([]);
   const [run, setRun] = useState(0);
+  // Entraînement : correction après chaque réponse ; évaluation : corrections et note à la fin.
+  const [mode, setMode] = useState<"training" | "evaluation">("evaluation");
 
   useEffect(() => {
     if (!reportId || !versionId) return;
@@ -98,7 +101,8 @@ export function Bilan({
     }
   }
 
-  function start() {
+  function start(m: "training" | "evaluation" = mode) {
+    setMode(m);
     setResults([]);
     setCurrent(null);
     setI(0);
@@ -135,7 +139,9 @@ export function Bilan({
           <>
             <p className="lede small-lede">{t.lim.bilanIntro(questions.length)}</p>
             {insufficient && <p className="notice">{t.lim.bilanInsufficient}</p>}
-            <button type="button" className="btn btn-primary btn-block" onClick={start}>{t.lim.bilanStart} <Icon name="arrow" /></button>
+            <button type="button" className="btn btn-primary btn-block" onClick={() => start("evaluation")}>{t.lim.bilanStart} <Icon name="arrow" /></button>
+            <button type="button" className="btn btn-block" onClick={() => start("training")}>{t.lim.bilanTraining}</button>
+            <p className="muted small">{t.lim.bilanModes}</p>
           </>
         ) : (
           <>
@@ -148,7 +154,7 @@ export function Bilan({
             <h3 id="bilan-prev" className="eyebrow">{t.lim.bilanPrev}</h3>
             <ul className="attempts">
               {attempts.map((a) => (
-                <li key={a.created_at}><span>{when(a.created_at)}</span><b>{a.score} / {a.total}</b></li>
+                <li key={a.created_at}><span>{when(a.created_at)}</span><b>{a.total ? `${formatOn20(Math.round((a.score / a.total) * 40) / 2, lang)} / 20` : `${a.score} / ${a.total}`}</b></li>
               ))}
             </ul>
           </section>
@@ -157,36 +163,60 @@ export function Bilan({
     );
 
   if (phase === "done" && questions) {
-    const good = results.filter((r) => r.correct).length;
-    const review = [...new Set(questions.filter((q, k) => results[k]?.correct !== true).map((q) => q.section_id))];
+    const score = scoreOn20(results);
+    const notions = notionSummary(questions, results, titles);
+    const byId = new Map(results.map((r) => [r.id, r]));
     return (
       <div className="quiz-done stagger">
-        <p className="eyebrow">{t.lim.bilanObserved}</p>
+        <p className="eyebrow">{t.lim.bilanOfEval}</p>
         <div className="quiz-score" role="status">
-          <span className="big">{good}</span>
-          <span className="of">/{questions.length}</span>
+          {score.on20 === null ? (
+            <span className="big">—</span>
+          ) : (
+            <>
+              <span className="big">{formatOn20(score.on20, lang)}</span>
+              <span className="of">/20</span>
+            </>
+          )}
         </div>
+        <p className="muted">{t.lim.bilanAnswers(score.good, score.graded)}</p>
         <p className="muted small">{t.lim.bilanNote}</p>
-        {review.length === 0 ? (
-          <p className="quiz-verdict ok"><Icon name="check" /> {t.lim.bilanAllGood}</p>
-        ) : (
-          <>
-            <h3 className="eyebrow">{t.lim.bilanReview}</h3>
-            <ul className="rows">
-              {review.map((sid) => (
-                <li key={sid}>
-                  <button type="button" className="row" onClick={() => onGoTo(sid)}>
-                    <span className="row-icon"><Icon name="refresh" /></span>
-                    <span className="row-text"><b>{titles[sid] ?? sid}</b></span>
-                    <Icon name="chevron" className="row-chevron" />
+        {notions.length > 0 && (
+          <ul className="rows notion-verdicts">
+            {notions.map((n) => (
+              <li key={n.key} className="notion-verdict">
+                <span className={`pill ${n.status === "solide" ? "pill-ok" : "pill-review"}`}>{n.status === "solide" ? t.lim.solid : t.lim.toReview}</span>
+                <span className="row-text"><b>{n.label}</b></span>
+                {n.status === "a_revoir" && (
+                  <button type="button" className="btn-link" onClick={() => onGoTo(n.sectionId)}>
+                    <Icon name="book" size={16} /> {t.lim.reviewExplanation}
                   </button>
-                </li>
-              ))}
-            </ul>
-          </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {mode === "evaluation" && (
+          <details className="bilan-corrections">
+            <summary>{t.lim.bilanCorrections}</summary>
+            <ol>
+              {questions.map((q) => {
+                const r = byId.get(q.id);
+                return (
+                  <li key={q.id}>
+                    <p><b>{q.prompt}</b></p>
+                    <p className={`quiz-verdict ${r?.correct ? "ok" : "again"}`}>
+                      <Icon name={r?.correct ? "check" : "refresh"} /> {r?.correct ? t.lim.correct : r?.correct === null ? t.lim.indicative : t.lim.incorrect}
+                    </p>
+                    <p className="exercise-explain">{q.explanation}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          </details>
         )}
         <div className="actions-row">
-          <button type="button" className="btn" onClick={start}>{t.lim.bilanRetry}</button>
+          <button type="button" className="btn" onClick={() => start()}>{t.lim.bilanRetry}</button>
           <button type="button" className="btn btn-primary" onClick={onClose}>{t.lim.back}</button>
         </div>
       </div>
@@ -199,7 +229,7 @@ export function Bilan({
     <div className="bilan-run">
       <p className="quiz-progress">{t.lim.question(i + 1, questions!.length)}</p>
       <progress value={i + (current ? 1 : 0)} max={questions!.length} aria-hidden="true" />
-      <ExerciseView key={`${run}-${q.id}`} ex={q} reportId={reportId} versionId={versionId} onDone={(r) => setCurrent(r)} />
+      <ExerciseView key={`${run}-${q.id}`} ex={q} reportId={reportId} versionId={versionId} reveal={mode === "training"} onDone={(r) => setCurrent(r)} />
       {current && (
         <button
           type="button"
