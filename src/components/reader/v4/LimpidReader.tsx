@@ -80,11 +80,12 @@ export function LimpidReader({
       setAskOpened(true);
       askDialog.current?.showModal();
     } else if (open === "bilan" && bilan) {
-      bilanDialog.current?.showModal();
+      if (reportId) router.push(`/rapports/${reportId}/bilan`);
+      else bilanDialog.current?.showModal();
     } else if (open === "options") {
       optionsDialog.current?.showModal();
     }
-  }, [bilan]);
+  }, [bilan, reportId, router]);
 
   /** Défile jusqu'à un élément (compensation de l'en-tête par scroll-margin en CSS). */
   const scrollToId = useCallback((id: string, smooth = false) => {
@@ -167,10 +168,11 @@ export function LimpidReader({
         closeAll();
         scrollToId(id, true);
       },
-      openBilan: () => bilanDialog.current?.showModal(),
+      // Kit V5 : le bilan a sa page entière (démonstration : fenêtre, sans enregistrement).
+      openBilan: () => (reportId ? router.push(`/rapports/${reportId}/bilan`) : bilanDialog.current?.showModal()),
       openReformulate: () => reformDialog.current?.showModal(),
     }),
-    [reportId, versionId, scrollToId, closeAll],
+    [reportId, versionId, scrollToId, closeAll, router],
   );
 
   function close() {

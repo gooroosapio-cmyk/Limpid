@@ -9,9 +9,9 @@ describe("note sur 20 et bilan par notion", () => {
     const r = Array.from({ length: 10 }, (_, i) => ({ id: `ex_${i}`, correct: i < 8, ratio: null }));
     expect(scoreOn20(r)).toEqual({ good: 8, graded: 10, on20: 16 });
     expect(scoreOn20([...r, { id: "ex_x", correct: null, ratio: null }]).graded).toBe(10);
-    expect(scoreOn20([{ id: "a", correct: true, ratio: 1 }, { id: "b", correct: true, ratio: 1 }, { id: "c", correct: false, ratio: 0 }]).on20).toBe(13.5);
+    expect(scoreOn20([{ id: "a", correct: true, ratio: 1 }, { id: "b", correct: true, ratio: 1 }, { id: "c", correct: false, ratio: 0 }]).on20).toBe(13.3);
     expect(scoreOn20([]).on20).toBeNull();
-    expect(formatOn20(13.5, "fr")).toBe("13,5");
+    expect(formatOn20(13.3, "fr")).toBe("13,3");
   });
 
   it("solide à partir de trois quarts de réponses justes, notions à revoir d'abord", () => {

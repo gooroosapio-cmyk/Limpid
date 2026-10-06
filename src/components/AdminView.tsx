@@ -2,7 +2,7 @@ import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
-import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, setGeneration, setImageSettings, setMonthlyCap } from "@/app/admin/actions";
+import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMonthlyCap } from "@/app/admin/actions";
 import { IMAGE_MODELS, type ImageStyle } from "@/lib/visuals/image-models";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 import { nowMs } from "@/lib/time";
@@ -167,6 +167,16 @@ export async function AdminView({
           ))}
           <p className="muted small">{t.admin.images.note}</p>
           <button type="submit" className="btn">{t.admin.save}</button>
+        </form>
+      </section>
+
+      <section className="admin-section" aria-labelledby="adm-reset">
+        <h2 id="adm-reset">{t.admin.reset.title}</h2>
+        <p className="muted small">{t.admin.reset.intro}</p>
+        <form action={resetTestSpaceAction} className="admin-form">
+          <label htmlFor="reset-confirm">{t.admin.reset.confirm}</label>
+          <input id="reset-confirm" name="confirm" type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} required />
+          <button type="submit" className="btn btn-danger">{t.admin.reset.button}</button>
         </form>
       </section>
 

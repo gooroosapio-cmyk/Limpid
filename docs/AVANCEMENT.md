@@ -1,5 +1,18 @@
 # Avancement
 
+## Phase 19.4 — V5, lots D et E : bilan plein écran, installation, nettoyage (7 octobre 2026)
+
+### FAIT
+- Bilan final en page entière (`/rapports/[id]/bilan`) : introduction (nombre de questions, chapitres couverts, barème), une question par écran, Précédente/Suivante, « à revoir », récapitulatif avant soumission (questions sans réponse = 0), « Quitter et reprendre plus tard » (réponses gardées sur l'appareil).
+- Questions envoyées sans réponses ni corrections ; note calculée par le serveur au dixième (2/3 → 13,3/20), 1 point par question objective, réponse libre hors note ; clé de tentative : une double soumission ne compte qu'une fois (migration `20261022000000_v5_bilan.sql`, appliquée).
+- Résultat : note, « x réponses justes sur y », état par chapitre (Réussi ici / À revoir / Non évalué), Voir les corrections (bonne réponse, raisonnement, Revoir le passage), Retour au cours, Nouvelle tentative.
+- Exercices générés : mini-interrogation après chaque chapitre (20 au plus) et bilan d'au moins une question par chapitre (8 à 25).
+- Installation de l'application web : invitation dès la première ouverture ; après un refus, à la 3e visite puis toutes les 2 visites ; iPhone/iPad : marche à suivre (Partager → Sur l'écran d'accueil) ; jamais dans l'application installée.
+- Console admin : « Réinitialiser mon espace de test » (rapports et documents de l'administrateur supprimés avec leurs fichiers, crédits consommés rendus).
+
+### EN TEST
+- Vitest : correction serveur (questions publiques sans réponse, note au dixième, réponse libre hors note, états par chapitre), règle de fréquence de l'invitation. Rendu Playwright du bilan (questions, récapitulatif).
+
 ## Phase 19.3 — V5, lot C : lecture continue, notions, chat simplifié, taille du texte (7 octobre 2026)
 
 ### FAIT

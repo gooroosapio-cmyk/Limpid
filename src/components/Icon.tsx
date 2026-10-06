@@ -3,6 +3,9 @@
  * couleur héritée du texte. Toujours décoratives ou accompagnées d'un libellé.
  */
 const PATHS = {
+  "share": (
+    <><path d="M12 15V3M8 7l4-4 4 4M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
   "learning": (
     <><path d="m2 8 10-5 10 5-10 5Z M6 10v7q6 5 12 0v-7M22 8v9" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
   ),

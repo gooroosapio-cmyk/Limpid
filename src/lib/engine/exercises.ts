@@ -42,16 +42,19 @@ export const ExerciseDraft = z.strictObject({
 });
 export type ExerciseDraft = z.infer<typeof ExerciseDraft>;
 
-/** Taille du bilan : 5 pour un document court, jusqu'à 25 selon les notions évaluables. */
+/**
+ * Taille du bilan (kit V5) : au moins une question par chapitre, davantage pour les notions
+ * centrales ; cible 8 à 15, 25 au plus. Un petit document peut en avoir moins (au moins 5).
+ */
 export function bilanSize(ex: ExplanationObject, ko: KnowledgeObject): number {
   const central = ko.concepts.filter((c) => c.importance === "central").length;
-  const notions = Math.max(ex.sections.length, central + Math.ceil(ko.concepts.length / 3));
-  return Math.max(5, Math.min(25, Math.round(notions * 1.5)));
+  const wanted = Math.max(ex.sections.length, Math.min(15, ex.sections.length + Math.ceil(central / 2)), 8);
+  return Math.max(5, Math.min(25, wanted));
 }
 
 const INSTRUCTIONS = (n: number, mode: Mode, language: "fr" | "en" | null) => `Tu conçois les exercices d'un support pédagogique Limpid, à partir de son explication et des affirmations validées.
-1. checkpoints : de courtes vérifications (1 à 3 questions) ${mode === "revision" ? "après CHAQUE fiche (une par section)" : "seulement après les notions importantes ou difficiles (pas après chaque section ; environ une section sur deux ou trois)"} ; section_id = la section vérifiée.
-2. bilan : ${n} questions sur l'ensemble du document (vise ce nombre : chaque notion, chiffre important, mécanisme, définition ou réserve peut être évalué sous un angle différent), sans répéter une même question ; seulement si le contenu est vraiment insuffisant, moins de questions et insufficient = true.
+1. checkpoints : une courte vérification de 1 à 3 questions après CHAQUE chapitre (section), 20 au plus, dans l'ordre ; section_id = le chapitre vérifié. Question après une notion, jamais au milieu d'un raisonnement.
+2. bilan : ${n} questions sur l'ensemble du cours : AU MOINS UNE question par chapitre (section_id renseigné), davantage pour les notions centrales et les calculs, sans répéter une question des checkpoints ; seulement si le contenu est vraiment insuffisant, moins de questions et insufficient = true. N'évalue que ce qui est expliqué dans le cours.
 Varie les types selon le contenu :
 - "single" : 3 à 5 options, UNE seule correcte ; "multiple" : 3 à 6 options, plusieurs correctes, annonce-le dans prompt (« plusieurs réponses possibles »). Chaque option a why (pourquoi elle tient ou non).
 - "truefalse" : prompt = une affirmation ; truth = sa valeur ; explanation justifie.
