@@ -56,7 +56,7 @@ export default async function ReportPage({
           {t.versions.older} <Link href={`/rapports/${id}`}>{t.versions.backToCurrent}</Link>
         </p>
       )}
-      {preparing && job && <JobProgress reportId={id} initial={job} compact />}
+      {preparing && job && <JobProgress reportId={id} initial={job} compact partial={report.versions.length <= 1} />}
       {lastFailed && job && !preparing && report.isCurrent && (
         <div className="preparing">
           <p className="eyebrow">{t.versions.failedJob}</p>

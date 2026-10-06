@@ -445,6 +445,7 @@ export const fr = {
     home: "Revenir à la bibliothèque",
     close: "Fermer la préparation",
     foot: "Envoi terminé · traitement en cours",
+    moreChapters: "Chapitres suivants en préparation",
     newVersion: "Nouvelle version en préparation",
     errorTitle: "Lecture à compléter",
     kept: "Ce rapport n'a pas pu être terminé. Supprimez-le, puis ajoutez le document à nouveau pour réessayer.",

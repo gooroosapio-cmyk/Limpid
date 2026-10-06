@@ -43,8 +43,9 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-07.2";
-export const MAX_REPAIRS = 2;
+export const PROMPT_VERSION = "2026-10-08.1";
+/** Une seule réparation automatique par étape (kit V6) : chaque aller-retour coûte 30 à 80 s. */
+export const MAX_REPAIRS = 1;
 
 /* ---------- Brouillons demandés au modèle ---------- */
 
@@ -442,6 +443,12 @@ function verificationPayload(ko: KnowledgeObject, evidence: Evidence[], segments
  * Confronte chaque affirmation à ses extraits et abaisse son statut si nécessaire (jamais
  * l'inverse). Les écarts sont consignés ; une affirmation sans verdict garde son statut.
  */
+/** Affirmation à relire : chiffre, condition, exception, négation forte ou statut non « supported ». */
+export function riskyClaim(c: { statement: string; support_status: string }): boolean {
+  if (c.support_status !== "supported") return true;
+  return /\d|%|\b(si|sauf|uniquement|seulement|exception|interdit|obligatoire|doit|ne\s+\S+\s+pas|jamais|toujours|au plus|au moins|if|unless|only|except|must|never|always)\b/i.test(c.statement);
+}
+
 export async function verifyClaims(
   provider: AIProvider,
   input: GenerationInput,
@@ -450,15 +457,19 @@ export async function verifyClaims(
   segments: Map<string, SourceSegment>,
   v: ValidationCollector,
 ): Promise<KnowledgeObject> {
-  if (ko.claims.length === 0) return ko;
+  // Revue ciblée (kit V6) : seules les affirmations à risque (chiffres, conditions, exceptions,
+  // statut incertain) sont relues ; les autres gardent le contrôle déterministe des citations.
+  const risky = new Set(ko.claims.filter(riskyClaim).map((c) => c.id));
+  if (risky.size === 0) return ko;
   const draft = await callWithRetry(provider, input, "verification", 0, {
     schema: VerificationDraft,
     instructions: VERIFY_INSTRUCTIONS,
-    data: [{ label: "affirmations et extraits", text: verificationPayload(ko, evidence, segments) }],
-    budget: input.budgets.comprehension,
+    data: [{ label: "affirmations et extraits", text: verificationPayload({ ...ko, claims: ko.claims.filter((c) => risky.has(c.id)) }, evidence, segments) }],
+    budget: { ...input.budgets.comprehension, reasoning: "low" },
   });
   const verdicts = new Map(draft.verdicts.map((x) => [x.claim_id, x]));
   const claims = ko.claims.map((c) => {
+    if (!risky.has(c.id)) return c;
     const verdict = verdicts.get(c.id);
     if (!verdict) {
       v.fail("claim_verified", "model_review", [c.id], "affirmation sans verdict du vérificateur", false);

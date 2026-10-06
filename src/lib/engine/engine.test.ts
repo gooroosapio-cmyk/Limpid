@@ -180,13 +180,13 @@ describe("pipeline de génération", () => {
     expect(p.calls[1]!.data).toContain("erreurs a corriger");
   });
 
-  it("marque le rapport incomplet après deux réparations infructueuses", async () => {
+  it("marque le rapport incomplet après une réparation infructueuse", async () => {
     const bad = structuredClone(goodComp);
     bad.claims[1]!.numbers[0]!.source_form = "98 %";
     bad.claims[1]!.numbers[0]!.value = 98;
-    const out = await generateReport(new FakeProvider([bad, bad, bad, goodExpl, goodExpl]), input());
+    const out = await generateReport(new FakeProvider([bad, bad, goodExpl, goodExpl]), input());
     expect(out.status).toBe("incomplete");
-    expect(out.validation.knowledge.repair_count).toBe(2);
+    expect(out.validation.knowledge.repair_count).toBe(1);
     expect(out.validation.knowledge.blocking_errors.join()).toMatch(/98 %/);
   });
 

@@ -447,6 +447,7 @@ export const en: Dict = {
     home: "Back to the library",
     close: "Close the preparation",
     foot: "Upload complete · processing",
+    moreChapters: "Next chapters on the way",
     newVersion: "New version in preparation",
     errorTitle: "Reading to complete",
     kept: "This report could not be finished. Delete it, then add the document again to retry.",

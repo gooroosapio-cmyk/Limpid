@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
-import type { GenerationInput } from "./pipeline";
+import { riskyClaim, type GenerationInput } from "./pipeline";
 import type { AIProvider, StructuredRequest } from "./provider";
 import { capChapters, diagramContentOk, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
@@ -72,10 +72,10 @@ const enrich = {
 class StageProvider implements AIProvider {
   readonly name = "fake";
   readonly isDemo = false;
-  calls: { stage: string; tier: string; data: string[] }[] = [];
+  calls: { stage: string; tier: string; reasoning?: string; data: string[] }[] = [];
   constructor(private readonly answers: Record<string, unknown[]>) {}
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>) {
-    this.calls.push({ stage: req.stage, tier: req.budget.tier, data: req.untrustedData.map((d) => d.label) });
+    this.calls.push({ stage: req.stage, tier: req.budget.tier, reasoning: req.budget.reasoning, data: req.untrustedData.map((d) => d.label) });
     const queue = this.answers[req.stage];
     const next = queue && queue.length > 1 ? queue.shift() : queue?.[0];
     if (next === undefined) throw new Error(`aucune réponse pour ${req.stage}`);
@@ -104,18 +104,15 @@ function input(over: Partial<GenerationInput> = {}): GenerationInput {
 const far = () => ({ store: memoryStore(), deadline: Date.now() + 3_600_000 });
 
 describe("moteur V5 : un chapitre par appel", () => {
-  it("chapitres selon le plan, Pro seulement pour le chapitre difficile, puis enrichi par Flash", async () => {
-    const p = new StageProvider({ comprehension: [comp], plan: [plan], chapitre_1: [chapter1], chapitre_2: [chapter2], chapitre_2_enrichi: [enrich] });
+  it("chapitres selon le plan, tous par Flash (réflexion moyenne si difficile), sans second passage", async () => {
+    const p = new StageProvider({ comprehension: [comp], plan: [plan], chapitre_1: [chapter1], chapitre_2: [chapter2] });
     const res = await generateV5(p, input(), far());
     expect(res.status).toBe("done");
     if (res.status !== "done") return;
     const ex = res.output.explanation;
     expect(ex.sections.map((s) => s.id)).toEqual(["sec_1", "sec_2"]);
     expect(ex.sections[0]!.blocks.map((b) => b.id)).toEqual(["blk_c1_1", "blk_c1_2"]);
-    // L'analogie de Flash est insérée après le bloc éclairé du chapitre rédigé par Pro.
-    expect(ex.sections[1]!.blocks.map((b) => b.type)).toEqual(["fact", "analogy"]);
     expect(ex.sections[1]!.difficult).toBe(true);
-    expect(ex.sections[1]!.retain).toEqual(["97 % de l'eau est dans les océans."]);
     expect(ex.sections[0]!.notions?.[0]?.term).toBe("évaporation");
     expect(ex.glossary.map((g) => g.term)).toEqual(["évaporation"]);
     expect(ex.key_points).toHaveLength(2);
@@ -123,10 +120,31 @@ describe("moteur V5 : un chapitre par appel", () => {
     const tier = (stage: string) => p.calls.find((c) => c.stage === stage)!.tier;
     expect(tier("plan")).toBe("fast");
     expect(tier("chapitre_1")).toBe("fast");
-    expect(tier("chapitre_2")).toBe("complex");
-    expect(tier("chapitre_2_enrichi")).toBe("fast");
+    expect(tier("chapitre_2")).toBe("fast");
+    expect(p.calls.find((c) => c.stage === "chapitre_2")!.reasoning).toBe("medium");
+    expect(p.calls.find((c) => c.stage === "chapitre_1")!.reasoning).toBe("low");
+    expect(p.calls.some((c) => c.stage.endsWith("_enrichi"))).toBe(false);
     // Aucun graphique, flux ni dessin tracé par le code ; l'illustration prévue est gardée.
     expect(res.output.blueprint.visual_specs.map((v) => v.kind)).toEqual(["illustration"]);
+  });
+
+  it("publication progressive : le chapitre 1 est publié avant la fin du cours", async () => {
+    const p = new StageProvider({ comprehension: [comp], plan: [plan], chapitre_1: [chapter1], chapitre_2: [chapter2] });
+    const partial: { ready: number; total: number; sections: number }[] = [];
+    const res = await generateV5(p, input(), {
+      ...far(),
+      concurrency: 1,
+      onPartial: async (out, ready, total) => void partial.push({ ready, total, sections: out.explanation.sections.length }),
+    });
+    expect(res.status).toBe("done");
+    expect(partial).toEqual([{ ready: 1, total: 2, sections: 1 }]);
+  });
+
+  it("revue ciblée : seules les affirmations à risque sont relues", () => {
+    expect(riskyClaim({ statement: "97 % de l'eau est salée.", support_status: "supported" })).toBe(true);
+    expect(riskyClaim({ statement: "Le droit s'applique sauf exception.", support_status: "supported" })).toBe(true);
+    expect(riskyClaim({ statement: "L'eau s'évapore au soleil.", support_status: "partial" })).toBe(true);
+    expect(riskyClaim({ statement: "L'eau s'évapore au soleil.", support_status: "supported" })).toBe(false);
   });
 
   it("un chapitre qui oublie une affirmation est réécrit seul", async () => {

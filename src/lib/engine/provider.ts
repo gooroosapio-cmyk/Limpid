@@ -18,6 +18,11 @@ export interface StageBudget {
   maxInputTokens: number;
   maxOutputTokens: number;
   timeoutMs: number;
+  /**
+   * Effort de réflexion demandé au modèle (OpenRouter `reasoning.effort`) : « low » pour extraire
+   * ou organiser (rapide), « medium » pour un chapitre difficile. Absent : réglage du fournisseur.
+   */
+  reasoning?: "minimal" | "low" | "medium" | "high";
 }
 
 export interface UsageReport {
