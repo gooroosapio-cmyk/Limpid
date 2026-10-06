@@ -1,5 +1,11 @@
 # Avancement
 
+## Phase 17.4 — Menu latéral, Accueil = import (6 octobre 2026)
+
+- Barre de navigation basse supprimée. Menu latéral gauche (toujours visible sur ordinateur, tiroir ouvert par le bouton de l'en-tête sur mobile) : Accueil, Sources, Dossiers (liste dépliante, nouveau dossier), Créer un Limpid mis en évidence, Favoris, Bibliothèque avec « Voir tout » et la liste simple des Limpid (défilante). Paramètres en bas, fixe, dans un menu déroulant (Paramètres, Profil, Offres et crédits, tutoriel, déconnexion). Profil et cloche restent en haut à droite.
+- Accueil (`/`) = écran d'import, titré « Accueil » ; l'ancien Accueil est supprimé, `/ajouter` redirige.
+- Bibliothèque : recherche, filtres et tri repliés derrière la loupe ; plus d'indicateur « À vérifier » ; les préparations échouées apparaissent dans la liste (« Échec » et motif, « Limite de tokens atteinte » quand le document dépasse la capacité du modèle) ; aucun compteur affiché.
+
 ## Phase 17.3 — V4, lot 3 : aperçu, discussion, PDF, notifications, paramètres, profil (6 octobre 2026)
 
 - Aperçu d'un Limpid : en-tête, onglets, zone centrale qui défile (l'essentiel, une idée à retenir distincte, notions clés tirées du glossaire), dock toujours visible Présentation / QCM (QCM désactivé avec sa raison s'il n'existe pas), bouton de discussion flottant 48 px.

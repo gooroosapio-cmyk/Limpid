@@ -74,6 +74,7 @@ export function LibraryBrowser({
   filter,
   rail,
   sortControl,
+  filtered = false,
   resume,
   preparations,
   headerExtra,
@@ -92,8 +93,10 @@ export function LibraryBrowser({
   filter: LibraryFilter;
   /** Filtres et tri (liens et sélecteur gardés dans l'adresse). */
   rail: React.ReactNode;
-  /** Tri (Récents par défaut), affiché avec le choix Cartes / Liste. */
+  /** Tri (Récents par défaut), dans le panneau ouvert par la loupe. */
   sortControl?: React.ReactNode;
+  /** Un filtre ou un tri autre que celui par défaut est actif. */
+  filtered?: boolean;
   resume: ResumeItem | null;
   /** Indicateur « À vérifier (n) », s'il y a des préparations interrompues. */
   preparations: React.ReactNode;
@@ -107,6 +110,8 @@ export function LibraryBrowser({
   const t = useT();
   const v = t.library.v2;
   const l = t.v4.library;
+  // Recherche, filtres et tri repliés : la loupe les ouvre (ouverts d'office s'ils sont actifs).
+  const [open, setOpen] = useState(!!initialQuery || filtered);
   const [value, setValue] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [focused, setFocused] = useState(false);
@@ -188,9 +193,25 @@ export function LibraryBrowser({
     <>
       <div className="lib-titlebar">
         <h1>{title}</h1>
+        <button
+          type="button"
+          className={`icon-button lib-search-toggle${searching || filtered ? " is-active" : ""}`}
+          aria-expanded={open}
+          aria-controls="lib-search"
+          aria-label={open ? t.library.searchClose : t.library.searchOpen}
+          onClick={() => {
+            const next = !open;
+            setOpen(next);
+            if (next) requestAnimationFrame(() => inputRef.current?.focus());
+          }}
+        >
+          <Icon name={open ? "close" : "search"} size={22} />
+          {!open && (searching || filtered) && <span className="bell-dot" aria-hidden="true" />}
+        </button>
       </div>
       {headerExtra}
 
+      {open && (
       <div
         id="lib-search"
         className="lib-search"
@@ -279,14 +300,16 @@ export function LibraryBrowser({
             </button>
           </div>
         )}
+        {!searching && rail}
+        {sortControl && <div className="lib-sort-row">{sortControl}</div>}
       </div>
+      )}
       {searching && (
         <p id="lib-scope" className="active-search" role="status">
           {t.library.results(visible.length + (showFolders ? shownFolders.length : 0), query.trim())} · {folder ? t.library.scopeFolder(folder.name) : t.library.scopeAll}
         </p>
       )}
 
-      {!searching && rail}
       {!searching && preparations}
 
       {selecting && (
@@ -313,7 +336,7 @@ export function LibraryBrowser({
         </section>
       )}
 
-      {showFolders && (shownFolders.length > 0 || filter === "dossiers" || (root && !searching)) && (
+      {showFolders && (shownFolders.length > 0 || filter === "dossiers") && (
         <section className="lib-section" aria-labelledby="folders-h">
           <div className="lib-section-head">
             <h2 id="folders-h">{l.collections}</h2>
@@ -339,9 +362,8 @@ export function LibraryBrowser({
       {showLessons && (
         <section className="lib-section" aria-labelledby="limpids-h">
           <div className="lib-section-head">
-            <h2 id="limpids-h">{l.yourLimpids} <span className="meta">({visible.length})</span></h2>
+            <h2 id="limpids-h">{l.yourLimpids}</h2>
             <div className="lib-view-tools">
-            {sortControl}
             <div className="view-toggle" role="group" aria-label={l.viewLabel}>
               <button type="button" className="icon-button" aria-pressed={view === "grid"} aria-label={l.cards} onClick={() => chooseView("grid")}>
                 <Icon name="grid" size={20} />

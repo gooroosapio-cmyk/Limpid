@@ -29,6 +29,9 @@ const SORTS = ["recents", "anciens", "titre"] as const;
 type Sort = (typeof SORTS)[number];
 const KIND_LABELS: Record<string, string> = { pdf: "PDF", docx: "DOCX", txt: "TXT", paste: "Texte", url: "Lien", png: "Image", jpeg: "Image", webp: "Image" };
 
+/** Codes d'échec liés à la taille traitée par le modèle (limite de tokens). */
+const TOKEN_LIMIT = new Set(["provider_truncated", "provider_context_overflow"]);
+
 function href(params: { vue?: string; q?: string; filtre?: string; dossier?: string; tri?: string }): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
@@ -101,7 +104,7 @@ export default async function LibraryPage({
               <Icon name="alert" />
               <h3 id="recover-h">{t.library.recoverTitle}</h3>
               <p>{t.library.recoverText}</p>
-              <Link href="/ajouter" className="btn btn-block">{t.library.recoverCta}</Link>
+              <Link href="/" className="btn btn-block">{t.library.recoverCta}</Link>
             </div>
           </section>
         )}
@@ -130,6 +133,8 @@ export default async function LibraryPage({
   const { data: prefs } = await supabase.from("reader_preferences").select("recent_searches").maybeSingle();
   const recent = Array.isArray(prefs?.recent_searches) ? (prefs.recent_searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 5) : [];
   const folderNames = new Map(folders.map((f) => [f.id, f.name]));
+  const failureReason = (code: string | null) =>
+    TOKEN_LIMIT.has(code ?? "") ? t.v4.failure.tokenLimit : (t.jobErrors[code ?? "unknown"] ?? t.jobErrors.unknown);
   const toRow = (i: LibraryItem): RowData => ({
     id: i.id,
     title: i.title,
@@ -138,24 +143,23 @@ export default async function LibraryPage({
     folderId: i.folderId,
     folderName: i.folderId ? (folderNames.get(i.folderId) ?? null) : null,
     sub: whenLabel(i.createdAt, lang, t.library.today, t.library.yesterday),
-    reason: i.state === "failed" ? (t.jobErrors[i.errorCode ?? "unknown"] ?? t.jobErrors.unknown) : undefined,
+    reason: i.state === "failed" ? failureReason(i.errorCode) : undefined,
     favorite: i.favorite,
     cover: i.cover,
     sourceCount: i.sourceCount,
   });
   const scoped = folder ? items.filter((i) => i.folderId === folder.id) : items;
-  // Les préparations interrompues sont accessibles par « À vérifier (n) », hors de la grille.
+  // Les préparations échouées restent dans la liste (« Échec » et motif), comme les autres.
   const lessons = scoped.filter((i) => i.state === "ready");
   const byOpened = (a: LibraryItem, b: LibraryItem) => (b.openedAt ?? b.createdAt).localeCompare(a.openedAt ?? a.createdAt);
   const pool =
     filter === "prets" ? lessons
     : filter === "favoris" ? lessons.filter((i) => i.favorite)
     : filter === "en_cours" ? scoped.filter((i) => i.state === "running")
-    : scoped.filter((i) => i.state !== "failed");
+    : scoped;
   const shown = [...pool].sort((a, b) =>
     sort === "titre" ? a.title.localeCompare(b.title, lang) : sort === "anciens" ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt),
   );
-  const failed = scoped.filter((i) => i.state === "failed").length;
   const last = lessons.filter((i) => i.openedAt).sort(byOpened)[0];
   const resume: ResumeItem | null = last
     ? { id: last.id, title: last.title, cover: last.cover, sourceCount: last.sourceCount, opened: whenLabel(last.openedAt!, lang, t.library.today, t.library.yesterday).split(" · ")[0]!.toLowerCase() }
@@ -172,7 +176,7 @@ export default async function LibraryPage({
           <Illustration name="bibliotheque-vide" fallback="lumiere" className="lib-empty-cover" eager />
           <h2>{v.emptyTitle}</h2>
           <p className="muted">{v.emptyText}</p>
-          <Link href="/ajouter" className="btn btn-primary btn-block">{t.library.emptyCta} <Icon name="arrow" /></Link>
+          <Link href="/" className="btn btn-primary btn-block">{t.library.emptyCta} <Icon name="arrow" /></Link>
           <NewFolder />
           <ReportLink href="/rapports/demo" className="btn-link" immersive>{t.library.example}</ReportLink>
         </section>
@@ -214,13 +218,8 @@ export default async function LibraryPage({
           </nav>
         }
         sortControl={<SortSelect value={sort} hrefs={sortHrefs} />}
-        preparations={
-          failed > 0 ? (
-            <Link href={href({ vue: "preparations", filtre: "a_verifier" })} className="lib-tocheck">
-              <Icon name="alert" size={18} /> <span>{l.toCheck(failed)}</span> <Icon name="chevron" size={18} />
-            </Link>
-          ) : null
-        }
+        preparations={null}
+        filtered={filter !== "tous" || sort !== "recents"}
         footer={
           !folder ? (
             <ul className="rows lib-extra">

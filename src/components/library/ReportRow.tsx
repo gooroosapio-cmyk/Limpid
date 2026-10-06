@@ -41,7 +41,7 @@ async function patch(id: string, body: Record<string, unknown>): Promise<boolean
 export function StatusLabel({ state }: { state: RowData["state"] }) {
   const t = useT();
   const icon: IconName = state === "failed" ? "alert" : state === "running" ? "hourglass" : "check";
-  const label = state === "failed" ? t.library.v2.interrupted : state === "running" ? t.library.v2.preparing : t.library.v2.ready;
+  const label = state === "failed" ? t.v4.failure.label : state === "running" ? t.library.v2.preparing : t.library.v2.ready;
   return (
     <span className={`status status-${state}`}>
       <Icon name={icon} size={14} />
@@ -230,6 +230,7 @@ export function ReportRow({
           <StatusLabel state={row.state} />
           {favorite && <span className="lesson-fav-mark" role="img" aria-label={t.v4.library.favorite}><Icon name="heart" size={14} className="is-on" /></span>}
         </span>
+        {row.state === "failed" && row.reason && <small className="lesson-reason">{row.reason}</small>}
         {row.folderName && <small className="meta lesson-folder">{t.library.inFolder(row.folderName)}</small>}
       </span>
     </>

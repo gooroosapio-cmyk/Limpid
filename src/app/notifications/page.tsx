@@ -55,7 +55,7 @@ export default async function NotificationsPage() {
         case "report_ready":
           return { ...base, icon: "check", title: v.ready, detail: title, href: i.reportId ? `/rapports/${i.reportId}/apercu` : null };
         case "report_failed":
-          return { ...base, icon: "alert", title: v.failed, detail: v.failedDetail, href: "/bibliotheque?vue=preparations&filtre=a_verifier", danger: true };
+          return { ...base, icon: "alert", title: v.failed, detail: v.failedDetail, href: i.reportId ? `/rapports/${i.reportId}` : "/bibliotheque", danger: true };
         case "credits_added":
           return { ...base, icon: "star", title: v.credits, detail: n.creditsAdded(Number(i.data.credits ?? 0)), href: "/compte/credits" };
         default:
