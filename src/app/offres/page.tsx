@@ -3,7 +3,7 @@ import Link from "next/link";
 import { OffersView } from "@/components/billing/OffersView";
 import { Icon } from "@/components/Icon";
 import { Illustration } from "@/components/Illustration";
-import { LogoMark } from "@/components/Logo";
+import { Wordmark } from "@/components/Logo";
 import { Screen } from "@/components/shell/Screen";
 import { currentUser } from "@/lib/auth";
 import { ACTION_PRICES, formatXof, PAID_PLANS, PLANS, reportsFor, TOPUPS, type PlanCode } from "@/lib/billing/catalog";
@@ -33,7 +33,7 @@ export default async function OffersPage() {
     <Screen className="offers-page">
       <div className="offers-bar">
         <Link href={user ? "/compte" : "/connexion"} className="ib lesson-bar-btn" aria-label={t.nav.back}><Icon name="back" size={26} /></Link>
-        <Link href="/" className="brand offers-brand" aria-label={t.common.brandHome}><LogoMark /><b>limpid</b></Link>
+        <Link href="/" className="brand offers-brand" aria-label={t.common.brandHome}><Wordmark /></Link>
         <a href="#details" className="ib lesson-bar-btn" aria-label={o.v2.detailsTitle}><Icon name="kebab" size={26} /></a>
       </div>
       <Illustration name="offres" fallback="ambre" className="offers-hero-art" eager />

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { LogoMark } from "@/components/Logo";
+import { Wordmark } from "@/components/Logo";
 import { useT } from "@/lib/i18n/client";
 import { initials } from "@/lib/initials";
 
@@ -28,8 +28,7 @@ function AppHeader({ email }: { email: string }) {
     <header className="appbar">
       <Link href="/" className="brand-link" aria-label={t.common.brandHome}>
         <span className="brand">
-          <LogoMark />
-          <b>limpid</b>
+          <Wordmark />
         </span>
       </Link>
       <div className="appbar-end">

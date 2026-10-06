@@ -688,3 +688,9 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 @media (max-width: 359px) { .mode-grid { grid-template-columns: 1fr; } }
 .offers-page { overflow-x: clip; }
 .offers-hero-art { right: 0; }
+
+/* Ressources livrées (pack production) : logo vectorisé et illustrations, sujet à droite. */
+.wordmark { display: block; flex: none; }
+.appbar .wordmark { height: 28px; width: auto; }
+.illus > img { object-position: right center; }
+.offers-hero-art > img { object-position: right top; }

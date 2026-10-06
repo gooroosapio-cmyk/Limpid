@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 1700" role="img" aria-labelledby="title desc">
+<title id="title">Limpid — ressources V2, galerie éditoriale</title><desc id="desc">Logo livre ouvert, vingt icônes vectorielles, palette, typographie, boutons, statuts et intentions de mouvement.</desc>
+<defs>
+<symbol id="icon-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4c3-1 6 0 9 2 3-2 6-3 9-2v15c-3-1-6 0-9 2-3-2-6-3-9-2V4Z"/><path d="M12 6v15"/></g></symbol>
+<symbol id="icon-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></g></symbol>
+<symbol id="icon-folder" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5h7l2 3h9v12H3V7Z"/></g></symbol>
+<symbol id="icon-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></symbol>
+<symbol id="icon-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2H4Z"/></g></symbol>
+<symbol id="icon-heart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21 3.5 12.5a5.5 5.5 0 0 1 8.5-7 5.5 5.5 0 0 1 8.5 7L12 21Z"/></g></symbol>
+<symbol id="icon-file" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2h9l5 5v15H5V2Z"/><path d="M14 2v6h5M9 13h6M9 17h6"/></g></symbol>
+<symbol id="icon-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 10 5-10 5L2 8l10-5ZM2 12l10 5 10-5M2 16l10 5 10-5"/></g></symbol>
+<symbol id="icon-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/></g></symbol>
+<symbol id="icon-list" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h16M4 19h16"/></g></symbol>
+<symbol id="icon-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16m-6-6 6 6-6 6"/></g></symbol>
+<symbol id="icon-chevron" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></g></symbol>
+<symbol id="icon-check" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></g></symbol>
+<symbol id="icon-alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></g></symbol>
+<symbol id="icon-close" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 5 14 14M19 5 5 19"/></g></symbol>
+<symbol id="icon-more" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="20" cy="12" r="1"/></g></symbol>
+<symbol id="icon-eye" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12S6 5 12 5s10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+<symbol id="icon-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 4v6c0 5-5 9-9 10-4-1-9-5-9-10V6l9-4Z"/><path d="m8 12 3 3 5-6"/></g></symbol>
+<symbol id="icon-spark" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 7 3 9 10 10-7 1-9 3-10 10-1-7-3-9-10-10 7-1 9-3 10-10Z"/></g></symbol>
+<symbol id="icon-light" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19h6m-5 3h4M8 16c0-3-3-3-3-7a7 7 0 0 1 14 0c0 4-3 4-3 7v1H8v-1Z"/></g></symbol>
+<symbol id="logo-limpid" viewBox="0 0 48 48"><path d="M5 8c7-2 13-1 19 3 6-4 12-5 19-3v30c-7-2-13-1-19 3-6-4-12-5-19-3V8Z" fill="none" stroke="currentColor" stroke-width="3.1" stroke-linejoin="round"/><path d="M24 11v30" stroke="currentColor" stroke-width="2.8"/><path d="M7 23h14m6 0h8" stroke="#F1D94E" stroke-width="5"/></symbol>
+<radialGradient id="halo"><stop stop-color="#F1D94E" stop-opacity=".22"/><stop offset="1" stop-color="#F1D94E" stop-opacity="0"/></radialGradient>
+<linearGradient id="glass" x2="1" y2="1"><stop stop-color="#29382D"/><stop offset="1" stop-color="#131A16"/></linearGradient>
+<style>text{font-family:Inter,Arial,sans-serif;fill:#F5F4EC}.h{font-size:30px;font-weight:600}.sub{font-size:16px;fill:#AEB6AE}.label{font-size:13px;fill:#AEB6AE;letter-spacing:1.5px}.btn{font-size:16px;font-weight:600;fill:#15180F}.rule{stroke:#354239;stroke-width:1}</style></defs>
+<rect width="1440" height="1700" fill="#0E110F"/><ellipse cx="1330" cy="70" rx="420" ry="280" fill="url(#halo)"/>
+<use xlink:href="#logo-limpid" x="64" y="54" width="62" height="62" color="#F5F4EC"/>
+<text x="145" y="100" font-size="49">limpid</text>
+<text x="1375" y="92" font-size="16"></text>
+<text x="64" y="164" class="h">Galerie éditoriale</text>
+<text x="64" y="197" class="sub">Ressources vectorielles · V2 · mêmes règles, sur chaque écran</text>
+<path d="M64 228H1376" class="rule"/>
+<rect x="64" y="252" width="408" height="164" rx="16" fill="#171D19"/>
+<use xlink:href="#logo-limpid" x="88" y="280" width="60" height="60" color="#F5F4EC"/>
+<text x="164" y="326" font-size="45">limpid</text>
+<text x="88" y="391" class="label">01 / Signature sombre</text>
+<rect x="492" y="252" width="408" height="164" rx="16" fill="#F5F4EC"/>
+<use xlink:href="#logo-limpid" x="516" y="280" width="60" height="60" color="#15180F"/>
+<text x="592" y="326" font-size="45" style="fill:#15180F">limpid</text>
+<text x="516" y="391" font-size="13" style="fill:#48564D">02 / Signature claire</text>
+<rect x="920" y="252" width="456" height="164" rx="16" fill="#171D19"/>
+<rect x="944" y="275" width="90" height="90" rx="24" fill="#F1D94E"/>
+<use xlink:href="#icon-book" x="959" y="290" width="60" height="60" color="#15180F"/>
+<text x="1060" y="312" font-size="19">Icône application</text>
+<text x="1060" y="343" class="sub">Livre ouvert conservé</text>
+<text x="944" y="391" class="label">03 / Emblème compact</text>
+<rect x="64" y="450" width="164" height="52" rx="12" fill="#0E110F" stroke="#354239"/>
+<text x="64" y="529" font-size="15">Fond</text>
+<text x="64" y="551" class="label">#0E110F</text>
+<rect x="252" y="450" width="164" height="52" rx="12" fill="#171D19" stroke="#354239"/>
+<text x="252" y="529" font-size="15">Surface</text>
+<text x="252" y="551" class="label">#171D19</text>
+<rect x="440" y="450" width="164" height="52" rx="12" fill="#212A24" stroke="#354239"/>
+<text x="440" y="529" font-size="15">Élevée</text>
+<text x="440" y="551" class="label">#212A24</text>
+<rect x="628" y="450" width="164" height="52" rx="12" fill="#F5F4EC" stroke="#354239"/>
+<text x="628" y="529" font-size="15">Ivoire</text>
+<text x="628" y="551" class="label">#F5F4EC</text>
+<rect x="816" y="450" width="164" height="52" rx="12" fill="#F1D94E" stroke="#354239"/>
+<text x="816" y="529" font-size="15">Jaune</text>
+<text x="816" y="551" class="label">#F1D94E</text>
+<rect x="1004" y="450" width="164" height="52" rx="12" fill="#A9C9B7" stroke="#354239"/>
+<text x="1004" y="529" font-size="15">Sauge</text>
+<text x="1004" y="551" class="label">#A9C9B7</text>
+<rect x="1192" y="450" width="164" height="52" rx="12" fill="#E4A69B" stroke="#354239"/>
+<text x="1192" y="529" font-size="15">Interruption</text>
+<text x="1192" y="551" class="label">#E4A69B</text>
+<path d="M64 580H1376" class="rule"/>
+<text x="64" y="625" class="h">Une famille d’icônes</text>
+<text x="64" y="654" class="sub">Grille 24 × 24 · trait 1,75 · extrémités arrondies · currentColor</text>
+<rect x="64" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-book" x="101" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="72" y="758" font-size="11">Bibliothèque</text>
+<rect x="196" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-search" x="233" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="204" y="758" font-size="11">Rechercher</text>
+<rect x="328" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-folder" x="365" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="336" y="758" font-size="11">Dossier</text>
+<rect x="460" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-plus" x="497" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="468" y="758" font-size="11">Créer</text>
+<rect x="592" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-user" x="629" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="600" y="758" font-size="11">Profil</text>
+<rect x="724" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-heart" x="761" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="732" y="758" font-size="11">Favori</text>
+<rect x="856" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-file" x="893" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="864" y="758" font-size="11">Source</text>
+<rect x="988" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-layers" x="1025" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="996" y="758" font-size="11">Sources</text>
+<rect x="1120" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-grid" x="1157" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="1128" y="758" font-size="11">Grille</text>
+<rect x="1252" y="685" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-list" x="1289" y="698" width="34" height="34" color="#A9C9B7"/>
+<text x="1260" y="758" font-size="11">Liste</text>
+<rect x="64" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-arrow" x="101" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="72" y="864" font-size="11">Suivant</text>
+<rect x="196" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-chevron" x="233" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="204" y="864" font-size="11">Ouvrir</text>
+<rect x="328" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-check" x="365" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="336" y="864" font-size="11">Prêt</text>
+<rect x="460" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-alert" x="497" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="468" y="864" font-size="11">Interruption</text>
+<rect x="592" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-close" x="629" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="600" y="864" font-size="11">Fermer</text>
+<rect x="724" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-more" x="761" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="732" y="864" font-size="11">Menu</text>
+<rect x="856" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-eye" x="893" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="864" y="864" font-size="11">Voir</text>
+<rect x="988" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-shield" x="1025" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="996" y="864" font-size="11">Confidentialité</text>
+<rect x="1120" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-spark" x="1157" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="1128" y="864" font-size="11">Assistant</text>
+<rect x="1252" y="791" width="108" height="88" rx="16" fill="#171D19"/>
+<use xlink:href="#icon-light" x="1289" y="804" width="34" height="34" color="#A9C9B7"/>
+<text x="1260" y="864" font-size="11">Comprendre</text>
+<path d="M64 903H1376" class="rule"/>
+<text x="64" y="948" class="h">Composants &amp; alignements</text>
+<rect x="64" y="976" width="404" height="234" rx="16" fill="#171D19"/>
+<text x="88" y="1007" class="label">ACTIONS</text>
+<rect x="88" y="1031" width="356" height="48" rx="16" fill="#F1D94E"/>
+<text x="112" y="1061" class="btn">Continuer</text>
+<use xlink:href="#icon-arrow" x="400" y="1043" width="24" height="24" color="#15180F"/>
+<rect x="88" y="1095" width="356" height="48" rx="16" fill="#212A24" stroke="#48574C"/>
+<text x="112" y="1125" font-size="16">Voir les détails</text>
+<text x="88" y="1185" class="sub">48 px · rayon 16 · marges 24</text>
+<rect x="488" y="976" width="420" height="234" rx="16" fill="#171D19"/>
+<text x="512" y="1007" class="label">RECHERCHE &amp; ÉTATS</text>
+<rect x="512" y="1031" width="372" height="48" rx="16" fill="#212A24"/>
+<use xlink:href="#icon-search" x="528" y="1043" width="24" height="24" color="#AEB6AE"/>
+<text x="568" y="1061" font-size="16" style="fill:#AEB6AE">Rechercher</text>
+<use xlink:href="#icon-check" x="513" y="1098" width="20" height="20" color="#A9C9B7"/>
+<text x="541" y="1115" font-size="15" style="fill:#A9C9B7">Prêt</text>
+<use xlink:href="#icon-alert" x="629" y="1098" width="20" height="20" color="#E4A69B"/>
+<text x="657" y="1115" font-size="15" style="fill:#E4A69B">Interrompu</text>
+<text x="512" y="1185" class="sub">Toujours une icône et un libellé</text>
+<rect x="928" y="976" width="448" height="234" rx="16" fill="#171D19"/>
+<text x="952" y="1007" class="label">HIÉRARCHIE · INTER</text>
+<text x="952" y="1053" font-size="32">Comprendre.</text>
+<text x="952" y="1088" font-size="22">Une seule idée à la fois.</text>
+<text x="952" y="1121" font-size="16">Corps 16/24 · lecture confortable</text>
+<text x="952" y="1149" font-size="13" style="fill:#AEB6AE">Métadonnées 13/18</text>
+<text x="952" y="1185" class="sub">Graisses 400 / 500 / 600</text>
+<path d="M64 1242H1376" class="rule"/>
+<text x="64" y="1287" class="h">Une profondeur discrète</text>
+<text x="64" y="1316" class="sub">Le mouvement accompagne l’action. La lecture reste calme.</text>
+<rect x="64" y="1346" width="416" height="205" rx="20" fill="url(#glass)" stroke="#344338"/>
+<rect x="512" y="1346" width="416" height="205" rx="20" fill="url(#glass)" stroke="#344338"/>
+<rect x="960" y="1346" width="416" height="205" rx="20" fill="url(#glass)" stroke="#344338"/>
+<use xlink:href="#icon-book" x="92" y="1375" width="35" height="35" color="#F1D94E"/>
+<text x="145" y="1401" font-size="21">Au repos</text>
+<text x="92" y="1443" class="sub">Halo statique · surface fumée</text>
+<text x="92" y="1480" class="sub">Contraste et relief sans surcharge</text>
+<text x="92" y="1520" class="label">OPACITÉ DU HALO : 6–10 %</text>
+<use xlink:href="#icon-plus" x="540" y="1375" width="35" height="35" color="#F1D94E"/>
+<text x="593" y="1401" font-size="21">Au toucher</text>
+<text x="540" y="1443" class="sub">Scale .985 · 110 ms</text>
+<text x="540" y="1480" class="sub">Retour souple · 160 ms</text>
+<text x="540" y="1520" class="label">AUCUNE DÉFORMATION DU TEXTE</text>
+<use xlink:href="#icon-layers" x="988" y="1375" width="35" height="35" color="#F1D94E"/>
+<text x="1041" y="1401" font-size="21">À l’ouverture</text>
+<text x="988" y="1443" class="sub">Fondu + 6 px · 200 ms</text>
+<text x="988" y="1480" class="sub">Feuille d’action · 240 ms</text>
+<text x="988" y="1520" class="label">RESPECT DU MOUVEMENT RÉDUIT</text>
+<text x="64" y="1610" class="sub">Symboles nommés et réutilisables : logo-limpid, icon-search, icon-folder, icon-heart…</text>
+<text x="64" y="1642" class="sub">Les logos d’authentification tiers doivent provenir de leurs ressources officielles.</text>
+</svg>

@@ -93,6 +93,6 @@ export const config = {
   matcher: [
     // Aucune exception sur les en-têtes « préchargement » : ils viennent du client, et le
     // contrôle des sessions doit s'appliquer à toute requête (sans la prolonger, cf. isInteractive).
-    { source: "/((?!_next/static|_next/image|favicon.ico|icon.svg|sw.js|manifest.webmanifest|icons/|fonts/).*)" },
+    { source: "/((?!_next/static|_next/image|favicon.ico|icon.svg|sw.js|manifest.webmanifest|icons/|fonts/|illustrations/|brand/|splash/|opengraph-image).*)" },
   ],
 };

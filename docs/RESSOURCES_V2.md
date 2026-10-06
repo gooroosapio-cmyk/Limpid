@@ -1,5 +1,9 @@
 # Limpid V2.1 — Ressources graphiques à fournir
 
+**Reçu et intégré (pack production, 6 octobre 2026)** : logos SVG (`public/brand/`), icônes d'application (`public/icons/`, favicon `src/app/icon.svg`), illustrations `connexion`, `bibliotheque-vide`, `import`, `offres`, `profil-offre` (1× et @2x, `public/illustrations/`), image de partage (`src/app/opengraph-image.png`), écrans de démarrage iPhone (`public/splash/`), planche source (`docs/assets/`).
+
+**Reste à fournir** : `offres-actuelle`, `offres-plus`, `lecon-presentation`, `lecon-quiz` et, en option, `dossier-1…6` (tableau A ci-dessous).
+
 Les couvertures des leçons sont **générées par Gemini** (aucune image à fournir). Tant qu'une ressource ci-dessous n'est pas livrée, l'écran affiche un dégradé de la même famille de couleurs : rien n'est cassé.
 
 **Format commun des images** : WebP, qualité ~80, moins de 200 Ko, ambiance sombre (fond proche de #0E110F), **aucun texte dans l'image**, sujet du côté indiqué. Fournir aussi la version 2× (même nom + `@2x`) si possible.

@@ -24,7 +24,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="page page-enter login-page">
       <div className="login-hero">
         <Illustration name="connexion" fallback="lumiere" className="login-art" eager />
-        <div className="login-brand"><Logo /></div>
+        <div className="login-brand"><Logo height={34} /></div>
       </div>
       <div className="page-title login-title">
         <h1>{t.login.v2Title}</h1>

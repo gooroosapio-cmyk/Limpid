@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { Cover } from "@/components/library/Cover";
-import { LogoMark } from "@/components/Logo";
+import { Wordmark } from "@/components/Logo";
 import { Illustration } from "@/components/Illustration";
 import { ReportLink } from "@/components/ReportLink";
 import { requireUser } from "@/lib/auth";
@@ -48,7 +48,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
         <Cover cover={cover} className="lesson-hero-cover" eager />
         <div className="lesson-hero-bar">
           <Link href="/" className="ib lesson-bar-btn" aria-label={l.back}><Icon name="back" size={26} /></Link>
-          <span className="brand lesson-hero-brand" aria-hidden="true"><LogoMark /><b>limpid</b></span>
+          <span className="brand lesson-hero-brand" aria-hidden="true"><Wordmark /></span>
           <Link href={`/rapports/${id}?ouvrir=options`} className="ib lesson-bar-btn" aria-label={l.options}><Icon name="more" size={26} /></Link>
         </div>
         <div className="lesson-hero-text">
