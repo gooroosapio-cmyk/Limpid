@@ -47,6 +47,9 @@ export type ProviderErrorCode =
   | "rate_limited"
   | "quota_exhausted" // quota journalier (offre gratuite) : inutile de réessayer avant longtemps
   | "unavailable"
+  | "auth" // 401 : clé refusée (invalide, révoquée)
+  | "forbidden" // 403 : limite de dépense de la clé atteinte, accès au modèle refusé
+  | "bad_request" // 400 / 404 / 422 : paramètre ou modèle refusé par le fournisseur
   | "cancelled"
   | "not_configured";
 

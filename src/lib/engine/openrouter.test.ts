@@ -85,6 +85,22 @@ describe("OpenRouter : appels", () => {
     expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_EDITOR: "google/gemini-3.8-flash" }).models.editor).toBe("google/gemini-3.8-flash");
   });
 
+  it("requête refusée par Luna Pro (400) : Gemini 3.8 Flash prend le relais", async () => {
+    const models: string[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      models.push(body.model);
+      if (body.model === "openai/gpt-6-luna-pro") return reply({ error: { code: 400, message: "Unsupported parameter" } }, 400);
+      return reply({ choices: [{ finish_reason: "stop", message: { content: '{"answer":"ok"}' } }], usage: {} });
+    });
+    const out = await new OpenRouterProvider(openRouterConfigFromEnv(env)).generateStructured(req());
+    expect(out.value).toEqual({ answer: "ok" });
+    expect(models).toEqual(["openai/gpt-6-luna-pro", "google/gemini-3.8-flash"]);
+    // Clé refusée : aucun secours (inutile), erreur précise.
+    vi.stubGlobal("fetch", async () => reply({ error: { code: 401, message: "No auth" } }, 401));
+    await expect(new OpenRouterProvider(openRouterConfigFromEnv(env)).generateStructured(req())).rejects.toMatchObject({ code: "auth" });
+  });
+
   it("réponse tronquée, hors schéma, crédit épuisé", async () => {
     const p = new OpenRouterProvider(openRouterConfigFromEnv(env));
     vi.stubGlobal("fetch", async () => reply({ choices: [{ finish_reason: "length", message: { content: '{"ans' } }] }));
@@ -109,6 +125,8 @@ describe("OpenRouter : appels", () => {
 describe("OpenRouter : utilitaires", () => {
   it("codes d'erreur", () => {
     expect(errorCodeFor(402, "")).toBe("quota_exhausted");
+    // Refus immédiats distingués (clé, limite de dépense, paramètre ou modèle refusé).
+    expect([401, 403, 400, 404].map((x) => errorCodeFor(x, ""))).toEqual(["auth", "forbidden", "bad_request", "bad_request"]);
     expect(errorCodeFor(429, "")).toBe("rate_limited");
     expect(errorCodeFor(400, "maximum context length exceeded")).toBe("context_overflow");
     expect(errorCodeFor(503, "")).toBe("unavailable");
