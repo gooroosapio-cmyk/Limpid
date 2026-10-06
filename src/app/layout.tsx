@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { AppShell } from "@/components/shell/AppShell";
+import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { Pwa } from "@/components/shell/Pwa";
 import { Toaster } from "@/components/shell/Toasts";
 import { currentUser } from "@/lib/auth";
@@ -69,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main id="contenu" className="app-content">{children}</main>
         </div>
         <Pwa account={user ? offlineKey(user.id) : null} />
+        <InstallPrompt />
         <Toaster closeLabel={t.reader.close} />
         </I18nProvider>
       </body>

@@ -13,14 +13,14 @@ export interface GradedAnswer {
 export interface Score {
   good: number;
   graded: number;
-  /** Sur 20, arrondi au demi-point ; null si aucune réponse n'a pu être évaluée. */
+  /** Sur 20, au dixième (kit V5) ; null si aucune réponse n'a pu être évaluée. */
   on20: number | null;
 }
 
 export function scoreOn20(results: GradedAnswer[]): Score {
   const graded = results.filter((r) => r.correct !== null);
   const good = graded.filter((r) => r.correct).length;
-  return { good, graded: graded.length, on20: graded.length ? Math.round((good / graded.length) * 40) / 2 : null };
+  return { good, graded: graded.length, on20: graded.length ? Math.round((good / graded.length) * 200) / 10 : null };
 }
 
 export interface NotionVerdict {

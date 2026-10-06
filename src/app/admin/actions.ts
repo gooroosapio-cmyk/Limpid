@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { resetTestSpace } from "@/lib/account/reset-test";
 import { cleanRoute, modelInfo, type ImageStyle } from "@/lib/visuals/image-models";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -171,6 +172,15 @@ export async function grantCreditsAction(form: FormData) {
   if (error) done("Les crédits n'ont pas été ajoutés.");
   await audit(user.id, "credits.grant", target.id, { credits: credits.data, reason: reason.data, ref });
   done(`${credits.data} crédits ajoutés à ${email.data} (valables 12 mois).`);
+}
+
+/** Espace de test de l'administrateur : rapports et documents supprimés, crédits rendus. */
+export async function resetTestSpaceAction(form: FormData) {
+  const user = await requireAdmin();
+  if (String(form.get("confirm") ?? "").trim().toUpperCase() !== "SUPPRIMER") done("Tapez SUPPRIMER pour confirmer.");
+  const r = await resetTestSpace(user.id);
+  await audit(user.id, "account.reset_test", user.id, r);
+  done(`${r.reports} rapport(s) et ${r.sources} document(s) supprimés ; ${r.refunded} crédit(s) rendus.`);
 }
 
 /** Rapprochement immédiat des commandes en attente (sans attendre le cron). */

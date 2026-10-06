@@ -154,7 +154,7 @@ export function Bilan({
             <h3 id="bilan-prev" className="eyebrow">{t.lim.bilanPrev}</h3>
             <ul className="attempts">
               {attempts.map((a) => (
-                <li key={a.created_at}><span>{when(a.created_at)}</span><b>{a.total ? `${formatOn20(Math.round((a.score / a.total) * 40) / 2, lang)} / 20` : `${a.score} / ${a.total}`}</b></li>
+                <li key={a.created_at}><span>{when(a.created_at)}</span><b>{a.total ? `${formatOn20(Math.round((a.score / a.total) * 200) / 10, lang)} / 20` : `${a.score} / ${a.total}`}</b></li>
               ))}
             </ul>
           </section>
