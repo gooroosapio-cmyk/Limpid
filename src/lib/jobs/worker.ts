@@ -5,7 +5,7 @@
  */
 import "server-only";
 import type { z } from "zod";
-import { limits, retention } from "@/lib/config";
+import { limits } from "@/lib/config";
 import {
   Evidence,
   ExplanationObject,
@@ -46,7 +46,7 @@ import { notify } from "@/lib/notifications";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/source-set";
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
-import { BUCKET, purgeOriginal } from "@/lib/sources/uploads";
+import { BUCKET, purgeDate, purgeOriginal } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
 import type { JobStage } from "./state";
 
@@ -369,11 +369,8 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
         coverage: { ...out.coverage, ocr_all: true },
       })
       .eq("id", sourceId);
-    // Lu : l'original reste consultable pendant la conservation du rapport.
-    await db
-      .from("sources")
-      .update({ original_purge_at: new Date(Date.now() + retention.originalHours * 3600_000).toISOString() })
-      .eq("id", sourceId);
+    // Lu : l'original reste consultable jusqu'à la suppression du Limpid (aucune échéance).
+    await db.from("sources").update({ original_purge_at: purgeDate() }).eq("id", sourceId);
   } catch (e) {
     // Échec de lecture d'un document entièrement visuel : l'original n'est pas gardé.
     if (!pages) await purgeOriginal(sourceId, src.storage_path);

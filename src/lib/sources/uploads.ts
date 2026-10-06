@@ -6,7 +6,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import { limits } from "@/lib/config";
+import { limits, retention } from "@/lib/config";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const BUCKET = "sources";
@@ -97,6 +97,11 @@ export async function createUpload(
 }
 
 /** Efface l'original d'une source et le note (idempotent). */
+/** Échéance de l'original d'une source lue : aucune (null) depuis la V4, sauf réglage contraire. */
+export function purgeDate(): string | null {
+  return retention.originalHours > 0 ? new Date(Date.now() + retention.originalHours * 3600_000).toISOString() : null;
+}
+
 export async function purgeOriginal(sourceId: string, path: string | null): Promise<boolean> {
   const db = adminClient();
   const removed = !path || !(await db.storage.from(BUCKET).remove([path])).error;
@@ -139,7 +144,7 @@ export async function purgeDueOriginals(limit = 200): Promise<number> {
  */
 export async function purgeUnusedSources(limit = 100): Promise<number> {
   const db = adminClient();
-  const before = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const before = new Date(Date.now() - retention.unusedHours * 3600_000).toISOString();
   const { data } = await db
     .from("sources")
     .select("id, storage_path, reports!report_sources(id)")

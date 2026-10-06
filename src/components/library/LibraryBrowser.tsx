@@ -25,11 +25,11 @@ export interface ResumeItem {
   opened: string;
 }
 
-export type LibraryFilter = "tous" | "recents" | "dossiers" | "prets" | "favoris";
+export type LibraryFilter = "tous" | "dossiers" | "prets" | "en_cours" | "favoris";
 type View = "grid" | "list";
 
 const VIEW_KEY = "limpid-library-view";
-const HOME_COUNT = 4;
+const HOME_FOLDERS = 4;
 const DEBOUNCE_MS = 250;
 
 function readView(): View {
@@ -59,13 +59,13 @@ export function FolderTile({ folder }: { folder: FolderItem }) {
 }
 
 /**
- * Bibliothèque V2 (galerie) : recherche visible, rail de filtres, Reprendre, collections et
- * leçons en grille 4:5 ou en liste (choix mémorisé). Recherche instantanée sans réseau ni IA ;
- * sélection multiple et « Déplacer vers… » conservées.
+ * Bibliothèque V4 : recherche visible, filtres (Tous, Prêts, En cours, Favoris) et tri séparés,
+ * « À vérifier (n) », Reprendre, collections, puis Vos Limpid en cartes 4/3 ou en liste (choix
+ * mémorisé, mêmes données et actions). Recherche instantanée sans réseau ni IA ; sélection
+ * multiple et « Déplacer vers… » conservées.
  */
 export function LibraryBrowser({
   title,
-  subtitle,
   folder,
   folders,
   allFolders,
@@ -73,6 +73,7 @@ export function LibraryBrowser({
   root,
   filter,
   rail,
+  sortControl,
   resume,
   preparations,
   headerExtra,
@@ -83,16 +84,18 @@ export function LibraryBrowser({
   newFolder,
 }: {
   title: string;
-  subtitle: string | null;
   folder: { id: string; name: string } | null;
   folders: FolderItem[];
   allFolders: { id: string; name: string }[];
   rows: RowData[];
   root: boolean;
   filter: LibraryFilter;
+  /** Filtres et tri (liens et sélecteur gardés dans l'adresse). */
   rail: React.ReactNode;
+  /** Tri (Récents par défaut), affiché avec le choix Cartes / Liste. */
+  sortControl?: React.ReactNode;
   resume: ResumeItem | null;
-  /** Lien vers les préparations (en cours, à vérifier), si elles existent. */
+  /** Indicateur « À vérifier (n) », s'il y a des préparations interrompues. */
   preparations: React.ReactNode;
   headerExtra?: React.ReactNode;
   footer?: React.ReactNode;
@@ -103,8 +106,7 @@ export function LibraryBrowser({
 }) {
   const t = useT();
   const v = t.library.v2;
-  // Recherche rétractable : la loupe à droite du titre ouvre le champ.
-  const [open, setOpen] = useState(!!initialQuery);
+  const l = t.v4.library;
   const [value, setValue] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [focused, setFocused] = useState(false);
@@ -163,8 +165,6 @@ export function LibraryBrowser({
   const shownFolders = searching ? folders.filter((f) => matchesQuery(f.name, query)) : folders;
   const showFolders = root && (filter === "tous" || filter === "dossiers" || searching);
   const showLessons = filter !== "dossiers" || searching;
-  // Accueil (« Tous ») : quelques leçons et « Tout voir » ; les autres filtres montrent tout.
-  const home = filter === "tous" && root && !searching && !selecting;
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -187,50 +187,27 @@ export function LibraryBrowser({
   return (
     <>
       <div className="lib-titlebar">
-        <div className="page-title lib-title">
-          <h1>{title}</h1>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
-        <button
-          type="button"
-          className={`ib lib-search-toggle${searching ? " is-active" : ""}`}
-          aria-expanded={open}
-          aria-controls="lib-search"
-          aria-label={searching ? `${t.library.searchOpen} — ${t.library.searchActive(query)}` : t.library.searchOpen}
-          onClick={() => {
-            if (open && !value.trim()) return setOpen(false);
-            setOpen(true);
-            requestAnimationFrame(() => inputRef.current?.focus());
-          }}
-        >
-          <Icon name="search" size={26} />
-          {searching && <span className="bell-dot" aria-hidden="true" />}
-        </button>
+        <h1>{title}</h1>
       </div>
       {headerExtra}
 
-      {open && (
       <div
         id="lib-search"
         className="lib-search"
         onFocus={() => setFocused(true)}
         onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-            setFocused(false);
-            // Champ vide quitté : la recherche se replie.
-            if (!value.trim()) setOpen(false);
-          }
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
         }}
       >
         <div className="searchbox" role="search">
-          <Icon name="search" />
-          <label htmlFor="lib-q" className="sr-only">{t.library.searchLabel}</label>
+          <Icon name="search" size={20} />
+          <label htmlFor="lib-q" className="sr-only">{l.searchLabel}</label>
           <input
             ref={inputRef}
             id="lib-q"
             type="search"
             value={value}
-            placeholder={t.library.search}
+            placeholder={l.search}
             maxLength={80}
             autoComplete="off"
             enterKeyHint="search"
@@ -250,14 +227,13 @@ export function LibraryBrowser({
               } else if (e.key === "Escape") {
                 setValue("");
                 setQuery("");
-                setOpen(false);
               }
             }}
           />
           {value && (
             <button
               type="button"
-              className="ib searchbox-clear"
+              className="icon-button searchbox-clear"
               aria-label={t.library.searchClear}
               onPointerDown={(e) => e.preventDefault()}
               onClick={() => {
@@ -304,7 +280,6 @@ export function LibraryBrowser({
           </div>
         )}
       </div>
-      )}
       {searching && (
         <p id="lib-scope" className="active-search" role="status">
           {t.library.results(visible.length + (showFolders ? shownFolders.length : 0), query.trim())} · {folder ? t.library.scopeFolder(folder.name) : t.library.scopeAll}
@@ -312,6 +287,7 @@ export function LibraryBrowser({
       )}
 
       {!searching && rail}
+      {!searching && preparations}
 
       {selecting && (
         <div className="lib-selbar" role="toolbar" aria-label={t.library.selectedCount(selected.size)}>
@@ -323,39 +299,36 @@ export function LibraryBrowser({
         </div>
       )}
 
-      {!searching && preparations}
-
       {!searching && resume && filter === "tous" && root && (
-        <section className="resume" aria-labelledby="resume-h">
-          <Cover cover={resume.cover} className="resume-cover" eager />
-          <div className="resume-body">
-            <p className="resume-eyebrow">{v.resume}</p>
-            <h2 id="resume-h">{resume.title}</h2>
-            <p className="resume-meta">
-              <Icon name="layers" size={18} /> {v.sources(resume.sourceCount)} · {v.opened(resume.opened)}
-            </p>
+        <section className="lib-section" aria-labelledby="resume-h">
+          <h2 id="resume-h">{v.resume}</h2>
+          <div className="home-resume">
+            <Cover cover={resume.cover} className="home-thumb" eager />
+            <div className="home-resume-text">
+              <b>{resume.title}</b>
+              <small className="meta">{v.sources(resume.sourceCount)} · {v.opened(resume.opened)}</small>
+            </div>
+            <Link href={`/rapports/${resume.id}`} className="btn btn-primary home-resume-cta">{v.continue}</Link>
           </div>
-          <Link href={`/rapports/${resume.id}`} className="btn btn-primary resume-cta">
-            {v.continue} <Icon name="arrow" />
-          </Link>
         </section>
       )}
 
-      {showFolders && (shownFolders.length > 0 || filter === "dossiers") && (
-        <section aria-labelledby="folders-h">
-          <div className="section-head">
-            <h2 id="folders-h">{v.collections}</h2>
-            {filter === "tous" && !searching && folders.length > 2 ? (
-              <Link href="/bibliotheque?filtre=dossiers">{v.seeAll} <Icon name="chevron" /></Link>
-            ) : (
-              !searching && newFolder
-            )}
+      {showFolders && (shownFolders.length > 0 || filter === "dossiers" || (root && !searching)) && (
+        <section className="lib-section" aria-labelledby="folders-h">
+          <div className="lib-section-head">
+            <h2 id="folders-h">{l.collections}</h2>
+            <div className="lib-section-tools">
+              {filter === "tous" && !searching && folders.length > HOME_FOLDERS && (
+                <Link href="/bibliotheque?filtre=dossiers" className="see-all">{l.seeAll} <Icon name="chevron" size={18} /></Link>
+              )}
+              {!searching && newFolder}
+            </div>
           </div>
           {shownFolders.length === 0 ? (
-            <p className="muted">{v.noFolders}</p>
+            <p className="meta">{v.noFolders}</p>
           ) : (
             <ul className="folder-tiles">
-              {(filter === "tous" && !searching ? shownFolders.slice(0, 2) : shownFolders).map((f) => (
+              {(filter === "tous" && !searching ? shownFolders.slice(0, HOME_FOLDERS) : shownFolders).map((f) => (
                 <FolderTile key={f.id} folder={f} />
               ))}
             </ul>
@@ -364,36 +337,30 @@ export function LibraryBrowser({
       )}
 
       {showLessons && (
-        <section aria-labelledby="limpids-h">
-          {home ? (
-            <div className="section-head">
-              <h2 id="limpids-h">{v.yourLimpids}</h2>
-              {visible.length > HOME_COUNT && <Link href="/bibliotheque?filtre=prets">{v.seeAll} <Icon name="chevron" /></Link>}
+        <section className="lib-section" aria-labelledby="limpids-h">
+          <div className="lib-section-head">
+            <h2 id="limpids-h">{l.yourLimpids} <span className="meta">({visible.length})</span></h2>
+            <div className="lib-view-tools">
+            {sortControl}
+            <div className="view-toggle" role="group" aria-label={l.viewLabel}>
+              <button type="button" className="icon-button" aria-pressed={view === "grid"} aria-label={l.cards} onClick={() => chooseView("grid")}>
+                <Icon name="grid" size={20} />
+              </button>
+              <button type="button" className="icon-button" aria-pressed={view === "list"} aria-label={l.list} onClick={() => chooseView("list")}>
+                <Icon name="lines" size={20} />
+              </button>
             </div>
-          ) : (
-            <div className="section-head lib-count">
-              <p id="limpids-h">{filter === "prets" ? v.readyCount(visible.length) : v.count(visible.length)}</p>
-              <div className="view-toggle" role="group" aria-label={v.yourLimpids}>
-                <button type="button" className="ib" aria-pressed={view === "grid"} aria-label={v.viewGrid} onClick={() => chooseView("grid")}>
-                  <Icon name="grid" />
-                </button>
-                <button type="button" className="ib" aria-pressed={view === "list"} aria-label={v.viewList} onClick={() => chooseView("list")}>
-                  <Icon name="lines" />
-                </button>
-              </div>
             </div>
-          )}
+          </div>
           {visible.length === 0 ? (
-            <p className="muted">{searching ? t.library.noResult : emptyText}</p>
+            <p className="meta lib-empty-line">{searching ? t.library.noResult : emptyText}</p>
           ) : (
-            <ul className={home || view === "grid" ? `lesson-grid${home ? " lesson-grid-home" : ""}` : "lesson-list"}>
-              {(home ? visible.slice(0, HOME_COUNT) : visible).map((r) => (
+            <ul className={view === "grid" ? "limpid-grid" : "limpid-list"}>
+              {visible.map((r) => (
                 <ReportRow
                   key={r.id}
                   row={searching ? r : { ...r, folderName: null }}
-                  variant={home ? "grid" : view}
-                  showFavorite={!home}
-                  sourcesFirst={home}
+                  variant={view}
                   selecting={selecting}
                   selected={selected.has(r.id)}
                   onToggle={toggle}

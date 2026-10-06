@@ -1,5 +1,13 @@
 # Avancement
 
+## Phase 17.2 — V4, lot 2 : bibliothèque, import, conservation (6 octobre 2026)
+
+- Conservation : plus aucune purge automatique des Limpid ni des originaux utilisés (configuration figée, tâche quotidienne limitée aux envois abandonnés et aux sources jamais utilisées après 24 h). Migration `20261017000000_v4_retention.sql` (retrait des échéances posées, idempotente, aucune suppression) appliquée en production. Textes « conservés jusqu'à votre suppression ». Sessions, codes et liens signés inchangés ; changement d'offre : rien n'est effacé (seule la création est bloquée au-delà de la limite).
+- Bibliothèque : recherche visible (« Rechercher un Limpid ou un dossier »), filtres Tous / Prêts / En cours / Favoris, tri Récents / Plus anciens / Titre, indicateur « À vérifier (n) », Reprendre compact, collections en petites tuiles avec bouton icône, Vos Limpid en cartes 4/3 (texte sous l'image, titre 2 lignes, sources et date, statut, menu) ou en liste, choix mémorisé. Anciens filtres « recents » ramenés au tri par défaut.
+- Relance : quota ou plafond atteint → « Réessayer plus tard » (pas de réessai immédiat).
+- Couvertures générées en 4/3 (1200 × 900) ; les anciennes, en portrait, sont recadrées à l'affichage.
+- Import : titre « Créer un Limpid », zone d'ajout texte à gauche et illustration à droite, Niveau et longueur dans une feuille locale (transmis à la création, brouillon conservé).
+
 ## Phase 17 — V4, lot 1 : Accueil, navigation, connexion, première connexion (6 octobre 2026)
 
 - Dossier V4 (LIMPID_V4) : cadrage par QCM (lots fusionnés successivement, conservation sans expiration, connexion compacte, cartes 4/3, chat flottant seul, « Bonjour, Prénom. », initiales seulement).

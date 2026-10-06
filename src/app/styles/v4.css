@@ -225,3 +225,101 @@
 /* ---------- Animations : entrée unique 180 ms, réduites si demandé ---------- */
 @media (prefers-reduced-motion: reduce) { .home-create, .onboarding .choice { transition: none; } .home-create:hover { transform: none; } }
 :root[data-motion="reduit"] .home-create, :root[data-motion="reduit"] .onboarding .choice { transition: none; }
+
+/* ---------- Bibliothèque V4 ---------- */
+.lib-titlebar h1 { margin: var(--s4) 0 var(--s3); }
+.lib-search { margin: 0 0 var(--s3); }
+.lib-search .searchbox { position: relative; margin: 0; }
+.lib-search .searchbox > .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--muted); pointer-events: none; }
+.lib-search .searchbox input[type="search"] { width: 100%; min-height: 44px; padding: 10px 44px 10px 40px; font-size: 1rem; line-height: 1.375rem; border-radius: var(--r-control); }
+.lib-search .searchbox .searchbox-clear { position: absolute; right: 0; top: 0; transform: none; width: 44px; height: 44px; }
+.lib-controls { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--s3); min-width: 0; }
+.lib-filters { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.lib-filters::-webkit-scrollbar { display: none; }
+.lib-filters a { flex: none; display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; font-size: 0.8125rem; font-weight: 500; }
+.lib-filters a[aria-current="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+.lib-sort select { min-height: 36px; padding: 0 28px 0 10px; font-size: 0.8125rem; line-height: 1.125rem; border-radius: 999px; border: 1px solid var(--line-strong); background-color: var(--surface); color: var(--ink); }
+.lib-tocheck { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; margin: 0 0 var(--s3); border-radius: 999px; background: var(--danger-pale); color: var(--ink); text-decoration: none; font-size: 0.8125rem; font-weight: 600; }
+.lib-tocheck .icon:first-child { color: var(--danger); }
+.lib-section { margin-top: var(--s5); }
+.lib-section > h2 { margin: 0 0 var(--s3); }
+.lib-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 var(--s3); min-width: 0; }
+.lib-section-head h2 { margin: 0; min-width: 0; }
+.lib-section-tools { display: flex; align-items: center; gap: 4px; flex: none; }
+.lib-newfolder-icon { color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r-control); }
+.lib-empty-line { margin: 0; }
+.folder-tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 768px) { .folder-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.view-toggle { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-control); border: 1px solid var(--line); }
+.view-toggle .icon-button { min-width: 40px; min-height: 40px; color: var(--muted); }
+.view-toggle .icon-button[aria-pressed="true"] { background: var(--elevated); color: var(--ink); }
+
+/* Cartes : visuel 4/3 puis zone de texte opaque ; titre 2 lignes ; jamais de texte sur l'image. */
+.limpid-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 359px) { .limpid-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 768px) { .limpid-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .limpid-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.limpid-item { position: relative; min-width: 0; }
+.limpid-item .lesson-hit { display: block; height: 100%; color: inherit; text-decoration: none; border-radius: var(--r-card); }
+.limpid-item-grid .lesson-hit { background: var(--surface); border: 1px solid var(--line); overflow: hidden; transition: box-shadow 140ms ease, transform 140ms ease; }
+@media (hover: hover) { .limpid-item-grid .lesson-hit:hover { transform: translateY(-1px); box-shadow: var(--shadow); } }
+.limpid-item-grid .lesson-hit-inner, .limpid-item-grid label.lesson-hit { display: flex; flex-direction: column; height: 100%; }
+.limpid-card-cover { width: 100%; aspect-ratio: 4 / 3; flex: none; border-radius: 0; }
+.limpid-item-grid .lesson-text { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; min-width: 0; background: var(--surface); flex: 1; }
+.limpid-item .lesson-status { padding-right: 36px; min-height: 24px; }
+.limpid-item .lesson-title { font-size: 0.9375rem; line-height: 1.3125rem; font-weight: 600; color: var(--ink); overflow-wrap: break-word; }
+.lesson-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lesson-status { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.limpid-item .status { font-size: 0.75rem; line-height: 1rem; color: var(--muted); gap: 4px; }
+.limpid-item .status .icon { width: 14px; height: 14px; }
+.limpid-item .status-ready .icon { color: var(--sage); }
+.limpid-item .status-running .icon { color: var(--ink); }
+.limpid-item .status-failed, .limpid-item .status-failed .icon { color: var(--danger); }
+.lesson-fav-mark { display: inline-flex; color: var(--yellow); }
+.lesson-fav-mark .icon path { fill: currentColor; }
+:root[data-mode="light"] .lesson-fav-mark { color: #75620b; }
+.limpid-item .lesson-actions { position: absolute; inset: auto 0 0 auto; display: flex; pointer-events: none; }
+.limpid-item .lesson-actions .icon-button { pointer-events: auto; color: var(--muted); }
+.limpid-item .lesson-check { position: absolute; z-index: 2; top: 10px; left: 10px; width: 22px; height: 22px; margin: 0; accent-color: var(--yellow); }
+.limpid-item.is-selected .lesson-hit { box-shadow: 0 0 0 2px var(--yellow); }
+.limpid-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.limpid-item-list .lesson-hit { min-height: 72px; padding: 8px 48px 8px 8px; background: var(--surface); border: 1px solid var(--line); }
+.limpid-item-list .lesson-hit-inner, .limpid-item-list label.lesson-hit { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 12px; }
+.limpid-item-list .lesson-thumb { width: 64px; height: 48px; border-radius: 10px; }
+.limpid-item-list .lesson-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.limpid-item-list .lesson-actions { inset: 50% 2px auto auto; transform: translateY(-50%); }
+.limpid-item-list .lesson-check { top: 50%; left: 30px; transform: translateY(-50%); }
+@media (prefers-reduced-motion: reduce) { .limpid-item-grid .lesson-hit { transition: none; } .limpid-item-grid .lesson-hit:hover { transform: none; } }
+:root[data-motion="reduit"] .limpid-item-grid .lesson-hit { transition: none; transform: none; }
+
+/* ---------- Créer un Limpid ---------- */
+.add-page h1 { margin: var(--s4) 0 var(--s3); }
+.upload {
+  position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px;
+  align-items: center; align-content: center; justify-content: stretch; min-height: 120px; padding: 16px; padding-right: 40%;
+  border-radius: var(--r-card); border: 1px dashed var(--line-strong); background: var(--surface); text-align: left;
+}
+.upload::after { display: none; }
+.upload-art { position: absolute; inset: 0 0 0 auto; width: 46%; z-index: -1; -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); }
+.upload-icon { position: static; grid-row: 1 / span 2; width: 48px; height: 48px; transform: none; box-shadow: none; }
+.upload:hover .upload-icon { transform: none; }
+.upload-title { grid-column: 2; font-size: 0.9375rem; line-height: 1.3125rem; font-weight: 600; color: var(--ink); }
+.upload-sub { grid-column: 2; font-size: 0.8125rem; line-height: 1.125rem; color: var(--muted); }
+@media (max-width: 359px) { .upload { padding-right: 16px; } .upload-art { display: none; } }
+.modes legend { font-size: 1.125rem; line-height: 1.5rem; font-weight: 600; letter-spacing: -0.01em; margin: var(--s5) 0 var(--s3); }
+.mode-card { min-height: 56px; }
+button.import-prefs { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.tuning-sheet .choices { margin: var(--s3) 0; }
+.tuning-sheet .choices legend { font-size: 0.8125rem; font-weight: 600; margin: 0 0 var(--s2); }
+.tuning-sheet .choice { min-height: 48px; padding: 10px 14px; }
+.add-privacy { font-size: 0.75rem; line-height: 1rem; }
+.lib-section-head .lib-sort { margin-left: auto; }
+.lib-view-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.lib-sort select { width: auto; max-width: 9.5rem; }
+.limpid-item-grid { display: flex; flex-direction: column; }
+.limpid-item-grid .lesson-main { flex: 1; display: flex; flex-direction: column; }
+.limpid-item-grid .lesson-main > .lesson-hit { flex: 1; }
+.lib-tocheck { align-self: flex-start; }
+/* Collections : petites tuiles sobres (icône, nom, nombre), sans image derrière le texte. */
+.folder-tile-cover { display: none; }
+.folder-tile a { background: var(--surface); border: 1px solid var(--line); }

@@ -21,7 +21,7 @@ export function coverPrompt(title: string, hints: string[]): string {
     `Photographie éditoriale décorative servant de couverture à une leçon intitulée : « ${topic} ».`,
     "Un seul objet ou une seule matière évoquant le sujet (pierre, papier, verre, eau, végétal, métal, lumière), en gros plan.",
     "Lumière douce et chaude, ambiance sombre et premium, fond profond vert-noir, légers reflets dorés, faible profondeur de champ.",
-    "Cadrage vertical, sujet légèrement décentré vers le haut, bas de l'image sombre et calme (un titre clair y sera posé).",
+    "Cadrage horizontal 4/3, sujet légèrement décentré, composition calme (le titre est affiché sous l'image, jamais dessus).",
     "Aucun texte, aucune lettre, aucun chiffre, aucun logo, aucune interface, aucun visage reconnaissable.",
   ].join(" ");
 }
@@ -42,7 +42,7 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
     out = await provider.generateIllustration({
       model,
       prompt: coverPrompt(input.title, input.hints),
-      aspectRatio: "3:4",
+      aspectRatio: "4:3",
       signal: input.signal ?? new AbortController().signal,
       timeoutMs: 90_000,
     });
@@ -67,9 +67,9 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
     provider_request_id: out.usage.requestId,
     price_basis: PRICE_BASIS,
   });
-  // WebP 900 × 1200 : léger, net sur téléphone, recadré par object-fit selon l'écran.
+  // WebP 1200 × 900 (cartes 4/3, V4) : léger, net sur téléphone ; les anciennes couvertures portrait sont recadrées à l'affichage.
   const sharp = (await import("sharp")).default;
-  const webp = await sharp(out.bytes).resize(900, 1200, { fit: "cover", position: "attention" }).webp({ quality: 78 }).toBuffer();
+  const webp = await sharp(out.bytes).resize(1200, 900, { fit: "cover", position: "attention" }).webp({ quality: 78 }).toBuffer();
   const path = `covers/${input.reportId}/${randomUUID()}.webp`;
   const { error } = await db.storage.from("exports").upload(path, webp, { contentType: "image/webp", upsert: false });
   if (error) {
