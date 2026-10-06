@@ -57,6 +57,7 @@ export const fr = {
       retry: "Réessayer",
     },
     preview: {
+      photoBy: "Photo :",
       keyNotions: "Notions clés",
       presentation: "Présentation",
       quiz: "QCM",
@@ -981,6 +982,15 @@ export const fr = {
     noRequests: "Aucune requête depuis la remise à zéro.",
     circuit: "Coupe-circuit",
     generationEnabled: "Génération active (décocher pour suspendre tout appel IA)",
+    images: {
+      title: "Images des cours",
+      intro: "Fournisseur et modèle pour chaque type d'illustration. 3 illustrations au plus par cours, seulement quand le plan les juge utiles ; repli automatique sur l'autre fournisseur.",
+      enabled: "Générer des illustrations",
+      vector: "Illustrations vectorielles (concepts, analogies)",
+      realistic: "Scènes réalistes (lieu, objet, situation)",
+      missingKey: "clé absente",
+      note: "Couverture : photo Unsplash, sinon Nano Banana 2 Lite. Aucun dessin ni graphique n'est tracé par le code.",
+    },
     capLabel: (max: number) => `Plafond mensuel, en euros (${max} € au plus, fixé par la configuration du serveur)`,
     save: "Enregistrer",
     allowlist: "Adresses autorisées",

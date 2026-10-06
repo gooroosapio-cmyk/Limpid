@@ -193,6 +193,8 @@ const VisualIntent = z.strictObject({
 
 export const PlanV5Draft = z.strictObject({
   title: txt(200),
+  /** 2 à 5 mots-clés EN ANGLAIS pour une photo de couverture (sujet concret, sans nom propre). */
+  cover_query_en: z.string().trim().max(80).default(""),
   key_points: z.array(txt(300)).min(2).max(7),
   chapters: z
     .array(
@@ -213,7 +215,7 @@ export const PlanV5Draft = z.strictObject({
 export type PlanV5 = z.infer<typeof PlanV5Draft>;
 
 const PLAN_INSTRUCTIONS = (input: GenerationInput) => `Tu établis le plan d'un cours Limpid à partir de TOUTES les affirmations validées d'une ou plusieurs sources. Ne rédige pas encore le cours.
-- title : titre informatif et court. key_points : 3 à 7 idées essentielles DISTINCTES, une phrase chacune (le résumé « L'essentiel »).
+- title : titre informatif et court. cover_query_en : 2 à 5 mots-clés anglais décrivant une photo de couverture évocatrice et concrète (objet, lieu, matière), sans chiffre ni nom propre. key_points : 3 à 7 idées essentielles DISTINCTES, une phrase chacune (le résumé « L'essentiel »).
 - chapters : dans l'ordre pédagogique (prérequis d'abord, puis le sommaire réel de la source quand il est logique). Un chapitre = une question à comprendre, 2 à 5 objectifs liés, environ 3 à 15 affirmations. AUCUN quota de pages ou d'écrans : une source courte donne 2 à 4 chapitres, une source riche autant qu'il en faut (jusqu'à 40). Ne fusionne pas des notions sans lien pour réduire le nombre ; scinde un chapitre qui porte plusieurs objectifs.
 - title (chapitre) : une question ou un apprentissage précis, jamais « Partie 1 ». objective : ce que le lecteur saura faire ou comprendre.
 - claim_ids : les affirmations que ce chapitre explique. Chaque affirmation "supported" ou "partial" pertinente apparaît dans UN chapitre, ou dans excluded avec sa raison (doublon, détail sans intérêt pour comprendre). Aucune notion centrale, aucun chiffre qui change la conclusion, aucune réserve ou exception ne peut être exclue.
@@ -644,7 +646,7 @@ export function assemble(input: GenerationInput, ko: KnowledgeObject, evidence: 
     illustrations: plan.chapters.flatMap((ch, i) =>
       ch.visual.kind === "none" ? [] : [{ section_id: `sec_${i + 1}`, query: ch.visual.query_en || ch.visual.subject, subject: ch.visual.subject, alt_text: ch.visual.purpose || ch.visual.subject, style: ch.visual.kind }],
     ),
-  } as ExplanationDraft;
+  };
   const explanation = buildExplanation(input, ko, draft);
   const blueprint = buildBlueprint(draft, explanation, ko, evidence, Math.min(18, Math.max(1, sections.length)), input.visualMode);
   const v = new ValidationCollector();

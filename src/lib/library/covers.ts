@@ -41,16 +41,35 @@ export interface CoverView {
   id: CoverId;
   image: string | null;
   tones: [string, string, string];
+  /** Photo Unsplash : auteur et page de la photo (crédit obligatoire là où elle s'affiche en grand). */
+  credit?: { author: string | null; url: string } | null;
 }
 
 export function coverView(id: CoverId): CoverView {
   return { id, image: COVER_IMAGES.has(id) ? `/covers/${id}.webp` : null, tones: COVER_TONES[id] };
 }
 
-/** Couverture d'un Limpid : image générée (servie par Limpid) si elle existe, sinon la banque. */
-export function lessonCover(reportId: string, chosen: string | null | undefined, generatedPath: string | null | undefined): CoverView {
+/** Crédit Unsplash enregistré avec la couverture (forme contrôlée, liens Unsplash seulement). */
+export function coverCredit(v: unknown): { author: string | null; url: string } | null {
+  const c = v as { author?: unknown; url?: unknown } | null;
+  if (!c || typeof c.url !== "string" || !c.url.startsWith("https://unsplash.com/")) return null;
+  return { author: typeof c.author === "string" ? c.author.slice(0, 120) : null, url: c.url };
+}
+
+/**
+ * Couverture d'un Limpid : photo Unsplash (affichée depuis Unsplash, avec crédit), sinon image
+ * générée (servie par Limpid), sinon la banque.
+ */
+export function lessonCover(
+  reportId: string,
+  chosen: string | null | undefined,
+  generatedPath: string | null | undefined,
+  photo?: { url: string | null | undefined; credit: unknown } | null,
+): CoverView {
   const base = coverView(coverFor(reportId, chosen));
-  if (!generatedPath || chosen) return base;
+  if (chosen) return base;
+  if (photo?.url?.startsWith("https://images.unsplash.com/")) return { ...base, image: photo.url, credit: coverCredit(photo.credit) };
+  if (!generatedPath) return base;
   const key = generatedPath.split("/").pop()!.replace(/\.[a-z]+$/, "").slice(0, 12);
   return { ...base, image: `/api/reports/${reportId}/cover?k=${key}` };
 }

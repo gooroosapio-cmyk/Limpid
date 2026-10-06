@@ -4,7 +4,8 @@ import type { ReportBlueprint } from "@/lib/contracts/schemas";
 import { safeImageQuery } from "@/lib/render/visuals";
 import { availableVisualModes, effectiveVisualMode, visualConfig } from "./config";
 import { creditText } from "./credit";
-import { carryIllustrations, illustrate, mergeVisualPasses, type AssetRow, type IllustrateDeps } from "./illustrate";
+import { illustrate, type AssetRow, type IllustrateDeps } from "./illustrate";
+import { DEFAULT_IMAGE_SETTINGS, imageAttempts, imageSettingsFrom } from "./image-models";
 import { checkImage, commonsCandidates, plainText, rankCandidates, relevance, unsplashCandidates, type Candidate } from "./sources";
 
 /** PNG valide minimal (en-tête IHDR lu par imageSize). */
@@ -145,13 +146,20 @@ function blueprint(): ReportBlueprint {
   } as ReportBlueprint;
 }
 
-function deps(over: Partial<IllustrateDeps> = {}): IllustrateDeps & { rows: AssetRow[] } {
+const usage = (model: string) => ({ provider: "x", model, inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null });
+
+function deps(over: Partial<IllustrateDeps> = {}): IllustrateDeps & { rows: AssetRow[]; calls: string[] } {
   const rows: AssetRow[] = [];
+  const calls: string[] = [];
   return {
     rows,
-    searchCommons: async (q) => (q === "rain clouds" ? [{ provider: "commons", title: "Rain clouds", kind: "photo", imageUrl: "https://upload.wikimedia.org/a.png", width: 960, height: 640, sourceUrl: "https://commons.wikimedia.org/wiki/File:A", author: "A", license: "CC0", licenseUrl: null, modifications: "Redimensionnée" }] : []),
-    downloadCommons: async () => checkImage(png(960, 640)),
-    generatedThisMonth: async () => 0,
+    calls,
+    settings: DEFAULT_IMAGE_SETTINGS,
+    available: { recraft: true, nanobanana: true },
+    render: async (route, style) => {
+      calls.push(`${style}:${route.provider}:${route.model}`);
+      return { image: checkImage(png(960, 640))!, usage: usage(route.model) };
+    },
     store: async (_img, ext) => `o/r/assets/x.${ext}`,
     insertAsset: async (row) => {
       rows.push(row);
@@ -161,120 +169,62 @@ function deps(over: Partial<IllustrateDeps> = {}): IllustrateDeps & { rows: Asse
   };
 }
 
-const configOff = visualConfig({} as NodeJS.ProcessEnv);
+function styled(): ReportBlueprint {
+  const bp = blueprint();
+  return { ...bp, visual_specs: bp.visual_specs.map((v, i) => ({ ...v, data: { ...v.data, style: i === 0 ? "vector" : "realistic" } })) };
+}
 
-describe("orchestration des illustrations", () => {
-  it("prend une image libre de droits, retire celle sans résultat, sans génération non activée", async () => {
-    const d = deps({ generateImage: async () => { throw new Error("ne doit pas être appelé"); } });
-    const out = await illustrate(blueprint(), "auto", configOff, d);
-    expect(out.added).toBe(1);
-    expect(out.blueprint.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1"]);
-    expect(out.blueprint.visual_specs[0]!.data.asset_id).toBe("00000000-0000-4000-8000-000000000001");
-    expect(out.blueprint.sections[0]!.visual_ids).toEqual(["vis_ill_1"]);
-    expect(d.rows[0]).toMatchObject({ provider: "commons", license: "CC0", storage_path: "o/r/assets/x.png", width: 960 });
-    expect(out.notes[0]).toContain("Sujet 2");
-  });
-
-  it("illustrations vectorielles Recraft d'abord, dans la limite du rapport", async () => {
-    const config = { ...configOff, commons: true };
-    let calls = 0;
-    const generateVector = async () => {
-      calls++;
-      const bytes = Buffer.from('<svg viewBox="0 0 800 600"></svg>');
-      return { vector: { bytes, mime: "image/svg+xml" as const, width: 800, height: 600, sha256: "a".repeat(64) }, usage: { provider: "recraft", model: "recraftv4_1_vector", inputTokens: null, outputTokens: null, durationMs: 1, requestId: null, costUsd: 0.08 } };
-    };
-    const d = deps({ generateVector, vectorBudget: 1 });
-    const out = await illustrate(blueprint(), "auto", config, d);
-    expect(calls).toBe(1);
-    expect(d.rows[0]).toMatchObject({ provider: "recraft", mime: "image/svg+xml", storage_path: "o/r/assets/x.svg" });
-    // La seconde illustration passe par la banque (aucune deuxième image vectorielle).
-    expect(out.added).toBeGreaterThanOrEqual(1);
-    // Mode « schémas » : aucune image vectorielle.
-    calls = 0;
-    await illustrate(blueprint(), "schemas", config, deps({ generateVector, vectorBudget: 4 }));
-    expect(calls).toBe(0);
-  });
-
-  it("respecte le quota mensuel d'images générées", async () => {
-    const config = { ...configOff, commons: false, geminiImage: true, imageModel: "img", monthlyGenerated: 20 };
-    let calls = 0;
-    const gen = async () => {
-      calls++;
-      return { bytes: png(1024, 768), mime: "image/png", usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null } };
-    };
-    const cutPlate = async (_b: Buffer, n: number) => Array.from({ length: n }, () => checkImage(png(400, 300)));
-    const ok = await illustrate(blueprint(), "gemini", config, deps({ generateImage: gen, cutPlate, generatedThisMonth: async () => 19 }));
-    expect(calls).toBe(1);
-    expect(ok.added).toBe(1);
-    const full = await illustrate(blueprint(), "gemini", config, deps({ generateImage: gen, cutPlate, generatedThisMonth: async () => 20 }));
-    expect(calls).toBe(1);
-    expect(full.added).toBe(0);
-  });
-
-  it("génère toutes les illustrations en une seule planche, découpée sans fond", async () => {
-    const config = { ...configOff, commons: false, geminiImage: true, imageModel: "img", monthlyGenerated: 20 };
-    const prompts: string[] = [];
-    const ratios: string[] = [];
-    const gen = async (prompt: string, ratio: string) => {
-      prompts.push(prompt);
-      ratios.push(ratio);
-      return { bytes: png(1600, 900), mime: "image/png", usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null } };
-    };
-    const d = deps({ generateImage: gen, cutPlate: async (_b, n) => Array.from({ length: n }, () => checkImage(png(400, 300))) });
-    const out = await illustrate(blueprint(), "auto", config, d);
-    expect(prompts).toHaveLength(1);
-    expect(prompts[0]).toContain("2 illustrations distinctes");
-    expect(prompts[0]).toContain("Fond blanc pur");
-    expect(ratios).toEqual(["16:9"]);
+describe("illustrations V5 : route par type de visuel", () => {
+  it("vectoriel par Recraft, réaliste par Nano Banana (réglages par défaut)", async () => {
+    const d = deps();
+    const out = await illustrate(styled(), "auto", d);
     expect(out.added).toBe(2);
-    expect(d.rows.map((r) => r.modifications)).toEqual(["Découpée d'une planche, fond rendu transparent", "Découpée d'une planche, fond rendu transparent"]);
+    expect(d.calls.sort()).toEqual(["realistic:nanobanana:google/gemini-3.1-flash-lite-image", "vector:recraft:recraftv4_1_vector"]);
+    expect(d.rows.map((r) => r.provider).sort()).toEqual(["gemini", "recraft"]);
   });
 
-  it("ne cherche rien en mode schémas ou aucun", async () => {
-    const d = deps({ searchCommons: async () => { throw new Error("ne doit pas chercher"); } });
-    const out = await illustrate(blueprint(), "schemas", configOff, d);
+  it("repli sur l'autre fournisseur, appel échoué journalisé", async () => {
+    const logged: string[] = [];
+    const d = deps({
+      render: async (route) => {
+        if (route.provider === "recraft") throw Object.assign(new Error("402"), { usage: usage(route.model) });
+        return { image: checkImage(png(960, 640))!, usage: usage(route.model) };
+      },
+      onUsage: (route, attempt) => void logged.push(`${route.provider}:${attempt}`),
+    });
+    const out = await illustrate({ ...styled(), visual_specs: [styled().visual_specs[0]!] }, "auto", d);
+    expect(out.added).toBe(1);
+    expect(logged).toEqual(["recraft:1", "nanobanana:2"]);
+  });
+
+  it("réglage admin respecté, fournisseur absent ignoré, rien sans image exploitable", async () => {
+    const d = deps({ settings: { ...DEFAULT_IMAGE_SETTINGS, vector: { provider: "nanobanana", model: "google/gemini-3.1-flash-image" } }, available: { recraft: false, nanobanana: true } });
+    await illustrate({ ...styled(), visual_specs: [styled().visual_specs[0]!] }, "auto", d);
+    expect(d.calls).toEqual(["vector:nanobanana:google/gemini-3.1-flash-image"]);
+    const none = deps({ available: { recraft: false, nanobanana: false } });
+    const out = await illustrate(styled(), "auto", none);
     expect(out.blueprint.visual_specs).toHaveLength(0);
+    expect(out.blueprint.sections[0]!.visual_ids).toEqual([]);
   });
 
-  it("reprend les illustrations trouvées dans une nouvelle version", async () => {
-    const prev = (await illustrate(blueprint(), "auto", configOff, deps())).blueprint;
-    const next = { ...blueprint(), sections: [{ section_id: "sec_1", visual_ids: ["vis_ill_1"], page_hint: 1 }] };
-    const carried = carryIllustrations(prev, next);
-    expect(carried.visual_specs).toEqual(prev.visual_specs);
-    expect(carried.sections[0]!.visual_ids).toEqual(["vis_ill_1"]);
-  });
-});
-
-describe("panne de la génération d'image", () => {
-  it("se replie sur la banque d'images et journalise l'appel échoué", async () => {
-    const config = { ...configOff, geminiImage: true, imageModel: "img" };
-    const usages: number[] = [];
-    const err = Object.assign(new Error("HTTP 500"), { usage: { provider: "gemini", model: "img", inputTokens: 1, outputTokens: 0, durationMs: 5, requestId: null } });
-    const out = await illustrate(blueprint(), "gemini", config, deps({ generateImage: async () => { throw err; }, cutPlate: async () => [], onImageUsage: (a) => void usages.push(a) }));
-    expect(out.blueprint.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1"]);
-    // Une seule génération (la planche), journalisée même en échec.
-    expect(usages).toEqual([1]);
+  it("aucune image en texte seul ou quand les illustrations sont coupées", async () => {
+    expect((await illustrate(styled(), "aucun", deps())).blueprint.visual_specs).toHaveLength(0);
+    const off = deps({ settings: { ...DEFAULT_IMAGE_SETTINGS, enabled: false } });
+    expect((await illustrate(styled(), "auto", off)).added).toBe(0);
+    expect(off.calls).toEqual([]);
   });
 });
 
-describe("passes visuelles parallèles", () => {
-  it("garde les dessins ajoutés, les actifs posés et retire les illustrations abandonnées", () => {
-    const base = blueprint();
-    const drawing = { ...base.visual_specs[0]!, id: "vis_drw_1", kind: "drawing" } as ReportBlueprint["visual_specs"][number];
-    const drawn: ReportBlueprint = {
-      ...base,
-      visual_specs: [...base.visual_specs, drawing],
-      sections: [{ ...base.sections[0]!, visual_ids: [...base.sections[0]!.visual_ids, "vis_drw_1"] }],
-    };
-    const first = base.visual_specs[0]!;
-    const illustrated: ReportBlueprint = {
-      ...base,
-      visual_specs: [{ ...first, data: { ...first.data, asset_id: "11111111-1111-1111-1111-111111111111" } }],
-      sections: [{ ...base.sections[0]!, visual_ids: ["vis_ill_1"] }],
-    };
-    const out = mergeVisualPasses(base, drawn, illustrated);
-    expect(out.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1", "vis_drw_1"]);
-    expect((out.visual_specs[0]!.data as { asset_id: string }).asset_id).toBe("11111111-1111-1111-1111-111111111111");
-    expect(out.sections[0]!.visual_ids).toEqual(["vis_ill_1", "vis_drw_1"]);
+describe("catalogue des modèles d'image", () => {
+  it("réglages en base nettoyés : modèle inconnu ou incohérent → défaut du type", () => {
+    expect(imageSettingsFrom({ images_enabled: true, image_vector_provider: "recraft", image_vector_model: "google/gemini-3.1-flash-image", image_realistic_provider: "recraft", image_realistic_model: "recraftv4_1" })).toEqual({
+      enabled: true,
+      vector: DEFAULT_IMAGE_SETTINGS.vector,
+      realistic: { provider: "recraft", model: "recraftv4_1" },
+    });
+    expect(imageAttempts("realistic", DEFAULT_IMAGE_SETTINGS, { recraft: true, nanobanana: true })).toEqual([
+      { provider: "nanobanana", model: "google/gemini-3.1-flash-lite-image" },
+      { provider: "recraft", model: "recraftv4_1" },
+    ]);
   });
 });

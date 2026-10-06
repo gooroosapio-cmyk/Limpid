@@ -61,6 +61,7 @@ export const en: Dict = {
       retry: "Try again",
     },
     preview: {
+      photoBy: "Photo by",
       keyNotions: "Key notions",
       presentation: "Presentation",
       quiz: "Quiz",
@@ -1011,6 +1012,15 @@ export const en: Dict = {
     noRequests: "No requests since the reset.",
     circuit: "Circuit breaker",
     generationEnabled: "Generation active (uncheck to suspend all AI calls)",
+    images: {
+      title: "Course images",
+      intro: "Provider and model for each kind of illustration. At most 3 per course, only when the outline finds them useful; automatic fallback to the other provider.",
+      enabled: "Generate illustrations",
+      vector: "Vector illustrations (concepts, analogies)",
+      realistic: "Realistic scenes (place, object, situation)",
+      missingKey: "key missing",
+      note: "Cover: Unsplash photo, otherwise Nano Banana 2 Lite. No drawing or chart is drawn by code.",
+    },
     capLabel: (max: number) => `Monthly cap, in euros (${max} € max, set by the server configuration)`,
     save: "Save",
     allowlist: "Authorised addresses",

@@ -55,6 +55,8 @@ export const IllustrationData = z.strictObject({
   asset_id: z.string().uuid().nullable(),
   /** Bloc dans lequel l'image est incrustée (facultatif : sinon un bloc de la partie). */
   block_id: z.string().max(80).nullable().optional(),
+  /** V5 : type de visuel voulu par le plan (route d'image réglée dans la console admin). */
+  style: z.enum(["vector", "realistic"]).optional(),
 });
 export type IllustrationData = z.infer<typeof IllustrationData>;
 

@@ -6,7 +6,6 @@
 import "server-only";
 import { openRouterConfigFromEnv } from "@/lib/engine/openrouter";
 import { recraftConfigFromEnv } from "@/lib/visuals/recraft";
-import { imageModelFor } from "@/lib/visuals/config";
 import { siteUrl } from "@/lib/site";
 import { z } from "zod";
 import { activeProvider, isUrlImportEnabled, retention } from "@/lib/config";
@@ -30,7 +29,7 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   add("Fournisseur IA", p !== "demo", p === "openrouter" ? "OpenRouter (clé présente)" : p === "gemini" ? "Gemini direct (clé présente)" : "Mode démonstration : OPENROUTER_API_KEY absente");
   if (p === "openrouter") {
     const c = openRouterConfigFromEnv();
-    add("Modèles (Atlas)", true, `classer : ${c.models.lite} · expliquer : ${c.models.editor} · difficultés : ${c.models.complex} · image : ${imageModelFor() ?? "aucun"}`);
+    add("Modèles (moteur V5)", true, `lecture, plan et chapitres : ${c.models.editor} · chapitres difficiles : ${c.models.complex} · repli : ${c.fallbackModels.join(", ") || "aucun"}`);
   } else {
     add(
       "Modèles Gemini",
@@ -39,7 +38,8 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
     );
   }
   const recraft = recraftConfigFromEnv();
-  add("Illustrations vectorielles (Recraft)", !!recraft, recraft ? `actives (${recraft.model})` : "RECRAFT_API_KEY absente : schémas et couverture seulement");
+  add("Illustrations (Recraft)", !!recraft, recraft ? "clé présente (modèles réglés dans « Images des cours »)" : "RECRAFT_API_KEY absente : Nano Banana prend le relais");
+  add("Couvertures (Unsplash)", present("UNSPLASH_ACCESS_KEY"), present("UNSPLASH_ACCESS_KEY") ? "photo Unsplash, sinon Nano Banana 2 Lite" : "UNSPLASH_ACCESS_KEY absente : Nano Banana 2 Lite");
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
   add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || `absente : ${siteUrl()} par défaut`);

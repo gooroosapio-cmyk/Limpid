@@ -6,7 +6,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { z } from "zod";
-import { limits } from "@/lib/config";
+import { activeProvider, limits } from "@/lib/config";
 import {
   Evidence,
   ExplanationObject,
@@ -25,7 +25,7 @@ import { priceBasisFor, usageCents } from "@/lib/budget";
 import { assertBudget, BudgetError } from "./budget-guard";
 import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getImageProvider, getProvider } from "@/lib/engine";
-import { generateVector, recraftConfigFromEnv, vectorPrompt } from "@/lib/visuals/recraft";
+import { generateRaster, generateVector, realisticPrompt, recraftConfigFromEnv, vectorPrompt } from "@/lib/visuals/recraft";
 import { svgSize } from "@/lib/visuals/svg";
 import { generateExercises } from "@/lib/engine/exercises";
 import {
@@ -36,14 +36,14 @@ import {
   type ReformulateReason,
   type Variation,
 } from "@/lib/engine/pipeline";
-import { visualConfig } from "@/lib/visuals/config";
-import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
+import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow, type IllustrateDeps } from "@/lib/visuals/illustrate";
+import { imageSettingsFrom, modelInfo, type ImageProviderId, type ImageSettings } from "@/lib/visuals/image-models";
 import { jobStore } from "./checkpoints";
-import { generateV5 } from "@/lib/engine/v5";
-import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
+import { generateV5, PlanCheckpoint } from "@/lib/engine/v5";
+import { checkImage } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { finishJobReservation } from "@/lib/billing/wallet";
-import { generateCover } from "@/lib/library/cover-gen";
+import { chooseCover } from "@/lib/library/cover-gen";
 import { notify } from "@/lib/notifications";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/source-set";
@@ -553,78 +553,72 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
   return out.status === "validated" ? "succeeded" : "incomplete_check";
 }
 
-/** Illustrations vectorielles par rapport (Atlas) : 1 court, 2 standard, 4 long complexe. */
-export function vectorBudgetFor(targetPages: number | null | undefined): number {
-  const pages = targetPages ?? 6;
-  return pages <= 3 ? 1 : pages <= 9 ? 2 : 4;
+/** Réglages d'images de la console admin (fournisseur et modèle par type de visuel). */
+async function imageSettings(): Promise<ImageSettings> {
+  const { data } = await adminClient()
+    .from("app_settings")
+    .select("images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model")
+    .maybeSingle();
+  return imageSettingsFrom(data as Record<string, unknown> | null);
 }
 
-/** Recherche ou génération des illustrations prévues par le plan ; un échec n'arrête jamais le rapport. */
+/** Fournisseurs d'images utilisables : Recraft (clé), Nano Banana (fournisseur IA OpenRouter ou Gemini). */
+function imageProviders(): Record<ImageProviderId, boolean> {
+  const ai = activeProvider();
+  return { recraft: !!recraftConfigFromEnv(), nanobanana: ai === "openrouter" || ai === "gemini" };
+}
+
+/** Illustrations prévues par le plan (0–1 par chapitre, 3 au plus) ; un échec n'arrête jamais le cours. */
 async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, controller: AbortController): Promise<ReportBlueprint> {
   if (!job.report_id || pendingIllustrations(blueprint).length === 0) return blueprint;
   await setStage(job.id, "illustrations");
   const db = adminClient();
-  const config = visualConfig();
   const reportId = job.report_id;
-  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY ?? "";
-  const image = config.geminiImage && config.imageModel ? getImageProvider() : null;
   const recraft = recraftConfigFromEnv();
-  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+  const deps: IllustrateDeps = {
+    settings: await imageSettings(),
+    available: imageProviders(),
+    render: async (route, style, item) => {
+      // Plafonds vérifiés avant chaque image ; un refus laisse le cours sans image.
+      await checkBudget(job.owner_id);
+      const prompt = style === "realistic" ? realisticPrompt(item.subject, item.purpose, item.altText) : vectorPrompt(item.subject, item.purpose, item.altText);
+      if (route.provider === "recraft") {
+        if (!recraft) throw new ProviderError("not_configured", "Recraft absent.");
+        if (modelInfo(route.model)?.output === "svg") {
+          const out = await generateVector(recraft, { prompt, model: route.model, size: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+          const bytes = Buffer.from(out.svg, "utf8");
+          const { width, height } = svgSize(out.svg);
+          return { image: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
+        }
+        return generateRaster(recraft, { prompt, model: route.model, size: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+      }
+      const out = await getImageProvider().generateIllustration({ model: route.model, prompt, aspectRatio: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+      const image = checkImage(out.bytes);
+      if (!image) throw new ProviderError("empty", "Image inexploitable.", out.usage);
+      return { image, usage: out.usage };
+    },
+    onUsage: (route, attempt, u) => recordUsage(job, route.provider === "recraft" ? "illustrations_recraft" : "illustrations_nanobanana", attempt, u),
+    store: async (img, ext) => {
+      const path = `${job.owner_id}/${reportId}/assets/${crypto.randomUUID()}.${ext}`;
+      const { error } = await db.storage.from("exports").upload(path, img.bytes, { contentType: img.mime, upsert: false });
+      return error ? null : path;
+    },
+    insertAsset: async (row: AssetRow) => {
+      const { data, error } = await db
+        .from("visual_assets")
+        .insert({ ...row, owner_id: job.owner_id, report_id: reportId })
+        .select("id")
+        .single();
+      if (error && row.storage_path) await db.storage.from("exports").remove([row.storage_path]);
+      return error ? null : data.id;
+    },
+  };
   try {
-    const out = await illustrate(blueprint, job.params.visual_mode ?? "auto", config, {
-      searchCommons: (q, t) => searchCommons(q, undefined, t),
-      downloadCommons: (c, t) => downloadCommons(c, undefined, t),
-      searchUnsplash: config.unsplash ? (q, t) => searchUnsplash(q, unsplashKey, t) : undefined,
-      trackUnsplash: (loc) => trackUnsplashDownload(loc, unsplashKey),
-      generateImage: image
-        ? async (prompt, aspectRatio) => {
-            // Plafonds vérifiés avant chaque image ; un refus laisse le rapport sans image.
-            await checkBudget(job.owner_id);
-            return image.generateIllustration({ model: config.imageModel!, prompt, aspectRatio, signal: controller.signal, timeoutMs: 90_000 });
-          }
-        : undefined,
-      onImageUsage: (attempt, u) => recordUsage(job, "illustrations", attempt, u),
-      generateVector: recraft
-        ? async (item) => {
-            await checkBudget(job.owner_id);
-            const out = await generateVector(recraft, { prompt: vectorPrompt(item.subject, item.purpose, item.altText), size: "4:3", signal: controller.signal, timeoutMs: 90_000 });
-            const bytes = Buffer.from(out.svg, "utf8");
-            const { width, height } = svgSize(out.svg);
-            return { vector: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
-          }
-        : undefined,
-      onVectorUsage: (attempt, u) => recordUsage(job, "illustrations_vectorielles", attempt, u),
-      vectorBudget: vectorBudgetFor(job.params.target_pages),
-      cutPlate: async (bytes, n) => (await import("@/lib/visuals/plate")).cutPlate(bytes, n),
-      generatedThisMonth: async () =>
-        (
-          await db
-            .from("visual_assets")
-            .select("id", { count: "exact", head: true })
-            .eq("owner_id", job.owner_id)
-            .eq("provider", "gemini")
-            .gte("created_at", monthStart)
-        ).count ?? 0,
-      store: async (img, ext) => {
-        const path = `${job.owner_id}/${reportId}/assets/${crypto.randomUUID()}.${ext}`;
-        const { error } = await db.storage.from("exports").upload(path, img.bytes, { contentType: img.mime, upsert: false });
-        return error ? null : path;
-      },
-      insertAsset: async (row: AssetRow) => {
-        const { data, error } = await db
-          .from("visual_assets")
-          .insert({ ...row, owner_id: job.owner_id, report_id: reportId })
-          .select("id")
-          .single();
-        if (error && row.storage_path) await db.storage.from("exports").remove([row.storage_path]);
-        return error ? null : data.id;
-      },
-    });
-    return out.blueprint;
+    return (await illustrate(blueprint, job.params.visual_mode ?? "auto", deps)).blueprint;
   } catch (e) {
     if (e instanceof JobFailure) throw e; // annulation ou budget
-    // Repli : sans illustration, le rapport reste complet.
-    return (await illustrate(blueprint, "schemas", config, {} as never)).blueprint;
+    // Repli : sans illustration, le cours reste complet.
+    return (await illustrate(blueprint, "aucun", deps)).blueprint;
   }
 }
 
@@ -851,13 +845,15 @@ async function afterDelivery(job: JobRow) {
   const db = adminClient();
   const { data: report } = await db
     .from("reports")
-    .select("title, cover_path, report_versions!reports_current_version_fk(explanation)")
+    .select("title, cover_path, cover_url, report_versions!reports_current_version_fk(explanation)")
     .eq("id", reportId)
     .maybeSingle();
   await notify(job.owner_id, "report_ready", `job:${job.id}:ready`, { reportId, data: { title: report?.title ?? null } }).catch(() => undefined);
-  if (job.kind !== "generate_report" || !report || report.cover_path) return;
+  if (job.kind !== "generate_report" || !report || report.cover_path || report.cover_url) return;
   const explanation = (report.report_versions as unknown as { explanation: { key_points?: string[] } } | null)?.explanation;
-  await generateCover({ reportId, ownerId: job.owner_id, title: report.title as string, hints: explanation?.key_points ?? [], jobId: job.id }).catch((e) =>
+  // Mots-clés anglais prévus par le plan pour la photo de couverture.
+  const plan = await jobStore(job.id).load("plan", PlanCheckpoint).catch(() => null);
+  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, hints: explanation?.key_points ?? [], query: plan?.plan.cover_query_en ?? "", jobId: job.id }).catch((e) =>
     console.error("cover", (e as Error).message),
   );
 }

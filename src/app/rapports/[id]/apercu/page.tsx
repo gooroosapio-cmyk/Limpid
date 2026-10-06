@@ -40,8 +40,11 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   if (!report) notFound();
   if (report.state !== "ready") redirect(`/rapports/${id}`);
   const supabase = await createUserClient();
-  const { data: extra } = await supabase.from("reports").select("cover_id, cover_path").eq("id", id).maybeSingle();
-  const cover = lessonCover(id, (extra?.cover_id as string | null) ?? null, (extra?.cover_path as string | null) ?? null);
+  const { data: extra } = await supabase.from("reports").select("cover_id, cover_path, cover_url, cover_credit").eq("id", id).maybeSingle();
+  const cover = lessonCover(id, (extra?.cover_id as string | null) ?? null, (extra?.cover_path as string | null) ?? null, {
+    url: extra?.cover_url as string | null,
+    credit: extra?.cover_credit,
+  });
   const tab: Tab = (TABS as readonly string[]).includes(onglet ?? "") ? (onglet as Tab) : "apercu";
   const l = t.lesson;
   const p = t.v4.preview;
@@ -69,6 +72,14 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
         {tab === "apercu" && (
           <>
             <Cover cover={cover} className="preview-cover" eager />
+            {cover.credit && (
+              <p className="cover-credit">
+                {t.v4.preview.photoBy}{" "}
+                <a href={`${cover.credit.url}?utm_source=limpid&utm_medium=referral`} target="_blank" rel="noopener noreferrer">{cover.credit.author ?? "Unsplash"}</a>
+                {" · "}
+                <a href="https://unsplash.com/?utm_source=limpid&utm_medium=referral" target="_blank" rel="noopener noreferrer">Unsplash</a>
+              </p>
+            )}
             <p className="meta preview-meta">
               <Icon name="check" size={14} /> {t.library.v2.ready} · {t.library.v2.sources(report.documents.length || 1)}
             </p>

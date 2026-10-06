@@ -206,7 +206,7 @@ describe("moteur V5 : plan", () => {
   const ch = (claim_ids: string[], visual = visualNone) => ({ title: "T", objective: "O", claim_ids, difficulty: "standard" as const, notions: [], visual: visual as PlanV5["chapters"][number]["visual"] });
 
   it("chaque affirmation dans un seul chapitre, oubliées rattachées au plus proche", () => {
-    const draft: PlanV5 = { title: "T", key_points: ["a", "b"], chapters: [ch(["clm_1", "clm_9"]), ch(["clm_1", "clm_4"])], excluded: [], limitations: [] };
+    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1", "clm_9"]), ch(["clm_1", "clm_4"])], excluded: [], limitations: [] };
     const { plan: p, orphans } = normalizePlanV5(draft, ko, input());
     expect(orphans).toEqual(["clm_2", "clm_3"]);
     expect(p.chapters.map((c) => c.claim_ids)).toEqual([["clm_1", "clm_2", "clm_3"], ["clm_4"]]);
@@ -214,7 +214,7 @@ describe("moteur V5 : plan", () => {
 
   it("3 illustrations au plus, aucune en résumé fidèle ou en texte seul", () => {
     const v = { kind: "vector", subject: "s", query_en: "q", purpose: "p" };
-    const draft: PlanV5 = { title: "T", key_points: ["a", "b"], chapters: [ch(["clm_1"], v), ch(["clm_2"], v), ch(["clm_3"], v), ch(["clm_4"], v)], excluded: [], limitations: [] };
+    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1"], v), ch(["clm_2"], v), ch(["clm_3"], v), ch(["clm_4"], v)], excluded: [], limitations: [] };
     expect(normalizePlanV5(draft, ko, input()).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(3);
     expect(normalizePlanV5(draft, ko, input({ mode: "resume" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
     expect(normalizePlanV5(draft, ko, input({ visualMode: "aucun" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);

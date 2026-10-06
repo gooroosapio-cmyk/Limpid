@@ -121,6 +121,7 @@ export const ExplanationDraft = z.preprocess(repairDraftBlocks, z.strictObject({
         query: z.string().trim().min(2).max(60),
         subject: z.string().trim().min(1).max(120),
         alt_text: z.string().trim().min(1).max(300),
+        style: z.enum(["vector", "realistic"]).optional(),
       }),
     )
     .max(4)
@@ -621,7 +622,7 @@ export function buildBlueprint(
       const sec = ex.sections.find((x) => x.id === idea.section_id);
       const query = safeImageQuery(idea.query);
       const claimIds = sec ? [...new Set(sec.blocks.flatMap(blockClaimIds))].filter(supported).slice(0, 5) : [];
-      if (!sec || !query || claimIds.length === 0 || n >= 4) continue;
+      if (!sec || !query || claimIds.length === 0 || n >= 3) continue;
       const id = `vis_ill_${++n}`;
       visuals.push({
         id,
@@ -629,7 +630,7 @@ export function buildBlueprint(
         purpose: "Illustrer une idée (sans valeur de preuve)",
         claim_ids: claimIds,
         evidence_ids: [],
-        data: { query, subject: idea.subject, asset_id: null },
+        data: { query, subject: idea.subject, asset_id: null, ...(idea.style ? { style: idea.style } : {}) },
         alt_text: idea.alt_text,
         caption: idea.subject,
         illustrative_only: true,

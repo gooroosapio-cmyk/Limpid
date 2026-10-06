@@ -2,7 +2,8 @@ import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
-import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, setGeneration, setMonthlyCap } from "@/app/admin/actions";
+import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, setGeneration, setImageSettings, setMonthlyCap } from "@/app/admin/actions";
+import { IMAGE_MODELS, type ImageStyle } from "@/lib/visuals/image-models";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 import { nowMs } from "@/lib/time";
 
@@ -140,6 +141,31 @@ export async function AdminView({
         <form action={setMonthlyCap} className="admin-form">
           <label htmlFor="cap">{t.admin.capLabel(o.envCapCents / 100)}</label>
           <input id="cap" name="euros" type="number" inputMode="decimal" min={0} max={o.envCapCents / 100} step="0.5" defaultValue={o.monthlyCapCents / 100} />
+          <button type="submit" className="btn">{t.admin.save}</button>
+        </form>
+      </section>
+
+      <section className="admin-section" aria-labelledby="adm-images">
+        <h2 id="adm-images">{t.admin.images.title}</h2>
+        <p className="muted small">{t.admin.images.intro}</p>
+        <form action={setImageSettings} className="admin-form admin-images">
+          <label className="consent">
+            <input type="checkbox" name="images_enabled" defaultChecked={o.images.enabled} />
+            <span>{t.admin.images.enabled}</span>
+          </label>
+          {(["vector", "realistic"] as ImageStyle[]).map((style) => (
+            <label key={style} className="admin-select">
+              <span>{t.admin.images[style]}</span>
+              <select name={style} defaultValue={`${o.images[style].provider}|${o.images[style].model}`}>
+                {IMAGE_MODELS.map((m) => (
+                  <option key={m.id} value={`${m.provider}|${m.id}`} disabled={!o.imageProviders[m.provider]}>
+                    {m.label} — {m.usd.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} $ / image{o.imageProviders[m.provider] ? "" : ` (${t.admin.images.missingKey})`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <p className="muted small">{t.admin.images.note}</p>
           <button type="submit" className="btn">{t.admin.save}</button>
         </form>
       </section>
