@@ -30,7 +30,7 @@ export function LimpidReader({
   reportId,
   versionId,
   chapters,
-  initialAnchor,
+  initialAnchor: _initialAnchor,
   bilan,
   insufficient,
   options,
@@ -71,7 +71,7 @@ export function LimpidReader({
   useDialogHistory(bilanDialog);
   useDialogHistory(reformDialog);
   const markedRead = useRef(false);
-  const anchorRef = useRef<string | null>(initialAnchor);
+  const anchorRef = useRef<string | null>(null);
   /** Ancre de retour d'annexe (`?a=`) : undefined = pas encore lue. */
   const backAnchor = useRef<string | null | undefined>(undefined);
   /** Première composition faite : avant, une position de défilement n'est pas une lecture. */
@@ -171,10 +171,9 @@ export function LimpidReader({
   useEffect(() => {
     const deck = deckRef.current;
     if (!deck) return;
-    let saved: string | null = initialAnchor;
-    try {
-      saved = localStorage.getItem(progressKey(reportId ?? "demo")) ?? initialAnchor;
-    } catch {}
+    // V4 : un Limpid s'ouvre toujours en tête (la position de lecture enregistrée reste une
+    // information, jamais un saut imposé) ; seule une ancre explicite (`?a=`) est suivie.
+    let saved: string | null = null;
     // Retour d'annexe : l'adresse porte l'ancre exacte de lecture (`?a=`), lue une seule fois
     // puis retirée de l'adresse une fois la vue rétablie.
     if (backAnchor.current === undefined) {
@@ -223,7 +222,6 @@ export function LimpidReader({
       pieceObs.disconnect();
       attrObs.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
 
   // Vue affichée, chapitre courant, transition « page tournée », progression enregistrée.

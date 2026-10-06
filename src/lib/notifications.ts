@@ -33,12 +33,13 @@ export async function unreadCount(ownerId: string): Promise<number> {
 }
 
 export async function listNotifications(ownerId: string, limit = 50): Promise<NotificationView[]> {
-  const { data } = await adminClient()
+  const { data, error } = await adminClient()
     .from("notifications")
     .select("id, kind, report_id, data, created_at, read_at")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (error) throw new Error(`notifications: ${error.code}`);
   return (data ?? []).map((n) => ({
     id: n.id as string,
     kind: n.kind as NotificationKind,

@@ -1,5 +1,15 @@
 # Avancement
 
+## Phase 17.3 — V4, lot 3 : aperçu, discussion, PDF, notifications, paramètres, profil (6 octobre 2026)
+
+- Aperçu d'un Limpid : en-tête, onglets, zone centrale qui défile (l'essentiel, une idée à retenir distincte, notions clés tirées du glossaire), dock toujours visible Présentation / QCM (QCM désactivé avec sa raison s'il n'existe pas), bouton de discussion flottant 48 px.
+- Discussion : feuille 85 % de hauteur (plein écran clavier ouvert, panneau latéral 400 px sur ordinateur), portée « Ce Limpid » / « Cette section », Arrêter, Réessayer, brouillon gardé dans la session, pas de défilement forcé (« Dernier message »).
+- Lecteur : ouverture toujours en tête ; seule une ancre explicite (retour d'annexe, citation) est suivie. Taille de lecture 16 à 24 px (18 par défaut), sans effet sur la navigation.
+- PDF : « Préparation du PDF… » puis « Téléchargement lancé » (fichier reçu et remis au navigateur), erreur persistante avec Réessayer, double clic sans effet.
+- Notifications : groupes Aujourd'hui / Plus tôt, « Tout marquer comme lu » explicite (plus de lecture automatique à l'ouverture), état vide et erreur de chargement.
+- Paramètres : Apparence (thème Appareil / Clair / Sombre, contraste, animations), Lecture (taille du texte, langue en sélecteur), Application ; préférences pédagogiques déplacées dans Profil > Mon apprentissage.
+- Profil : solde réel avec Historique des crédits et Offres, Mon apprentissage, compte ; doublons retirés.
+
 ## Phase 17.2 — V4, lot 2 : bibliothèque, import, conservation (6 octobre 2026)
 
 - Conservation : plus aucune purge automatique des Limpid ni des originaux utilisés (configuration figée, tâche quotidienne limitée aux envois abandonnés et aux sources jamais utilisées après 24 h). Migration `20261017000000_v4_retention.sql` (retrait des échéances posées, idempotente, aucune suppression) appliquée en production. Textes « conservés jusqu'à votre suppression ». Sessions, codes et liens signés inchangés ; changement d'offre : rien n'est effacé (seule la création est bloquée au-delà de la limite).
