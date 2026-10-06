@@ -83,7 +83,7 @@ export interface AssetView {
   src: string;
   width: number;
   height: number;
-  provider: "commons" | "unsplash" | "gemini";
+  provider: "commons" | "unsplash" | "gemini" | "recraft";
   author: string | null;
   license: string | null;
   licenseUrl: string | null;

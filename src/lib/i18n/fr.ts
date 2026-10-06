@@ -1348,7 +1348,7 @@ export const fr = {
     createCost: (n: number) => `Créer mon Limpid · ${n} crédits`,
     createCostFrom: (n: number) => `à partir de ${n} crédits selon la taille du document`,
     quizCost: "Nouveau test : 3 crédits",
-    versionCost: "Nouvelle version : 8 crédits",
+    versionCost: "Nouvelle version : 22 crédits",
     offers: {
       taglinesShort: { free: "Pour découvrir Limpid", essential: "Pour apprendre régulièrement", plus: "Pour aller plus loin chaque semaine", pro: "Pour un usage intensif" } as Record<string, string>,
       v2: {
@@ -1390,7 +1390,7 @@ export const fr = {
         plus: ["Tout Essentiel", "100 Limpid conservés", "2 préparations en même temps"],
         pro: ["Tout Plus", "300 Limpid conservés", "3 préparations en même temps"],
       } as Record<string, string[]>,
-      note: "Les crédits sont communs à toutes vos générations. Un rapport standard utilise 20 crédits ; le prix de chaque action est indiqué avant de commencer.",
+      note: "Les crédits sont communs à toutes vos générations. Un rapport standard illustré utilise 40 crédits ; le prix de chaque action est indiqué avant de commencer.",
       noteTopup: "Besoin d'un coup de pouce ? Recharges dès 1 000 FCFA, sans abonnement.",
       prepaid: "Accès prépayé : aucun prélèvement automatique. Vous renouvelez quand vous le souhaitez.",
       topupsTitle: "Recharges ponctuelles",
@@ -1427,7 +1427,7 @@ export const fr = {
       expiry: "Les crédits mensuels expirent à la fin de leur cycle, sans report. Les recharges expirent 12 mois après leur achat. Les crédits qui expirent le plus tôt sont utilisés en premier.",
       faqTitle: "Questions fréquentes",
       faq: [
-        ["Que coûte un rapport ?", "8 crédits pour un document de quelques pages, 20 pour un document standard, 40 pour un document volumineux. Le prix est affiché avant de lancer la création."],
+        ["Que coûte un rapport ?", "22 crédits pour un document de quelques pages, 40 pour un document standard, 92 pour un document long ou complexe. Le prix est affiché avant de lancer la création."],
         ["Les crédits se cumulent-ils ?", "Non : les crédits mensuels expirent à la fin du cycle. Les recharges restent valables 12 mois."],
         ["Que se passe-t-il à zéro crédit ?", "Vos Limpid restent lisibles et exportables. Seules les nouvelles créations attendent le prochain cycle, une recharge ou une offre."],
         ["Une recharge change-t-elle mon offre ?", "Non. Elle ajoute des crédits et ouvre les fonctions Essentiel tant qu'elle n'est pas épuisée, sans mois d'abonnement."],
@@ -1543,7 +1543,7 @@ export const fr = {
     already: "J'ai déjà un compte",
     noCard: "Sans carte bancaire. Votre compte reste gratuit tant que vous ne choisissez pas une offre payante.",
     sentTitle: "Vérifiez votre adresse email",
-    sent: "Confirmez votre adresse avec le lien reçu pour activer vos 80 crédits gratuits (4 rapports).",
+    sent: "Confirmez votre adresse avec le lien reçu pour activer vos 80 crédits gratuits chaque mois (environ 3 rapports courts).",
     closed: "Les inscriptions ne sont pas encore ouvertes.",
     create: "Créer un compte gratuit",
   },

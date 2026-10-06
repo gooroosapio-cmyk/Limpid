@@ -6,7 +6,12 @@
  */
 import type { z } from "zod";
 
-export type ModelTier = "fast" | "quality";
+/**
+ * Niveau de modèle (Atlas de conception) : « lite » classe et prépare (Flash-Lite), « fast » et
+ * « quality » expliquent et vérifient (Flash), « complex » traite les passages difficiles (Pro).
+ * Le routage est décidé par Limpid, jamais par le document.
+ */
+export type ModelTier = "lite" | "fast" | "quality" | "complex";
 
 export interface StageBudget {
   tier: ModelTier;
@@ -22,6 +27,8 @@ export interface UsageReport {
   outputTokens: number | null;
   durationMs: number;
   requestId: string | null;
+  /** Coût réel facturé par le fournisseur (USD), quand il le communique (OpenRouter). */
+  costUsd?: number | null;
 }
 
 export type ProviderErrorCode =
@@ -88,6 +95,14 @@ export interface AIProvider {
   readonly name: string;
   readonly isDemo: boolean;
   generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>>;
+}
+
+export type ImageAspect = "4:3" | "16:9" | "1:1" | "3:2" | "3:4";
+
+/** Génération d'image raster (couverture, planche d'illustrations) : une image, aucun texte incorporé. */
+export interface ImageProvider {
+  readonly name: string;
+  generateIllustration(req: { model: string; prompt: string; aspectRatio: ImageAspect; signal: AbortSignal; timeoutMs: number }): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }>;
 }
 
 /** Enveloppe les données non fiables avec des délimiteurs aléatoires impossibles à deviner par le document. */

@@ -8,7 +8,7 @@ import { sniff } from "@/lib/security/file-type";
 import { imageSize } from "@/lib/security/image";
 import { safeFetch, type SafeFetchOptions, type SafeFetchResult } from "@/lib/security/safe-fetch";
 
-export const USER_AGENT = "Limpid/1.0 (https://limpidgooroo.vercel.app; illustrations pedagogiques)";
+export const USER_AGENT = "Limpid/1.0 (https://limpid.company; illustrations pedagogiques)";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Hôtes de fichiers Commons autorisés (téléchargement et redirections). */
 const COMMONS_FILES = /^https:\/\/(upload|thumb)\.wikimedia\.org\//;

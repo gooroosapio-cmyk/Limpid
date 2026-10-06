@@ -21,7 +21,7 @@ import { renderReportPdf, type PdfImage } from "@/lib/render/pdf";
 import { ChartData, ComparisonData, IllustrationData, type AssetView } from "@/lib/render/visuals";
 import { visualConfig } from "@/lib/visuals/config";
 import { creditText } from "@/lib/visuals/credit";
-import { illustrate, type AssetRow } from "@/lib/visuals/illustrate";
+import { illustrate, type AssetRow, type StoredVector } from "@/lib/visuals/illustrate";
 import { downloadCommons, searchCommons, type StoredImage } from "@/lib/visuals/sources";
 import { EAU_VILLE_PAGES, EAU_VILLE_TITLE } from "./corpus/eau-ville";
 
@@ -52,7 +52,7 @@ describe.skipIf(!process.env.LIMPID_LIVE || !out)("recette lot D : visuels réel
     });
 
     // Illustrations : vraie recherche Commons, stockage en mémoire.
-    const stored = new Map<string, { img: StoredImage; row: AssetRow }>();
+    const stored = new Map<string, { img: StoredImage | StoredVector; row: AssetRow }>();
     const t0 = Date.now();
     const ill = await illustrate(report.blueprint, "auto", visualConfig({} as NodeJS.ProcessEnv), {
       searchCommons: (q, t) => searchCommons(q, undefined, t),

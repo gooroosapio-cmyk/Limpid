@@ -4,6 +4,7 @@
  * d'erreur ni dans les journaux.
  */
 import "server-only";
+import { createHash } from "node:crypto";
 import type { z } from "zod";
 import { limits } from "@/lib/config";
 import {
@@ -20,11 +21,12 @@ import {
   type Mode,
   type VisualMode,
 } from "@/lib/contracts/schemas";
-import { estimateCents, PRICE_BASIS } from "@/lib/budget";
+import { priceBasisFor, usageCents } from "@/lib/budget";
 import { assertBudget, BudgetError } from "./budget-guard";
 import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
-import { getProvider } from "@/lib/engine";
-import { GeminiProvider, geminiConfigFromEnv } from "@/lib/engine/gemini";
+import { getImageProvider, getProvider } from "@/lib/engine";
+import { generateVector, recraftConfigFromEnv, vectorPrompt } from "@/lib/visuals/recraft";
+import { svgSize } from "@/lib/visuals/svg";
 import { generateDrawings } from "@/lib/engine/drawings";
 import { generateExercises } from "@/lib/engine/exercises";
 import {
@@ -213,7 +215,8 @@ async function finish(jobId: string, status: string, errorCode: string | null) {
 
 /** Journal de consommation : une ligne par appel, sans double débit (clé tâche/étape/tentative). */
 async function recordUsage(job: JobRow, stage: string, attempt: number, u: UsageReport) {
-  const cents = estimateCents(u.inputTokens, u.outputTokens);
+  const cents = usageCents(u);
+  const known = u.inputTokens !== null || typeof u.costUsd === "number";
   await adminClient().from("usage_ledger").upsert(
     {
       owner_id: job.owner_id,
@@ -222,14 +225,14 @@ async function recordUsage(job: JobRow, stage: string, attempt: number, u: Usage
       attempt,
       provider: u.provider,
       model: u.model,
-      status: u.inputTokens === null ? "uncertain" : "settled",
+      status: known ? "settled" : "uncertain",
       reserved_cents: cents,
-      actual_cents: u.inputTokens === null ? null : cents,
+      actual_cents: known ? cents : null,
       input_tokens: u.inputTokens,
       output_tokens: u.outputTokens,
       duration_ms: u.durationMs,
       provider_request_id: u.requestId,
-      price_basis: PRICE_BASIS,
+      price_basis: priceBasisFor(u),
     },
     { onConflict: "job_id,stage,attempt", ignoreDuplicates: true },
   );
@@ -537,6 +540,12 @@ async function runDrawings(job: JobRow, explanation: ExplanationObject, blueprin
   }
 }
 
+/** Illustrations vectorielles par rapport (Atlas) : 1 court, 2 standard, 4 long complexe. */
+export function vectorBudgetFor(targetPages: number | null | undefined): number {
+  const pages = targetPages ?? 6;
+  return pages <= 3 ? 1 : pages <= 9 ? 2 : 4;
+}
+
 /** Recherche ou génération des illustrations prévues par le plan ; un échec n'arrête jamais le rapport. */
 async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, controller: AbortController): Promise<ReportBlueprint> {
   if (!job.report_id || pendingIllustrations(blueprint).length === 0) return blueprint;
@@ -545,7 +554,8 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
   const config = visualConfig();
   const reportId = job.report_id;
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY ?? "";
-  const image = config.geminiImage && config.imageModel ? new GeminiProvider(geminiConfigFromEnv()) : null;
+  const image = config.geminiImage && config.imageModel ? getImageProvider() : null;
+  const recraft = recraftConfigFromEnv();
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
   try {
     const out = await illustrate(blueprint, job.params.visual_mode ?? "auto", config, {
@@ -561,6 +571,17 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
           }
         : undefined,
       onImageUsage: (attempt, u) => recordUsage(job, "illustrations", attempt, u),
+      generateVector: recraft
+        ? async (item) => {
+            await checkBudget(job.owner_id);
+            const out = await generateVector(recraft, { prompt: vectorPrompt(item.subject, item.purpose, item.altText), size: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+            const bytes = Buffer.from(out.svg, "utf8");
+            const { width, height } = svgSize(out.svg);
+            return { vector: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
+          }
+        : undefined,
+      onVectorUsage: (attempt, u) => recordUsage(job, "illustrations_vectorielles", attempt, u),
+      vectorBudget: vectorBudgetFor(job.params.target_pages),
       cutPlate: async (bytes, n) => (await import("@/lib/visuals/plate")).cutPlate(bytes, n),
       generatedThisMonth: async () =>
         (

@@ -10,6 +10,7 @@ import { MODES, type Mode } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
+import { ACTION_PRICES } from "@/lib/billing/catalog";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
 type Tab = "file" | "link" | "text";
@@ -591,7 +592,7 @@ export function ImportForm({
         {phase.step !== "creating" && <Icon name="arrow" />}
       </button>
       {missing && <p id={`${base}-missing`} className="muted small center">{missing}</p>}
-      {count === 1 && <p className="muted small center">{quote ? t.add.v2.cost(quote) : t.billing.createCostFrom(8)}</p>}
+      {count === 1 && <p className="muted small center">{quote ? t.add.v2.cost(quote) : t.billing.createCostFrom(ACTION_PRICES.report_short)}</p>}
     </form>
   );
 }

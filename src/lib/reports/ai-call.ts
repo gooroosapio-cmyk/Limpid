@@ -3,7 +3,7 @@
  * par heure, journal de consommation et messages d'erreur lisibles. Partagé par les routes.
  */
 import "server-only";
-import { estimateCents, PRICE_BASIS } from "@/lib/budget";
+import { priceBasisFor, usageCents } from "@/lib/budget";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { assertBudget, BudgetError } from "@/lib/jobs/budget-guard";
 import { adminClient } from "@/lib/supabase/admin";
@@ -77,7 +77,7 @@ export async function guardReaderCall(userId: string, stage: string, perHour: nu
 }
 
 export async function recordReaderUsage(userId: string, stage: string, u: UsageReport) {
-  const cents = estimateCents(u.inputTokens, u.outputTokens);
+  const cents = usageCents(u);
   await adminClient().from("usage_ledger").insert({
     owner_id: userId,
     job_id: null,
@@ -85,14 +85,14 @@ export async function recordReaderUsage(userId: string, stage: string, u: UsageR
     attempt: 0,
     provider: u.provider,
     model: u.model,
-    status: u.inputTokens === null ? "uncertain" : "settled",
+    status: u.inputTokens === null && u.costUsd == null ? "uncertain" : "settled",
     reserved_cents: cents,
-    actual_cents: u.inputTokens === null ? null : cents,
+    actual_cents: u.inputTokens === null && u.costUsd == null ? null : cents,
     input_tokens: u.inputTokens,
     output_tokens: u.outputTokens,
     duration_ms: u.durationMs,
     provider_request_id: u.requestId,
-    price_basis: PRICE_BASIS,
+    price_basis: priceBasisFor(u),
   });
 }
 

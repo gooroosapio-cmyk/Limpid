@@ -36,12 +36,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (variant !== "key") {
     await Promise.all(
       Object.values(report.assets).map(async (a) => {
-        if (!a.storagePath || (a.mime !== "image/jpeg" && a.mime !== "image/png")) return;
+        if (!a.storagePath || (a.mime !== "image/jpeg" && a.mime !== "image/png" && a.mime !== "image/svg+xml")) return;
         const { data } = await adminClient().storage.from("exports").download(a.storagePath);
         if (!data) return;
+        let bytes = Buffer.from(await data.arrayBuffer());
+        // Illustration vectorielle (SVG assaini) : rendue en PNG pour le PDF, sans réseau.
+        if (a.mime === "image/svg+xml") {
+          const sharp = (await import("sharp")).default;
+          bytes = await sharp(bytes, { density: 144 }).resize({ width: 1200, withoutEnlargement: true }).png().toBuffer().catch(() => Buffer.alloc(0));
+          if (!bytes.length) return;
+        }
         images[a.id] = {
-          data: Buffer.from(await data.arrayBuffer()),
-          format: a.mime === "image/png" ? "png" : "jpg",
+          data: bytes,
+          format: a.mime === "image/jpeg" ? "jpg" : "png",
           width: a.width,
           height: a.height,
           credit: creditText(a),

@@ -8,7 +8,7 @@ import { quotaBlock, quotaState, resolvePlan } from "./wallet";
 describe("catalogue (révision tarifaire)", () => {
   it("offres : prix, crédits mensuels et équivalents en rapports standard", () => {
     expect([PLANS.essential.monthlyXof, PLANS.plus.monthlyXof, PLANS.pro.monthlyXof]).toEqual([2_900, 5_900, 11_900]);
-    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => reportsFor(p.monthlyCredits))).toEqual([4, 12, 30, 75]);
+    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => reportsFor(p.monthlyCredits))).toEqual([2, 6, 15, 37]);
     // Annuel : douze mois pour le prix de dix.
     for (const p of [PLANS.essential, PLANS.plus, PLANS.pro]) expect(p.yearlyXof).toBe(p.monthlyXof * 10);
     // Plafonds V2 : jour / semaine.
@@ -19,9 +19,9 @@ describe("catalogue (révision tarifaire)", () => {
       [20, 100],
     ]);
   });
-  it("recharges : pas en dessous de 1 000 FCFA, 25 rapports pour 5 000", () => {
+  it("recharges : pas en dessous de 1 000 FCFA, 12 rapports standard pour 5 000", () => {
     expect(Object.values(TOPUPS).map((t) => t.xof)).toEqual([1_000, 2_500, 5_000]);
-    expect(reportsFor(TOPUPS.topup_500.credits)).toBe(25);
+    expect(reportsFor(TOPUPS.topup_500.credits)).toBe(12);
   });
   it("neuf produits, tous résolus côté serveur ; un code inconnu ne vaut rien", () => {
     expect(PRODUCT_CODES).toHaveLength(9);
@@ -35,7 +35,7 @@ describe("catalogue (révision tarifaire)", () => {
     expect(reportAction(3_000)).toBe("report_short");
     expect(reportAction(20_000)).toBe("report_standard");
     expect(reportAction(200_000)).toBe("report_long");
-    expect([ACTION_PRICES.report_short, ACTION_PRICES.report_standard, ACTION_PRICES.report_long]).toEqual([8, 20, 40]);
+    expect([ACTION_PRICES.report_short, ACTION_PRICES.report_standard, ACTION_PRICES.report_long]).toEqual([22, 40, 92]);
   });
 });
 

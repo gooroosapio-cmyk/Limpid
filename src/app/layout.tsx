@@ -10,6 +10,7 @@ import { htmlAttributes, readDisplayPrefs } from "@/lib/display/prefs";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLang, getT } from "@/lib/i18n/server";
 import { offlineKey } from "@/lib/offline-key";
+import { siteUrl } from "@/lib/site";
 import "./styles/base.css";
 import "./styles/shell.css";
 import "./styles/components.css";
@@ -19,6 +20,7 @@ import "./styles/v2.css";
 import "./styles/v4.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: { default: "Limpid", template: "%s · Limpid" },
   description: "Un document. Une explication qui fait sens.",
   robots: { index: false, follow: false }, // alpha privée

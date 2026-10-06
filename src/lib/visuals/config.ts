@@ -14,8 +14,18 @@ export interface VisualConfig {
   monthlyGenerated: number;
 }
 
+/**
+ * Modèle image : celui déclaré, sinon, avec OpenRouter, l'image Lite de l'Atlas (couverture
+ * à bas coût ; Flash Image reste un repli explicite via LIMPID_IMAGE_MODEL).
+ */
+export function imageModelFor(env: NodeJS.ProcessEnv = process.env): string | null {
+  const declared = env.LIMPID_IMAGE_MODEL?.trim();
+  if (declared) return declared;
+  return env.OPENROUTER_API_KEY?.trim() ? "google/gemini-3.1-flash-lite-image" : null;
+}
+
 export function visualConfig(env: NodeJS.ProcessEnv = process.env): VisualConfig {
-  const imageModel = env.LIMPID_IMAGE_MODEL?.trim() || null;
+  const imageModel = imageModelFor(env);
   return {
     commons: env.LIMPID_ILLUSTRATIONS_COMMONS !== "off",
     unsplash: !!env.UNSPLASH_ACCESS_KEY?.trim() && env.LIMPID_ILLUSTRATIONS_UNSPLASH === "on",

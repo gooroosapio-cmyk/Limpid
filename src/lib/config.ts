@@ -50,18 +50,23 @@ export const retention = {
 
 export const budget = {
   /** Coupe-circuit global, en centimes d'euro par mois (cadrage Q17). */
-  monthlyCapCents: int("LIMPID_MONTHLY_CAP_CENTS", 1_000),
-  perReportCapCents: int("LIMPID_REPORT_CAP_CENTS", 50),
-  perAccountDailyCapCents: int("LIMPID_ACCOUNT_DAILY_CAP_CENTS", 200),
+  // Simulation du 6 octobre 2026 : un long complexe coûte ~0,73 USD (≈ 67 c€) ; plafonds par défaut ajustés.
+  monthlyCapCents: int("LIMPID_MONTHLY_CAP_CENTS", 5_000),
+  perReportCapCents: int("LIMPID_REPORT_CAP_CENTS", 120),
+  perAccountDailyCapCents: int("LIMPID_ACCOUNT_DAILY_CAP_CENTS", 600),
 };
 
-export type ProviderName = "gemini" | "demo";
+export type ProviderName = "openrouter" | "gemini" | "demo";
 
-export function activeProvider(): ProviderName {
-  const p = (process.env.LIMPID_AI_PROVIDER ?? "gemini").toLowerCase();
-  if (p !== "gemini" && p !== "demo") throw new Error("LIMPID_AI_PROVIDER invalide");
-  // Sans clé, le seul mode possible est la démo, affichée comme telle.
-  if (p === "gemini" && !process.env.GEMINI_API_KEY) return "demo";
+/**
+ * Fournisseur IA actif (un seul, aucune bascule silencieuse). Par défaut : OpenRouter si sa clé
+ * est présente, sinon Gemini direct. Sans clé, le seul mode possible est la démo, affichée comme telle.
+ */
+export function activeProvider(env: NodeJS.ProcessEnv = process.env): ProviderName {
+  const p = (env.LIMPID_AI_PROVIDER ?? (env.OPENROUTER_API_KEY ? "openrouter" : "gemini")).toLowerCase();
+  if (p !== "openrouter" && p !== "gemini" && p !== "demo") throw new Error("LIMPID_AI_PROVIDER invalide");
+  if (p === "openrouter" && !env.OPENROUTER_API_KEY) return "demo";
+  if (p === "gemini" && !env.GEMINI_API_KEY) return "demo";
   return p;
 }
 
