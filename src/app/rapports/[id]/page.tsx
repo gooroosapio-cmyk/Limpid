@@ -95,7 +95,9 @@ export default async function ReportPage({
       reportId={report.isCurrent ? id : null}
       versionId={report.versionId}
       initialAnchor={report.progressAnchor}
-      bilan={report.exercises?.bilan.length ? report.exercises.bilan : null}
+      // Version courante : le bilan est noté par le serveur sur sa page ; aucune réponse n'est envoyée
+      // au navigateur ici (liste vide = « un bilan existe »). Ancienne version : fenêtre locale.
+      bilan={report.exercises?.bilan.length ? (report.isCurrent ? [] : report.exercises.bilan) : null}
       insufficient={report.exercises?.insufficient ?? false}
       annexBase={`/rapports/${id}/annexes${report.isCurrent ? "" : `?version=${report.shownVersion}`}`}
       originalHref={report.originalHref}

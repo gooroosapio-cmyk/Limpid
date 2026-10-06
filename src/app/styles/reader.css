@@ -61,6 +61,7 @@ table.compare thead th { font-size: 12px; color: var(--muted); font-weight: 600;
 figure.illustration { padding: 0; overflow: hidden; background: var(--soft); border: 0; border-radius: 6px; }
 figure.illustration img { display: block; width: 100%; max-height: 420px; object-fit: cover; }
 figure.illustration figcaption { padding: var(--s3) var(--s4) var(--s4); }
+figure.illustration.diagram img { width: 100%; max-width: 560px; height: auto; max-height: none; margin: 0 auto; object-fit: contain; background: #fff; }
 .credit { font-size: 12px; }
 
 .glossary dt { font-weight: 700; margin-top: var(--s4); }
@@ -242,8 +243,8 @@ figure.illustration figcaption { padding: var(--s3) var(--s4) var(--s4); }
 /* Visuels : tailles et placements adaptatifs */
 .piece-visual figure.visual { margin: 0; }
 .visual-compact figure.visual, .visual-thumb figure.visual { max-width: 440px; margin-inline: auto; }
-.visual-thumb figure.illustration img { max-height: 200px; }
-.visual-compact figure.illustration img { max-height: 300px; }
+.visual-thumb figure.illustration:not(.diagram) img { max-height: 200px; }
+.visual-compact figure.illustration:not(.diagram) img { max-height: 300px; }
 .pair { display: grid; gap: var(--s4); }
 @media (min-width: 720px) {
   .pair { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }

@@ -137,16 +137,6 @@ export function ReportRow({
     }
   }
 
-  async function generate() {
-    toast(v.generating);
-    const res = await fetch(`/api/reports/${row.id}/cover`, { method: "POST" }).catch(() => null);
-    if (!res?.ok) return toast(res?.status === 429 ? v.generateTooSoon : v.generateFailed, "error");
-    // Une couverture choisie dans la banque masquerait l'image générée : on revient à l'automatique.
-    await patch(row.id, { cover_id: null });
-    toast(v.generated);
-    router.refresh();
-  }
-
   async function saveTitle(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const value = String(new FormData(e.currentTarget).get("title") ?? "").trim();
@@ -299,14 +289,6 @@ export function ReportRow({
               <span className="row-text"><b>{v.rename}</b></span>
             </button>
           </li>
-          {row.state === "ready" && (
-            <li>
-              <button type="button" className="row" onClick={() => { menu.current?.close(); void generate(); }}>
-                <span className="row-icon"><Icon name="spark" /></span>
-                <span className="row-text"><b>{v.generateCover}</b><small>{v.generateNote}</small></span>
-              </button>
-            </li>
-          )}
           <li>
             <button type="button" className="row" onClick={() => { menu.current?.close(); covers.current?.showModal(); }}>
               <span className="row-icon"><Icon name="grid" /></span>

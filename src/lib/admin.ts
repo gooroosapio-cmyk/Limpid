@@ -79,7 +79,7 @@ export async function adminOverview() {
   const quotaStart = pacificMidnight(now);
 
   const [settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
-    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model").single(),
+    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
     db.from("usage_ledger").select("model").gte("created_at", quotaStart.toISOString()),

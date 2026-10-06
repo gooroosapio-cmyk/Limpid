@@ -57,8 +57,6 @@ export const fr = {
       retry: "Réessayer",
     },
     preview: {
-      photoBy: "Photo :",
-      illustrationBy: "Illustration :",
       keyNotions: "Notions clés",
       presentation: "Présentation",
       quiz: "QCM",
@@ -507,12 +505,6 @@ export const fr = {
   library: {
     v2: {
       count: (n: number) => (n > 1 ? `${n} leçons` : n === 1 ? "1 leçon" : "Aucune leçon"),
-      generateCover: "Changer de couverture",
-      generateNote: "Une autre illustration sur le même thème.",
-      generating: "Recherche d’une couverture…",
-      generated: "Nouvelle couverture prête.",
-      generateFailed: "La couverture n'a pas pu être créée. Réessayez plus tard.",
-      generateTooSoon: "Une couverture vient d'être créée : réessayez dans quelques minutes.",
       subtitle: "Votre prochaine idée commence ici.",
       ready: "Prêt",
       preparing: "En préparation",
@@ -831,6 +823,7 @@ export const fr = {
   visuals: {
     notStated: "Non précisé par la source",
     illustration: "Illustration",
+    diagram: "Schéma",
     generated: "Illustration générée par IA, sans valeur documentaire",
     modeLabel: "Illustrations",
     modes: {
@@ -1000,12 +993,13 @@ export const fr = {
     },
     images: {
       title: "Images des cours",
-      intro: "Fournisseur et modèle pour chaque type d'illustration. 3 illustrations au plus par cours, seulement quand le plan les juge utiles ; repli automatique sur l'autre fournisseur.",
+      intro: "Fournisseur et modèle pour chaque type d'image. 3 images au plus par cours, seulement quand le plan les juge utiles ; repli automatique sur l'autre fournisseur.",
       enabled: "Générer des illustrations",
       vector: "Illustrations vectorielles (concepts, analogies)",
       realistic: "Scènes réalistes (lieu, objet, situation)",
+      diagram: "Schémas, graphiques, tableaux (format téléphone, symétriques, alignés)",
       missingKey: "clé absente",
-      note: "Couverture : illustration Pixabay choisie selon le thème du document, sinon image Gemini (Nano Banana 2 Lite). Aucun dessin ni graphique n'est tracé par le code.",
+      note: "Couverture : illustration Pixabay choisie selon le thème du document, sinon image Gemini (Nano Banana 2 Lite). Aucun dessin ni graphique n'est tracé par le code : les schémas sont des images générées.",
     },
     capLabel: (max: number) => `Plafond mensuel, en euros (${max} € au plus, fixé par la configuration du serveur)`,
     save: "Enregistrer",

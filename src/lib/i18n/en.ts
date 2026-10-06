@@ -61,8 +61,6 @@ export const en: Dict = {
       retry: "Try again",
     },
     preview: {
-      photoBy: "Photo by",
-      illustrationBy: "Illustration by",
       keyNotions: "Key notions",
       presentation: "Presentation",
       quiz: "Quiz",
@@ -509,12 +507,6 @@ export const en: Dict = {
   library: {
     v2: {
       count: (n: number) => (n > 1 ? `${n} lessons` : n === 1 ? "1 lesson" : "No lesson"),
-      generateCover: "Change cover",
-      generateNote: "Another illustration on the same theme.",
-      generating: "Creating the cover…",
-      generated: "New cover ready.",
-      generateFailed: "The cover could not be created. Try again later.",
-      generateTooSoon: "A cover was just created: try again in a few minutes.",
       subtitle: "Your next idea starts here.",
       ready: "Ready",
       preparing: "Preparing",
@@ -833,6 +825,7 @@ export const en: Dict = {
   visuals: {
     notStated: "Not specified by the source",
     illustration: "Illustration",
+    diagram: "Diagram",
     generated: "AI-generated illustration, with no documentary value",
     modeLabel: "Illustrations",
     modes: {
@@ -1034,8 +1027,9 @@ export const en: Dict = {
       enabled: "Generate illustrations",
       vector: "Vector illustrations (concepts, analogies)",
       realistic: "Realistic scenes (place, object, situation)",
+      diagram: "Diagrams, charts, tables (phone format, symmetric, aligned)",
       missingKey: "key missing",
-      note: "Cover: Pixabay illustration matching the document theme, otherwise a Gemini image (Nano Banana 2 Lite). No drawing or chart is drawn by code.",
+      note: "Cover: Pixabay illustration matching the document theme, otherwise a Gemini image (Nano Banana 2 Lite). No drawing or chart is drawn by code: diagrams are generated images.",
     },
     capLabel: (max: number) => `Monthly cap, in euros (${max} € max, set by the server configuration)`,
     save: "Save",

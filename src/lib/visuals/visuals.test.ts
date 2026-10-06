@@ -5,7 +5,7 @@ import { safeImageQuery } from "@/lib/render/visuals";
 import { availableVisualModes, effectiveVisualMode, visualConfig } from "./config";
 import { creditText } from "./credit";
 import { illustrate, type AssetRow, type IllustrateDeps } from "./illustrate";
-import { DEFAULT_IMAGE_SETTINGS, imageAttempts, imageSettingsFrom } from "./image-models";
+import { DEFAULT_IMAGE_SETTINGS, diagramPrompt, imageAttempts, imageSettingsFrom } from "./image-models";
 import { checkImage, commonsCandidates, plainText, rankCandidates, relevance, unsplashCandidates, type Candidate } from "./sources";
 
 /** PNG valide minimal (en-tête IHDR lu par imageSize). */
@@ -171,15 +171,15 @@ function deps(over: Partial<IllustrateDeps> = {}): IllustrateDeps & { rows: Asse
 
 function styled(): ReportBlueprint {
   const bp = blueprint();
-  return { ...bp, visual_specs: bp.visual_specs.map((v, i) => ({ ...v, data: { ...v.data, style: i === 0 ? "vector" : "realistic" } })) };
+  return { ...bp, visual_specs: bp.visual_specs.map((v, i) => ({ ...v, data: { ...v.data, ...(i === 0 ? { style: "vector" } : { style: "diagram", content: "Évaporation → Condensation → Pluie" }) } })) };
 }
 
 describe("illustrations V5 : route par type de visuel", () => {
-  it("vectoriel par Recraft, réaliste par Nano Banana (réglages par défaut)", async () => {
+  it("illustration par Recraft, schéma par Gemini (réglages par défaut)", async () => {
     const d = deps();
     const out = await illustrate(styled(), "auto", d);
     expect(out.added).toBe(2);
-    expect(d.calls.sort()).toEqual(["realistic:nanobanana:google/gemini-3.1-flash-lite-image", "vector:recraft:recraftv4_1_vector"]);
+    expect(d.calls.sort()).toEqual(["diagram:nanobanana:google/gemini-3.1-flash-image", "vector:recraft:recraftv4_1_vector"]);
     expect(d.rows.map((r) => r.provider).sort()).toEqual(["gemini", "recraft"]);
   });
 
@@ -213,6 +213,13 @@ describe("illustrations V5 : route par type de visuel", () => {
     expect((await illustrate(styled(), "auto", off)).added).toBe(0);
     expect(off.calls).toEqual([]);
   });
+
+  it("« Schémas seulement » : le schéma reste, l'illustration décorative est retirée", async () => {
+    const d = deps();
+    const out = await illustrate(styled(), "schemas", d);
+    expect(d.calls).toEqual(["diagram:nanobanana:google/gemini-3.1-flash-image"]);
+    expect(out.blueprint.visual_specs).toHaveLength(1);
+  });
 });
 
 describe("catalogue des modèles d'image", () => {
@@ -221,10 +228,12 @@ describe("catalogue des modèles d'image", () => {
       enabled: true,
       vector: DEFAULT_IMAGE_SETTINGS.vector,
       realistic: { provider: "recraft", model: "recraftv4_1" },
+      diagram: DEFAULT_IMAGE_SETTINGS.diagram,
     });
-    expect(imageAttempts("realistic", DEFAULT_IMAGE_SETTINGS, { recraft: true, nanobanana: true })).toEqual([
-      { provider: "nanobanana", model: "google/gemini-3.1-flash-lite-image" },
+    expect(imageAttempts("diagram", DEFAULT_IMAGE_SETTINGS, { recraft: true, nanobanana: true })).toEqual([
+      { provider: "nanobanana", model: "google/gemini-3.1-flash-image" },
       { provider: "recraft", model: "recraftv4_1" },
     ]);
+    expect(diagramPrompt("Cycle de l'eau", "ordre des étapes", "Évaporation → Pluie")).toMatch(/portrait 3:4.*Évaporation → Pluie.*symmetrical/s);
   });
 });

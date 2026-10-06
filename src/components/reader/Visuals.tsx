@@ -162,13 +162,14 @@ export function VisualFigure({
     case "illustration": {
       const d = IllustrationData.safeParse(v.data);
       if (!showIllustrations || !d.success || !asset) return null;
+      const diagram = d.data.style === "diagram";
       return (
-        <figure className="visual illustration">
+        <figure className={`visual illustration${diagram ? " diagram" : ""}`}>
           {/* Actif vérifié (type, taille, dimensions) et servi par Limpid ou l'hébergeur autorisé. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset.src} alt={v.alt_text} width={asset.width} height={asset.height} loading="lazy" decoding="async" />
           <figcaption>
-            <span className="eyebrow">{t.visuals.illustration}</span> {v.caption}
+            <span className="eyebrow">{diagram ? t.visuals.diagram : t.visuals.illustration}</span> {v.caption}
             <br />
             <Credit asset={asset} />
           </figcaption>

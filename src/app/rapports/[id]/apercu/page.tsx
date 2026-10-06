@@ -72,12 +72,6 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
         {tab === "apercu" && (
           <>
             <Cover cover={cover} className="preview-cover" eager />
-            {cover.credit?.author && (
-              <p className="cover-credit">
-                {cover.credit.source === "pixabay" ? t.v4.preview.illustrationBy : t.v4.preview.photoBy}{" "}
-                <a href={cover.credit.source === "pixabay" ? cover.credit.url : `${cover.credit.url}?utm_source=limpid&utm_medium=referral`} target="_blank" rel="noopener noreferrer">{cover.credit.author}</a>
-              </p>
-            )}
             <p className="meta preview-meta">
               <Icon name="check" size={14} /> {t.library.v2.ready} · {t.library.v2.sources(report.documents.length || 1)}
             </p>

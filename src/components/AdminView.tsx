@@ -3,7 +3,7 @@ import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
 import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMonthlyCap } from "@/app/admin/actions";
-import { IMAGE_MODELS, type ImageStyle } from "@/lib/visuals/image-models";
+import { IMAGE_MODELS, IMAGE_STYLES } from "@/lib/visuals/image-models";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 import { nowMs } from "@/lib/time";
 
@@ -153,7 +153,7 @@ export async function AdminView({
             <input type="checkbox" name="images_enabled" defaultChecked={o.images.enabled} />
             <span>{t.admin.images.enabled}</span>
           </label>
-          {(["vector", "realistic"] as ImageStyle[]).map((style) => (
+          {IMAGE_STYLES.map((style) => (
             <label key={style} className="admin-select">
               <span>{t.admin.images[style]}</span>
               <select name={style} defaultValue={`${o.images[style].provider}|${o.images[style].model}`}>
