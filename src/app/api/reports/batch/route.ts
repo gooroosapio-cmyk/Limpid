@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     if (e instanceof CreateError) {
       if (isBillingBlock(e.code)) return billingResponse(await getT(), await getLang(), e.code, e.detail);
-      const status = { limit: 429, rate: 429, source_missing: 410, source_used: 409, generation_disabled: 503, storage: 500 }[e.code as string] ?? 422;
+      const status = { limit: 429, rate: 429, source_missing: 410, source_used: 409, generation_disabled: 503,
+        too_long: 413, storage: 500 }[e.code as string] ?? 422;
       return NextResponse.json({ error: e.code, message: e.message, reportId: e.reportId }, { status });
     }
     console.error("create batch", (e as Error).name);

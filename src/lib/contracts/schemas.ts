@@ -153,11 +153,12 @@ export const KnowledgeObject = z.strictObject({
   schema_version: schemaVersion,
   id,
   source_ids: ids(10).min(1), // V5 : jusqu'à 10 documents (Limpid commun)
-  concepts: z.array(Concept).max(100),
-  claims: z.array(Claim).max(500),
-  relations: z.array(Relation).max(300),
-  contradictions: z.array(Contradiction).max(50),
-  missing_information: z.array(mediumText).max(50),
+  // V5 : jusqu'à ~150 pages lues par fragments.
+  concepts: z.array(Concept).max(400),
+  claims: z.array(Claim).max(2_000),
+  relations: z.array(Relation).max(800),
+  contradictions: z.array(Contradiction).max(150),
+  missing_information: z.array(mediumText).max(150),
   coverage: Coverage,
 });
 export type KnowledgeObject = z.infer<typeof KnowledgeObject>;
@@ -198,12 +199,28 @@ export const Block = z.discriminatedUnion("type", [
 ]);
 export type Block = z.infer<typeof Block>;
 
+/** Notion à toucher (V5) : définition et exemple préproduits, aucun appel IA au toucher. */
+export const Notion = z.strictObject({
+  term: z.string().trim().min(1).max(80),
+  definition: mediumText,
+  example: mediumText.nullable(),
+  claim_ids: ids(10),
+});
+export type Notion = z.infer<typeof Notion>;
+
 export const Section = z.strictObject({
   id,
   question: shortText,
   takeaway: mediumText,
-  blocks: z.array(Block).min(1).max(30),
+  blocks: z.array(Block).min(1).max(40),
+  /** V5 : 2 à 4 idées « À retenir » en fin de chapitre. */
+  retain: z.array(shortText).max(5).optional(),
+  /** V5 : notions soulignées dans le chapitre (premières occurrences utiles). */
+  notions: z.array(Notion).max(8).optional(),
+  /** V5 : chapitre rédigé par le modèle le plus capable (passage difficile). */
+  difficult: z.boolean().optional(),
 });
+export type Section = z.infer<typeof Section>;
 
 export const GlossaryEntry = z.strictObject({
   term: shortText,
@@ -237,14 +254,14 @@ export const ExplanationObject = z.strictObject({
   /** Approche choisie (absente : générations antérieures à V4). */
   mode: Mode.optional(),
   /** 3 à 5 points clés affichés sous le titre. */
-  key_points: z.array(shortText).max(5).optional(),
+  key_points: z.array(shortText).max(7).optional(),
   /** Source trop pauvre pour un rapport complet : résultat court annoncé comme tel. */
   short_result: z.boolean().optional(),
   preferences_snapshot: PreferencesSnapshot,
-  sections: z.array(Section).min(1).max(20),
-  glossary: z.array(GlossaryEntry).max(60),
+  sections: z.array(Section).min(1).max(40),
+  glossary: z.array(GlossaryEntry).max(200),
   checks: z.array(ComprehensionCheck).max(20),
-  limitations: z.array(mediumText).max(20),
+  limitations: z.array(mediumText).max(40),
 });
 export type ExplanationObject = z.infer<typeof ExplanationObject>;
 
@@ -273,7 +290,7 @@ export type VisualSpec = z.infer<typeof VisualSpec>;
 export const BlueprintSection = z.strictObject({
   section_id: id,
   visual_ids: ids(5),
-  page_hint: z.number().int().min(1).max(18).nullable(),
+  page_hint: z.number().int().min(1).max(200).nullable(),
 });
 
 export const ReportBlueprint = z.strictObject({
@@ -283,10 +300,10 @@ export const ReportBlueprint = z.strictObject({
   template_id: TemplateId,
   target_pages: TargetPages,
   title: shortText,
-  sections: z.array(BlueprintSection).min(1).max(20),
-  visual_specs: z.array(VisualSpec).max(20),
-  source_index: ids(500),
-  layout_warnings: z.array(shortText).max(20),
+  sections: z.array(BlueprintSection).min(1).max(40),
+  visual_specs: z.array(VisualSpec).max(40),
+  source_index: ids(4_000),
+  layout_warnings: z.array(shortText).max(40),
 });
 export type ReportBlueprint = z.infer<typeof ReportBlueprint>;
 

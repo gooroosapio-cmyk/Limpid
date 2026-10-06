@@ -165,8 +165,8 @@ describe("pipeline de génération", () => {
     expect(out.status).toBe("validated");
     const ev2 = out.evidence.find((e) => e.id === "ev_2")!;
     expect(ev2.quote).toBe("environ 97 % de l’eau de la planète"); // tranche réelle, apostrophe typographique
-    expect(out.blueprint.visual_specs).toHaveLength(1);
-    expect(out.blueprint.sections[0]!.visual_ids).toEqual(["vis_flow"]);
+    // V5 : aucun schéma tracé par le code, même proposé par le rédacteur.
+    expect(out.blueprint.visual_specs).toHaveLength(0);
     expect(out.knowledge.coverage).toMatchObject({ segments_total: 2, segments_processed: 2 });
   });
 
@@ -190,13 +190,14 @@ describe("pipeline de génération", () => {
     expect(out.validation.knowledge.blocking_errors.join()).toMatch(/98 %/);
   });
 
-  it("écarte un schéma dont les étapes ne sont pas sourcées", async () => {
+  it("ignore schémas et graphiques proposés (V5 : rien n'est tracé par le code)", async () => {
     const ex = structuredClone(goodExpl);
-    ex.flow = { steps: [{ label: "A", claim_id: "clm_x" }, { label: "B", claim_id: "clm_y" }], cyclic: false };
+    ex.flow = { steps: [{ label: "A", claim_id: "clm_1" }, { label: "B", claim_id: "clm_2" }], cyclic: false };
+    ex.chart = { title: "Parts", bars: [{ label: "A", claim_id: "clm_2", source_form: "97 %" }, { label: "B", claim_id: "clm_2", source_form: "97 %" }] };
     const out = await generateReport(new FakeProvider([goodComp, ex]), input());
     expect(out.blueprint.visual_specs).toHaveLength(0);
-    expect(out.blueprint.layout_warnings).toHaveLength(1);
   });
+
 
   it("ne retente pas une erreur non passagère", async () => {
     const p = new FakeProvider([new ProviderError("refused", "non")]);
@@ -358,23 +359,6 @@ describe("schémas et illustrations déterministes", () => {
     return c;
   };
 
-  it("reprend les valeurs du graphique depuis les affirmations validées", async () => {
-    const expl = {
-      ...goodExpl,
-      chart: { title: "Répartition", bars: [{ label: "Océans", claim_id: "clm_2", source_form: "97 %" }, { label: "Planète", claim_id: "clm_3", source_form: "97 %" }, { label: "Inventé", claim_id: "clm_2", source_form: "50 %" }] },
-    };
-    const out = await generateReport(new FakeProvider([withNumbers(), expl, expl]), input());
-    const chart = out.blueprint.visual_specs.find((v) => v.kind === "bar_chart")!;
-    expect(chart.data).toEqual({
-      unit: "%",
-      bars: [
-        { label: "Océans", value: 97, source_form: "97 %", claim_id: "clm_2" },
-        { label: "Planète", value: 97, source_form: "97 %", claim_id: "clm_3" },
-      ],
-    });
-    expect(chart.alt_text).toContain("Océans : 97 %");
-  });
-
   it("vide les cellules de comparaison non soutenues", async () => {
     const expl = {
       ...goodExpl,
@@ -410,12 +394,12 @@ describe("schémas et illustrations déterministes", () => {
     expect(ill).toHaveLength(1);
     expect(ill[0]!.data).toEqual({ query: "ocean waves jean dupont", subject: "Les océans", asset_id: null });
     expect(ill[0]!.illustrative_only).toBe(true);
-    expect(out.blueprint.sections[0]!.visual_ids).toEqual(["vis_flow", "vis_ill_1"]);
+    expect(out.blueprint.sections[0]!.visual_ids).toEqual(["vis_ill_1"]);
 
     const none = await generateReport(new FakeProvider([goodComp, expl]), { ...input(), visualMode: "aucun" });
     expect(none.blueprint.visual_specs).toHaveLength(0);
     const schemas = await generateReport(new FakeProvider([goodComp, expl]), { ...input(), visualMode: "schemas" });
-    expect(schemas.blueprint.visual_specs.map((v) => v.kind)).toEqual(["flow"]);
+    expect(schemas.blueprint.visual_specs).toHaveLength(0);
   });
 });
 

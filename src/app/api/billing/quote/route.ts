@@ -18,6 +18,6 @@ export async function POST(request: NextRequest) {
   const ids = [...new Set(parsed.data.source_ids)];
   const { count } = await adminClient().from("sources").select("id", { count: "exact", head: true }).in("id", ids).eq("owner_id", user.id).is("deleted_at", null);
   if (count !== ids.length) return NextResponse.json({ error: "introuvable" }, { status: 404 });
-  const action = reportAction((await automaticSettings(user.id, ids)).chars);
+  const action = reportAction((await automaticSettings(user.id, ids)).pages);
   return NextResponse.json({ action, credits: ACTION_PRICES[action] }, { headers: { "Cache-Control": "no-store" } });
 }

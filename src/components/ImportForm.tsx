@@ -40,7 +40,6 @@ interface Item {
 /** Niveaux proposés à la création (V4) ; « auto » laisse le serveur choisir selon l'approche. */
 const LEVEL_CHOICES = ["ultra_simple", "grand_public", "etudiant", "professionnel"] as const;
 /** Longueur : pages visées ; « auto » suit la taille du document. */
-const LENGTH_PAGES = { courte: 3, detaillee: 10 } as const;
 
 const CONCURRENCY = 2;
 
@@ -130,9 +129,9 @@ export function ImportForm({
   const [mode, setMode] = useState<Mode>(defaultMode);
   // Niveau et longueur : réglés dans une feuille locale (le brouillon n'est jamais quitté).
   const [level, setLevel] = useState<(typeof LEVEL_CHOICES)[number] | null>(null);
-  const [length, setLength] = useState<keyof typeof LENGTH_PAGES | null>(null);
   const tuning = useRef<HTMLDialogElement>(null);
-  const tuned = { ...(level ? { level } : {}), ...(length ? { target_pages: LENGTH_PAGES[length] } : {}) };
+  // V5 : la longueur suit le contenu du document (aucun choix de pages).
+  const tuned = level ? { level } : {};
   const [items, setItems] = useState<Item[]>([]);
   const [output, setOutput] = useState<Output>("common");
   const [url, setUrl] = useState("");
@@ -536,7 +535,7 @@ export function ImportForm({
         <span className="row-icon"><Icon name="settings" /></span>
         <span className="row-text">
           <b>{t.add.v2.levelLength[0]}</b>
-          <small>{level || length ? `${tl.levels[level ?? "auto"]} · ${tl.lengths[length ?? "auto"]}` : t.add.v2.levelLength[1]}</small>
+          <small>{level ? tl.levels[level] : t.add.v2.levelLength[1]}</small>
         </span>
         <Icon name="chevron" className="row-chevron" />
       </button>
@@ -554,15 +553,6 @@ export function ImportForm({
             <label key={l} className="choice">
               <input type="radio" name={`${base}-level`} checked={(level ?? "auto") === l} onChange={() => setLevel(l === "auto" ? null : l)} />
               <span><strong>{tl.levels[l]}</strong></span>
-            </label>
-          ))}
-        </fieldset>
-        <fieldset className="choices">
-          <legend>{tl.lengthLegend}</legend>
-          {(["auto", "courte", "detaillee"] as const).map((l) => (
-            <label key={l} className="choice">
-              <input type="radio" name={`${base}-length`} checked={(length ?? "auto") === l} onChange={() => setLength(l === "auto" ? null : l)} />
-              <span><strong>{tl.lengths[l]}</strong></span>
             </label>
           ))}
         </fieldset>

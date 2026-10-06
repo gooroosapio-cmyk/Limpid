@@ -50,7 +50,7 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
   }
   const { data: set } = await db.from("report_sources").select("source_id").eq("report_id", reportId).order("position");
   const sourceIds = set?.length ? set.map((r) => r.source_id as string) : [(last.source_id ?? report.source_id) as string];
-  const action = reportAction((await automaticSettings(userId, sourceIds)).chars);
+  const action = reportAction((await automaticSettings(userId, sourceIds)).pages);
   let reservationId: string;
   try {
     ({ reservationId } = await reserveCredits(userId, action, `report:${idempotencyKey}`, { reportId }, { wallet: ent.wallet }));
