@@ -12,6 +12,7 @@ import {
   UNTRUSTED_PREAMBLE,
   wrapUntrusted,
   type AIProvider,
+  type ImageProvider,
   type StructuredRequest,
   type StructuredResponse,
   type UsageReport,
@@ -90,7 +91,7 @@ export function requestParts(req: StructuredRequest<z.ZodType>, nonce: string) {
   return parts;
 }
 
-export class GeminiProvider implements AIProvider {
+export class GeminiProvider implements AIProvider, ImageProvider {
   readonly name = "gemini";
   readonly isDemo = false;
   private readonly client: GoogleGenAI;
@@ -100,7 +101,8 @@ export class GeminiProvider implements AIProvider {
   }
 
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>> {
-    const primary = req.budget.tier === "fast" ? this.config.modelFast : this.config.modelQuality;
+    // Gemini direct : deux modèles seulement (rapide pour lite/fast, qualité pour quality/complex).
+    const primary = req.budget.tier === "fast" || req.budget.tier === "lite" ? this.config.modelFast : this.config.modelQuality;
     const fallbacks = (this.config.fallbackModels ?? []).filter((m) => m !== primary);
     const models = req.preferFallback && fallbacks.length ? [...fallbacks, primary] : [primary, ...fallbacks];
     for (let i = 0; ; i++) {

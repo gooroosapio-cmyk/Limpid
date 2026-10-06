@@ -4,6 +4,10 @@
  * demande, un appel Gemini minimal (une requête du quota). Aucun secret n'est renvoyé.
  */
 import "server-only";
+import { openRouterConfigFromEnv } from "@/lib/engine/openrouter";
+import { recraftConfigFromEnv } from "@/lib/visuals/recraft";
+import { imageModelFor } from "@/lib/visuals/config";
+import { siteUrl } from "@/lib/site";
 import { z } from "zod";
 import { activeProvider, isUrlImportEnabled, retention } from "@/lib/config";
 import { getProvider } from "@/lib/engine";
@@ -22,15 +26,23 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   const checks: DiagnosticCheck[] = [];
   const add = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
 
-  add("Fournisseur IA", activeProvider() === "gemini", activeProvider() === "gemini" ? "Gemini (clé présente)" : "Mode démonstration : GEMINI_API_KEY absente");
-  add(
-    "Modèles Gemini",
-    present("LIMPID_MODEL_FAST") && present("LIMPID_MODEL_QUALITY"),
-    `rapide : ${process.env.LIMPID_MODEL_FAST || "absent"} · qualité : ${process.env.LIMPID_MODEL_QUALITY || "absent"} · repli : ${process.env.LIMPID_MODEL_FALLBACKS?.trim() || "aucun"}`,
-  );
+  const p = activeProvider();
+  add("Fournisseur IA", p !== "demo", p === "openrouter" ? "OpenRouter (clé présente)" : p === "gemini" ? "Gemini direct (clé présente)" : "Mode démonstration : OPENROUTER_API_KEY absente");
+  if (p === "openrouter") {
+    const c = openRouterConfigFromEnv();
+    add("Modèles (Atlas)", true, `classer : ${c.models.lite} · expliquer : ${c.models.editor} · difficultés : ${c.models.complex} · image : ${imageModelFor() ?? "aucun"}`);
+  } else {
+    add(
+      "Modèles Gemini",
+      present("LIMPID_MODEL_FAST") && present("LIMPID_MODEL_QUALITY"),
+      `rapide : ${process.env.LIMPID_MODEL_FAST || "absent"} · qualité : ${process.env.LIMPID_MODEL_QUALITY || "absent"} · repli : ${process.env.LIMPID_MODEL_FALLBACKS?.trim() || "aucun"}`,
+    );
+  }
+  const recraft = recraftConfigFromEnv();
+  add("Illustrations vectorielles (Recraft)", !!recraft, recraft ? `actives (${recraft.model})` : "RECRAFT_API_KEY absente : schémas et couverture seulement");
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
-  add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || "absente : déduite de la requête");
+  add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || `absente : ${siteUrl()} par défaut`);
   add("Import par lien", true, isUrlImportEnabled() ? "activé" : "désactivé");
   add(
     "Conservation des rapports",

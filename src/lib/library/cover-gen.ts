@@ -1,17 +1,19 @@
 /**
- * Couverture générée par Gemini pour chaque leçon (V2.1) : décorative, sans texte, comprise
+ * Couverture générée (image Lite de Gemini, via OpenRouter ou Google) pour chaque leçon (V2.1) : décorative, sans texte, comprise
  * dans le prix de la leçon (aucun crédit), plafonnée par le budget IA. Un échec laisse le
  * dégradé de la banque : la leçon reste complète.
  */
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { estimateCents, PRICE_BASIS } from "@/lib/budget";
-import { GeminiProvider, geminiConfigFromEnv } from "@/lib/engine/gemini";
+import { priceBasisFor, usageCents } from "@/lib/budget";
+import { getImageProvider } from "@/lib/engine";
+import { imageModelFor } from "@/lib/visuals/config";
 import { assertBudget } from "@/lib/jobs/budget-guard";
 import { adminClient } from "@/lib/supabase/admin";
 
 export function coverGenerationEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return !!env.LIMPID_IMAGE_MODEL?.trim() && !!env.GEMINI_API_KEY && env.LIMPID_COVERS_GEMINI !== "off";
+  const keyed = !!env.OPENROUTER_API_KEY?.trim() || !!env.GEMINI_API_KEY?.trim();
+  return keyed && !!imageModelFor(env as NodeJS.ProcessEnv) && env.LIMPID_COVERS_GEMINI !== "off";
 }
 
 /** Consigne : une photographie éditoriale décorative, jamais une illustration pédagogique. */
@@ -35,8 +37,8 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
   } catch {
     return null;
   }
-  const model = process.env.LIMPID_IMAGE_MODEL!.trim();
-  const provider = new GeminiProvider(geminiConfigFromEnv());
+  const model = imageModelFor()!;
+  const provider = getImageProvider();
   let out;
   try {
     out = await provider.generateIllustration({
@@ -50,7 +52,7 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
     console.error("cover.generate", (e as Error).message);
     return null;
   }
-  const cents = estimateCents(out.usage.inputTokens, out.usage.outputTokens);
+  const cents = usageCents(out.usage);
   await db.from("usage_ledger").insert({
     owner_id: input.ownerId,
     job_id: input.jobId ?? null,
@@ -58,14 +60,14 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
     attempt: 1,
     provider: out.usage.provider,
     model: out.usage.model,
-    status: out.usage.inputTokens === null ? "uncertain" : "settled",
+    status: out.usage.inputTokens === null && out.usage.costUsd == null ? "uncertain" : "settled",
     reserved_cents: cents,
-    actual_cents: out.usage.inputTokens === null ? null : cents,
+    actual_cents: out.usage.inputTokens === null && out.usage.costUsd == null ? null : cents,
     input_tokens: out.usage.inputTokens,
     output_tokens: out.usage.outputTokens,
     duration_ms: out.usage.durationMs,
     provider_request_id: out.usage.requestId,
-    price_basis: PRICE_BASIS,
+    price_basis: priceBasisFor(out.usage),
   });
   // WebP 1200 × 900 (cartes 4/3, V4) : léger, net sur téléphone ; les anciennes couvertures portrait sont recadrées à l'affichage.
   const sharp = (await import("sharp")).default;

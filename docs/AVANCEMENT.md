@@ -1,5 +1,13 @@
 # Avancement
 
+## Phase 18.1 — Pipeline, lot 1 : OpenRouter, Recraft, crédits, domaine (6 octobre 2026)
+
+- Cadrage (QCM) : clé OpenRouter, Recraft activé, débit 22 / 40 / 92 crédits, catalogue actuel conservé, routage complet de l'Atlas, QCM intégrés et évaluation au lot 3, gratuit à 80 crédits par mois, domaine `limpid.company` (www redirigé).
+- Adaptateur OpenRouter : JSON structuré validé côté serveur, lecture d'images et de PDF, image de couverture, coût réel journalisé. Niveaux : `lite` (Flash-Lite), `fast`/`quality` (Flash), `complex` (Pro, pris en premier pour la dernière correction de format). Gemini direct reste possible.
+- Recraft V4.1 Vector : 1 / 2 / 4 illustrations vectorielles par rapport court / standard / long, SVG assainis (liste blanche), stockés en privé, rendus en PNG dans le PDF. Migration `20261018000000_pipeline_providers.sql` appliquée en production.
+- Crédits : rapport court 22, standard 40, long 92, nouvelle version 22 ; équivalent « rapports standard » sur 40 crédits. Plafonds de dépense par défaut relevés (mois 50 €, réserve par rapport 1,20 €, compte 6 € / 24 h).
+- Domaine : adresse publique centralisée (`LIMPID_SITE_URL`, défaut `https://limpid.company`), `metadataBase`. Guide : `docs/INTEGRATION_IA_DOMAINE.md`.
+
 ## Phase 17.4 — Menu latéral, Accueil = import (6 octobre 2026)
 
 - Barre de navigation basse supprimée. Menu latéral gauche (toujours visible sur ordinateur, tiroir ouvert par le bouton de l'en-tête sur mobile) : Accueil, Sources, Dossiers (liste dépliante, nouveau dossier), Créer un Limpid mis en évidence, Favoris, Bibliothèque avec « Voir tout » et la liste simple des Limpid (défilante). Paramètres en bas, fixe, dans un menu déroulant (Paramètres, Profil, Offres et crédits, tutoriel, déconnexion). Profil et cloche restent en haut à droite.

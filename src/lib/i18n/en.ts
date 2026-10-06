@@ -1377,7 +1377,7 @@ export const en: Dict = {
     createCost: (n: number) => `Create my Limpid · ${n} credits`,
     createCostFrom: (n: number) => `from ${n} credits depending on document size`,
     quizCost: "New test: 3 credits",
-    versionCost: "New version: 8 credits",
+    versionCost: "New version: 22 credits",
     offers: {
       taglinesShort: { free: "To discover Limpid", essential: "To learn regularly", plus: "To go further every week", pro: "For intensive use" } as Record<string, string>,
       v2: {
@@ -1419,7 +1419,7 @@ export const en: Dict = {
         plus: ["Everything in Essential", "100 Limpids kept", "2 preparations at once"],
         pro: ["Everything in Plus", "300 Limpids kept", "3 preparations at once"],
       } as Record<string, string[]>,
-      note: "Credits are shared by all your generations. A standard report uses 20 credits; the price of each action is shown before you start.",
+      note: "Credits are shared by all your generations. A standard illustrated report uses 40 credits; the price of each action is shown before you start.",
       noteTopup: "Need a boost? Top-ups from 1,000 FCFA, no subscription.",
       prepaid: "Prepaid access: no automatic charge. You renew whenever you want.",
       topupsTitle: "One-off top-ups",
@@ -1456,7 +1456,7 @@ export const en: Dict = {
       expiry: "Monthly credits expire at the end of their cycle, with no carry-over. Top-ups expire 12 months after purchase. Credits expiring soonest are used first.",
       faqTitle: "Frequently asked questions",
       faq: [
-        ["How much does a report cost?", "8 credits for a document of a few pages, 20 for a standard document, 40 for a large document. The price is shown before you start."],
+        ["How much does a report cost?", "22 credits for a document of a few pages, 40 for a standard document, 92 for a long or complex document. The price is shown before you start."],
         ["Do credits add up?", "No: monthly credits expire at the end of the cycle. Top-ups stay valid for 12 months."],
         ["What happens at zero credits?", "Your Limpids stay readable and exportable. Only new creations wait for the next cycle, a top-up or a plan."],
         ["Does a top-up change my plan?", "No. It adds credits and opens Essential features while it lasts, without subscription months."],
@@ -1572,7 +1572,7 @@ export const en: Dict = {
     already: "I already have an account",
     noCard: "No credit card. Your account stays free until you choose a paid plan.",
     sentTitle: "Check your email address",
-    sent: "Confirm your address with the link you received to activate your 80 free credits (4 reports).",
+    sent: "Confirm your address with the link you received to activate your 80 free monthly credits (about 3 short reports).",
     closed: "Sign-ups are not open yet.",
     create: "Create a free account",
   },

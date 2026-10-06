@@ -9,7 +9,7 @@ export type PaidPlan = Exclude<PlanCode, "free">;
 export type Period = "monthly" | "yearly";
 
 /** Crédits d'un rapport standard : l'unité des équivalents « rapports » affichés. */
-export const STANDARD_REPORT_CREDITS = 20;
+export const STANDARD_REPORT_CREDITS = 40;
 
 export interface PlanDef {
   code: PlanCode;
@@ -110,13 +110,16 @@ export function product(code: string): Product | null {
   };
 }
 
-/** Prix fixes des actions (§ 3). */
+/**
+ * Prix fixes des actions (§ 3 ; simulation du 6 octobre 2026). Le coût vient du travail :
+ * court illustré 22, standard illustré 40, long complexe 92 crédits.
+ */
 export const ACTION_PRICES = {
-  report_short: 8,
-  report_standard: 20,
-  report_long: 40,
+  report_short: 22,
+  report_standard: 40,
+  report_long: 92,
   /** Nouvelle version complète d'un rapport existant (autre approche, autre formulation). */
-  report_version: 8,
+  report_version: 22,
   ask: 1,
   quiz: 3,
 } as const;

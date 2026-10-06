@@ -66,7 +66,7 @@ En cas de webhook perdu, le bouton **Rapprocher les commandes en attente** (admi
 ## Règles appliquées
 
 - **Prix fixe annoncé avant l'action**, réservé avant tout appel IA, consommé à la livraison, rendu en cas d'échec.
-  - Rapport court, standard ou long : 8, 20 ou 40 crédits.
+  - Rapport court, standard ou long : 22, 40 ou 92 crédits (simulation du 6 octobre 2026).
   - Nouvelle version : 8. Question : 1. Nouveau test : 3.
 - **Crédits mensuels** : ils expirent en fin de cycle, sans report.
 - **Recharges** : valables 12 mois. Elles ouvrent le mode « Recharge » (fonctions Essentiel) sans mois d'abonnement.

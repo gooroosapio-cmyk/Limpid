@@ -21,3 +21,17 @@ export function estimateCents(inputTokens: number | null, outputTokens: number |
   const cents = ((inputTokens ?? 0) * PRICES.inputCentsPerMTok + (outputTokens ?? 0) * PRICES.outputCentsPerMTok) / 1e6;
   return Math.ceil(cents);
 }
+
+/** Taux de conversion USD → euro pour le journal (coût réel OpenRouter / Recraft). */
+export const USD_TO_EUR = price("LIMPID_USD_TO_EUR", 0.92);
+
+/** Centimes d'euro d'un appel : coût réel du fournisseur s'il est connu, sinon estimation par jetons. */
+export function usageCents(u: { inputTokens: number | null; outputTokens: number | null; costUsd?: number | null }): number {
+  if (typeof u.costUsd === "number" && Number.isFinite(u.costUsd) && u.costUsd >= 0) return Math.ceil(u.costUsd * 100 * USD_TO_EUR);
+  return estimateCents(u.inputTokens, u.outputTokens);
+}
+
+/** Base de prix notée au journal pour un appel. */
+export function priceBasisFor(u: { costUsd?: number | null }): string {
+  return typeof u.costUsd === "number" ? `coût réel du fournisseur (USD × ${USD_TO_EUR})` : PRICE_BASIS;
+}

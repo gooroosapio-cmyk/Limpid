@@ -175,6 +175,26 @@ describe("orchestration des illustrations", () => {
     expect(out.notes[0]).toContain("Sujet 2");
   });
 
+  it("illustrations vectorielles Recraft d'abord, dans la limite du rapport", async () => {
+    const config = { ...configOff, commons: true };
+    let calls = 0;
+    const generateVector = async () => {
+      calls++;
+      const bytes = Buffer.from('<svg viewBox="0 0 800 600"></svg>');
+      return { vector: { bytes, mime: "image/svg+xml" as const, width: 800, height: 600, sha256: "a".repeat(64) }, usage: { provider: "recraft", model: "recraftv4_1_vector", inputTokens: null, outputTokens: null, durationMs: 1, requestId: null, costUsd: 0.08 } };
+    };
+    const d = deps({ generateVector, vectorBudget: 1 });
+    const out = await illustrate(blueprint(), "auto", config, d);
+    expect(calls).toBe(1);
+    expect(d.rows[0]).toMatchObject({ provider: "recraft", mime: "image/svg+xml", storage_path: "o/r/assets/x.svg" });
+    // La seconde illustration passe par la banque (aucune deuxième image vectorielle).
+    expect(out.added).toBeGreaterThanOrEqual(1);
+    // Mode « schémas » : aucune image vectorielle.
+    calls = 0;
+    await illustrate(blueprint(), "schemas", config, deps({ generateVector, vectorBudget: 4 }));
+    expect(calls).toBe(0);
+  });
+
   it("respecte le quota mensuel d'images générées", async () => {
     const config = { ...configOff, commons: false, geminiImage: true, imageModel: "img", monthlyGenerated: 20 };
     let calls = 0;

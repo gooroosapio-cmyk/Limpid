@@ -5,7 +5,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import { estimateCents, PRICE_BASIS } from "@/lib/budget";
+import { priceBasisFor, usageCents } from "@/lib/budget";
 import { getProvider } from "@/lib/engine";
 import { ProviderError, type AIProvider, type UsageReport } from "@/lib/engine/provider";
 import { assertBudget, BudgetError } from "@/lib/jobs/budget-guard";
@@ -104,7 +104,7 @@ export async function gradeAnswer(userId: string, reportId: string, input: z.inf
 
   const quotes = report.evidence.filter((e) => check.evidence_ids.includes(e.id)).map((e) => `« ${e.quote} »`);
   const record = (u: UsageReport) => {
-    const cents = estimateCents(u.inputTokens, u.outputTokens);
+    const cents = usageCents(u);
     return db.from("usage_ledger").insert({
       owner_id: userId,
       job_id: null,
@@ -112,14 +112,14 @@ export async function gradeAnswer(userId: string, reportId: string, input: z.inf
       attempt: 0,
       provider: u.provider,
       model: u.model,
-      status: u.inputTokens === null ? "uncertain" : "settled",
+      status: u.inputTokens === null && u.costUsd == null ? "uncertain" : "settled",
       reserved_cents: cents,
-      actual_cents: u.inputTokens === null ? null : cents,
+      actual_cents: u.inputTokens === null && u.costUsd == null ? null : cents,
       input_tokens: u.inputTokens,
       output_tokens: u.outputTokens,
       duration_ms: u.durationMs,
       provider_request_id: u.requestId,
-      price_basis: PRICE_BASIS,
+      price_basis: priceBasisFor(u),
     });
   };
 

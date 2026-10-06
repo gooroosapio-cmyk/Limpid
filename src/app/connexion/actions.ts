@@ -6,6 +6,7 @@ import { z } from "zod";
 import { dropUnconfirmedAccount, isAdminAddress, isAllowed, passwordProblem, recordAttempt, signupOpen } from "@/lib/auth/password";
 import { getT } from "@/lib/i18n/server";
 import { createUserClient } from "@/lib/supabase/server";
+import { OFFICIAL_SITE_URL } from "@/lib/site";
 
 export interface LoginState {
   status: "idle" | "sent" | "error";
@@ -21,7 +22,7 @@ const Email = z.string().trim().toLowerCase().email().max(254);
 async function siteUrl(): Promise<string> {
   if (process.env.LIMPID_SITE_URL) return process.env.LIMPID_SITE_URL.replace(/\/$/, "");
   // En production, jamais l'en-tête Host (un lien envoyé par email ne doit pas pouvoir être détourné).
-  if (process.env.VERCEL_ENV === "production") return "https://limpidgooroo.vercel.app";
+  if (process.env.VERCEL_ENV === "production") return OFFICIAL_SITE_URL;
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");

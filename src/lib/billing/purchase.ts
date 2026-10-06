@@ -4,6 +4,7 @@
  * jamais un montant ni une quantité de crédits : seulement un code produit.
  */
 import "server-only";
+import { siteUrl } from "@/lib/site";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { product, type Product } from "./catalog";
@@ -53,9 +54,6 @@ export function newOrderRef(): string {
   return `lmp_${randomBytes(15).toString("hex").slice(0, 24)}`;
 }
 
-function siteUrl(): string {
-  return (process.env.LIMPID_SITE_URL ?? "https://limpidgooroo.vercel.app").replace(/\/$/, "");
-}
 
 /** Crée (ou retrouve, double clic) la commande et renvoie l'adresse de paiement Chariow. */
 export async function startCheckout(

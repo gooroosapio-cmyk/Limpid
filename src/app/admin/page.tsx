@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { siteUrl } from "@/lib/site";
 import { AdminBilling } from "@/components/AdminBilling";
 import { AdminView } from "@/components/AdminView";
 import { Screen } from "@/components/shell/Screen";
@@ -15,7 +16,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <Screen wide>
       <AdminView o={o} perf={perf} jobs={jobs} userEmail={user.email ?? null} message={message} />
-      <AdminBilling siteUrl={(process.env.LIMPID_SITE_URL ?? "https://limpidgooroo.vercel.app").replace(/\/$/, "")} />
+      <AdminBilling siteUrl={siteUrl()} />
     </Screen>
   );
 }
