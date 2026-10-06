@@ -40,16 +40,28 @@ function model(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
   return v && MODEL_RE.test(v) ? v : fallback;
 }
 
-/** Configuration lue dans l'environnement ; défauts = modèles de l'Atlas (vérifiés le 6 octobre 2026). */
+/** Modèle de texte par défaut (OpenRouter) : lecture, plan, rédaction Feynman, QCM, chat. */
+export const DEFAULT_TEXT_MODEL = "openai/gpt-6-luna-pro";
+
+/** Les modèles OpenAI de raisonnement (GPT-6, o-series) refusent le paramètre temperature. */
+export function acceptsTemperature(model: string): boolean {
+  return !/^~?openai\//.test(model);
+}
+
+/**
+ * Configuration lue dans l'environnement. Défauts (comparatif IA du 6 octobre 2026) : GPT-6
+ * Luna Pro pour toutes les tâches de texte (lecture, plan, rédaction, QCM, chat) ; un chapitre
+ * difficile ou une réparation de dernier recours garde le même modèle avec une réflexion haute.
+ */
 export function openRouterConfigFromEnv(env: NodeJS.ProcessEnv = process.env): OpenRouterConfig {
   const apiKey = env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) throw new ProviderError("not_configured", "OpenRouter n'est pas configuré (clé manquante).");
   return {
     apiKey,
     models: {
-      lite: model(env, "LIMPID_MODEL_LITE", "google/gemini-3.1-flash-lite"),
-      editor: model(env, "LIMPID_MODEL_EDITOR", "google/gemini-3.8-flash"),
-      complex: model(env, "LIMPID_MODEL_COMPLEX", "google/gemini-3.1-pro-preview"),
+      lite: model(env, "LIMPID_MODEL_LITE", DEFAULT_TEXT_MODEL),
+      editor: model(env, "LIMPID_MODEL_EDITOR", DEFAULT_TEXT_MODEL),
+      complex: model(env, "LIMPID_MODEL_COMPLEX", DEFAULT_TEXT_MODEL),
     },
     fallbackModels: (env.LIMPID_MODEL_FALLBACKS ?? "")
       .split(",")
@@ -144,9 +156,11 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
     // Dernière correction de schéma : le modèle plus capable (Pro) reprend la main.
     const escalate = req.preferFallback && primary !== this.config.models.complex ? [this.config.models.complex] : [];
     const models = [...new Set([...escalate, primary, ...this.config.fallbackModels])];
+    // Même modèle pour tous les niveaux (Luna Pro) : la dernière correction réfléchit davantage.
+    const final = req.preferFallback ? { ...req, budget: { ...req.budget, reasoning: "high" as const } } : req;
     for (let i = 0; ; i++) {
       try {
-        return await this.generateWith(models[i]!, req);
+        return await this.generateWith(models[i]!, final);
       } catch (e) {
         const switchable = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited");
         if (!switchable || i >= models.length - 1) throw e;
@@ -174,9 +188,12 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
         // Un fournisseur qui ignorerait le format structuré n'est jamais choisi.
         provider: { require_parameters: true },
         max_tokens: req.budget.maxOutputTokens,
-        temperature: 0.2,
+        // Les modèles de raisonnement OpenAI n'acceptent pas la température : avec
+        // require_parameters, l'envoyer rendrait le modèle introuvable.
+        ...(acceptsTemperature(model) ? { temperature: 0.2 } : {}),
         // Réflexion bornée : la vitesse vient surtout de là (les jetons de réflexion sont séquentiels).
-        ...(req.budget.reasoning ? { reasoning: { effort: req.budget.reasoning } } : {}),
+        // Niveau « complexe » : même modèle, réflexion haute.
+        ...((req.budget.reasoning ?? (req.budget.tier === "complex" ? "high" : null)) ? { reasoning: { effort: req.budget.reasoning ?? "high" } } : {}),
         usage: { include: true },
       },
       signal,

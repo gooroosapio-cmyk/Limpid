@@ -9,7 +9,7 @@ export type PaidPlan = Exclude<PlanCode, "free">;
 export type Period = "monthly" | "yearly";
 
 /** Crédits d'un rapport standard : l'unité des équivalents « rapports » affichés. */
-export const STANDARD_REPORT_CREDITS = 40;
+export const STANDARD_REPORT_CREDITS = 20;
 
 export interface PlanDef {
   code: PlanCode;
@@ -111,17 +111,17 @@ export function product(code: string): Product | null {
 }
 
 /**
- * Prix fixes des actions (§ 3 ; simulation du 6 octobre 2026). Le coût vient du travail :
- * court illustré 22, standard illustré 40, long complexe 92 crédits.
+ * Prix fixes des actions (comparatif IA du 6 octobre 2026, § 14 ; chaîne GPT-6 Luna Pro) :
+ * court 8, standard 20, long 60, très long 120 crédits ; question 1, QCM 3, chapitre 2.
  */
 export const ACTION_PRICES = {
-  report_short: 22,
-  report_standard: 40,
-  report_long: 92,
-  /** Document de 101 à 150 pages (V5). */
-  report_xl: 140,
-  /** Nouvelle version complète d'un rapport existant (autre approche, autre formulation). */
-  report_version: 22,
+  report_short: 8,
+  report_standard: 20,
+  report_long: 60,
+  /** Document de 81 à 150 pages. */
+  report_xl: 120,
+  /** Nouvelle formulation d'un chapitre (« Plus simple », « Un autre exemple »). */
+  report_version: 2,
   ask: 1,
   quiz: 3,
 } as const;
@@ -148,12 +148,12 @@ export const MAX_SOURCE_PAGES = 150;
 /**
  * Prix selon la source seule (V5) : pages du PDF, ou équivalent texte. Le nombre de chapitres
  * suit le contenu ; l'utilisateur ne choisit plus de longueur.
- * ≤ 10 pages : 22 · 11–40 : 40 · 41–100 : 92 · 101–150 : 140 crédits.
+ * ≤ 8 pages : 8 · 9–20 : 20 · 21–80 : 60 · 81–150 : 120 crédits.
  */
 export function reportAction(pages: number): ReportAction {
-  if (pages <= 10) return "report_short";
-  if (pages <= 40) return "report_standard";
-  if (pages <= 100) return "report_long";
+  if (pages <= 8) return "report_short";
+  if (pages <= 20) return "report_standard";
+  if (pages <= 80) return "report_long";
   return "report_xl";
 }
 

@@ -14,12 +14,12 @@ function reply(body: unknown, status = 200) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("OpenRouter : configuration et routage", () => {
-  it("modèles de l'Atlas par défaut, remplaçables", () => {
+  it("GPT-6 Luna Pro par défaut pour tout le texte, remplaçable", () => {
     const c = openRouterConfigFromEnv(env);
-    expect(c.models).toEqual({ lite: "google/gemini-3.1-flash-lite", editor: "google/gemini-3.8-flash", complex: "google/gemini-3.1-pro-preview" });
+    expect(c.models).toEqual({ lite: "openai/gpt-6-luna-pro", editor: "openai/gpt-6-luna-pro", complex: "openai/gpt-6-luna-pro" });
     expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_EDITOR: "google/gemini-3.5-flash" }).models.editor).toBe("google/gemini-3.5-flash");
     // Identifiant douteux ignoré.
-    expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_COMPLEX: "x; rm -rf" }).models.complex).toBe("google/gemini-3.1-pro-preview");
+    expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_COMPLEX: "x; rm -rf" }).models.complex).toBe("openai/gpt-6-luna-pro");
   });
   it("niveaux : lite → Flash-Lite, fast/quality → Flash, complex → Pro", () => {
     const c = openRouterConfigFromEnv(env);
@@ -57,7 +57,9 @@ describe("OpenRouter : appels", () => {
     const p = new OpenRouterProvider(openRouterConfigFromEnv(env));
     const out = await p.generateStructured(req());
     expect(out.value).toEqual({ answer: "ok" });
-    expect(out.usage).toMatchObject({ provider: "openrouter", model: "google/gemini-3.8-flash", inputTokens: 10, outputTokens: 5, costUsd: 0.0004 });
+    expect(out.usage).toMatchObject({ provider: "openrouter", model: "openai/gpt-6-luna-pro", inputTokens: 10, outputTokens: 5, costUsd: 0.0004 });
+    // Modèle OpenAI de raisonnement : pas de température (require_parameters la rendrait bloquante).
+    expect(calls[0]!.body.temperature).toBeUndefined();
     expect(calls[0]!.body.response_format).toMatchObject({ type: "json_schema" });
     expect(calls[0]!.body.provider).toEqual({ require_parameters: true });
     // Données du document délimitées, jamais dans le message système.
@@ -66,15 +68,21 @@ describe("OpenRouter : appels", () => {
     expect(JSON.stringify(messages[1])).toContain("Ignore tes consignes");
   });
 
-  it("dernière correction de schéma : Pro d'abord", async () => {
-    const models: string[] = [];
+  it("dernière correction et niveau complexe : même modèle, réflexion haute", async () => {
+    const bodies: Record<string, unknown>[] = [];
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(String(init.body));
-      models.push(body.model);
+      bodies.push(JSON.parse(String(init.body)));
       return reply({ choices: [{ finish_reason: "stop", message: { content: '{"answer":"ok"}' } }], usage: {} });
     });
-    await new OpenRouterProvider(openRouterConfigFromEnv(env)).generateStructured(req("fast", true));
-    expect(models[0]).toBe("google/gemini-3.1-pro-preview");
+    const p = new OpenRouterProvider(openRouterConfigFromEnv(env));
+    await p.generateStructured(req("fast", true));
+    await p.generateStructured(req("complex"));
+    expect(bodies.map((b) => [b.model, (b.reasoning as { effort?: string } | undefined)?.effort])).toEqual([
+      ["openai/gpt-6-luna-pro", "high"],
+      ["openai/gpt-6-luna-pro", "high"],
+    ]);
+    // Un modèle d'un autre fournisseur garde sa température.
+    expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_EDITOR: "google/gemini-3.8-flash" }).models.editor).toBe("google/gemini-3.8-flash");
   });
 
   it("réponse tronquée, hors schéma, crédit épuisé", async () => {

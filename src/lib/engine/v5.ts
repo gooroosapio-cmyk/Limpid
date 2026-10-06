@@ -6,8 +6,8 @@
  *    puis fusionnés en un inventaire unique.
  * 2. Plan (3.8 Flash) : titre, résumé en puces, chapitres (objectif, affirmations, difficulté,
  *    notions, visuel utile), affirmations écartées avec leur raison. Couverture contrôlée.
- * 3. Rédaction : un appel Flash par chapitre, en parallèle (réflexion « moyenne » si difficile).
- *    Un chapitre incomplet est réparé une fois ; Pro seulement en dernier recours.
+ * 3. Rédaction : un appel par chapitre (GPT-6 Luna Pro), en parallèle (réflexion « moyenne » si
+ *    difficile). Un chapitre incomplet est réparé une fois (réflexion haute s'il est difficile).
  * 4. Assemblage déterministe et validation globale.
  *
  * Chaque étape validée est enregistrée (fragments, plan, chapitres) : une tâche longue
@@ -601,10 +601,10 @@ function demoteComponents(section: Section, statements: Map<string, string>): Se
 }
 
 /**
- * Rédaction d'un chapitre (V6, vitesse) : un seul appel Flash, réflexion basse (« moyenne » pour
- * un chapitre difficile), puis au plus une réparation ciblée ; Pro ne reprend la main qu'en
- * dernier recours, pour un chapitre difficile encore non conforme. Aucun second passage
- * d'enrichissement : exemples, notions et « À retenir » sont produits dans le même appel.
+ * Rédaction d'un chapitre : un seul appel (GPT-6 Luna Pro), réflexion basse (« moyenne » pour un
+ * chapitre difficile), puis au plus une réparation ciblée ; un chapitre difficile encore non
+ * conforme est réparé avec une réflexion haute (niveau « complexe »). Exemples, notions, QCM et
+ * « À retenir » sont produits dans le même appel.
  */
 async function writeChapter(provider: AIProvider, input: GenerationInput, c: ChapterInputs): Promise<Section> {
   const difficult = c.chapter.difficulty === "difficile";
@@ -617,7 +617,7 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
   const budgetFor = (repair: number): StageBudget => ({
     ...input.budgets.explanation,
     tier: repair > 0 && difficult ? "complex" : "fast",
-    reasoning: difficult ? "medium" : "low",
+    reasoning: repair > 0 && difficult ? "high" : difficult ? "medium" : "low",
     maxOutputTokens: Math.max(input.budgets.explanation.maxOutputTokens, 16_000),
   });
   let draft: ChapterDraft | null = null;
