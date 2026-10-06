@@ -11,9 +11,10 @@ import { IllustrationData } from "@/lib/render/visuals";
 import type { ImageProviderId, ImageRoute, ImageSettings, ImageStyle } from "./image-models";
 import { imageAttempts } from "./image-models";
 import type { Candidate, StoredImage } from "./sources";
+import type { SvgLibrary } from "./svg-library";
 
-/** Illustrations par cours (kit V5 : 3 au plus). */
-export const MAX_ILLUSTRATIONS = 3;
+/** Images générées par cours : 3 images + 2 SVG au plus (le plan applique le plafond par taille). */
+export const MAX_ILLUSTRATIONS = 5;
 
 /** Image vectorielle assainie, prête à stocker. */
 export interface StoredVector {
@@ -25,7 +26,7 @@ export interface StoredVector {
 }
 
 export interface AssetRow {
-  provider: Candidate["provider"] | "gemini" | "recraft";
+  provider: Candidate["provider"] | "gemini" | "recraft" | "seedream";
   kind: "photo" | "illustration" | "generated";
   query: string;
   source_url: string | null;
@@ -54,6 +55,8 @@ export interface IllustrateDeps {
   store(img: StoredImage | StoredVector, ext: "jpg" | "png" | "svg"): Promise<string | null>;
   /** Enregistre l'actif ; renvoie son identifiant, ou null. */
   insertAsset(row: AssetRow): Promise<string | null>;
+  /** Banque SVG Limpid : réutilisée avant toute génération vectorielle, enrichie ensuite. */
+  library?: SvgLibrary;
 }
 
 function withoutVisual(bp: ReportBlueprint, id: string): ReportBlueprint {
@@ -100,7 +103,36 @@ export async function illustrate(
   const items = pending.slice(0, MAX_ILLUSTRATIONS);
   const results = await Promise.all(
     items.map(async ({ spec, data }, n) => {
-      const style: ImageStyle = data.style === "realistic" || (data.style === "diagram" && data.content) ? data.style : "vector";
+      const style: ImageStyle =
+        data.style === "realistic" || data.style === "illustration" || (data.style === "diagram" && data.content) ? data.style : "vector";
+      // SVG : la banque Limpid d'abord (même sujet déjà dessiné), aucune nouvelle génération.
+      if (style === "vector" && deps.library) {
+        const hit = await deps.library.find(data.query).catch(() => null);
+        if (hit) {
+          const path = await deps.store(hit.image, "svg");
+          const id = path
+            ? await deps.insertAsset({
+                provider: "recraft",
+                kind: "generated",
+                query: data.query,
+                source_url: null,
+                remote_url: null,
+                storage_path: path,
+                mime: hit.image.mime,
+                width: hit.image.width,
+                height: hit.image.height,
+                byte_size: hit.image.bytes.length,
+                sha256: hit.image.sha256,
+                author: null,
+                license: null,
+                license_url: null,
+                modifications: "Illustration vectorielle de la banque Limpid (réutilisée, nettoyée)",
+                model: hit.model,
+              })
+            : null;
+          if (id) return id;
+        }
+      }
       const routes = imageAttempts(style, deps.settings, deps.available);
       for (const [k, route] of routes.entries()) {
         const attempt = n * 10 + k + 1;
@@ -110,8 +142,9 @@ export async function illustrate(
           const svg = out.image.mime === "image/svg+xml";
           const path = await deps.store(out.image, svg ? "svg" : out.image.mime === "image/png" ? "png" : "jpg");
           if (!path) continue;
+          if (svg) await deps.library?.save(out.image as StoredVector, data.query, out.usage.model).catch(() => undefined);
           const id = await deps.insertAsset({
-            provider: route.provider === "recraft" ? "recraft" : "gemini",
+            provider: route.provider === "nanobanana" ? "gemini" : route.provider,
             kind: "generated",
             query: data.query,
             source_url: null,

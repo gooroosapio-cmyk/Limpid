@@ -8,7 +8,7 @@ import { quotaBlock, quotaState, resolvePlan } from "./wallet";
 describe("catalogue (révision tarifaire)", () => {
   it("offres : prix, crédits mensuels et équivalents en rapports standard", () => {
     expect([PLANS.essential.monthlyXof, PLANS.plus.monthlyXof, PLANS.pro.monthlyXof]).toEqual([2_900, 5_900, 11_900]);
-    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => reportsFor(p.monthlyCredits))).toEqual([2, 6, 15, 37]);
+    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => reportsFor(p.monthlyCredits))).toEqual([4, 12, 30, 75]);
     // Annuel : douze mois pour le prix de dix.
     for (const p of [PLANS.essential, PLANS.plus, PLANS.pro]) expect(p.yearlyXof).toBe(p.monthlyXof * 10);
     // Plafonds V2 : jour / semaine.
@@ -19,9 +19,9 @@ describe("catalogue (révision tarifaire)", () => {
       [20, 100],
     ]);
   });
-  it("recharges : pas en dessous de 1 000 FCFA, 12 rapports standard pour 5 000", () => {
+  it("recharges : pas en dessous de 1 000 FCFA, 25 rapports standard pour 5 000", () => {
     expect(Object.values(TOPUPS).map((t) => t.xof)).toEqual([1_000, 2_500, 5_000]);
-    expect(reportsFor(TOPUPS.topup_500.credits)).toBe(12);
+    expect(reportsFor(TOPUPS.topup_500.credits)).toBe(25);
   });
   it("neuf produits, tous résolus côté serveur ; un code inconnu ne vaut rien", () => {
     expect(PRODUCT_CODES).toHaveLength(9);
@@ -32,19 +32,20 @@ describe("catalogue (révision tarifaire)", () => {
     expect(product("admin")).toBeNull();
   });
   it("devis d'un rapport selon la taille réelle du texte lu", () => {
-    // Pages du document (V5) : ≤ 10 / 11–40 / 41–100 / 101–150.
+    // Pages du document (comparatif IA) : ≤ 8 / 9–20 / 21–80 / 81–150.
     expect(reportAction(6)).toBe("report_short");
-    expect(reportAction(10)).toBe("report_short");
-    expect(reportAction(11)).toBe("report_standard");
-    expect(reportAction(40)).toBe("report_standard");
-    expect(reportAction(41)).toBe("report_long");
-    expect(reportAction(101)).toBe("report_xl");
-    expect(ACTION_PRICES.report_xl).toBe(140);
+    expect(reportAction(8)).toBe("report_short");
+    expect(reportAction(9)).toBe("report_standard");
+    expect(reportAction(20)).toBe("report_standard");
+    expect(reportAction(21)).toBe("report_long");
+    expect(reportAction(80)).toBe("report_long");
+    expect(reportAction(81)).toBe("report_xl");
+    expect(ACTION_PRICES.report_xl).toBe(120);
     // PDF paginé : sa pagination ; texte sans pages : 2 500 caractères par page.
     expect(sourcePages(6, 9_328)).toBe(6);
     expect(sourcePages(null, 9_328)).toBe(4);
     expect(sourcePages(2, 60_000)).toBe(6);
-    expect([ACTION_PRICES.report_short, ACTION_PRICES.report_standard, ACTION_PRICES.report_long]).toEqual([22, 40, 92]);
+    expect([ACTION_PRICES.report_short, ACTION_PRICES.report_standard, ACTION_PRICES.report_long]).toEqual([8, 20, 60]);
   });
 });
 

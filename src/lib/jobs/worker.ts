@@ -27,8 +27,9 @@ import { priceBasisFor, usageCents } from "@/lib/budget";
 import { assertBudget, BudgetError } from "./budget-guard";
 import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getImageProvider, getProvider } from "@/lib/engine";
-import { generateRaster, generateVector, realisticPrompt, recraftConfigFromEnv, vectorPrompt } from "@/lib/visuals/recraft";
-import { svgSize } from "@/lib/visuals/svg";
+import { realisticPrompt, vectorPrompt } from "@/lib/visuals/recraft";
+import { svgLibrary } from "@/lib/visuals/svg-library";
+import { sanitizeSvg, svgSize } from "@/lib/visuals/svg";
 import { generateExercises } from "@/lib/engine/exercises";
 import {
   PROMPT_VERSION,
@@ -627,15 +628,15 @@ async function publishVersion(
 async function imageSettings(): Promise<ImageSettings> {
   const { data } = await adminClient()
     .from("app_settings")
-    .select("images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model")
+    .select("images_enabled, image_illustration_provider, image_illustration_model, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model")
     .maybeSingle();
   return imageSettingsFrom(data as Record<string, unknown> | null);
 }
 
-/** Fournisseurs d'images utilisables : Recraft (clé), Nano Banana (fournisseur IA OpenRouter ou Gemini). */
+/** Modèles d'image utilisables : tous servis par OpenRouter (Recraft, Seedream, Nano Banana). */
 function imageProviders(): Record<ImageProviderId, boolean> {
-  const ai = activeProvider();
-  return { recraft: !!recraftConfigFromEnv(), nanobanana: ai === "openrouter" || ai === "gemini" };
+  const on = activeProvider() === "openrouter";
+  return { recraft: on, seedream: on, nanobanana: on || activeProvider() === "gemini" };
 }
 
 /** Illustrations prévues par le plan (0–1 par chapitre, 3 au plus) ; un échec n'arrête jamais le cours. */
@@ -644,7 +645,6 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
   await setStage(job.id, "illustrations");
   const db = adminClient();
   const reportId = job.report_id;
-  const recraft = recraftConfigFromEnv();
   const deps: IllustrateDeps = {
     settings: await imageSettings(),
     available: imageProviders(),
@@ -657,24 +657,26 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
           : style === "realistic"
             ? realisticPrompt(item.subject, item.purpose, item.altText)
             : vectorPrompt(item.subject, item.purpose, item.altText);
-      // Schéma : portrait 3/4 pour l'écran du téléphone (Recraft, en repli, n'a que le carré).
-      const recraftSize = style === "diagram" ? "1:1" : "4:3";
-      if (route.provider === "recraft") {
-        if (!recraft) throw new ProviderError("not_configured", "Recraft absent.");
-        if (modelInfo(route.model)?.output === "svg") {
-          const out = await generateVector(recraft, { prompt, model: route.model, size: recraftSize, signal: controller.signal, timeoutMs: 90_000 });
-          const bytes = Buffer.from(out.svg, "utf8");
-          const { width, height } = svgSize(out.svg);
-          return { image: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
-        }
-        return generateRaster(recraft, { prompt, model: route.model, size: recraftSize, signal: controller.signal, timeoutMs: 90_000 });
-      }
+      // Schéma : portrait 3/4 pour l'écran du téléphone.
       const out = await getImageProvider().generateIllustration({ model: route.model, prompt, aspectRatio: style === "diagram" ? "3:4" : "4:3", signal: controller.signal, timeoutMs: 90_000 });
+      if (out.mime === "image/svg+xml" || modelInfo(route.model)?.output === "svg") {
+        // SVG nettoyé avant stockage : aucun script, lien externe ni gestionnaire d'événement.
+        let svg: string;
+        try {
+          svg = sanitizeSvg(out.bytes.toString("utf8"));
+        } catch {
+          throw new ProviderError("empty", "SVG inexploitable.", out.usage);
+        }
+        const bytes = Buffer.from(svg, "utf8");
+        const { width, height } = svgSize(svg);
+        return { image: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
+      }
       const image = checkImage(out.bytes);
       if (!image) throw new ProviderError("empty", "Image inexploitable.", out.usage);
       return { image, usage: out.usage };
     },
-    onUsage: (route, attempt, u) => recordUsage(job, route.provider === "recraft" ? "illustrations_recraft" : "illustrations_nanobanana", attempt, u),
+    library: svgLibrary(db),
+    onUsage: (route, attempt, u) => recordUsage(job, `illustrations_${route.provider}`, attempt, u),
     store: async (img, ext) => {
       const path = `${job.owner_id}/${reportId}/assets/${crypto.randomUUID()}.${ext}`;
       const { error } = await db.storage.from("exports").upload(path, img.bytes, { contentType: img.mime, upsert: false });

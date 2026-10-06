@@ -2,8 +2,8 @@
  * Couverture de chaque cours : d'abord une illustration de la banque Pixabay choisie d'après le
  * thème du document (mots-clés prévus par le plan, sinon le titre), gratuite. Pixabay interdit
  * l'affichage permanent depuis ses serveurs : l'image est téléchargée, recadrée en 4/3 (WebP
- * 1200 × 900) et servie par Limpid, avec le nom de l'auteur. Sans résultat, une image Gemini
- * (Nano Banana 2 Lite) décorative et sans texte, plafonnée par le budget IA. Un double échec
+ * 1200 × 900) et servie par Limpid. Sans résultat, une image Seedream 5.0 Flash (OpenRouter)
+ * décorative et sans texte, plafonnée par le budget IA. Un double échec
  * laisse le dégradé de la banque : le cours est complet.
  */
 import "server-only";
@@ -12,9 +12,10 @@ import { priceBasisFor, usageCents } from "@/lib/budget";
 import { getImageProvider } from "@/lib/engine";
 import { assertBudget } from "@/lib/jobs/budget-guard";
 import { adminClient } from "@/lib/supabase/admin";
+import { COVER_IMAGE_MODEL } from "@/lib/visuals/image-models";
 
-/** Modèle des couvertures générées quand Pixabay ne trouve rien. */
-export const COVER_MODEL = "google/gemini-3.1-flash-lite-image";
+/** Modèle des couvertures générées quand Pixabay ne trouve rien (Seedream 5.0 Flash, OpenRouter). */
+export const COVER_MODEL = COVER_IMAGE_MODEL;
 
 const API = "https://pixabay.com/api/";
 const IMAGE_HOSTS = new Set(["pixabay.com", "cdn.pixabay.com"]);
@@ -136,7 +137,7 @@ export function coverPrompt(title: string, keywords: string): string {
   ].join(" ");
 }
 
-/** Couverture générée par Gemini (repli quand Pixabay ne trouve rien) ; renvoie le chemin. */
+/** Couverture générée par Seedream (repli quand Pixabay ne trouve rien) ; renvoie le chemin. */
 export async function geminiCover(input: { reportId: string; ownerId: string; title: string; keywords: string; jobId?: string | null }): Promise<string | null> {
   if (!geminiCoverEnabled()) return null;
   try {
@@ -178,12 +179,12 @@ export async function geminiCover(input: { reportId: string; ownerId: string; ti
   return storeCover({ reportId: input.reportId, ownerId: input.ownerId, bytes: out.bytes, credit: null });
 }
 
-/** Couverture selon le thème : Pixabay (gratuit), sinon Gemini. Renvoie le chemin, ou null. */
+/** Couverture selon le thème : Pixabay (gratuit), sinon Seedream. Renvoie le chemin, ou null. */
 export async function themeCover(input: { reportId: string; ownerId: string; keywords: string; title: string; pick?: number; jobId?: string | null; generated?: boolean }): Promise<string | null> {
   return (await pixabayCover(input)) ?? (input.generated === false ? null : await geminiCover(input));
 }
 
-/** Couverture d'un nouveau cours (après livraison) : Pixabay, sinon Gemini, sinon rien. */
+/** Couverture d'un nouveau cours (après livraison) : Pixabay, sinon Seedream, sinon rien. */
 export async function chooseCover(input: { reportId: string; ownerId: string; title: string; query: string; jobId?: string | null; generated?: boolean }): Promise<void> {
   await themeCover({ reportId: input.reportId, ownerId: input.ownerId, keywords: input.query, title: input.title, jobId: input.jobId, generated: input.generated });
 }

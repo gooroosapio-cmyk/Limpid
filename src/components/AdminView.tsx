@@ -157,7 +157,7 @@ export async function AdminView({
             <label key={style} className="admin-select">
               <span>{t.admin.images[style]}</span>
               <select name={style} defaultValue={`${o.images[style].provider}|${o.images[style].model}`}>
-                {IMAGE_MODELS.map((m) => (
+                {IMAGE_MODELS.filter((m) => (style === "vector") === (m.output === "svg")).map((m) => (
                   <option key={m.id} value={`${m.provider}|${m.id}`} disabled={!o.imageProviders[m.provider]}>
                     {m.label} — {m.usd.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} $ / image{o.imageProviders[m.provider] ? "" : ` (${t.admin.images.missingKey})`}
                   </option>

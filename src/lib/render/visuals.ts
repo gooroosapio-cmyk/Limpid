@@ -56,7 +56,7 @@ export const IllustrationData = z.strictObject({
   /** Bloc dans lequel l'image est incrustée (facultatif : sinon un bloc de la partie). */
   block_id: z.string().max(80).nullable().optional(),
   /** V5 : type de visuel voulu par le plan (route d'image réglée dans la console admin). */
-  style: z.enum(["vector", "realistic", "diagram"]).optional(),
+  style: z.enum(["illustration", "vector", "realistic", "diagram"]).optional(),
   /** Schéma (Gemini) : éléments exacts à représenter, repris de la source par le plan. */
   content: z.string().trim().max(600).optional(),
 });
@@ -87,7 +87,7 @@ export interface AssetView {
   src: string;
   width: number;
   height: number;
-  provider: "commons" | "unsplash" | "gemini" | "recraft";
+  provider: "commons" | "unsplash" | "gemini" | "recraft" | "seedream";
   author: string | null;
   license: string | null;
   licenseUrl: string | null;

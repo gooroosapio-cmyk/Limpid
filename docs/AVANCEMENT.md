@@ -1,5 +1,21 @@
 # Avancement
 
+## Phase 21 — V7 : modèles du comparatif IA, banque SVG, crédits des actions (8 octobre 2026)
+
+### FAIT
+- Texte : GPT-6 Luna Pro (OpenRouter) pour lecture, plan, rédaction, QCM, bilan et chat ;
+  réflexion haute pour les chapitres difficiles et la dernière réparation ; plus de température
+  envoyée aux modèles OpenAI (incompatible avec `require_parameters`).
+- Images : API Images d'OpenRouter pour tout (plus de clé Recraft). Recraft V4.1 Flash
+  (illustrations simples), Recraft V4.1 Vector (SVG), Seedream 5.0 Flash (scènes, schémas annotés
+  aux valeurs reprises des affirmations, couverture de secours). Réglage par type dans l'admin.
+- Banque SVG Limpid partagée (mots-clés génériques, aucune donnée de compte) consultée avant toute
+  génération vectorielle ; chaque cours garde sa copie.
+- Plafonds par taille : court 1 image + 1 SVG, standard 2 + 1, long 3 + 2.
+- Crédits : court (≤ 8 p.) 8, standard (≤ 20 p.) 20, long (≤ 80 p.) 60, très long (≤ 150 p.) 120 ;
+  question 1, QCM 3, nouvelle formulation d'un chapitre 2. Abonnements inchangés.
+- Migration `20261025000000_v7_models.sql` (à appliquer).
+
 ## Phase 20 — V6 : vitesse de génération, approches, composants du lecteur (8 octobre 2026)
 
 ### FAIT

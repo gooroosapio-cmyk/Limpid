@@ -1,10 +1,10 @@
-# Intégrer l'API IA (OpenRouter + Recraft) et le domaine limpid.company
+# Intégrer l'API IA (OpenRouter) et le domaine limpid.company
 
 Ce guide suit l'ordre recommandé. Ne collez jamais une clé dans un message ou dans le code : elles vont **uniquement** dans Vercel (Settings → Environment Variables), cochées pour **Production** (et Preview si vous voulez tester sur les aperçus).
 
 ---
 
-## 1. OpenRouter (texte, lecture d'images, couverture)
+## 1. OpenRouter (texte et images : une seule clé)
 
 1. Sur **openrouter.ai** → *Keys* → *Create key*. Nommez-la « Limpid production ».
 2. Fixez une **limite de crédit** sur la clé (ex. 50 USD) : c'est votre filet de sécurité côté fournisseur.
@@ -15,27 +15,26 @@ Ce guide suit l'ordre recommandé. Ne collez jamais une clé dans un message ou 
 |---|---|---|
 | `OPENROUTER_API_KEY` | votre clé `sk-or-…` | oui |
 | `LIMPID_AI_PROVIDER` | `openrouter` | conseillé (sinon déduit de la clé) |
-| `LIMPID_MODEL_LITE` | `google/gemini-3.1-flash-lite` | non (défaut) |
-| `LIMPID_MODEL_EDITOR` | `google/gemini-3.8-flash` | non (défaut) |
-| `LIMPID_MODEL_COMPLEX` | `google/gemini-3.1-pro-preview` | non (défaut) |
-| `LIMPID_IMAGE_MODEL` | `google/gemini-3.1-flash-lite-image` | non (défaut) |
 | `LIMPID_USD_TO_EUR` | `0.92` | non |
 
-Routage appliqué par Limpid (moteur V5) : 3.8 Flash lit la source (par fragments au-delà d'environ 24 pages), établit le plan et rédige les chapitres ; Pro rédige seulement les chapitres que le plan juge difficiles, puis Flash les agrémente (exemples, analogies, notions). Pro reprend aussi la dernière correction d'une réponse hors format. Le coût réel de chaque appel, renvoyé par OpenRouter, est inscrit au journal.
+**Ne définissez pas** `LIMPID_MODEL_LITE`, `LIMPID_MODEL_EDITOR`, `LIMPID_MODEL_COMPLEX` ni `LIMPID_MODEL_FALLBACKS` : vides, Limpid applique les choix du comparatif IA (6 octobre 2026).
 
-5. Les anciennes variables `GEMINI_API_KEY`, `LIMPID_MODEL_FAST`, `LIMPID_MODEL_QUALITY`, `AI_REPORT_MODEL`, `AI_CHAT_MODEL` ne servent plus avec OpenRouter. Vous pouvez les laisser (sans effet) ou les supprimer.
-
-## 2. Recraft (illustrations vectorielles SVG)
-
-1. Sur **app.recraft.ai/profile/api** : achetez des unités API (1 USD = 1 000 unités ; une illustration vectorielle V4.1 = 0,08 USD), puis créez un jeton.
-2. Dans Vercel, ajoutez :
-
-| Variable | Valeur |
+| Tâche | Modèle (OpenRouter) |
 |---|---|
-| `RECRAFT_API_KEY` | votre jeton Recraft |
-| `LIMPID_RECRAFT_MODEL` | `recraftv4_1_vector` (défaut) |
+| Lecture du document, plan, rédaction Feynman, QCM, bilan, chat | `openai/gpt-6-luna-pro` (réflexion basse ou moyenne) |
+| Chapitre difficile, dernière réparation | `openai/gpt-6-luna-pro`, réflexion haute |
+| Illustrations simples | `recraft/recraft-v4.1-flash` (0,007 $) |
+| Dessins vectoriels SVG | banque Limpid d'abord, sinon `recraft/recraft-v4.1-vector` (0,08 $) |
+| Scènes réalistes, schémas annotés | `bytedance-seed/seedream-5-0-flash` (0,018 $) |
+| Couverture | Pixabay (gratuit), sinon `bytedance-seed/seedream-5-0-flash` |
 
-Limpid génère 1, 2 ou 4 illustrations vectorielles par rapport court, standard ou long. Les SVG sont nettoyés (aucun script ni lien externe) avant stockage privé, et convertis en PNG dans le PDF. Pour couper Recraft sans retirer la clé : `LIMPID_ILLUSTRATIONS_RECRAFT=off`.
+Les modèles d'image se règlent dans **Administration → Images des cours**. Plafond par cours selon la taille : court 1 image + 1 SVG, standard 2 + 1, long 3 + 2. Le coût réel de chaque appel, renvoyé par OpenRouter, est inscrit au journal.
+
+5. Les anciennes variables `GEMINI_API_KEY`, `LIMPID_MODEL_FAST`, `LIMPID_MODEL_QUALITY`, `AI_REPORT_MODEL`, `AI_CHAT_MODEL`, `LIMPID_IMAGE_MODEL`, `RECRAFT_API_KEY`, `LIMPID_RECRAFT_MODEL`, `LIMPID_ILLUSTRATIONS_RECRAFT` ne servent plus : supprimez-les.
+
+## 2. Recraft et Seedream
+
+Plus de compte ni de clé Recraft : Recraft V4.1 et Seedream 5.0 Flash sont facturés sur le solde OpenRouter. Les SVG sont nettoyés (aucun script ni lien externe) avant stockage privé ; un SVG généré est versé dans la banque Limpid (mots-clés génériques, aucune donnée de compte ni de document) et réutilisé pour les cours suivants sans nouvelle génération.
 
 ## 2 bis. Pixabay (couvertures)
 

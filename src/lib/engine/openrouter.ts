@@ -23,6 +23,7 @@ import {
   type UsageReport,
 } from "./provider";
 
+const IMAGES_ENDPOINT = "https://openrouter.ai/api/v1/images";
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL_RE = /^[a-z0-9][a-z0-9._\-]*\/[a-z0-9][a-z0-9.:_\-]{1,100}$/;
 
@@ -40,16 +41,28 @@ function model(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
   return v && MODEL_RE.test(v) ? v : fallback;
 }
 
-/** Configuration lue dans l'environnement ; défauts = modèles de l'Atlas (vérifiés le 6 octobre 2026). */
+/** Modèle de texte par défaut (OpenRouter) : lecture, plan, rédaction Feynman, QCM, chat. */
+export const DEFAULT_TEXT_MODEL = "openai/gpt-6-luna-pro";
+
+/** Les modèles OpenAI de raisonnement (GPT-6, o-series) refusent le paramètre temperature. */
+export function acceptsTemperature(model: string): boolean {
+  return !/^~?openai\//.test(model);
+}
+
+/**
+ * Configuration lue dans l'environnement. Défauts (comparatif IA du 6 octobre 2026) : GPT-6
+ * Luna Pro pour toutes les tâches de texte (lecture, plan, rédaction, QCM, chat) ; un chapitre
+ * difficile ou une réparation de dernier recours garde le même modèle avec une réflexion haute.
+ */
 export function openRouterConfigFromEnv(env: NodeJS.ProcessEnv = process.env): OpenRouterConfig {
   const apiKey = env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) throw new ProviderError("not_configured", "OpenRouter n'est pas configuré (clé manquante).");
   return {
     apiKey,
     models: {
-      lite: model(env, "LIMPID_MODEL_LITE", "google/gemini-3.1-flash-lite"),
-      editor: model(env, "LIMPID_MODEL_EDITOR", "google/gemini-3.8-flash"),
-      complex: model(env, "LIMPID_MODEL_COMPLEX", "google/gemini-3.1-pro-preview"),
+      lite: model(env, "LIMPID_MODEL_LITE", DEFAULT_TEXT_MODEL),
+      editor: model(env, "LIMPID_MODEL_EDITOR", DEFAULT_TEXT_MODEL),
+      complex: model(env, "LIMPID_MODEL_COMPLEX", DEFAULT_TEXT_MODEL),
     },
     fallbackModels: (env.LIMPID_MODEL_FALLBACKS ?? "")
       .split(",")
@@ -144,9 +157,11 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
     // Dernière correction de schéma : le modèle plus capable (Pro) reprend la main.
     const escalate = req.preferFallback && primary !== this.config.models.complex ? [this.config.models.complex] : [];
     const models = [...new Set([...escalate, primary, ...this.config.fallbackModels])];
+    // Même modèle pour tous les niveaux (Luna Pro) : la dernière correction réfléchit davantage.
+    const final = req.preferFallback ? { ...req, budget: { ...req.budget, reasoning: "high" as const } } : req;
     for (let i = 0; ; i++) {
       try {
-        return await this.generateWith(models[i]!, req);
+        return await this.generateWith(models[i]!, final);
       } catch (e) {
         const switchable = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited");
         if (!switchable || i >= models.length - 1) throw e;
@@ -174,9 +189,12 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
         // Un fournisseur qui ignorerait le format structuré n'est jamais choisi.
         provider: { require_parameters: true },
         max_tokens: req.budget.maxOutputTokens,
-        temperature: 0.2,
+        // Les modèles de raisonnement OpenAI n'acceptent pas la température : avec
+        // require_parameters, l'envoyer rendrait le modèle introuvable.
+        ...(acceptsTemperature(model) ? { temperature: 0.2 } : {}),
         // Réflexion bornée : la vitesse vient surtout de là (les jetons de réflexion sont séquentiels).
-        ...(req.budget.reasoning ? { reasoning: { effort: req.budget.reasoning } } : {}),
+        // Niveau « complexe » : même modèle, réflexion haute.
+        ...((req.budget.reasoning ?? (req.budget.tier === "complex" ? "high" : null)) ? { reasoning: { effort: req.budget.reasoning ?? "high" } } : {}),
         usage: { include: true },
       },
       signal,
@@ -213,8 +231,13 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
     return { value: parsed.data, usage };
   }
 
-  /** Couverture ou planche : une image, aucun texte incorporé (modèle image configuré à part). */
+  /**
+   * Image générée. Modèles d'image dédiés (Recraft, Seedream…) : API Images d'OpenRouter
+   * (`/api/v1/images`, réponse en base64, SVG pour Recraft Vector). Modèles Gemini « image » :
+   * complétion de chat avec sortie image.
+   */
   async generateIllustration(req: { model: string; prompt: string; aspectRatio: ImageAspect; signal: AbortSignal; timeoutMs: number }): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }> {
+    if (usesImagesApi(req.model)) return this.imagesApi(req);
     const started = Date.now();
     const timeout = AbortSignal.timeout(req.timeoutMs);
     const signal = AbortSignal.any([req.signal, timeout]);
@@ -248,6 +271,53 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
     if (!m) throw new ProviderError("empty", "Aucune image renvoyée.", usage);
     return { bytes: Buffer.from(m[2]!, "base64"), mime: m[1]!, usage };
   }
+
+  private async imagesApi(req: { model: string; prompt: string; aspectRatio: ImageAspect; signal: AbortSignal; timeoutMs: number }): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }> {
+    const started = Date.now();
+    const timeout = AbortSignal.timeout(req.timeoutMs);
+    const signal = AbortSignal.any([req.signal, timeout]);
+    const base = { provider: this.name, model: req.model, inputTokens: null, outputTokens: null, requestId: null };
+    const fail = (code: ProviderError["code"], msg: string, cost: number | null = null) =>
+      new ProviderError(code, msg, { ...base, durationMs: Date.now() - started, costUsd: cost });
+    const body: Record<string, unknown> = { model: req.model, prompt: req.prompt.slice(0, 4_000), aspect_ratio: imageAspectFor(req.model, req.aspectRatio), n: 1 };
+    if (/-vector$/.test(req.model)) body.output_format = "svg";
+    if (req.model.startsWith("bytedance-seed/")) body.resolution = "1K";
+    let res: Response;
+    try {
+      res = await fetch(IMAGES_ENDPOINT, { method: "POST", headers: this.headers(), body: JSON.stringify(body), signal });
+    } catch {
+      if (timeout.aborted) throw fail("timeout_ambiguous", "Délai dépassé ; facturation incertaine.");
+      if (req.signal.aborted) throw fail("cancelled", "Opération annulée.");
+      throw fail("unavailable", "OpenRouter injoignable.");
+    }
+    const json = (await res.json().catch(() => ({}))) as {
+      id?: string;
+      data?: { b64_json?: string; media_type?: string }[];
+      usage?: { cost?: number };
+      error?: { code?: number | string; message?: string };
+    };
+    const cost = typeof json.usage?.cost === "number" ? json.usage.cost : null;
+    if (!res.ok || json.error) {
+      const status = res.ok ? Number(json.error?.code) || 500 : res.status;
+      throw fail(errorCodeFor(status, String(json.error?.message ?? "")), `OpenRouter images : erreur HTTP ${status}.`, cost);
+    }
+    const item = json.data?.[0];
+    if (!item?.b64_json) throw fail("empty", "Aucune image renvoyée.", cost);
+    const bytes = Buffer.from(item.b64_json, "base64");
+    const mime = item.media_type ?? (bytes.subarray(0, 5).toString() === "<?xml" || bytes.subarray(0, 4).toString() === "<svg" ? "image/svg+xml" : "image/png");
+    return { bytes, mime, usage: { ...base, durationMs: Date.now() - started, requestId: json.id ?? null, costUsd: cost } };
+  }
+}
+
+/** Modèle servi par l'API Images (et non par la complétion de chat). */
+export function usesImagesApi(model: string): boolean {
+  return !/^google\/.+-image/.test(model);
+}
+
+/** Recraft n'accepte que 1:1, 4:3, 3:4, 16:9, 9:16 : rapport le plus proche. */
+export function imageAspectFor(model: string, aspect: ImageAspect): string {
+  if (model.startsWith("recraft/") && aspect === "3:2") return "4:3";
+  return aspect;
 }
 
 /** Certains modèles entourent le JSON de ```json … ``` malgré le format demandé. */
