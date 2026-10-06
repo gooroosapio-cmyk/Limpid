@@ -25,7 +25,7 @@ export const WritingCheckpoint = z.object({
   validation: z.object({ explanation: ValidationResult }),
 });
 
-type Stage = "comprehension" | "explication" | "plan" | `frag_${number}` | `chap_${number}`;
+type Stage = "comprehension" | "explication" | "plan" | "publication" | `frag_${number}` | `chap_${number}`;
 
 /** Lit et revalide un point de reprise ; tout écart (version, schéma) vaut absence. */
 export function parseCheckpoint<T extends z.ZodType>(schema: T, row: { prompt_version: string; payload: unknown } | null | undefined): z.infer<T> | null {

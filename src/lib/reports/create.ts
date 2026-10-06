@@ -5,7 +5,8 @@
  */
 import "server-only";
 import { z } from "zod";
-import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, VisualMode } from "@/lib/contracts/schemas";
+import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, V6_MODES, VisualMode } from "@/lib/contracts/schemas";
+import { selectAll } from "@/lib/supabase/paginate";
 import { planPages } from "@/lib/engine/pipeline";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { ACTION_PRICES, CHARS_PER_PAGE, MAX_SOURCE_PAGES, reportAction, sourcePages } from "@/lib/billing/catalog";
@@ -285,7 +286,7 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
   const ids = Array.isArray(sourceIds) ? sourceIds : [sourceIds];
   const [{ data: prefs }, { data: segs }] = await Promise.all([
     db.from("reader_preferences").select("familiarity, goal, default_mode, explanation_lang").eq("owner_id", userId).maybeSingle(),
-    db.from("source_segments").select("source_id, text").in("source_id", ids).limit(20_000),
+    selectAll<{ source_id: string; text: string }>((from, to) => db.from("source_segments").select("source_id, text").in("source_id", ids).order("source_id").order("ordinal").range(from, to)),
   ]);
   // Pages encore à lire par OCR : estimées (2 500 caractères par page) pour le devis.
   const { data: meta } = await db.from("sources").select("id, page_count, coverage").in("id", ids);
@@ -299,7 +300,9 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
     chars += c;
     pages += sourcePages(m.page_count as number | null, c);
   }
-  const mode: Mode = chosen ?? Mode.safeParse(prefs?.default_mode).data ?? "claire";
+  // V6 : sans choix, l'approche « Par défaut » (une ancienne préférence V4 n'est plus proposée).
+  const saved = Mode.safeParse(prefs?.default_mode).data;
+  const mode: Mode = chosen ?? (saved && (V6_MODES as readonly string[]).includes(saved) ? saved : "auto");
   return {
     chars,
     pages,

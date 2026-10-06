@@ -175,6 +175,8 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
         provider: { require_parameters: true },
         max_tokens: req.budget.maxOutputTokens,
         temperature: 0.2,
+        // Réflexion bornée : la vitesse vient surtout de là (les jetons de réflexion sont séquentiels).
+        ...(req.budget.reasoning ? { reasoning: { effort: req.budget.reasoning } } : {}),
         usage: { include: true },
       },
       signal,

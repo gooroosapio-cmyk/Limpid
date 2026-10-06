@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { savePreferenceField } from "@/app/preferences/actions";
+import { V6_MODES } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
 
 type Field = "familiarity" | "goal" | "default_mode" | "explanation_lang";
@@ -24,7 +25,8 @@ export function ReadingPrefs({
   const [values, setValues] = useState<Record<Field, string | null>>({
     familiarity,
     goal,
-    default_mode: defaultMode ?? "claire",
+    // V6 : les quatre approches seulement ; un ancien choix (V4) s'affiche comme Par défaut.
+    default_mode: defaultMode && (V6_MODES as readonly string[]).includes(defaultMode) ? defaultMode : "auto",
     explanation_lang: explanationLang ?? "fr",
   });
   const [isConcrete, setConcrete] = useState(concrete);
@@ -64,7 +66,7 @@ export function ReadingPrefs({
   return (
     <>
       {group("explanation_lang", t.compte.language, t.compte.languages)}
-      {group("default_mode", t.compte.defaultMode, Object.fromEntries(Object.entries(t.add.modes).map(([k, v]) => [k, v.title])))}
+      {group("default_mode", t.compte.defaultMode, Object.fromEntries(V6_MODES.map((m) => [m, t.add.modes[m]?.title ?? m])))}
       {group("familiarity", t.compte.familiarity, t.compte.familiarities)}
       {group("goal", t.compte.goal, t.compte.goals)}
       <label className="setting">

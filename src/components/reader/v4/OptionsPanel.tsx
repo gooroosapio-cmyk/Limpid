@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 import { ComfortSettings } from "@/components/account/DisplaySettings";
-import { MODES, type Mode } from "@/lib/contracts/schemas";
+import { V6_MODES, type Mode } from "@/lib/contracts/schemas";
 import { DISPLAY_COOKIES, setDisplayPref, type DisplayPrefs, type TextSize } from "@/lib/display/prefs";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
@@ -191,7 +191,7 @@ export function OptionsPanel({
         {back(t.lim.optNewVersion)}
         <p className="muted small">{t.lim.keptNote}</p>
         <ul className="rows">
-          {MODES.map((m) => (
+          {V6_MODES.map((m) => (
             <li key={m}>
               <button type="button" className="row" disabled={busy || !data.reportId} onClick={() => newVersion(m)}>
                 <span className="row-icon"><Icon name={m === data.mode ? "check" : "spark"} /></span>

@@ -52,9 +52,9 @@ export function bilanSize(ex: ExplanationObject, ko: KnowledgeObject): number {
   return Math.max(5, Math.min(25, wanted));
 }
 
-const INSTRUCTIONS = (n: number, mode: Mode, language: "fr" | "en" | null) => `Tu conçois les exercices d'un support pédagogique Limpid, à partir de son explication et des affirmations validées.
-1. checkpoints : une courte vérification de 1 à 3 questions après CHAQUE chapitre (section), 20 au plus, dans l'ordre ; section_id = le chapitre vérifié. Question après une notion, jamais au milieu d'un raisonnement.
-2. bilan : ${n} questions sur l'ensemble du cours : AU MOINS UNE question par chapitre (section_id renseigné), davantage pour les notions centrales et les calculs, sans répéter une question des checkpoints ; seulement si le contenu est vraiment insuffisant, moins de questions et insufficient = true. N'évalue que ce qui est expliqué dans le cours.
+const INSTRUCTIONS = (n: number, mode: Mode, language: "fr" | "en" | null, quizzes: boolean) => `Tu conçois les exercices d'un support pédagogique Limpid, à partir de son explication et des affirmations validées.
+1. checkpoints : ${quizzes ? "[] (chaque chapitre a déjà ses questions de fin de chapitre, fournies dans quiz : ne les répète pas)" : "une courte vérification de 1 à 3 questions après CHAQUE chapitre (section), 20 au plus, dans l'ordre ; section_id = le chapitre vérifié. Question après une notion, jamais au milieu d'un raisonnement."}
+2. bilan : ${n} questions sur l'ensemble du cours : AU MOINS UNE question par chapitre (section_id renseigné), davantage pour les notions centrales et les calculs, sans répéter une question des checkpoints ni des quiz de chapitre ; seulement si le contenu est vraiment insuffisant, moins de questions et insufficient = true. N'évalue que ce qui est expliqué dans le cours.
 Varie les types selon le contenu :
 - "single" : 3 à 5 options, UNE seule correcte ; "multiple" : 3 à 6 options, plusieurs correctes, annonce-le dans prompt (« plusieurs réponses possibles »). Chaque option a why (pourquoi elle tient ou non).
 - "truefalse" : prompt = une affirmation ; truth = sa valeur ; explanation justifie.
@@ -207,7 +207,8 @@ export async function generateExercises(
       res = await provider.generateStructured({
         stage: "exercises",
         schema: ExerciseDraft,
-        trustedInstructions: INSTRUCTIONS(n, input.mode, input.language ?? null),
+        // V6 : les chapitres portent leur QCM (produit avec le chapitre) ; seul le bilan reste à faire.
+        trustedInstructions: INSTRUCTIONS(n, input.mode, input.language ?? null, input.explanation.sections.some((x) => (x.quiz?.length ?? 0) > 0)),
         untrustedData: [{ label: "explication du support", text: explanationPayload(input.explanation) }],
         budget: input.budget,
         signal: input.signal,

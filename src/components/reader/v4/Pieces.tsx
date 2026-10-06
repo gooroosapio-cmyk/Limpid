@@ -16,6 +16,15 @@ import { VisualFigure, type AssetView } from "../Visuals";
 import { ChapterCheck } from "./ChapterCheck";
 import { AnnexLinks, EndActions } from "./EndActions";
 import { ExampleBlock } from "./ExampleBlock";
+import { Calculation } from "../v6/Calculation";
+import { Chart } from "../v6/Chart";
+import { Comparison } from "../v6/Comparison";
+import { Details } from "../v6/Details";
+import { Essential } from "../v6/Essential";
+import { Proportion } from "../v6/Proportion";
+import { Scene } from "../v6/Scene";
+import { Steps } from "../v6/Steps";
+import { Timeline } from "../v6/Timeline";
 
 /** Taille des groupes des longues listes (une pièce = un groupe insécable). */
 const CHUNK = 100;
@@ -171,6 +180,97 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
         );
       });
     }
+    /* V6 : composants du lecteur dessinés par le code à partir de données exactes. */
+    case "steps":
+      return [
+        piece(
+          "block block-v6 block-steps",
+          <Steps
+            label={t.blocks6.stepsLabel}
+            intro={<Rich text={b.text} ctx={ctx} />}
+            refs={refs}
+            items={b.items.map((it) => ({ title: it.title, body: <Rich text={it.text} ctx={ctx} />, refs: <Refs ids={it.evidence_ids} ctx={ctx} /> }))}
+          />,
+        ),
+      ];
+    case "timeline":
+      return [
+        piece(
+          "block block-v6 block-timeline",
+          <Timeline
+            label={t.blocks6.timeline}
+            orderLabel={t.blocks6.order[b.order]}
+            intro={<Rich text={b.text} ctx={ctx} />}
+            refs={refs}
+            events={b.events.map((ev) => ({ date: ev.date, title: ev.title, body: <Rich text={ev.text} ctx={ctx} />, refs: <Refs ids={ev.evidence_ids} ctx={ctx} /> }))}
+          />,
+        ),
+      ];
+    case "comparison":
+      return [
+        piece(
+          "block block-v6 block-comparison",
+          <Comparison
+            label={t.blocks6.comparison}
+            scrollLabel={t.blocks6.tableScroll}
+            missing={t.blocks6.missing}
+            intro={<Rich text={b.text} ctx={ctx} />}
+            refs={refs}
+            columns={b.columns}
+            rows={b.rows.map((r) => ({ cells: r.cells, refs: <Refs ids={r.evidence_ids} ctx={ctx} /> }))}
+          />,
+        ),
+      ];
+    case "proportion":
+      return [
+        piece(
+          "block block-v6 block-proportion",
+          <Proportion
+            base={b.base}
+            percent={b.percent}
+            unit={b.unit}
+            partLabel={b.part_label}
+            restLabel={b.rest_label}
+            interactive={b.interactive}
+            example={b.example}
+            intro={<Rich text={b.text} ctx={ctx} />}
+            refs={refs}
+          />,
+        ),
+      ];
+    case "calculation":
+      return [
+        piece(
+          "block block-v6 block-calculation",
+          <Calculation
+            formula={b.formula_id}
+            variables={[b.variables[0]!, b.variables[1]!]}
+            steps={b.steps}
+            interactive={b.interactive}
+            example={b.example}
+            intro={<Rich text={b.text} ctx={ctx} />}
+            refs={refs}
+          />,
+        ),
+      ];
+    case "chart":
+      return [piece("block block-v6 block-chart", <Chart chartType={b.chart_type} unit={b.unit} points={b.points} intro={<Rich text={b.text} ctx={ctx} />} refs={refs} />)];
+    case "details":
+      return [
+        piece(
+          "block block-v6 block-details",
+          <Details summary={b.summary}>
+            <p><Rich text={b.text} ctx={ctx} /> {refs}</p>
+          </Details>,
+        ),
+      ];
+    case "scene":
+      return [
+        piece(
+          "block block-v6 block-scene",
+          <Scene asset={b.asset} alt={t.blocks6.scenes[b.asset]} note={t.blocks6.sceneNote} caption={<><Rich text={b.text} ctx={ctx} linkTerms={false} /> {refs}</>} />,
+        ),
+      ];
   }
 }
 
@@ -300,6 +400,14 @@ export function composeLimpid({
         <h2>{s.question}</h2>
       </div>,
     );
+    // V6 : « L'essentiel » du chapitre, en tête du corps (une fois par chapitre).
+    if (s.essential?.length) {
+      out.push(
+        <aside key={`ess-${s.id}`} id={`ess_${s.id}`} className="piece v6-essential" aria-label={t.blocks6.essential} {...attrs({ section: s.id })}>
+          <Essential title={t.blocks6.essential} items={s.essential.map((e, i) => <Rich key={i} text={e} ctx={ctx} linkTerms={false} />)} />
+        </aside>,
+      );
+    }
     // V5 : une figure prend toute la largeur, après l'explication qu'elle accompagne (jamais
     // de texte qui l'entoure sur mobile). Illustration après le premier bloc, données ensuite.
     const illustrations = placed.filter((v) => v.kind === "illustration");

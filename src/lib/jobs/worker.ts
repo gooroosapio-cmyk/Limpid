@@ -4,8 +4,10 @@
  * d'erreur ni dans les journaux.
  */
 import "server-only";
+import { siteUrl } from "@/lib/site";
+import { selectAll } from "@/lib/supabase/paginate";
 import { createHash } from "node:crypto";
-import type { z } from "zod";
+import { z } from "zod";
 import { activeProvider, limits } from "@/lib/config";
 import {
   Evidence,
@@ -33,6 +35,7 @@ import {
   regenerateExplanation,
   regenerateSection,
   reverifyKnowledge,
+  type GenerationOutput,
   type ReformulateReason,
   type Variation,
 } from "@/lib/engine/pipeline";
@@ -101,7 +104,7 @@ const SECTION_CHANGE_REASON: Record<Variation, string> = {
   reformulate: "autre_formulation",
 };
 
-const EXERCISE_BUDGET = { tier: "quality" as const, maxInputTokens: 60_000, maxOutputTokens: 24_000, timeoutMs: 150_000 };
+const EXERCISE_BUDGET = { tier: "quality" as const, maxInputTokens: 60_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const };
 
 /**
  * Exercices du support (points de contrôle et bilan), rédigés une fois avec la version.
@@ -187,11 +190,14 @@ async function loadSourceSet(sourceIds: string[]): Promise<SourceSegment[]> {
   const db = adminClient();
   const bySource = await Promise.all(
     sourceIds.map(async (sourceId) => {
-      const { data, error } = await db
-        .from("source_segments")
-        .select("id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
-        .eq("source_id", sourceId)
-        .order("ordinal");
+      const { data, error } = await selectAll((from, to) =>
+        db
+          .from("source_segments")
+          .select("id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
+          .eq("source_id", sourceId)
+          .order("ordinal")
+          .range(from, to),
+      );
       if (error || !data?.length) throw new JobFailure("source_missing");
       return { sourceId, rows: data };
     }),
@@ -409,6 +415,23 @@ async function requeue(jobId: string) {
     .eq("status", "running");
 }
 
+/**
+ * Relance immédiate (plan Hobby, 300 s par exécution) : une tâche remise en file repart aussitôt
+ * dans une nouvelle exécution du worker, sans attendre le suivi de la page ni le cron. L'appel
+ * n'attend que l'acceptation (202) ; la réservation atomique empêche tout double traitement.
+ */
+export async function relayWorker(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  const secret = env.CRON_SECRET?.trim();
+  if (!secret) return false;
+  const res = await fetch(`${siteUrl(env)}/api/worker`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}` },
+    signal: AbortSignal.timeout(5_000),
+    cache: "no-store",
+  }).catch(() => null);
+  return !!res && res.status === 202;
+}
+
 async function runGenerate(job: JobRow, controller: AbortController, claimedAt: number): Promise<string> {
   if (!job.source_id || !job.report_id) throw new JobFailure("job_invalid");
   const db = adminClient();
@@ -447,9 +470,9 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     signal: controller.signal,
     // Niveaux par défaut (3.8 Flash) ; le moteur passe un chapitre difficile au modèle Pro.
     budgets: {
-      comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000, reasoning: "low" as const },
       explanation: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
-      plan: { tier: "fast" as const, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000 },
+      plan: { tier: "fast" as const, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const },
     },
     onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
@@ -461,96 +484,143 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
   // Moteur V5 : lecture (par fragments si besoin), plan, chapitres en parallèle. Chaque étape
   // validée est enregistrée ; près du délai de la fonction, la tâche repart dans une nouvelle
   // invocation qui reprend où elle s'était arrêtée, sans refaire ni repayer.
-  const result = await generateV5(provider, input, { store: jobStore(job.id), deadline: claimedAt + GENERATION_WINDOW_MS });
-  if (result.status === "paused" || Date.now() - claimedAt > REQUEUE_BEFORE_VISUALS_MS) {
+  const store = jobStore(job.id);
+  // Publication progressive : dès que les chapitres 1 à k sont rédigés, le cours est lisible.
+  const publishAs = (out: GenerationOutput, final: boolean) =>
+    publishVersion(job, out, { provider: provider.name, sourceVersion: segments[0]!.source_version, sourceIds, final });
+  const result = await generateV5(provider, input, {
+    store,
+    deadline: claimedAt + GENERATION_WINDOW_MS,
+    onPartial: async (out) => {
+      await publishAs(out, false);
+    },
+  });
+  if (result.status === "paused") {
     await requeue(job.id);
     return "requeued";
   }
   const out = result.output;
+  const versionId = await publishAs(out, true);
 
-  // Illustrations et exercices en parallèle. Aucun dessin ni graphique tracé par le code.
+  // Finitions après publication (le cours est déjà lisible) : illustrations et exercices.
+  if (Date.now() - claimedAt > REQUEUE_BEFORE_VISUALS_MS) {
+    await requeue(job.id);
+    return "requeued";
+  }
   const evidenceIds = new Set(out.evidence.map((e) => e.id));
   const [blueprint, exercises] = await Promise.all([
     runIllustrations(job, out.blueprint, controller),
     prepareExercises(job, out.explanation, out.knowledge, evidenceIds, controller),
   ]);
-
   await setStage(job.id, "mise_en_page");
-  const models = await jobModels(job.id);
-
-  const ko = await db
-    .from("knowledge_objects")
-    .insert({
-      owner_id: job.owner_id,
-      source_id: job.source_id,
-      source_version: segments[0]!.source_version,
-      schema_version: out.knowledge.schema_version,
-      prompt_version: PROMPT_VERSION,
-      model: models.reading ?? provider.name,
-      body: out.knowledge,
-      validation: out.validation.knowledge,
-    })
-    .select("id")
-    .single();
-  if (ko.error || !ko.data) throw new JobFailure("persist_knowledge");
-
-  if (out.evidence.length) {
-    const ev = await db.from("evidence").insert(
-      out.evidence.map((e) => {
-        const stored = storedEvidence(e, sourceIds);
-        return {
-          id: e.id,
-          knowledge_id: ko.data.id,
-          owner_id: job.owner_id,
-          source_id: stored.source_id,
-          segment_id: stored.segment_id,
-          start_offset: e.start_offset,
-          end_offset: e.end_offset,
-          quote: e.quote,
-        };
-      }),
-    );
-    if (ev.error) throw new JobFailure("persist_evidence");
+  if (blueprint !== out.blueprint) {
+    const upd = await db.from("report_versions").update({ blueprint }).eq("id", versionId);
+    if (upd.error) throw new JobFailure("persist_version");
   }
+  await saveExercises(job, versionId, exercises);
+  return out.status === "validated" ? "succeeded" : "incomplete_check";
+}
 
-  const { count } = await db
-    .from("report_versions")
-    .select("id", { count: "exact", head: true })
-    .eq("report_id", job.report_id);
-  const version = await db
-    .from("report_versions")
-    .insert({
-      report_id: job.report_id,
-      owner_id: job.owner_id,
-      version_number: (count ?? 0) + 1,
-      knowledge_id: ko.data.id,
-      level: job.params.level,
-      goal: job.params.goal,
-      template_id: out.blueprint.template_id,
-      target_pages: job.params.target_pages,
-      explanation: out.explanation,
-      blueprint,
-      validation: out.validation.explanation,
-      check_status: out.status === "validated" ? "validated" : "incomplete",
-      change_reason: "generation_initiale",
-      mode: out.explanation.mode ?? null,
-      provider: provider.name,
-      model: models.writing ?? null,
-      prompt_version: PROMPT_VERSION,
-    })
-    .select("id")
-    .single();
-  // Le trigger refuse l'écriture si le rapport a été supprimé entre-temps.
-  if (version.error || !version.data) throw new JobFailure("persist_version");
-  await saveExercises(job, version.data.id, exercises);
+const Publication = z.object({ version_id: z.string().uuid(), knowledge_id: z.string().uuid(), final: z.boolean() });
 
+/**
+ * Publie le cours (kit V6, publication progressive) : la première fois, enregistre la
+ * connaissance, les preuves et une version, puis en fait la version courante ; ensuite, met à
+ * jour cette même version (chapitres suivants, puis cours complet). Idempotent à la reprise.
+ */
+async function publishVersion(
+  job: JobRow,
+  out: GenerationOutput,
+  ctx: { provider: string; sourceVersion: string; sourceIds: string[]; final: boolean },
+): Promise<string> {
+  const db = adminClient();
+  const store = jobStore(job.id);
+  const previous = await store.load("publication", Publication);
+  const models = await jobModels(job.id);
+  const fields = {
+    explanation: out.explanation,
+    blueprint: out.blueprint,
+    validation: out.validation.explanation,
+    check_status: ctx.final && out.status === "validated" ? "validated" : "incomplete",
+    template_id: out.blueprint.template_id,
+    mode: out.explanation.mode ?? null,
+    model: models.writing ?? null,
+  };
+  let versionId: string;
+  if (previous) {
+    versionId = previous.version_id;
+    // Cours déjà complet (reprise des finitions) : rien à republier.
+    if (previous.final) return versionId;
+    const upd = await db.from("report_versions").update(fields).eq("id", versionId);
+    if (upd.error) throw new JobFailure("persist_version");
+  } else {
+    const ko = await db
+      .from("knowledge_objects")
+      .insert({
+        owner_id: job.owner_id,
+        source_id: job.source_id,
+        source_version: ctx.sourceVersion,
+        schema_version: out.knowledge.schema_version,
+        prompt_version: PROMPT_VERSION,
+        model: models.reading ?? ctx.provider,
+        body: out.knowledge,
+        validation: out.validation.knowledge,
+      })
+      .select("id")
+      .single();
+    if (ko.error || !ko.data) throw new JobFailure("persist_knowledge");
+    if (out.evidence.length) {
+      const ev = await db.from("evidence").insert(
+        out.evidence.map((e) => {
+          const stored = storedEvidence(e, ctx.sourceIds);
+          return {
+            id: e.id,
+            knowledge_id: ko.data.id,
+            owner_id: job.owner_id,
+            source_id: stored.source_id,
+            segment_id: stored.segment_id,
+            start_offset: e.start_offset,
+            end_offset: e.end_offset,
+            quote: e.quote,
+          };
+        }),
+      );
+      if (ev.error) throw new JobFailure("persist_evidence");
+    }
+    const { count } = await db.from("report_versions").select("id", { count: "exact", head: true }).eq("report_id", job.report_id);
+    const version = await db
+      .from("report_versions")
+      .insert({
+        ...fields,
+        report_id: job.report_id,
+        owner_id: job.owner_id,
+        version_number: (count ?? 0) + 1,
+        knowledge_id: ko.data.id,
+        level: job.params.level,
+        goal: job.params.goal,
+        target_pages: job.params.target_pages,
+        change_reason: "generation_initiale",
+        provider: ctx.provider,
+        prompt_version: PROMPT_VERSION,
+      })
+      .select("id")
+      .single();
+    // Le trigger refuse l'écriture si le rapport a été supprimé entre-temps.
+    if (version.error || !version.data) throw new JobFailure("persist_version");
+    versionId = version.data.id;
+    await store.save("publication", { version_id: versionId, knowledge_id: ko.data.id, final: false });
+  }
   const rep = await db
     .from("reports")
-    .update({ current_version_id: version.data.id, title: blueprint.title.slice(0, 300), mode: out.explanation.mode ?? null })
-    .eq("id", job.report_id)
+    .update({ current_version_id: versionId, title: out.blueprint.title.slice(0, 300), mode: out.explanation.mode ?? null })
+    .eq("id", job.report_id!)
     .is("deleted_at", null);
   if (rep.error) throw new JobFailure("persist_report");
-  return out.status === "validated" ? "succeeded" : "incomplete_check";
+  if (ctx.final) {
+    const pub = await store.load("publication", Publication);
+    if (pub) await store.save("publication", { ...pub, final: true });
+  }
+  return versionId;
 }
 
 /** Réglages d'images de la console admin (fournisseur et modèle par type de visuel). */
@@ -823,14 +893,18 @@ export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENE
     if (job.kind === "generate_report") status = await runGenerate(job, controller, claimedAt);
     else if (job.kind === "reexplain_section") status = await runReexplain(job, controller);
     else throw new JobFailure("kind_unsupported");
-    if (status === "requeued") return { id: job.id, requeued: true };
+    if (status === "requeued") {
+      if (!(await relayWorker())) console.error("worker.relay", job.id);
+      return { id: job.id, requeued: true };
+    }
     await finish(job.id, status, null);
     // Module livré : le prix réservé devient une consommation (une seule fois).
     await finishJobReservation(job.id, status === "succeeded" || status === "incomplete_check");
     if (job.report_id && (status === "succeeded" || status === "incomplete_check")) await afterDelivery(job, claimedAt);
   } catch (e) {
     const f = failureOf(e);
-    console.error("job", job.id, f.code);
+    // Message technique seulement (ex. « OpenRouter : erreur HTTP 403. »), jamais le contenu du document.
+    console.error("job", job.id, f.code, e instanceof Error ? e.message.slice(0, 160) : "");
     await finish(job.id, f.status, f.code);
     // Échec ou annulation : les crédits réservés sont rendus à leurs lots d'origine.
     await finishJobReservation(job.id, false);

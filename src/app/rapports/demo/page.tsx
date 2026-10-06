@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { composeLimpid } from "@/components/reader/v4/Pieces";
-import { LimpidScreen } from "@/components/reader/v4/LimpidScreen";
+import { chapterQuizzes, LimpidScreen } from "@/components/reader/v4/LimpidScreen";
 import { readDisplayPrefs } from "@/lib/display/prefs";
 import { getT } from "@/lib/i18n/server";
 import { DEMO_SOURCE_TITLE, demoBlueprint, demoEvidence, demoExplanation, demoSegments } from "@/lib/demo/cycle-eau";
@@ -28,6 +28,7 @@ export default async function DemoReportPage() {
   return (
     <LimpidScreen
       doc={doc}
+      quizzes={chapterQuizzes(demoExplanation.sections)}
       reportId={null}
       versionId={null}
       initialAnchor={null}

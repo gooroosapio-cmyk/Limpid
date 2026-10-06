@@ -56,7 +56,7 @@ export default async function HomeImportPage({ searchParams }: { searchParams: P
         urlEnabled={isUrlImportEnabled()}
         maxFileMb={Math.round(limits.maxFileBytes / 1024 / 1024)}
         maxPages={limits.maxPages}
-        defaultMode={Mode.safeParse(prefs?.default_mode).data ?? "claire"}
+        defaultMode={Mode.safeParse(prefs?.default_mode).data ?? "auto"}
       />
       <p className="muted small add-privacy">
         <span>{t.add.privacy}</span>{" "}

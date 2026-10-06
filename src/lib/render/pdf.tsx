@@ -13,6 +13,7 @@ import type { Evidence, Exercise, ExerciseSet, ExplanationObject, ReportBlueprin
 import { shuffled } from "@/lib/exercises/grade";
 import { dictFor, type Dict, type Lang } from "@/lib/i18n";
 import { stripRich } from "@/lib/reader/rich";
+import { computeCalculation, formatNumber, formulaText, proportionParts, resultUnit } from "./calc";
 import { sourceEntries } from "./sources";
 import { arrowHead, barRatios, ChartData, ComparisonData, DRAW_RATIOS, DrawingData, FlowData, IllustrationData, safeHref } from "./visuals";
 
@@ -199,7 +200,139 @@ function BlockPdf({ block, numbers, d }: { block: Block; numbers: Map<string, nu
           <Text>{plain(block.text)}{refs}</Text>
         </View>
       );
+    /* V6 : équivalents statiques des composants du lecteur (valeurs de référence exactes). */
+    case "steps":
+      return (
+        <View style={s.block}>
+          <Text style={s.label}>{d.blocks6.stepsLabel}</Text>
+          <Text style={s.p}>{plain(block.text)}{refs}</Text>
+          <Bullets
+            ordered
+            items={block.items.map((it, i) => (
+              <Text key={i}><Text style={{ fontWeight: 700 }}>{it.title}.</Text> {plain(it.text)}<Refs ids={it.evidence_ids} numbers={numbers} /></Text>
+            ))}
+          />
+        </View>
+      );
+    case "timeline":
+      return (
+        <View style={s.block}>
+          <Text style={s.label}>{d.blocks6.timeline} · {d.blocks6.order[block.order]}</Text>
+          <Text style={s.p}>{plain(block.text)}{refs}</Text>
+          <Bullets
+            ordered
+            items={block.events.map((ev, i) => (
+              <Text key={i}><Text style={{ fontWeight: 700 }}>{ev.date} — {ev.title}.</Text> {plain(ev.text)}<Refs ids={ev.evidence_ids} numbers={numbers} /></Text>
+            ))}
+          />
+        </View>
+      );
+    case "comparison":
+      return (
+        <View style={s.block}>
+          <Text style={s.label}>{d.blocks6.comparison}</Text>
+          <Text style={s.p}>{plain(block.text)}{refs}</Text>
+          <TablePdf
+            header={block.columns}
+            rows={block.rows.map((r) => block.columns.map((_, ci) => (r.cells[ci]?.trim() ? r.cells[ci]!.trim() : null)))}
+            rowRefs={block.rows.map((r) => <Refs key={r.cells.join("|")} ids={r.evidence_ids} numbers={numbers} />)}
+          />
+        </View>
+      );
+    case "proportion": {
+      const f = (n: number) => pdfSafe(formatNumber(n, d.blocks6.locale));
+      const u = (n: number) => (block.unit ? `${f(n)} ${block.unit}` : f(n));
+      const r = proportionParts(block.base, block.percent);
+      return (
+        <View style={T.key} wrap={false}>
+          <Text style={s.label}>{d.blocks6.percent}{block.example ? ` · ${d.blocks6.example}` : ""}</Text>
+          <Text style={s.p}>{plain(block.text)}{refs}</Text>
+          <Text>{d.blocks6.total} : {u(block.base)}</Text>
+          <Text>{d.blocks6.percent} : {f(r.percent)} %</Text>
+          <Text>{block.part_label} : {u(r.part)}</Text>
+          <Text>{block.rest_label} : {u(r.rest)} ({f(100 - r.percent)} %)</Text>
+          <Text style={s.muted}>{f(block.base)} × {f(r.percent)} / 100 = {f(r.part)}</Text>
+        </View>
+      );
+    }
+    case "calculation": {
+      const [va, vb] = block.variables;
+      if (!va || !vb) return null;
+      const f = (n: number) => pdfSafe(formatNumber(n, d.blocks6.locale));
+      const unit = resultUnit(block.formula_id, va.unit, vb.unit);
+      const result = computeCalculation(block.formula_id, va.value, vb.value);
+      const shown = result === null ? d.blocks6.unavailable : unit.unit ? `${f(result)} ${unit.unit}` : f(result);
+      return (
+        <View style={s.block} wrap={false}>
+          <Text style={s.label}>{d.blocks6.formulas[block.formula_id]}{block.example ? ` · ${d.blocks6.example}` : ""}</Text>
+          <Text style={s.p}>{plain(block.text)}{refs}</Text>
+          {block.variables.map((v, i) => (
+            <Text key={i}>{v.label} : {v.unit ? `${f(v.value)} ${v.unit}` : f(v.value)}</Text>
+          ))}
+          <Text style={[s.formula, { marginTop: 4 }]}>{pdfSafe(formulaText(block.formula_id, va.value, vb.value, d.blocks6.locale))} = {shown}</Text>
+          {unit.kind !== "plain" && <Text style={s.muted}>{unit.kind === "points" ? d.blocks6.points : d.blocks6.percentChange}</Text>}
+          {block.steps.length > 0 && (
+            <View style={{ marginTop: 4 }}>
+              <Text style={s.muted}>{d.blocks6.steps}</Text>
+              <Bullets ordered items={block.steps} />
+            </View>
+          )}
+        </View>
+      );
+    }
+    case "chart": {
+      const f = (n: number) => pdfSafe(formatNumber(n, d.blocks6.locale));
+      return (
+        <View style={s.block}>
+          <Text style={s.label}>{d.blocks6.chart}</Text>
+          <Text style={s.p}>{plain(block.text)}{refs}</Text>
+          <TablePdf
+            header={[d.blocks6.itemCol, block.unit ? `${d.blocks6.valueCol} (${block.unit})` : d.blocks6.valueCol]}
+            rows={block.points.map((p) => [p.label, p.value === null ? null : f(p.value)])}
+          />
+        </View>
+      );
+    }
+    case "details":
+      return (
+        <View style={s.block}>
+          <Text style={{ fontWeight: 700, marginBottom: 2 }}>{block.summary}</Text>
+          <Text>{plain(block.text)}{refs}</Text>
+        </View>
+      );
+    case "scene":
+      // L'illustration de contexte n'est pas reproduite : seule la légende reste.
+      return (
+        <Text style={[s.p, s.muted, s.italic]}>{plain(block.text)}{refs}</Text>
+      );
   }
+}
+
+/** Caractères absents de la police intégrée : signe moins typographique, espace fine insécable. */
+function pdfSafe(text: string): string {
+  return text.replace(/\u2212/g, "-").replace(/\u202f/g, "\u00a0");
+}
+
+/** Tableau simple (en-tête + lignes) ; cellule absente = « — », jamais zéro. */
+function TablePdf({ header, rows, rowRefs }: { header: string[]; rows: (string | null)[][]; rowRefs?: React.ReactNode[] }) {
+  const cell = { flex: 1, padding: 4, borderBottomWidth: 0.5, borderBottomColor: C.bordure };
+  return (
+    <View style={{ marginVertical: 6 }}>
+      <View style={{ flexDirection: "row" }} wrap={false}>
+        {header.map((h, i) => <Text key={i} style={[cell, { fontWeight: 700 }]}>{h}</Text>)}
+      </View>
+      {rows.map((r, ri) => (
+        <View key={ri} style={{ flexDirection: "row" }} wrap={false}>
+          {r.map((c, ci) => (
+            <Text key={ci} style={[cell, c === null ? s.muted : {}]}>
+              {c ?? "—"}
+              {ci === r.length - 1 && rowRefs?.[ri]}
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function FlowPdf({ data, cycle }: { data: FlowData; cycle: string }) {
@@ -511,6 +644,12 @@ function ReportDocument(input: PdfReportInput) {
             {/* Le titre reste avec son premier bloc : jamais seul en bas de page. */}
             <View wrap={false}>
               <Text style={s.h2}>{i + 1}. {sec.question}</Text>
+              {sec.essential && sec.essential.length > 0 && (
+                <View style={T.takeaway}>
+                  <Text style={s.boxTitle}>{d.blocks6.essential}</Text>
+                  <Bullets items={sec.essential.map(plain)} />
+                </View>
+              )}
               {sec.blocks[0] && <BlockPdf block={sec.blocks[0]} numbers={numbers} d={d} />}
             </View>
             {sec.blocks.slice(1).map((b) => <BlockPdf key={b.id} block={b} numbers={numbers} d={d} />)}

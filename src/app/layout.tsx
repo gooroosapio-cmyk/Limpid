@@ -16,9 +16,11 @@ import "./styles/base.css";
 import "./styles/shell.css";
 import "./styles/components.css";
 import "./styles/reader.css";
+import "./styles/reader-v6.css";
 import "./styles/pages.css";
 import "./styles/v2.css";
 import "./styles/v4.css";
+import "./styles/reader-carousel.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),

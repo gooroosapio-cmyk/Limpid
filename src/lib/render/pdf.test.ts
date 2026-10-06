@@ -123,3 +123,27 @@ describe("export PDF", () => {
     expect(pdfFileName("   ").ascii).toBe("limpid-rapport.pdf");
   });
 });
+
+describe("export PDF · composants V6", () => {
+  it("rend les équivalents statiques (proportion, calcul, graphique, tableau, frise, étapes, détail)", async () => {
+    const explanation = structuredClone(demoExplanation);
+    const sec = explanation.sections[0]!;
+    const src = { claim_ids: [], evidence_ids: [] };
+    sec.essential = ["Idée essentielle numéro un"];
+    sec.blocks.push(
+      { type: "proportion", id: "blk_p6", text: "Une part du total.", base: 200, percent: 30, unit: "€", part_label: "Part activité", rest_label: "Reste perso", interactive: true, example: true, ...src },
+      { type: "calculation", id: "blk_c6", text: "Une variation.", formula_id: "percent_change", variables: [{ label: "Avant", value: 200, unit: "€" }, { label: "Après", value: 250, unit: "€" }], steps: ["On soustrait."], interactive: false, example: false, ...src },
+      { type: "chart", id: "blk_g6", text: "Des valeurs.", chart_type: "line", unit: "mm", points: [{ label: "Janvier", value: 12.5 }, { label: "Février", value: null }], ...src },
+      { type: "comparison", id: "blk_t6", text: "Comparer.", columns: ["Option", "Coût"], rows: [{ cells: ["Option A", ""], ...src }], ...src },
+      { type: "timeline", id: "blk_f6", text: "Une frise.", order: "narratif", events: [{ date: "1990", title: "Début", text: "Premier.", ...src }, { date: "2000", title: "Suite", text: "Second.", ...src }], ...src },
+      { type: "details", id: "blk_d6", text: "Contenu caché développé.", summary: "Titre du détail", ...src },
+      { type: "scene", id: "blk_s6", text: "Légende de scène.", asset: "science", ...src },
+    );
+    const buf = await renderReportPdf({ blueprint: demoBlueprint, explanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE });
+    const { blocks } = await extractPdf(new Uint8Array(buf), { maxPages: 50 });
+    const text = blocks.map((b) => b.text).join(" ").replace(/\s+/g, " ");
+    for (const want of ["Idée essentielle numéro un", "Part activité", "140 €", "25 %", "Janvier", "12,5", "Option A", "ORDRE DU RÉCIT", "(250 - 200)", "Titre du détail", "Contenu caché développé", "Légende de scène"]) {
+      expect(text).toContain(want);
+    }
+  }, 30_000);
+});

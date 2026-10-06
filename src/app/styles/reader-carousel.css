@@ -1,0 +1,90 @@
+/*
+ * Limpid V6 : un chapitre à la fois (kit V6, § 06), QCM de fin de chapitre (§ 09) et messages de
+ * la console d'import (§ 12). Chargée après v4.css. Aucun style en ligne (CSP stricte).
+ */
+
+/* ---------- Un chapitre à la fois ---------- */
+/* Pièces des autres chapitres : retirées du flux (attribut posé par le lecteur). */
+.deck-col.chapters .lim > [data-chapter-off] { display: none !important; }
+/* Le titre du chapitre ouvert reçoit le focus à l'ouverture (tabindex -1) : aucun cadre visible au focus programmatique. */
+.deck-col.chapters .section-head h2:focus { outline: none; }
+.deck-col.chapters .section-head h2:focus-visible { outline: 3px solid var(--focus, var(--green)); outline-offset: 4px; border-radius: 4px; }
+/* Le chapitre ouvert commence en haut de l'écran : pas de filet de séparation au-dessus de son titre. */
+.deck-col.chapters .lim > .section-head:not([data-chapter-off]) { margin-top: var(--s3); padding-top: var(--s2); border-top: 0; }
+
+/* Transition brève : sortie 110 ms puis entrée 170 ms (≈ 280 ms), horizontale. */
+.deck-col.chapters[data-motion="out-next"] { animation: chap-out-next 110ms ease-in both; }
+.deck-col.chapters[data-motion="out-prev"] { animation: chap-out-prev 110ms ease-in both; }
+.deck-col.chapters[data-motion="in-next"] { animation: chap-in-next 170ms ease-out both; }
+.deck-col.chapters[data-motion="in-prev"] { animation: chap-in-prev 170ms ease-out both; }
+@keyframes chap-out-next { to { transform: translateX(-28px); opacity: 0.2; } }
+@keyframes chap-out-prev { to { transform: translateX(28px); opacity: 0.2; } }
+@keyframes chap-in-next { from { transform: translateX(36px); opacity: 0.25; } to { transform: none; opacity: 1; } }
+@keyframes chap-in-prev { from { transform: translateX(-36px); opacity: 0.25; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .deck-col.chapters[data-motion] { animation: none; }
+}
+:root[data-motion="reduit"] .deck-col.chapters[data-motion] { animation: none; }
+/* La colonne bouge seule : jamais de défilement horizontal de la page pendant la transition. */
+.deck.continuous { overflow-x: hidden; }
+
+/* ---------- Fin de chapitre (zone de transition) ---------- */
+.chapter-end {
+  margin: var(--s6) 0 var(--s5); padding-top: var(--s4); border-top: 1px solid var(--line);
+  /* Le balayage horizontal n'est lu qu'ici ; le défilement vertical reste au navigateur. */
+  touch-action: pan-y;
+}
+.chapter-end-sep { margin: 0 0 var(--s4); }
+.chapter-end-title { margin: 0 0 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink); }
+.chapter-end-sub { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.chapter-end-quiz[hidden] { display: none !important; }
+.chapter-nav { display: flex; flex-wrap: wrap; gap: var(--s3); justify-content: space-between; margin-top: var(--s4); }
+.chapter-nav { flex-wrap: nowrap; }
+.chapter-nav .btn { min-height: var(--cible); padding: 10px 14px; gap: 6px; font-size: 15px; white-space: nowrap; }
+.chapter-nav .chapter-prev { flex: 0 1 auto; }
+.chapter-nav .chapter-next { flex: 1 1 auto; }
+@media (max-width: 340px) { .chapter-nav { flex-wrap: wrap; } .chapter-nav .btn { flex: 1 1 100%; } }
+.chapter-nav .btn:disabled { opacity: 0.45; cursor: default; }
+.chapter-nav .btn:focus-visible { outline: 3px solid var(--focus, var(--green)); outline-offset: 2px; }
+@media (min-width: 600px) { .chapter-nav .chapter-next { flex: 0 1 auto; } }
+
+/* ---------- QCM de chapitre (inline) ---------- */
+.cquiz { padding: var(--s4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
+.cquiz-head { margin: 0 0 var(--s2); font-size: 13px; font-weight: 600; letter-spacing: 0.2px; color: var(--muted); }
+.cquiz-q { min-width: 0; margin: 0 0 var(--s4); padding: 0; border: 0; }
+.cquiz-prompt { margin: 0 0 var(--s2); padding: 0; font-size: 17px; font-weight: 700; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; }
+.cquiz-choices { display: grid; gap: var(--s2); }
+.cquiz-choice {
+  display: flex; align-items: center; gap: 10px; min-height: var(--cible); padding: 10px 12px; border: 1px solid var(--line-strong);
+  border-radius: var(--r-control); background: transparent; color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.4; cursor: pointer;
+  margin: 0;
+}
+.cquiz-choice > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cquiz-choice input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--green); }
+.cquiz-choice:has(input:checked) { border-color: var(--focus, var(--green)); background: var(--soft); }
+.cquiz-choice:has(input:focus-visible) { outline: 3px solid var(--focus, var(--green)); outline-offset: 2px; }
+.cquiz-q[data-answered] .cquiz-choice { cursor: default; }
+.cquiz-choice.is-right { border: 2px solid var(--green); background: var(--positive-bg, var(--green-pale)); }
+.cquiz-choice.is-wrong { border: 2px dashed var(--danger); background: var(--danger-pale); }
+.cquiz-choice.is-answer { border-color: var(--green); }
+.cquiz-validate { min-height: var(--cible); margin-top: var(--s3); }
+.cquiz-feedback { margin-top: var(--s3); padding: var(--s3); border-left: 3px solid var(--green); border-radius: 0 var(--r-control) var(--r-control) 0; background: var(--soft); }
+.cquiz-feedback.is-wrong { border-left-color: var(--danger); }
+.cquiz-feedback p { margin: 0; font-size: 15px; line-height: 1.5; }
+.cquiz-feedback strong { display: inline-flex; align-items: center; gap: 4px; }
+.cquiz-revisit { min-height: var(--cible); margin-top: var(--s2); padding: 8px 14px; font-size: 14px; }
+.cquiz-skip { min-height: var(--cible); font-size: 15px; }
+.cquiz-skip[aria-pressed="true"] { color: var(--muted); }
+.cquiz-note { margin: var(--s2) 0 0; }
+.cquiz-done { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
+.cquiz-done p { margin: 0; font-weight: 650; }
+.cquiz-done .btn-link { min-height: var(--cible); }
+.cquiz button:focus-visible { outline: 3px solid var(--focus, var(--green)); outline-offset: 2px; }
+
+/* ---------- Console d'import : message attaché au fichier, sous la console ---------- */
+.fileline.is-error { align-items: flex-start; }
+.fileline .fileline-error {
+  display: block; margin-top: 4px; color: var(--danger);
+  font-size: 14px; line-height: 1.45;
+}
+.import-note { margin: var(--s3) 0 0; padding: 10px 12px; border-radius: var(--r-control); background: var(--danger-pale); color: var(--danger); font-size: 14px; line-height: 1.45; }

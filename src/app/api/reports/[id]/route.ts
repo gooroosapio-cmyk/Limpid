@@ -39,7 +39,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     after(() => drainQueue(`poll-${crypto.randomUUID().slice(0, 8)}`, started + 270_000));
   }
   const { lease_expires_at: _lease, ...view } = data;
-  return NextResponse.json(view, { headers: { "Cache-Control": "no-store" } });
+  // Publication progressive : le cours est-il déjà lisible (premiers chapitres publiés) ?
+  const { data: rep } = await supabase.from("reports").select("current_version_id").eq("id", id).maybeSingle();
+  return NextResponse.json({ ...view, readable: !!rep?.current_version_id }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
