@@ -5,6 +5,7 @@
  */
 import "server-only";
 import { siteUrl } from "@/lib/site";
+import { selectAll } from "@/lib/supabase/paginate";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { activeProvider, limits } from "@/lib/config";
@@ -189,11 +190,14 @@ async function loadSourceSet(sourceIds: string[]): Promise<SourceSegment[]> {
   const db = adminClient();
   const bySource = await Promise.all(
     sourceIds.map(async (sourceId) => {
-      const { data, error } = await db
-        .from("source_segments")
-        .select("id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
-        .eq("source_id", sourceId)
-        .order("ordinal");
+      const { data, error } = await selectAll((from, to) =>
+        db
+          .from("source_segments")
+          .select("id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
+          .eq("source_id", sourceId)
+          .order("ordinal")
+          .range(from, to),
+      );
       if (error || !data?.length) throw new JobFailure("source_missing");
       return { sourceId, rows: data };
     }),

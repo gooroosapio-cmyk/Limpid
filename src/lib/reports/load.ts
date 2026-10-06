@@ -3,6 +3,7 @@
  * PDF. Lectures via la RLS uniquement : un rapport d'un autre compte est introuvable, et
  * chaque objet stocké est revalidé contre son contrat avant d'être affiché.
  */
+import { selectAll } from "@/lib/supabase/paginate";
 import "server-only";
 import { z } from "zod";
 import { Evidence, ExerciseSet, ExplanationObject, Mode, ReportBlueprint, SourceSegment, ThemeId, VisualMode } from "@/lib/contracts/schemas";
@@ -132,13 +133,19 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     .order("position");
   const sourceIds = setRows?.length ? setRows.map((r) => r.source_id as string) : report.source_id ? [report.source_id as string] : [];
   const [{ data: ev }, { data: segs }, { data: ans }, { data: assetRows }, { data: quizRow }, { data: progress }] = await Promise.all([
-    supabase.from("evidence").select("id, segment_id, source_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id),
-    supabase
-      .from("source_segments")
-      .select("id, source_id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
-      .in("source_id", sourceIds)
-      .order("ordinal")
-      .limit(10_000),
+    // Long document : plus de 1 000 preuves ou segments, lus par pages (plafond de l'API).
+    selectAll((from, to) =>
+      supabase.from("evidence").select("id, segment_id, source_id, start_offset, end_offset, quote").eq("knowledge_id", version.knowledge_id).order("id").range(from, to),
+    ),
+    selectAll((from, to) =>
+      supabase
+        .from("source_segments")
+        .select("id, source_id, source_version, locator, text, content_hash, extraction_warnings, ordinal")
+        .in("source_id", sourceIds)
+        .order("source_id")
+        .order("ordinal")
+        .range(from, to),
+    ),
     supabase
       .from("comprehension_answers")
       .select("check_id, answer, feedback")
