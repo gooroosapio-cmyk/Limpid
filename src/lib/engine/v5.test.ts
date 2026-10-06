@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import type { GenerationInput } from "./pipeline";
 import type { AIProvider, StructuredRequest } from "./provider";
-import { fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -218,5 +218,17 @@ describe("moteur V5 : plan", () => {
     expect(normalizePlanV5(draft, ko, input()).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(3);
     expect(normalizePlanV5(draft, ko, input({ mode: "resume" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
     expect(normalizePlanV5(draft, ko, input({ visualMode: "aucun" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
+  });
+});
+
+describe("moteur V5 : 15 chapitres au plus", () => {
+  it("réunit les chapitres voisins les plus légers, sans perdre d'affirmation", () => {
+    const none = { kind: "none" as const, subject: "", query_en: "", purpose: "" };
+    const chapters = Array.from({ length: 20 }, (_, i) => ({ title: `C${i}`, objective: `O${i}`, claim_ids: Array.from({ length: i % 3 === 0 ? 1 : 4 }, (_, k) => `clm_${i}_${k}`), difficulty: (i === 5 ? "difficile" : "standard") as "standard" | "difficile", notions: [], visual: none }));
+    const out = capChapters(chapters);
+    expect(out).toHaveLength(15);
+    expect(out.flatMap((c) => c.claim_ids)).toEqual(chapters.flatMap((c) => c.claim_ids));
+    expect(out.some((c) => c.difficulty === "difficile")).toBe(true);
+    expect(capChapters(chapters.slice(0, 4))).toHaveLength(4);
   });
 });

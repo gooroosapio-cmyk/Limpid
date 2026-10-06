@@ -1,5 +1,15 @@
 # Avancement
 
+## Phase 19.5 — Couvertures Pixabay, 15 chapitres au plus (7 octobre 2026)
+
+### FAIT
+- Couvertures : illustration de la banque Pixabay choisie d'après le thème du document (mots-clés du plan, sinon le titre) ; téléchargée, recadrée en 4/3 (WebP) et servie par Limpid ; crédit « Illustration : auteur · Pixabay » sur l'aperçu. Plus aucune couverture générée par l'IA ; Unsplash retiré. « Changer de couverture » propose une autre illustration du même thème.
+- Moteur V5 : 15 chapitres au plus ; au-delà, les chapitres voisins les plus légers sont réunis (aucune affirmation perdue, difficulté et visuel conservés).
+- Variable `PIXABAY_API_KEY` ; guide dans `docs/INTEGRATION_IA_DOMAINE.md` (§ 2 bis).
+
+### EN TEST
+- Vitest : filtrage des résultats Pixabay (hôtes, largeur, page), requête de couverture, plafond de 15 chapitres.
+
 ## Phase 19.4 — V5, lots D et E : bilan plein écran, installation, nettoyage (7 octobre 2026)
 
 ### FAIT

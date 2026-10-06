@@ -62,6 +62,7 @@ export const en: Dict = {
     },
     preview: {
       photoBy: "Photo by",
+      illustrationBy: "Illustration by",
       keyNotions: "Key notions",
       presentation: "Presentation",
       quiz: "Quiz",
@@ -508,8 +509,8 @@ export const en: Dict = {
   library: {
     v2: {
       count: (n: number) => (n > 1 ? `${n} lessons` : n === 1 ? "1 lesson" : "No lesson"),
-      generateCover: "Generate a cover",
-      generateNote: "Decorative image made by AI, no credits used.",
+      generateCover: "Change cover",
+      generateNote: "Another Pixabay illustration on the same theme.",
       generating: "Creating the cover…",
       generated: "New cover ready.",
       generateFailed: "The cover could not be created. Try again later.",
@@ -1034,7 +1035,7 @@ export const en: Dict = {
       vector: "Vector illustrations (concepts, analogies)",
       realistic: "Realistic scenes (place, object, situation)",
       missingKey: "key missing",
-      note: "Cover: Unsplash photo, otherwise Nano Banana 2 Lite. No drawing or chart is drawn by code.",
+      note: "Cover: Pixabay illustration matching the document theme (no generated image). No drawing or chart is drawn by code.",
     },
     capLabel: (max: number) => `Monthly cap, in euros (${max} € max, set by the server configuration)`,
     save: "Save",
