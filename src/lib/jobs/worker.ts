@@ -837,8 +837,8 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
 }
 
 /**
- * Après une livraison : notification « prête », puis illustration Pixabay en couverture pour un
- * nouveau Limpid qui n'en a pas encore (aucune IA, gratuite ; un échec ne change rien).
+ * Après une livraison : notification « prête », puis couverture pour un nouveau Limpid qui n'en
+ * a pas encore : illustration Pixabay, sinon image Gemini (un échec ne change rien).
  */
 async function afterDelivery(job: JobRow) {
   const reportId = job.report_id!;
@@ -852,7 +852,7 @@ async function afterDelivery(job: JobRow) {
   if (job.kind !== "generate_report" || !report || report.cover_path || report.cover_url) return;
   // Mots-clés anglais prévus par le plan pour la couverture (thème du document).
   const plan = await jobStore(job.id).load("plan", PlanCheckpoint).catch(() => null);
-  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, query: plan?.plan.cover_query_en ?? "" }).catch((e) =>
+  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, query: plan?.plan.cover_query_en ?? "", jobId: job.id }).catch((e) =>
     console.error("cover", (e as Error).message),
   );
 }

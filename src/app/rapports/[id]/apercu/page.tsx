@@ -72,14 +72,10 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
         {tab === "apercu" && (
           <>
             <Cover cover={cover} className="preview-cover" eager />
-            {cover.credit && (
+            {cover.credit?.author && (
               <p className="cover-credit">
                 {cover.credit.source === "pixabay" ? t.v4.preview.illustrationBy : t.v4.preview.photoBy}{" "}
-                <a href={cover.credit.source === "pixabay" ? cover.credit.url : `${cover.credit.url}?utm_source=limpid&utm_medium=referral`} target="_blank" rel="noopener noreferrer">{cover.credit.author ?? (cover.credit.source === "pixabay" ? "Pixabay" : "Unsplash")}</a>
-                {" · "}
-                <a href={cover.credit.source === "pixabay" ? "https://pixabay.com/" : "https://unsplash.com/?utm_source=limpid&utm_medium=referral"} target="_blank" rel="noopener noreferrer">
-                  {cover.credit.source === "pixabay" ? "Pixabay" : "Unsplash"}
-                </a>
+                <a href={cover.credit.source === "pixabay" ? cover.credit.url : `${cover.credit.url}?utm_source=limpid&utm_medium=referral`} target="_blank" rel="noopener noreferrer">{cover.credit.author}</a>
               </p>
             )}
             <p className="meta preview-meta">

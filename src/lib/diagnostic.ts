@@ -39,7 +39,7 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   }
   const recraft = recraftConfigFromEnv();
   add("Illustrations (Recraft)", !!recraft, recraft ? "clé présente (modèles réglés dans « Images des cours »)" : "RECRAFT_API_KEY absente : Nano Banana prend le relais");
-  add("Couvertures (Pixabay)", present("PIXABAY_API_KEY"), present("PIXABAY_API_KEY") ? "illustration Pixabay selon le thème du document" : "PIXABAY_API_KEY absente : couverture en dégradé de la charte");
+  add("Couvertures (Pixabay, sinon Gemini)", present("PIXABAY_API_KEY"), present("PIXABAY_API_KEY") ? "illustration Pixabay selon le thème du document, sinon image Gemini" : "PIXABAY_API_KEY absente : image Gemini à chaque couverture (payante)");
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
   add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || `absente : ${siteUrl()} par défaut`);

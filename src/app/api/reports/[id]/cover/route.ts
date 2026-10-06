@@ -3,7 +3,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { PlanCheckpoint } from "@/lib/engine/v5";
 import { jobStore } from "@/lib/jobs/checkpoints";
-import { coverGenerationEnabled, pixabayCover } from "@/lib/library/cover-gen";
+import { coverGenerationEnabled, themeCover } from "@/lib/library/cover-gen";
 import { adminClient } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   });
 }
 
-/** « Changer de couverture » : une autre illustration Pixabay sur le même thème (aucune IA, gratuite). */
+/** « Changer de couverture » : une autre illustration Pixabay sur le même thème, sinon une image Gemini. */
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "non_connecte" }, { status: 401 });
@@ -58,6 +58,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const { data: job } = await db.from("jobs").select("id").eq("report_id", id).eq("kind", "generate_report").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const plan = job ? await jobStore(job.id as string).load("plan", PlanCheckpoint).catch(() => null) : null;
   const pick = 1 + Math.floor(Math.random() * 8);
-  const path = await pixabayCover({ reportId: id, ownerId: user.id, keywords: plan?.plan.cover_query_en ?? "", title: report.title as string, pick });
+  const path = await themeCover({ reportId: id, ownerId: user.id, keywords: plan?.plan.cover_query_en ?? "", title: report.title as string, pick });
   return path ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "echec" }, { status: 502 });
 }
