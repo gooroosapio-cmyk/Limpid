@@ -1,5 +1,20 @@
 # Avancement
 
+## Phase 18.2 — Pipeline, lot 2 : plan, Pro ciblé, reprises, étapes parallèles (6 octobre 2026)
+
+### FAIT
+- Étape « plan » (Flash-Lite) entre compréhension et rédaction : chapitres, visuel prévu, passages difficiles ; identifiants inconnus retirés ; un échec ne bloque jamais (`LIMPID_PLAN=off` pour la couper).
+- Pro ciblé : un document que le plan juge complexe (avec au moins un passage difficile reconnu) est rédigé par le modèle Pro ; sinon Flash.
+- Points de reprise (`generation_checkpoints`, RLS sans politique, worker seul) : compréhension validée puis rédaction validée. Une invocation proche du délai de 300 s rend la tâche à la file et la suivante repart de la dernière sortie, sans nouvel appel ni nouvelle dépense. Un nouvel essai réutilise aussi ces sorties.
+- Dessins, illustrations (Recraft, banques, planche) et exercices lancés en parallèle, puis fusion déterministe des visuels.
+- Migration `20261019000000_pipeline_checkpoints.sql` appliquée en production avant la fusion.
+
+### EN TEST
+- Vitest : plan transmis, niveaux lite → Flash → Pro, échec du plan non bloquant, normalisation, relecture des points de reprise, fusion des passes visuelles. Recette SQL : RLS de la nouvelle table.
+
+### NON TESTÉ
+- Appels réels (aucune clé dans l'environnement de développement).
+
 ## Phase 18.1 — Pipeline, lot 1 : OpenRouter, Recraft, crédits, domaine (6 octobre 2026)
 
 - Cadrage (QCM) : clé OpenRouter, Recraft activé, débit 22 / 40 / 92 crédits, catalogue actuel conservé, routage complet de l'Atlas, QCM intégrés et évaluation au lot 3, gratuit à 80 crédits par mois, domaine `limpid.company` (www redirigé).

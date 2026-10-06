@@ -1036,7 +1036,7 @@ export const en: Dict = {
     retry: "Resume",
     cancel: "Cancel job",
     cancelPending: "cancellation requested",
-    stages: { validation: "Validation", extraction: "Reading", comprehension: "Comprehension", explication: "Explanation", verification: "Verification", mise_en_page: "Layout" } as Record<string, string>,
+    stages: { validation: "Validation", extraction: "Reading", comprehension: "Comprehension", explication: "Explanation", verification: "Verification", plan: "Outline", mise_en_page: "Layout" } as Record<string, string>,
     jobsTable: "Table of recent jobs (may scroll horizontally)",
     none: "Nothing yet.",
     date: "Date",

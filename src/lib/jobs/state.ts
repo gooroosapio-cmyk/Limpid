@@ -9,6 +9,7 @@ export const JOB_STAGES = [
   "comprehension",
   "explication",
   "verification",
+  "plan",
   "illustrations",
   "mise_en_page",
 ] as const;
@@ -64,5 +65,6 @@ export const STAGE_LABELS_FR: Record<JobStage, string> = {
   comprehension: "Repérage des informations",
   explication: "Rédaction des explications",
   verification: "Vérification des sources",
+  plan: "Préparation du plan",
   mise_en_page: "Mise en page",
 };

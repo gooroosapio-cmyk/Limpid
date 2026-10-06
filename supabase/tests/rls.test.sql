@@ -241,4 +241,14 @@ do $$ begin
   end if;
 end $$;
 
+-- Points de reprise du pipeline : RLS active et aucune politique (worker uniquement)
+do $$ begin
+  if not (select relrowsecurity from pg_class where oid = 'public.generation_checkpoints'::regclass) then
+    raise exception 'ECHEC : RLS inactive sur generation_checkpoints';
+  end if;
+  if exists (select 1 from pg_policies where tablename = 'generation_checkpoints') then
+    raise exception 'ECHEC : politique client sur generation_checkpoints';
+  end if;
+end $$;
+
 select 'RECETTE SQL : OK' as resultat;

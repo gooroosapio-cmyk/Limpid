@@ -4,7 +4,7 @@ import type { ReportBlueprint } from "@/lib/contracts/schemas";
 import { safeImageQuery } from "@/lib/render/visuals";
 import { availableVisualModes, effectiveVisualMode, visualConfig } from "./config";
 import { creditText } from "./credit";
-import { carryIllustrations, illustrate, type AssetRow, type IllustrateDeps } from "./illustrate";
+import { carryIllustrations, illustrate, mergeVisualPasses, type AssetRow, type IllustrateDeps } from "./illustrate";
 import { checkImage, commonsCandidates, plainText, rankCandidates, relevance, unsplashCandidates, type Candidate } from "./sources";
 
 /** PNG valide minimal (en-tête IHDR lu par imageSize). */
@@ -254,5 +254,27 @@ describe("panne de la génération d'image", () => {
     expect(out.blueprint.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1"]);
     // Une seule génération (la planche), journalisée même en échec.
     expect(usages).toEqual([1]);
+  });
+});
+
+describe("passes visuelles parallèles", () => {
+  it("garde les dessins ajoutés, les actifs posés et retire les illustrations abandonnées", () => {
+    const base = blueprint();
+    const drawing = { ...base.visual_specs[0]!, id: "vis_drw_1", kind: "drawing" } as ReportBlueprint["visual_specs"][number];
+    const drawn: ReportBlueprint = {
+      ...base,
+      visual_specs: [...base.visual_specs, drawing],
+      sections: [{ ...base.sections[0]!, visual_ids: [...base.sections[0]!.visual_ids, "vis_drw_1"] }],
+    };
+    const first = base.visual_specs[0]!;
+    const illustrated: ReportBlueprint = {
+      ...base,
+      visual_specs: [{ ...first, data: { ...first.data, asset_id: "11111111-1111-1111-1111-111111111111" } }],
+      sections: [{ ...base.sections[0]!, visual_ids: ["vis_ill_1"] }],
+    };
+    const out = mergeVisualPasses(base, drawn, illustrated);
+    expect(out.visual_specs.map((v) => v.id)).toEqual(["vis_ill_1", "vis_drw_1"]);
+    expect((out.visual_specs[0]!.data as { asset_id: string }).asset_id).toBe("11111111-1111-1111-1111-111111111111");
+    expect(out.sections[0]!.visual_ids).toEqual(["vis_ill_1", "vis_drw_1"]);
   });
 });

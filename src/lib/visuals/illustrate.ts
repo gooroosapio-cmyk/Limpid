@@ -87,6 +87,22 @@ function withAsset(bp: ReportBlueprint, id: string, assetId: string): ReportBlue
   };
 }
 
+/**
+ * Réunit deux passes lancées en parallèle sur le même plan : les dessins (ajout ou
+ * remplacement des visuels « drawing ») et les illustrations (actif posé ou visuel retiré).
+ * Les deux ne touchent jamais les mêmes visuels.
+ */
+export function mergeVisualPasses(base: ReportBlueprint, drawn: ReportBlueprint, illustrated: ReportBlueprint): ReportBlueprint {
+  const baseIllustrations = new Set(base.visual_specs.filter((v) => v.kind === "illustration").map((v) => v.id));
+  const kept = new Map(illustrated.visual_specs.filter((v) => baseIllustrations.has(v.id)).map((v) => [v.id, v]));
+  const dropped = new Set([...baseIllustrations].filter((id) => !kept.has(id)));
+  return {
+    ...drawn,
+    visual_specs: drawn.visual_specs.filter((v) => !dropped.has(v.id)).map((v) => kept.get(v.id) ?? v),
+    sections: drawn.sections.map((s) => ({ ...s, visual_ids: s.visual_ids.filter((id) => !dropped.has(id)) })),
+  };
+}
+
 export function pendingIllustrations(bp: ReportBlueprint) {
   return bp.visual_specs.flatMap((v) => {
     if (v.kind !== "illustration") return [];
