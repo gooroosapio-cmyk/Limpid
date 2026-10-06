@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Illustration } from "@/components/Illustration";
 import { LinkRow } from "@/components/LinkRow";
 import { LogoMark } from "@/components/Logo";
-import { MotionRow } from "@/components/account/DisplaySettings";
 import { ProfileName } from "@/components/account/ProfileName";
 import { Screen } from "@/components/shell/Screen";
 import { isAdmin } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
-import { readDisplayPrefs } from "@/lib/display/prefs";
 import { getLang, getT } from "@/lib/i18n/server";
 import { getWallet } from "@/lib/billing/wallet";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
@@ -26,10 +23,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * préférences en lignes simples ; puis compte, sécurité et déconnexion.
  */
 export default async function AccountPage() {
-  const [t, lang, jar] = await Promise.all([getT(), getLang(), cookies()]);
+  const [t, lang] = await Promise.all([getT(), getLang()]);
   const user = await requireUser();
   const email = user.email ?? "";
-  const display = readDisplayPrefs((n) => jar.get(n)?.value);
   const supabase = await createUserClient();
   const [admin, wallet, { data: prefs }, profile] = await Promise.all([
     isAdmin(user.id),
@@ -60,30 +56,27 @@ export default async function AccountPage() {
           <p id="offer-h" className="offer-eyebrow">{plan}</p>
           <p className="offer-number">{wallet.available.toLocaleString(lang === "fr" ? "fr-FR" : "en-GB")}</p>
           <p className="offer-label">{p.creditsAvailable}</p>
-          <Link href="/offres" className="offer-link">{p.seeOffer} <Icon name="arrow" /></Link>
+          <div className="offer-links">
+            <Link href="/compte/credits" className="offer-link">{t.v4.profile.history} <Icon name="arrow" /></Link>
+            <Link href="/offres" className="offer-link">{t.v4.profile.offers} <Icon name="arrow" /></Link>
+          </div>
         </section>
       )}
 
       <section aria-labelledby="prefs-h">
-        <h2 id="prefs-h" className="profile-h">{p.preferences}</h2>
+        <h2 id="prefs-h" className="profile-h">{t.v4.help.learning[0]}</h2>
         <ul className="rows settings-rows">
-          <LinkRow href="/bienvenue?revoir=1" icon="learning" title={t.v4.help.learning[0]} sub={t.v4.help.learning[1]} />
+          <LinkRow href="/bienvenue?revoir=1" icon="learning" title={t.v4.profile.answers[0]} sub={t.v4.profile.answers[1]} />
           <LinkRow href="/parametres/preferences" icon="file" title={p.explanations} sub={explain} />
-          <LinkRow href="/parametres#confort" icon="aa" title={t.compte.comfort} sub={p.comfortSub} />
-          <LinkRow href="/parametres#langue" icon="globe" title={p.language} sub={lang === "fr" ? "Français" : "English"} />
-          <li><MotionRow initial={display.reduceMotion} /></li>
-          <LinkRow href="/compte/donnees" icon="shield" title={p.privacy} />
         </ul>
       </section>
 
       <section aria-labelledby="account-h">
         <h2 id="account-h" className="profile-h">{p.account}</h2>
         <ul className="rows settings-rows">
-          <LinkRow href="/compte/credits" icon="clock" title={r.usage![0]} sub={r.usage![1]} />
-          <LinkRow href="/offres" icon="star" title={r.subscription![0]} sub={r.subscription![1]} />
           <LinkRow href="/compte/appareils" icon="shield" title={t.devices.title} sub={t.devices.signOutOthers} />
           <LinkRow href="/compte/mot-de-passe" icon="key" title={r.password![0]} sub={r.password![1]} />
-          <LinkRow href="/compte/installer" icon="download" title={r.install![0]} sub={r.install![1]} />
+          <LinkRow href="/compte/donnees" icon="shield" title={p.privacy} />
           {admin && <LinkRow href="/admin" icon="shield" title={r.admin![0]} sub={r.admin![1]} />}
         </ul>
       </section>

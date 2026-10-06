@@ -11,6 +11,7 @@ import type { DisplayPrefs } from "@/lib/display/prefs";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { OfflineSave } from "../OfflineSave";
+import { downloadPdf } from "../pdf-download";
 
 export interface OptionsData {
   reportId: string | null;
@@ -138,9 +139,9 @@ export function OptionsPanel({
       <div className="stagger" key="export">
         {back(t.lim.optExport)}
         <ul className="rows">
-          <Row icon="download" title={t.lim.exportContent} href={data.pdfHref} />
-          {data.hasExercises && <Row icon="quiz" title={t.lim.exportExercises} href={`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}exercices=1`} />}
-          {data.hasExercises && <Row icon="check" title={t.lim.exportKey} href={`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}corrige=1`} />}
+          <Row icon="download" title={t.lim.exportContent} href={data.pdfHref} onClick={() => void downloadPdf(data.pdfHref, t)} />
+          {data.hasExercises && <Row icon="quiz" title={t.lim.exportExercises} href={`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}exercices=1`} onClick={() => void downloadPdf(`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}exercices=1`, t)} />}
+          {data.hasExercises && <Row icon="check" title={t.lim.exportKey} href={`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}corrige=1`} onClick={() => void downloadPdf(`${data.pdfHref}${data.pdfHref.includes("?") ? "&" : "?"}corrige=1`, t)} />}
         </ul>
         <p className="muted small">{t.lim.exportNote}</p>
       </div>
