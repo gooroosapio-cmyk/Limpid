@@ -105,7 +105,7 @@ export function JobProgress({ reportId, initial, compact = false }: { reportId: 
       <p className="muted">{t.prep.kept}</p>
       <div className="actions-row">
         <Link href="/bibliotheque" className="btn">{t.prep.library}</Link>
-        <Link href="/ajouter" className="btn btn-primary">{t.prep.addAgain}</Link>
+        <Link href="/" className="btn btn-primary">{t.prep.addAgain}</Link>
       </div>
     </div>
   );

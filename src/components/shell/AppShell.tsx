@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { Wordmark } from "@/components/Logo";
 import { useT } from "@/lib/i18n/client";
 import { initials } from "@/lib/initials";
+import { SideMenu } from "@/components/shell/SideMenu";
 import { useKeyboardState } from "@/components/shell/keyboard";
-import { navSection } from "@/components/shell/nav";
 
-/** En-tête compact (AppHeader) : logo, cloche (notifications réelles), avatar vers le profil. */
-function AppHeader({ email }: { email: string }) {
+/**
+ * En-tête compact : bouton du menu (mobile), logo vers l'Accueil, cloche (notifications
+ * réelles) et avatar du profil en haut à droite.
+ */
+function AppHeader({ email, menuOpen, onMenu }: { email: string; menuOpen: boolean; onMenu: () => void }) {
   const t = useT();
   const pathname = usePathname();
   const [state, setState] = useState<{ unread: number; name: string | null }>({ unread: 0, name: null });
@@ -28,6 +31,16 @@ function AppHeader({ email }: { email: string }) {
   }, [pathname]);
   return (
     <header className="appbar">
+      <button
+        type="button"
+        className="icon-button appbar-menu"
+        aria-label={menuOpen ? t.v4.menu.close : t.v4.menu.open}
+        aria-expanded={menuOpen}
+        aria-controls="side-menu"
+        onClick={onMenu}
+      >
+        <Icon name={menuOpen ? "close" : "lines"} size={22} />
+      </button>
       <Link href="/" className="brand-link" aria-label={t.common.brandHome}>
         <span className="brand">
           <Wordmark />
@@ -40,7 +53,7 @@ function AppHeader({ email }: { email: string }) {
           aria-label={state.unread ? t.notifications.labelUnread(state.unread) : t.notifications.title}
           aria-current={pathname === "/notifications" ? "page" : undefined}
         >
-          <Icon name="bell" size={26} />
+          <Icon name="bell" size={22} />
           {state.unread > 0 && <span className="bell-dot" aria-hidden="true" />}
         </Link>
         <Link href="/compte" className="appbar-avatar" aria-label={t.nav.profile} aria-current={pathname === "/compte" ? "page" : undefined}>
@@ -51,43 +64,24 @@ function AppHeader({ email }: { email: string }) {
   );
 }
 
-const NAV = [
-  { key: "home", href: "/", icon: "home" },
-  { key: "library", href: "/bibliotheque", icon: "book" },
-  { key: "create", href: "/ajouter", icon: "plus-circle" },
-  { key: "settings", href: "/parametres", icon: "settings" },
-] as const;
-
 /**
- * Navigation (V4) : Accueil, Bibliothèque, Créer, Paramètres. Barre basse sur mobile, rail
- * latéral sur ordinateur. Masquée seulement quand le clavier virtuel est réellement ouvert.
- */
-function BottomNavigation() {
-  const t = useT();
-  const pathname = usePathname();
-  const current = navSection(pathname);
-  return (
-    <nav className="bottomnav" aria-label={t.nav.main}>
-      {NAV.map((n) => (
-        <Link key={n.key} href={n.href} className="bottomnav-item" aria-current={current === n.key ? "page" : undefined}>
-          <Icon name={n.icon} size={22} />
-          <span>{t.v4.nav[n.key]}</span>
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
-/**
- * Coquille de l'application connectée (V4) : en-tête (logo, cloche, avatar) et navigation
- * à quatre destinations. La lecture et l'aperçu d'une leçon les masquent (cf. v2.css).
+ * Coquille de l'application connectée : en-tête et menu latéral gauche (toujours visible sur
+ * ordinateur, tiroir sur mobile). Plus de barre de navigation fixe en bas. La lecture et
+ * l'aperçu d'une leçon masquent la coquille (cf. styles).
  */
 export function AppShell({ email }: { email: string }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  // Clavier virtuel ouvert : la discussion passe en plein écran (cf. styles).
   useKeyboardState();
+  // Changement d'écran : le tiroir se referme.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- suit la navigation
+  useEffect(() => setOpen(false), [pathname]);
   return (
     <>
-      <AppHeader email={email} />
-      <BottomNavigation />
+      <AppHeader email={email} menuOpen={open} onMenu={() => setOpen((v) => !v)} />
+      <SideMenu open={open} onClose={close} />
     </>
   );
 }

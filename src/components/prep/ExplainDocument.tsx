@@ -44,7 +44,7 @@ export function ExplainDocument({ sourceId }: { sourceId: string }) {
         <Icon name="spark" /> {pending ? t.added.explaining : t.added.explain}
       </button>
       <p className="center muted small">{t.added.cost}</p>
-      <p className="center"><Link href="/ajouter" className="btn-link">{t.added.change}</Link></p>
+      <p className="center"><Link href="/" className="btn-link">{t.added.change}</Link></p>
     </>
   );
 }

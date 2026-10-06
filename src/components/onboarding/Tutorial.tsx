@@ -73,10 +73,10 @@ export function Tutorial() {
       <div className="onboarding-actions">
         {last ? (
           <>
-            <button type="button" className="btn btn-primary btn-block" disabled={pending} onClick={() => leave("/ajouter")}>
+            <button type="button" className="btn btn-primary btn-block" disabled={pending} onClick={() => leave("/")}>
               {u.start} <Icon name="arrow" />
             </button>
-            <button type="button" className="btn btn-block" disabled={pending} onClick={() => leave("/")}>{u.later}</button>
+            <button type="button" className="btn btn-block" disabled={pending} onClick={() => leave("/bibliotheque")}>{u.later}</button>
           </>
         ) : (
           <button type="button" className="btn btn-primary btn-block" onClick={() => setStep(step + 1)}>

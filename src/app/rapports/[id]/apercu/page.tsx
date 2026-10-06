@@ -123,7 +123,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
               ))}
             </ul>
             <p className="meta">{l.sourcesNote}</p>
-            <Link href="/ajouter" className="btn btn-block">{l.addSource}</Link>
+            <Link href="/" className="btn btn-block">{l.addSource}</Link>
           </section>
         )}
 
