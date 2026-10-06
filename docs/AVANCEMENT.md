@@ -1,5 +1,16 @@
 # Avancement
 
+## Phase 18.3 — Pipeline, lot 3 : évaluation sur 20, PDF composé pour le papier (6 octobre 2026)
+
+### FAIT
+- QCM intégrés après les notions (facultatifs, « Passer ») : déjà en place, conservés.
+- Bilan : choix entre **évaluation** (réponse enregistrée sans correction, note sur 20 et corrections à la fin) et **entraînement** (correction immédiate).
+- Note explicable : réponses justes ramenées sur 20 au demi-point (une réponse libre non évaluée est écartée), puis chaque notion « Solide » (≥ 3/4 juste) ou « À revoir » avec « Revoir l'explication ». Tentatives précédentes affichées sur 20.
+- PDF : ni QCM, ni corrigés, ni scores (déjà), et désormais ni annexes ni glossaire développé ; limites et sources essentielles conservées. Les fiches d'exercices et le corrigé restent des exports distincts, à la demande.
+
+### EN TEST
+- Vitest : note sur 20, bilan par notion, contenu du PDF (aucun exercice, annexe ni glossaire).
+
 ## Phase 18.2 — Pipeline, lot 2 : plan, Pro ciblé, reprises, étapes parallèles (6 octobre 2026)
 
 ### FAIT

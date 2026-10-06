@@ -523,3 +523,14 @@ dialog.chat-sheet::backdrop { background: var(--backdrop); }
 .limpid-item .lesson-reason { padding-right: 32px; }
 .lib-search { gap: 8px; }
 .lib-search .lib-filters { margin: 0; }
+
+/* Bilan de l'évaluation (Atlas § 04) : note sur 20, notions solides ou à revoir. */
+.notion-verdicts { list-style: none; padding: 0; margin: var(--s3) 0; display: grid; gap: var(--s2); }
+.notion-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); padding: 12px 14px; border-radius: var(--r-control); background: var(--soft); }
+.notion-verdict .row-text { flex: 1 1 140px; min-width: 0; }
+.pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.pill-ok { background: var(--positive-bg); color: var(--sage); }
+.pill-review { background: var(--elevated); color: var(--ink); border: 1px solid var(--line-strong); }
+.bilan-corrections { margin: var(--s3) 0; }
+.bilan-corrections summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.bilan-corrections ol { padding-left: 1.2em; display: grid; gap: var(--s3); }

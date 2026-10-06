@@ -99,7 +99,14 @@ describe("export PDF", () => {
     expect(withEx).toContain("Question ex_a ?");
     expect(withEx).not.toContain("Explication ex_a");
     expect(withEx).toContain("Créé avec Limpid · version gratuite");
-    expect(withEx).toContain("Annexes");
+    // Composé pour le papier : ni annexes ni glossaire développé ; limites et sources restent.
+    expect(withEx).not.toContain("Annexes");
+    expect(withEx).toContain("Limites de ce document");
+    expect(withEx).toContain("Sources");
+    const plain = await read(await renderReportPdf({ ...base, variant: "content" }));
+    expect(plain).not.toContain("Question ex_a");
+    expect(plain).not.toContain("Exercices");
+    expect(plain).not.toContain("Glossaire");
     const key = await read(await renderReportPdf({ ...base, variant: "key" }));
     expect(key).toContain("Corrigé des exercices");
     expect(key).toContain("Explication ex_a");
@@ -107,7 +114,7 @@ describe("export PDF", () => {
     expect(key).not.toContain(demoExplanation.sections[0]!.blocks[0]!.text.slice(0, 40));
     expect(key).not.toContain("version gratuite");
     const en = await read(await renderReportPdf({ ...base, lang: "en" }));
-    expect(en).toContain("Appendices");
+    expect(en).not.toContain("Appendices");
     expect(en).toContain("The essentials");
   }, 60_000);
 
