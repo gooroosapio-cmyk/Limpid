@@ -118,15 +118,17 @@ export const ACTION_PRICES = {
   report_short: 22,
   report_standard: 40,
   report_long: 92,
+  /** Document de 101 à 150 pages (V5). */
+  report_xl: 140,
   /** Nouvelle version complète d'un rapport existant (autre approche, autre formulation). */
   report_version: 22,
   ask: 1,
   quiz: 3,
 } as const;
 export type Action = keyof typeof ACTION_PRICES;
-export type ReportAction = "report_short" | "report_standard" | "report_long";
+export type ReportAction = "report_short" | "report_standard" | "report_long" | "report_xl";
 /** Actions qui comptent pour une « unité rapport » dans les plafonds jour/semaine. */
-export const REPORT_UNIT_ACTIONS: Action[] = ["report_short", "report_standard", "report_long", "report_version"];
+export const REPORT_UNIT_ACTIONS: Action[] = ["report_short", "report_standard", "report_long", "report_xl", "report_version"];
 
 /** Fenêtres des plafonds : jour calendaire UTC, semaine du lundi 00:00 UTC (V2, § 15). */
 export function quotaWindows(now = new Date()) {
@@ -138,15 +140,27 @@ export function quotaWindows(now = new Date()) {
   return { dayStart, dayEnd, weekStart, weekEnd };
 }
 
-/** Taille du texte lu (en caractères) au-delà de laquelle un rapport n'est plus court / devient long. */
-export const SHORT_MAX_CHARS = 6_000;
-export const LONG_MIN_CHARS = 90_000;
+/** Une page équivalente de texte (document sans pagination, texte collé, page web). */
+export const CHARS_PER_PAGE = 2_500;
+/** Au-delà, le document est refusé avec un message clair (moteur V5 : ~150 pages). */
+export const MAX_SOURCE_PAGES = 150;
 
-/** Devis d'un nouveau rapport selon la taille réelle du texte lu (mesurée côté serveur). */
-export function reportAction(chars: number): ReportAction {
-  if (chars <= SHORT_MAX_CHARS) return "report_short";
-  if (chars > LONG_MIN_CHARS) return "report_long";
-  return "report_standard";
+/**
+ * Prix selon la source seule (V5) : pages du PDF, ou équivalent texte. Le nombre de chapitres
+ * suit le contenu ; l'utilisateur ne choisit plus de longueur.
+ * ≤ 10 pages : 22 · 11–40 : 40 · 41–100 : 92 · 101–150 : 140 crédits.
+ */
+export function reportAction(pages: number): ReportAction {
+  if (pages <= 10) return "report_short";
+  if (pages <= 40) return "report_standard";
+  if (pages <= 100) return "report_long";
+  return "report_xl";
+}
+
+/** Pages d'un document : sa pagination si elle existe, sinon l'équivalent texte (au moins 1). */
+export function sourcePages(pageCount: number | null | undefined, chars: number): number {
+  const byText = Math.max(1, Math.ceil(chars / CHARS_PER_PAGE));
+  return pageCount && pageCount > 0 ? Math.max(pageCount, Math.min(byText, pageCount * 3)) : byText;
 }
 
 /** Équivalent en rapports standard d'une quantité de crédits (affichage). */

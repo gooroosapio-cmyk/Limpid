@@ -21,7 +21,7 @@ Ce guide suit l'ordre recommandé. Ne collez jamais une clé dans un message ou 
 | `LIMPID_IMAGE_MODEL` | `google/gemini-3.1-flash-lite-image` | non (défaut) |
 | `LIMPID_USD_TO_EUR` | `0.92` | non |
 
-Routage appliqué par Limpid (Atlas) : Flash-Lite classe et prépare, Flash comprend, rédige et vérifie, Pro reprend les cas difficiles : dernière correction d'une réponse hors format, et rédaction des documents que le plan juge complexes. Le plan (Flash-Lite) peut être coupé par `LIMPID_PLAN=off`. Le coût réel de chaque appel, renvoyé par OpenRouter, est inscrit au journal.
+Routage appliqué par Limpid (moteur V5) : 3.8 Flash lit la source (par fragments au-delà d'environ 24 pages), établit le plan et rédige les chapitres ; Pro rédige seulement les chapitres que le plan juge difficiles, puis Flash les agrémente (exemples, analogies, notions). Pro reprend aussi la dernière correction d'une réponse hors format. Le coût réel de chaque appel, renvoyé par OpenRouter, est inscrit au journal.
 
 5. Les anciennes variables `GEMINI_API_KEY`, `LIMPID_MODEL_FAST`, `LIMPID_MODEL_QUALITY`, `AI_REPORT_MODEL`, `AI_CHAT_MODEL` ne servent plus avec OpenRouter. Vous pouvez les laisser (sans effet) ou les supprimer.
 

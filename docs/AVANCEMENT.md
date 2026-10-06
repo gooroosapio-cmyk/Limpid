@@ -1,5 +1,26 @@
 # Avancement
 
+## Phase 19.1 — V5, lot A : moteur par chapitres, prix selon la source (7 octobre 2026)
+
+### FAIT
+- Constat de la première génération réelle : 19 affirmations, un plan correct de 5 chapitres, mais une rédaction d'un seul tenant (Pro) n'a rendu qu'une partie ; 60 % du coût pour un rapport sous-dimensionné.
+- Moteur V5 (`src/lib/engine/v5.ts`) :
+  - lecture en un appel jusqu'à ~24 pages, au-delà par fragments de ~40 000 caractères lus et vérifiés en parallèle, puis fusionnés (identifiants rendus uniques, notions homonymes fusionnées) ;
+  - plan par 3.8 Flash : titre, « L'essentiel » (3 à 7 puces), chapitres sans quota (objectif, affirmations, difficulté, notions, visuel utile), affirmations écartées avec raison ; affirmations oubliées : une demande de correction, puis rattachement au chapitre le plus proche ;
+  - un appel par chapitre, en parallèle : Flash pour un chapitre standard, Pro pour un chapitre difficile puis enrichissement par Flash (exemples, analogies, notions, « À retenir ») ;
+  - contrôle par chapitre (références, affirmations non expliquées, réserves, chiffres, minceur) et réécriture du seul chapitre fautif ;
+  - points de reprise par fragment, plan et chapitre : une source longue s'étend sur plusieurs invocations sans refaire ni repayer.
+- Plus aucun dessin, schéma ni graphique tracé par le code (tableau comparatif HTML conservé).
+- Prix selon la source seule : ≤ 10 pages 22 crédits, 11–40 : 40, 41–100 : 92, 101–150 : 140 (nouvelle action `report_xl`) ; au-delà de 150 pages, refus explicite. Choix de longueur retiré de l'import.
+- Étiquette du modèle de rédaction corrigée (modèles réellement utilisés par les chapitres).
+- Migration `20261020000000_report_xl.sql` appliquée en production avant fusion.
+
+### EN TEST
+- Vitest : chapitres et niveaux de modèle, enrichissement, réécriture d'un chapitre incomplet, reprise après interruption, fragments et fusion, normalisation du plan, budget d'illustrations, paliers de prix.
+
+### NON TESTÉ
+- Appels réels sur une source longue (à vérifier sur un document de 50 à 150 pages).
+
 ## Phase 18.3 — Pipeline, lot 3 : évaluation sur 20, PDF composé pour le papier (6 octobre 2026)
 
 ### FAIT

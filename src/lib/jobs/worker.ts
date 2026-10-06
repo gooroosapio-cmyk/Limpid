@@ -27,12 +27,9 @@ import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getImageProvider, getProvider } from "@/lib/engine";
 import { generateVector, recraftConfigFromEnv, vectorPrompt } from "@/lib/visuals/recraft";
 import { svgSize } from "@/lib/visuals/svg";
-import { generateDrawings } from "@/lib/engine/drawings";
 import { generateExercises } from "@/lib/engine/exercises";
 import {
   PROMPT_VERSION,
-  understand,
-  write,
   regenerateExplanation,
   regenerateSection,
   reverifyKnowledge,
@@ -40,8 +37,9 @@ import {
   type Variation,
 } from "@/lib/engine/pipeline";
 import { visualConfig } from "@/lib/visuals/config";
-import { carryIllustrations, illustrate, mergeVisualPasses, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
-import { loadUnderstanding, loadWriting, saveUnderstanding, saveWriting } from "./checkpoints";
+import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
+import { jobStore } from "./checkpoints";
+import { generateV5 } from "@/lib/engine/v5";
 import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { finishJobReservation } from "@/lib/billing/wallet";
@@ -104,8 +102,6 @@ const SECTION_CHANGE_REASON: Record<Variation, string> = {
 };
 
 const EXERCISE_BUDGET = { tier: "quality" as const, maxInputTokens: 60_000, maxOutputTokens: 24_000, timeoutMs: 150_000 };
-/** Planche de dessins : une génération, sortie courte. */
-const DRAWING_BUDGET = { tier: "quality" as const, maxInputTokens: 40_000, maxOutputTokens: 12_000, timeoutMs: 120_000 };
 
 /**
  * Exercices du support (points de contrôle et bilan), rédigés une fois avec la version.
@@ -144,8 +140,19 @@ async function storeExercises(job: JobRow, versionId: string, explanation: Expla
 
 /** Au-delà de cette durée après la réservation, la génération repart dans une nouvelle invocation. */
 const REQUEUE_AFTER_MS = 120_000;
-/** Après la rédaction, temps restant minimal (fonction de 300 s) pour finir visuels et exercices. */
-const REQUEUE_BEFORE_VISUALS_MS = 190_000;
+/** Fenêtre de génération d'une invocation (fonction de 300 s) : aucun appel long lancé au-delà. */
+const GENERATION_WINDOW_MS = 270_000;
+/** Cours prêt plus tard que cela : illustrations et exercices dans une nouvelle invocation. */
+const REQUEUE_BEFORE_VISUALS_MS = 200_000;
+
+/** Modèles réellement utilisés : lecture (compréhension) et rédaction (chapitres), pour l'étiquette. */
+async function jobModels(jobId: string): Promise<{ reading: string | null; writing: string | null }> {
+  const { data } = await adminClient().from("usage_ledger").select("stage, model").eq("job_id", jobId);
+  const of = (test: (stage: string) => boolean) => [...new Set((data ?? []).filter((r) => test(r.stage as string)).map((r) => r.model as string))];
+  const reading = of((x) => x === "comprehension")[0] ?? null;
+  const writing = of((x) => x.startsWith("chapitre_") || x === "explication").join(" + ").slice(0, 200) || null;
+  return { reading, writing };
+}
 
 class JobFailure extends Error {
   constructor(
@@ -438,50 +445,38 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     language: job.params.language ?? null,
     preferences,
     signal: controller.signal,
+    // Niveaux par défaut (3.8 Flash) ; le moteur passe un chapitre difficile au modèle Pro.
     budgets: {
       comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-      explanation: { tier: "quality" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-      plan: { tier: "lite" as const, maxInputTokens: 60_000, maxOutputTokens: 4_000, timeoutMs: 60_000 },
+      explanation: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
+      plan: { tier: "fast" as const, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000 },
     },
     onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
     verifyClaims: process.env.LIMPID_VERIFY_CLAIMS !== "off",
     template: job.params.template ?? null,
     visualMode: job.params.visual_mode ?? "auto",
-    plan: process.env.LIMPID_PLAN !== "off",
   };
 
-  // Reprise par étape : une sortie déjà validée pour cette tâche n'est ni refaite ni repayée.
-  let understanding = await loadUnderstanding(job.id);
-  if (!understanding) {
-    understanding = await understand(provider, input);
-    await saveUnderstanding(job.id, understanding);
-    if (Date.now() - claimedAt > REQUEUE_AFTER_MS && understanding.validation.blocking_errors.length === 0) {
-      await requeue(job.id);
-      return "requeued";
-    }
+  // Moteur V5 : lecture (par fragments si besoin), plan, chapitres en parallèle. Chaque étape
+  // validée est enregistrée ; près du délai de la fonction, la tâche repart dans une nouvelle
+  // invocation qui reprend où elle s'était arrêtée, sans refaire ni repayer.
+  const result = await generateV5(provider, input, { store: jobStore(job.id), deadline: claimedAt + GENERATION_WINDOW_MS });
+  if (result.status === "paused" || Date.now() - claimedAt > REQUEUE_BEFORE_VISUALS_MS) {
+    await requeue(job.id);
+    return "requeued";
   }
-  let out = await loadWriting(job.id, understanding);
-  if (!out) {
-    out = await write(provider, input, understanding);
-    await saveWriting(job.id, out);
-    if (Date.now() - claimedAt > REQUEUE_BEFORE_VISUALS_MS && out.validation.explanation.blocking_errors.length === 0) {
-      await requeue(job.id);
-      return "requeued";
-    }
-  }
+  const out = result.output;
 
-  // Dessins, illustrations et exercices en parallèle : aucun ne dépend des autres.
+  // Illustrations et exercices en parallèle. Aucun dessin ni graphique tracé par le code.
   const evidenceIds = new Set(out.evidence.map((e) => e.id));
-  const [drawn, illustrated, exercises] = await Promise.all([
-    runDrawings(job, out.explanation, out.blueprint, controller),
+  const [blueprint, exercises] = await Promise.all([
     runIllustrations(job, out.blueprint, controller),
     prepareExercises(job, out.explanation, out.knowledge, evidenceIds, controller),
   ]);
-  const blueprint = mergeVisualPasses(out.blueprint, drawn, illustrated);
 
   await setStage(job.id, "mise_en_page");
-  const model = (await db.from("usage_ledger").select("model").eq("job_id", job.id).limit(1).maybeSingle()).data?.model;
+  const models = await jobModels(job.id);
 
   const ko = await db
     .from("knowledge_objects")
@@ -491,7 +486,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
       source_version: segments[0]!.source_version,
       schema_version: out.knowledge.schema_version,
       prompt_version: PROMPT_VERSION,
-      model: model ?? provider.name,
+      model: models.reading ?? provider.name,
       body: out.knowledge,
       validation: out.validation.knowledge,
     })
@@ -540,7 +535,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
       change_reason: "generation_initiale",
       mode: out.explanation.mode ?? null,
       provider: provider.name,
-      model: model ?? null,
+      model: models.writing ?? null,
       prompt_version: PROMPT_VERSION,
     })
     .select("id")
@@ -556,30 +551,6 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     .is("deleted_at", null);
   if (rep.error) throw new JobFailure("persist_report");
   return out.status === "validated" ? "succeeded" : "incomplete_check";
-}
-
-/**
- * Planche de dessins vectoriels (une génération) ancrés aux blocs ; un échec n'arrête jamais
- * le rapport. Désactivée pour « texte seul ».
- */
-async function runDrawings(job: JobRow, explanation: ExplanationObject, blueprint: ReportBlueprint, controller: AbortController): Promise<ReportBlueprint> {
-  if ((job.params.visual_mode ?? "auto") === "aucun" || process.env.LIMPID_DRAWINGS === "off") return blueprint;
-  await setStage(job.id, "illustrations");
-  try {
-    await checkBudget(job.owner_id);
-    return await generateDrawings(getProvider(), {
-      explanation,
-      blueprint,
-      language: job.params.language ?? null,
-      budget: DRAWING_BUDGET,
-      signal: controller.signal,
-      onUsage: (u) => recordUsage(job, "drawings", 0, u),
-    });
-  } catch (e) {
-    if (e instanceof JobFailure) throw e; // annulation ou budget
-    console.error("drawings", e instanceof ProviderError ? e.code : (e as Error).name);
-    return blueprint;
-  }
 }
 
 /** Illustrations vectorielles par rapport (Atlas) : 1 court, 2 standard, 4 long complexe. */
@@ -754,8 +725,16 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
       });
   // Les illustrations déjà choisies sont reprises : pas de nouvelle recherche ni d'image générée.
   const carried = sectionId ? regenerated : { ...regenerated, blueprint: carryIllustrations(baseBlueprint, regenerated.blueprint) };
-  // Texte réécrit : la planche de dessins est refaite pour la nouvelle version complète.
-  const out = sectionId ? carried : { ...carried, blueprint: await runDrawings(job, carried.explanation, carried.blueprint, controller) };
+  // V5 : aucun dessin tracé par le code ; les anciens dessins ne sont pas recopiés.
+  const drawings = new Set(carried.blueprint.visual_specs.filter((v) => v.kind === "drawing").map((v) => v.id));
+  const out = {
+    ...carried,
+    blueprint: {
+      ...carried.blueprint,
+      visual_specs: carried.blueprint.visual_specs.filter((v) => !drawings.has(v.id)),
+      sections: carried.blueprint.sections.map((x) => ({ ...x, visual_ids: x.visual_ids.filter((id) => !drawings.has(id)) })),
+    },
+  };
 
   await setStage(job.id, "mise_en_page");
   const { count } = await db.from("report_versions").select("id", { count: "exact", head: true }).eq("report_id", job.report_id);

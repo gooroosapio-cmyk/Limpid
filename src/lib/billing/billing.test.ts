@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/admin", () => ({ adminClient: () => ({}) }));
 
-import { ACTION_PRICES, PLANS, PRODUCT_CODES, product, quotaWindows, reportAction, reportsFor, TOPUPS } from "./catalog";
+import { ACTION_PRICES, PLANS, PRODUCT_CODES, product, quotaWindows, reportAction, reportsFor, sourcePages, TOPUPS } from "./catalog";
 import { quotaBlock, quotaState, resolvePlan } from "./wallet";
 
 describe("catalogue (révision tarifaire)", () => {
@@ -32,9 +32,18 @@ describe("catalogue (révision tarifaire)", () => {
     expect(product("admin")).toBeNull();
   });
   it("devis d'un rapport selon la taille réelle du texte lu", () => {
-    expect(reportAction(3_000)).toBe("report_short");
-    expect(reportAction(20_000)).toBe("report_standard");
-    expect(reportAction(200_000)).toBe("report_long");
+    // Pages du document (V5) : ≤ 10 / 11–40 / 41–100 / 101–150.
+    expect(reportAction(6)).toBe("report_short");
+    expect(reportAction(10)).toBe("report_short");
+    expect(reportAction(11)).toBe("report_standard");
+    expect(reportAction(40)).toBe("report_standard");
+    expect(reportAction(41)).toBe("report_long");
+    expect(reportAction(101)).toBe("report_xl");
+    expect(ACTION_PRICES.report_xl).toBe(140);
+    // PDF paginé : sa pagination ; texte sans pages : 2 500 caractères par page.
+    expect(sourcePages(6, 9_328)).toBe(6);
+    expect(sourcePages(null, 9_328)).toBe(4);
+    expect(sourcePages(2, 60_000)).toBe(6);
     expect([ACTION_PRICES.report_short, ACTION_PRICES.report_standard, ACTION_PRICES.report_long]).toEqual([22, 40, 92]);
   });
 });

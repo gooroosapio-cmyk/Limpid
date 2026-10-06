@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, VisualMode } from "@/lib/contracts/schemas";
 import { planPages } from "@/lib/engine/pipeline";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
-import { ACTION_PRICES, reportAction } from "@/lib/billing/catalog";
+import { ACTION_PRICES, CHARS_PER_PAGE, MAX_SOURCE_PAGES, reportAction, sourcePages } from "@/lib/billing/catalog";
 import { accountUsage, attachReservation, CreditError, getEntitlements, quotaBlock, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
@@ -59,7 +59,8 @@ export class CreateError extends Error {
       | "credits"
       | "quota"
       | "plan_reports"
-      | "plan_sources",
+      | "plan_sources"
+      | "too_long",
     message: string,
     /** Pages à lire par OCR (demande d'accord). */
     public readonly pages?: number,
@@ -152,7 +153,10 @@ export async function createReport(
   const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
 
   // Devis fixe selon la taille réelle du texte lu, puis réservation avant tout appel IA.
-  const action = reportAction(auto.chars);
+  if (auto.pages > MAX_SOURCE_PAGES) {
+    throw new CreateError("too_long", `Ce document compte environ ${auto.pages} pages : Limpid en traite ${MAX_SOURCE_PAGES} au plus. Importez-le en plusieurs parties.`, auto.pages, undefined, { limit: MAX_SOURCE_PAGES });
+  }
+  const action = reportAction(auto.pages);
   let reservationId: string;
   try {
     ({ reservationId } = await reserveCredits(userId, action, `report:${input.idempotency_key}`, {}, { wallet: ent.wallet }));
@@ -281,17 +285,24 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
   const ids = Array.isArray(sourceIds) ? sourceIds : [sourceIds];
   const [{ data: prefs }, { data: segs }] = await Promise.all([
     db.from("reader_preferences").select("familiarity, goal, default_mode, explanation_lang").eq("owner_id", userId).maybeSingle(),
-    db.from("source_segments").select("text").in("source_id", ids).limit(6_000),
+    db.from("source_segments").select("source_id, text").in("source_id", ids).limit(20_000),
   ]);
   // Pages encore à lire par OCR : estimées (2 500 caractères par page) pour le devis.
-  const { data: pending } = await db.from("sources").select("page_count, coverage").in("id", ids);
-  const ocrChars = (pending ?? [])
-    .filter((s) => (s.coverage as { pending_ocr?: boolean } | null)?.pending_ocr === true)
-    .reduce((n, s) => n + ((s.page_count as number | null) ?? 1) * 2_500, 0);
-  const chars = (segs ?? []).reduce((n, x) => n + (x.text as string).length, 0) + ocrChars;
+  const { data: meta } = await db.from("sources").select("id, page_count, coverage").in("id", ids);
+  const charsBy = new Map<string, number>();
+  for (const x of segs ?? []) charsBy.set(x.source_id as string, (charsBy.get(x.source_id as string) ?? 0) + (x.text as string).length);
+  let chars = 0;
+  let pages = 0;
+  for (const m of meta ?? []) {
+    const pendingOcr = (m.coverage as { pending_ocr?: boolean } | null)?.pending_ocr === true;
+    const c = (charsBy.get(m.id as string) ?? 0) + (pendingOcr ? ((m.page_count as number | null) ?? 1) * CHARS_PER_PAGE : 0);
+    chars += c;
+    pages += sourcePages(m.page_count as number | null, c);
+  }
   const mode: Mode = chosen ?? Mode.safeParse(prefs?.default_mode).data ?? "claire";
   return {
     chars,
+    pages,
     mode,
     level: levelFor(mode, prefs?.familiarity),
     goal: mode === "revision" ? ("reviser" as const) : (Goal.safeParse(prefs?.goal).data ?? "comprendre"),

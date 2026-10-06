@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
         source_missing: 410,
         source_used: 409,
         generation_disabled: 503,
+        too_long: 413,
         storage: 500,
       }[e.code];
       return NextResponse.json({ error: e.code, message: e.message, pages: e.pages, reportId: e.reportId }, { status });

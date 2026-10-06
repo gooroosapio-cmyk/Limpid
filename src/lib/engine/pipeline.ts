@@ -38,13 +38,13 @@ import {
   validateExplanation,
   validateKnowledge,
 } from "@/lib/contracts/validate";
-import { ComparisonData, FlowData, safeImageQuery, type ChartData } from "@/lib/render/visuals";
+import { ComparisonData, FlowData, safeImageQuery } from "@/lib/render/visuals";
 import { ProviderError, type AIProvider, type StageBudget, type UsageReport } from "./provider";
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-06.1";
-const MAX_REPAIRS = 2;
+export const PROMPT_VERSION = "2026-10-07.1";
+export const MAX_REPAIRS = 2;
 
 /* ---------- Brouillons demandés au modèle ---------- */
 
@@ -131,7 +131,7 @@ export type ExplanationDraft = z.infer<typeof ExplanationDraft>;
 /* ---------- Consignes (fiables, versionnées) ---------- */
 
 /** Règles éditoriales par niveau (cahier V2, § 6) : le niveau change l'effort d'explication, jamais les réserves. */
-const LEVEL_GUIDE: Record<Level, string> = {
+export const LEVEL_GUIDE: Record<Level, string> = {
   ultra_simple: "une idée à la fois ; mots courants ; tout terme nouveau défini tout de suite ; exemple concret ; analogie si utile",
   grand_public: "définitions accessibles ; liens essentiels entre les idées ; exemple et limites en langage courant",
   etudiant: "prérequis rappelés ; définitions précises ; relations entre notions ; glossaire et questions de vérification",
@@ -216,8 +216,7 @@ ${noExamples ? `  · Résumé fidèle : n'utilise PAS "analogy", "fictional_exam
 - template_id ${template ? `: "${template}" (imposé par le lecteur)` : "au choix"}, et l'ordre des sections suit sa séquence :
 ${templates}
   Sans indication : "comprendre_processus" pour une suite d'étapes, "comparer_options" pour une comparaison, "expliquer_document" pour un document précis, sinon "comprendre_sujet".
-- flow : si la source décrit un processus en étapes, 2 à 8 étapes (label ≤ 40 caractères, claim_id existant) ; sinon null.
-- chart : seulement si au moins 2 valeurs comparables de même unité figurent dans des affirmations "supported" : une barre par valeur (label court, claim_id, source_form = l'écriture exacte du nombre dans l'affirmation) ; sinon null.
+- flow : null. chart : null (aucun schéma ni graphique dans le cours).
 - comparison : seulement si la source compare des options : critères identiques pour chaque option, une cellule par critère (texte ≤ 80 caractères et claim_id "supported", ou text et claim_id null si la source ne dit rien) ; sinon null.
 - illustrations : ${noExamples ? "[] (aucune)" : "0 à 4 idées d'illustration générique qui simplifient une notion complexe (section_id, query = 2 à 5 mots-clés EN ANGLAIS décrivant une scène ou un objet courant, sans nom propre, sans chiffre, sans donnée du document ; subject = sujet ; alt_text). Aucune illustration ne porte un fait."}
 - Langue : ${language === "en" ? "anglais (English), quelle que soit la langue de la source" : language === "fr" ? "français, quelle que soit la langue de la source" : "celle des affirmations"}.`;
@@ -293,7 +292,7 @@ export function resolveEvidence(draft: ComprehensionDraft, segments: Map<string,
 /** Corrections demandées au modèle quand sa réponse ne respecte pas le schéma JSON. */
 const MAX_SCHEMA_FIXES = 2;
 
-async function callWithRetry<T extends z.ZodType>(
+export async function callWithRetry<T extends z.ZodType>(
   provider: AIProvider,
   input: GenerationInput,
   stage: string,
@@ -335,7 +334,7 @@ async function callWithRetry<T extends z.ZodType>(
   }
 }
 
-async function comprehension(provider: AIProvider, input: GenerationInput, segments: Map<string, SourceSegment>) {
+export async function comprehension(provider: AIProvider, input: GenerationInput, segments: Map<string, SourceSegment>) {
   const sourceText = segmentsPayload(input.segments);
   let draft: ComprehensionDraft | null = null;
   let feedback: string[] = [];
@@ -441,7 +440,7 @@ function verificationPayload(ko: KnowledgeObject, evidence: Evidence[], segments
  * Confronte chaque affirmation à ses extraits et abaisse son statut si nécessaire (jamais
  * l'inverse). Les écarts sont consignés ; une affirmation sans verdict garde son statut.
  */
-async function verifyClaims(
+export async function verifyClaims(
   provider: AIProvider,
   input: GenerationInput,
   ko: KnowledgeObject,
@@ -509,7 +508,7 @@ function knowledgePayload(ko: KnowledgeObject, evidence: Evidence[]): string {
 /** Retire les marques de mise en forme pour compter les mots. */
 const plain = (t: string) => t.replace(/\*\*?([^*]+)\*\*?/g, "$1");
 
-function buildExplanation(input: GenerationInput, ko: KnowledgeObject, draft: ExplanationDraft): ExplanationObject {
+export function buildExplanation(input: GenerationInput, ko: KnowledgeObject, draft: ExplanationDraft): ExplanationObject {
   const mode = input.mode ?? "claire";
   // Résumé fidèle : ni analogie, ni exemple inventé, ni complément (le moteur l'impose).
   const strip = (b: z.infer<typeof Section>["blocks"][number]) => mode !== "resume" || !["analogy", "fictional_example", "complement"].includes(b.type);
@@ -526,7 +525,7 @@ function buildExplanation(input: GenerationInput, ko: KnowledgeObject, draft: Ex
     .flatMap((x) => x.blocks.flatMap((b) => [b.text, ...(b.type === "list" ? b.items.map((i) => i.text) : [])]))
     .join(" ")
     .split(/\s+/).length;
-  const keyPoints = [...new Set(draft.key_points.map((k) => plain(k).trim()).filter(Boolean))].slice(0, 5);
+  const keyPoints = [...new Set(draft.key_points.map((k) => plain(k).trim()).filter(Boolean))].slice(0, 7);
   return {
     schema_version: SCHEMA_VERSION,
     id: `exp_${ko.id.slice(3)}`,
@@ -535,8 +534,9 @@ function buildExplanation(input: GenerationInput, ko: KnowledgeObject, draft: Ex
     goal: input.goal,
     mode,
     key_points: keyPoints,
-    // Garde-fou : une source pauvre donne un résultat court, annoncé comme tel.
-    short_result: mode !== "revision" && (sections.length < 3 || words < 300),
+    // Résultat court annoncé seulement quand la source elle-même est pauvre (peu d'affirmations
+    // soutenues), jamais pour masquer une rédaction trop mince.
+    short_result: mode !== "revision" && ko.claims.filter((c) => c.support_status === "supported").length < 6 && words < 300,
     preferences_snapshot: input.preferences,
     sections: sections.length ? sections : draft.sections.slice(0, 1),
     glossary: draft.glossary,
@@ -581,59 +581,8 @@ export function buildBlueprint(
     placed.set(target, [...(placed.get(target) ?? []), visualId].slice(0, 5));
   };
 
-  if (draft.flow && visualMode !== "aucun") {
-    const steps = draft.flow.steps.filter((x) => supported(x.claim_id));
-    if (steps.length >= 2) {
-      const claimIds = [...new Set(steps.map((x) => x.claim_id))].slice(0, 30);
-      const labels = steps.map((x) => x.label);
-      visuals.push({
-        id: "vis_flow",
-        kind: "flow",
-        purpose: "Montrer l'enchaînement des étapes",
-        claim_ids: claimIds,
-        evidence_ids: evidenceOf(claimIds),
-        data: { steps, cyclic: draft.flow.cyclic },
-        alt_text: `Schéma${draft.flow.cyclic ? " en boucle" : ""} : ${labels.join(", puis ")}.`.slice(0, 2_000),
-        caption: "Les étapes, dans l'ordre",
-        illustrative_only: false,
-      });
-      place("vis_flow", claimIds);
-    } else {
-      warnings.push("Schéma de flux écarté : étapes insuffisamment sourcées.");
-    }
-  }
-
-  if (draft.chart && visualMode !== "aucun") {
-    // Chaque valeur est reprise des nombres validés de l'affirmation : le modèle ne fournit que le repère.
-    const norm = (t: string) => t.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
-    const bars: ChartData["bars"] = [];
-    const units = new Set<string>();
-    for (const b of draft.chart.bars) {
-      if (!supported(b.claim_id)) continue;
-      const n = claims.get(b.claim_id)!.numbers.find((x) => norm(x.source_form) === norm(b.source_form));
-      if (!n) continue;
-      bars.push({ label: b.label, value: n.value, source_form: n.source_form, claim_id: b.claim_id });
-      units.add(n.unit ?? "");
-    }
-    if (bars.length >= 2 && units.size === 1) {
-      const claimIds = [...new Set(bars.map((x) => x.claim_id))].slice(0, 30);
-      visuals.push({
-        id: "vis_chart",
-        kind: "bar_chart",
-        purpose: "Comparer des valeurs de la source",
-        claim_ids: claimIds,
-        evidence_ids: evidenceOf(claimIds),
-        data: { unit: [...units][0] || null, bars },
-        alt_text: `Graphique en barres. ${bars.map((x) => `${x.label} : ${x.source_form}`).join(" ; ")}.`.slice(0, 2_000),
-        caption: draft.chart.title,
-        illustrative_only: false,
-      });
-      place("vis_chart", claimIds);
-    } else {
-      warnings.push("Graphique écarté : valeurs absentes des affirmations soutenues ou unités différentes.");
-    }
-  }
-
+  // V5 : aucun schéma ni graphique tracé par le code (flow et chart ignorés) ; seul le tableau
+  // comparatif, rendu en HTML, reste un visuel de données.
   if (draft.comparison && visualMode !== "aucun") {
     const c = draft.comparison;
     // Une cellule sans affirmation soutenue n'affiche aucun contenu du modèle.
