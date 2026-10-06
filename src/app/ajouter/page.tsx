@@ -5,21 +5,21 @@ import { ImportForm } from "@/components/ImportForm";
 import { Screen } from "@/components/shell/Screen";
 import { Mode } from "@/lib/contracts/schemas";
 import { requireUser } from "@/lib/auth";
-import { isDemoMode, isUrlImportEnabled, limits, retention } from "@/lib/config";
+import { isDemoMode, isUrlImportEnabled, limits } from "@/lib/config";
 import { getT } from "@/lib/i18n/server";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
-  return { title: t.add.title };
+  return { title: t.v4.add.title };
 }
 
 const TABS = { fichier: "file", lien: "link", texte: "text" } as const;
 
 /**
- * Nouveau Limpid (V4, § 15) : titre court, Fichier / Lien / Texte, quatre approches,
- * « Créer mon Limpid », puis « Voir mes Limpid » et « Propulsé par gooroo ».
+ * Créer un Limpid (V4, § 6) : Fichier / Lien / Texte et leurs contraintes réelles, quatre
+ * approches, niveau et longueur dans une feuille locale, coût estimé par le serveur.
  */
 export default async function AddPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
   await requireUser();
@@ -31,10 +31,7 @@ export default async function AddPage({ searchParams }: { searchParams: Promise<
   const tab = TABS[mode as keyof typeof TABS] ?? "file";
   return (
     <Screen className="add-page">
-      <div className="page-title">
-        <h1>{t.add.heading}</h1>
-        <p>{t.add.v2.lede}</p>
-      </div>
+      <h1>{t.v4.add.title}</h1>
       <DemoBanner />
       {!enabled && <p className="notice notice-warn">{t.create.notConfigured}</p>}
       <ImportForm
@@ -47,7 +44,7 @@ export default async function AddPage({ searchParams }: { searchParams: Promise<
         defaultMode={Mode.safeParse(prefs?.default_mode).data ?? "claire"}
       />
       <p className="muted small add-privacy">
-        <span>{t.add.privacy(Math.round(retention.originalHours / 24), retention.reportDays)}</span>{" "}
+        <span>{t.add.privacy}</span>{" "}
         <Link href="/compte/donnees">{t.add.privacyLink}</Link>
       </p>
       <div className="add-foot">

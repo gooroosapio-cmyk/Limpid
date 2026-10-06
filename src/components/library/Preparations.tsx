@@ -15,7 +15,7 @@ import { Cover } from "./Cover";
 const STAGES = ["validation", "extraction", "comprehension", "explication", "verification", "mise_en_page"] as const;
 
 interface RunningItem { id: string; title: string; cover: CoverView; sourceCount: number; stage: string | null }
-interface FailedItem { id: string; title: string; cover: CoverView; sourceCount: number; reason: string }
+interface FailedItem { id: string; title: string; cover: CoverView; sourceCount: number; reason: string; retryable: boolean }
 
 function FailedCard({ item }: { item: FailedItem }) {
   const t = useT();
@@ -45,10 +45,15 @@ function FailedCard({ item }: { item: FailedItem }) {
         <p className="status status-failed"><Icon name="alert" /> <span>{v.interrupted}</span></p>
         <p className="muted small">{item.reason}</p>
         <p className="muted small">{v.sourcesKept}</p>
+        {!item.retryable && <p id={`later-${item.id}`} className="muted small">{t.v4.library.retryLaterNote}</p>}
         <div className="prep-actions">
-          <button type="button" className={`btn btn-primary${busy ? " busy" : ""}`} disabled={busy} onClick={retry}>
-            {busy ? t.library.retrying : t.library.retry}
-          </button>
+          {item.retryable ? (
+            <button type="button" className={`btn btn-primary${busy ? " busy" : ""}`} disabled={busy} onClick={retry}>
+              {busy ? t.library.retrying : t.library.retry}
+            </button>
+          ) : (
+            <button type="button" className="btn" disabled aria-describedby={`later-${item.id}`}>{t.v4.library.retryLater}</button>
+          )}
           <Link href={`/rapports/${item.id}`} className="btn">{v.details}</Link>
         </div>
       </div>

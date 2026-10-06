@@ -37,32 +37,27 @@ async function patch(id: string, body: Record<string, unknown>): Promise<boolean
   return !!res?.ok;
 }
 
-/** Statut toujours accompagné d'une icône et d'un libellé (jamais la couleur seule). */
-export function StatusLabel({ state, sources, sourcesFirst = false }: { state: RowData["state"]; sources: number; sourcesFirst?: boolean }) {
+/** Statut constant (Prêt / En préparation / Préparation interrompue) : icône et texte, jamais la couleur seule. */
+export function StatusLabel({ state }: { state: RowData["state"] }) {
   const t = useT();
   const icon: IconName = state === "failed" ? "alert" : state === "running" ? "hourglass" : "check";
   const label = state === "failed" ? t.library.v2.interrupted : state === "running" ? t.library.v2.preparing : t.library.v2.ready;
-  const count = t.library.v2.sources(sources);
   return (
     <span className={`status status-${state}`}>
-      {state === "ready" ? <span className="status-ok" aria-hidden="true"><Icon name="check" size={13} /></span> : <Icon name={icon} />}
-      <span>{sourcesFirst ? count : label}</span>
-      <span aria-hidden="true">·</span>
-      <span>{sourcesFirst ? label.toLowerCase() : count}</span>
+      <Icon name={icon} size={14} />
+      <span>{label}</span>
     </span>
   );
 }
 
 /**
- * Une leçon de la bibliothèque (LessonCard) : couverture 4:5 en grille, miniature en liste.
- * Favori et menu ⋯ (cibles 44 px) ; appui long, clic droit ou Maj+F10 ouvrent le même menu.
+ * Un Limpid de la bibliothèque : carte (visuel 4/3) en grille, miniature en liste. Menu ⋯
+ * (cible 44 px, favori, renommer, déplacer, supprimer…) ; appui long, clic droit ou Maj+F10.
  * En sélection, toucher la carte la coche au lieu de l'ouvrir. En échec : Réessayer et Supprimer.
  */
 export function ReportRow({
   row,
   variant = "grid",
-  showFavorite = true,
-  sourcesFirst = false,
   showFailure = false,
   selecting = false,
   selected = false,
@@ -73,10 +68,6 @@ export function ReportRow({
 }: {
   row: RowData;
   variant?: "grid" | "list";
-  /** Cœur visible sur la carte (vue Prêts / Favoris), absent sur l'accueil. */
-  showFavorite?: boolean;
-  /** « 5 sources · prêt » (accueil) au lieu de « Prêt · 5 sources ». */
-  sourcesFirst?: boolean;
   showFailure?: boolean;
   selecting?: boolean;
   selected?: boolean;
@@ -224,23 +215,28 @@ export function ReportRow({
     onOpen?.();
   };
 
+  // Carte V4 : visuel 4/3 puis zone de texte opaque (titre 2 lignes, sources et date sur une
+  // ligne, statut). L'image ne passe jamais devant le texte.
   const body = (
     <>
-      <Cover cover={cover} className={variant === "grid" ? "lesson-cover" : "lesson-thumb"} />
+      <Cover cover={cover} className={variant === "grid" ? "limpid-card-cover" : "lesson-thumb"} />
       <span className="lesson-text">
-        <b className="lesson-title">
+        <b className="lesson-title" title={title}>
           {title}
           {row.unread && <span className="unread-dot" role="img" aria-label={t.library.unread} />}
         </b>
-        <StatusLabel state={row.state} sources={row.sourceCount} sourcesFirst={sourcesFirst} />
-        <small className="lesson-date">{row.sub}</small>
-        {row.folderName && <small className="lesson-folder">{t.library.inFolder(row.folderName)}</small>}
+        <small className="meta lesson-meta">{v.sources(row.sourceCount)} · {row.sub}</small>
+        <span className="lesson-status">
+          <StatusLabel state={row.state} />
+          {favorite && <span className="lesson-fav-mark" role="img" aria-label={t.v4.library.favorite}><Icon name="heart" size={14} className="is-on" /></span>}
+        </span>
+        {row.folderName && <small className="meta lesson-folder">{t.library.inFolder(row.folderName)}</small>}
       </span>
     </>
   );
 
   return (
-    <li className={`lesson lesson-${variant} lesson-${row.state}${selected ? " is-selected" : ""}`}>
+    <li className={`lesson limpid-item limpid-item-${variant} lesson-${row.state}${selected ? " is-selected" : ""}`}>
       <div className="lesson-main" {...press}>
       {selecting ? (
         <label className="lesson-hit">
@@ -254,13 +250,8 @@ export function ReportRow({
       )}
       {!selecting && (
         <div className="lesson-actions">
-          {row.state === "ready" && showFavorite && (
-            <button type="button" className="ib ib-round lesson-fav" aria-pressed={favorite} aria-label={favorite ? v.unfavorite(title) : v.favorite(title)} onClick={toggleFavorite}>
-              <Icon name="heart" size={22} className={favorite ? "is-on" : undefined} />
-            </button>
-          )}
-          <button type="button" className="ib ib-round lesson-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(title)} onClick={openMenu}>
-            <Icon name="more" size={22} />
+          <button type="button" className="icon-button lesson-more" aria-haspopup="dialog" aria-label={t.library.actionsFor(title)} onClick={openMenu}>
+            <Icon name="more" size={20} />
           </button>
         </div>
       )}

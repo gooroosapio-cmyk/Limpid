@@ -224,6 +224,8 @@ export async function createReport(
 export const BatchRequest = z.strictObject({
   source_ids: z.array(z.string().uuid()).min(1).max(MAX_SOURCES),
   mode: Mode.optional(),
+  level: Level.optional(),
+  target_pages: TargetPages.optional(),
   visual_mode: VisualMode.optional(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,90}$/),
 });
@@ -253,7 +255,7 @@ export async function createBatch(userId: string, input: z.infer<typeof BatchReq
     }
     const { reportId } = await createReport(
       userId,
-      { source_id: sourceId, mode: input.mode, visual_mode: input.visual_mode, idempotency_key: key },
+      { source_id: sourceId, mode: input.mode, level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key },
       { limitsChecked: true },
     );
     reportIds.push(reportId);

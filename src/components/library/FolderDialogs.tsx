@@ -57,7 +57,7 @@ function NameDialog({
 }
 
 /** « Nouveau dossier » (bibliothèque ; aussi ouvert depuis le menu par ?nouveau-dossier=1). */
-export function NewFolder() {
+export function NewFolder({ iconOnly = false }: { iconOnly?: boolean }) {
   const t = useT();
   const router = useRouter();
   const pathname = usePathname();
@@ -75,9 +75,15 @@ export function NewFolder() {
 
   return (
     <>
-      <button type="button" className="btn lib-newfolder" aria-haspopup="dialog" onClick={() => ref.current?.showModal()}>
-        <Icon name="folder-plus" /> {t.library.newFolder}
-      </button>
+      {iconOnly ? (
+        <button type="button" className="icon-button lib-newfolder-icon" aria-haspopup="dialog" aria-label={t.library.newFolder} onClick={() => ref.current?.showModal()}>
+          <Icon name="folder-plus" size={20} />
+        </button>
+      ) : (
+        <button type="button" className="btn lib-newfolder" aria-haspopup="dialog" onClick={() => ref.current?.showModal()}>
+          <Icon name="folder-plus" /> {t.library.newFolder}
+        </button>
+      )}
       <NameDialog
         dialogRef={ref}
         title={t.library.newFolder}

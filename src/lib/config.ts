@@ -33,12 +33,19 @@ export function isUrlImportEnabled(): boolean {
   return (process.env.LIMPID_URL_IMPORT ?? "on").toLowerCase() !== "off";
 }
 
+/**
+ * Conservation (V4, § 7) : les Limpid et leurs documents originaux sont gardés jusqu'à leur
+ * suppression par l'utilisateur. Aucune variable d'environnement ne réintroduit d'échéance.
+ * Seuls restent temporaires : un envoi jamais utilisé dans un Limpid (24 h) et un envoi
+ * interrompu avant la fin du téléversement (cf. sources/uploads.ts).
+ */
 export const retention = {
-  /** Purge du fichier original après extraction (payload 1 § 6 ; cadrage Q18). */
-  /** Original conservé comme le rapport (30 jours) pour « Ouvrir le PDF » ; envois non utilisés : 24 h. */
-  originalHours: int("LIMPID_RETENTION_ORIGINAL_HOURS", 720),
-  /** Rapports effacés N jours après leur création (décision du 4 octobre 2026 : 30) ; 0 = illimité. */
-  reportDays: int("LIMPID_RETENTION_REPORT_DAYS", 30),
+  /** 0 : aucune purge automatique des Limpid. */
+  reportDays: 0,
+  /** 0 : original gardé tant que le Limpid (ou la source) existe. */
+  originalHours: 0,
+  /** Envoi préparé mais jamais utilisé dans un Limpid : effacé après ce délai. */
+  unusedHours: 24,
 };
 
 export const budget = {
