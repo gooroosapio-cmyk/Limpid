@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 import { ComfortSettings } from "@/components/account/DisplaySettings";
 import { MODES, type Mode } from "@/lib/contracts/schemas";
-import type { DisplayPrefs } from "@/lib/display/prefs";
+import { DISPLAY_COOKIES, setDisplayPref, type DisplayPrefs, type TextSize } from "@/lib/display/prefs";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { OfflineSave } from "../OfflineSave";
@@ -62,18 +62,47 @@ function Row({ icon, title, sub, onClick, href, danger, external }: { icon: Icon
   );
 }
 
+/** Taille de lecture (kit V5) : 16, 18 ou 20 px, sans régénérer le cours. */
+const READING_SIZES: { px: number; value: TextSize }[] = [
+  { px: 16, value: "standard" },
+  { px: 18, value: "grand" },
+  { px: 20, value: "tres-grand" },
+];
+
+function ReadingSize({ initial }: { initial: TextSize }) {
+  const t = useT();
+  const [text, setText] = useState<TextSize>(initial === "petit" ? "standard" : initial);
+  return (
+    <div className="setting setting-sizes">
+      <span><b>{t.lim.textSize}</b></span>
+      <div className="seg" role="radiogroup" aria-label={t.lim.textSize}>
+        {READING_SIZES.map((s) => (
+          <button
+            key={s.px}
+            type="button"
+            role="radio"
+            aria-checked={text === s.value}
+            onClick={() => {
+              setText(s.value);
+              setDisplayPref(DISPLAY_COOKIES.text, s.value === "standard" ? null : s.value, "data-text", s.value === "standard" ? null : s.value);
+            }}
+          >
+            {s.px} px
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Options du Limpid (V4, § 8) : actions rares, distinctes de la lecture. */
 export function OptionsPanel({
   data,
-  continuous,
-  onContinuous,
   onNavigate,
   annexHref,
   onAnnex,
 }: {
   data: OptionsData;
-  continuous: boolean;
-  onContinuous: (on: boolean) => void;
   onNavigate: () => void;
   /** Page Annexes du rapport, à une ancre (Annexes, Sources, Glossaire). */
   annexHref: (hash: string) => string;
@@ -151,14 +180,8 @@ export function OptionsPanel({
     return (
       <div className="stagger" key="display">
         {back(t.lim.optDisplay)}
-        <ComfortSettings initial={data.display} />
-        <label className="setting">
-          <span><b>{t.lim.continuous[0]}</b><small>{t.lim.continuous[1]}</small></span>
-          <span className="switch">
-            <input type="checkbox" checked={continuous} onChange={(e) => onContinuous(e.target.checked)} />
-            <i aria-hidden="true" />
-          </span>
-        </label>
+        <ReadingSize initial={data.display.text} />
+        <ComfortSettings initial={data.display} withSize={false} />
       </div>
     );
 

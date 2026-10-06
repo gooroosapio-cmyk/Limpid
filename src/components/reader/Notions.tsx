@@ -10,6 +10,8 @@ import { SourceRef } from "./Sources";
 export interface Notion {
   term: string;
   definition: string;
+  /** V5 : exemple préproduit avec le cours (aucun appel IA au toucher). */
+  example?: string | null;
   /** Références numérotées vers les extraits (définition sourcée dans le rapport). */
   refs: { n: number; evidenceId: string }[];
 }
@@ -61,6 +63,9 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
             <p className="eyebrow">{t.reader.inReport}</p>
             <h3 id="notion-title" className="notion-term">{notion.term}</h3>
             <p className="notion-def">{notion.definition}</p>
+            {notion.example && (
+              <p className="notion-example"><strong>{t.lim.example}</strong> {notion.example}</p>
+            )}
             {notion.refs.length > 0 && (
               <p className="citation">
                 <Icon name="file" /> {t.reader.source}

@@ -6,7 +6,7 @@ import { DISPLAY_COOKIES, MODES, TEXT_SIZES, setDisplayPref, type DisplayPrefs, 
 import { useT } from "@/lib/i18n/client";
 
 /** Confort de lecture de l'appareil : taille du texte, animations, contraste. Sans IA, effet immédiat. */
-export function ComfortSettings({ initial }: { initial: DisplayPrefs }) {
+export function ComfortSettings({ initial, withSize = true }: { initial: DisplayPrefs; withSize?: boolean }) {
   const t = useT();
   const [text, setText] = useState<TextSize>(initial.text);
   const [motion, setMotion] = useState(initial.reduceMotion);
@@ -20,11 +20,11 @@ export function ComfortSettings({ initial }: { initial: DisplayPrefs }) {
 
   return (
     <>
-      <div className="sizes" role="group" aria-label={t.compte.comfort}>
+      {withSize && <div className="sizes" role="group" aria-label={t.compte.comfort}>
         <button type="button" aria-label={t.compte.smaller} disabled={i <= 0} onClick={() => size(TEXT_SIZES[i - 1]!)}>A−</button>
         <span aria-live="polite">{t.compte.sizes[text]}</span>
         <button type="button" aria-label={t.compte.larger} disabled={i >= TEXT_SIZES.length - 1} onClick={() => size(TEXT_SIZES[i + 1]!)}>A+</button>
-      </div>
+      </div>}
       <label className="setting">
         <span><b>{t.compte.motion[0]}</b><small>{t.compte.motion[1]}</small></span>
         <span className="switch">

@@ -12,13 +12,13 @@ import { sourceEntries, type SourceEntry } from "@/lib/render/sources";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { NotionTerm, type Notion } from "../Notions";
 import { SourceRef } from "../Sources";
-import { VisualFigure, WrapFigure, type AssetView } from "../Visuals";
-import { Checkpoint } from "./Checkpoint";
+import { VisualFigure, type AssetView } from "../Visuals";
+import { ChapterCheck } from "./ChapterCheck";
 import { AnnexLinks, EndActions } from "./EndActions";
 import { ExampleBlock } from "./ExampleBlock";
 
 /** Taille des groupes des longues listes (une pièce = un groupe insécable). */
-const CHUNK = 5;
+const CHUNK = 100;
 
 interface Terms {
   matcher: RegExp | null;
@@ -201,6 +201,20 @@ export function buildNotions(explanation: ExplanationObject, numbers: Map<string
       byKey.set(key, { term: b.term.trim(), definition: b.text, refs });
     }
   }
+  // V5 : notions du chapitre (définition simple et exemple préproduits).
+  for (const s of explanation.sections) {
+    for (const n of s.notions ?? []) {
+      const key = n.term.trim().toLowerCase();
+      if (byKey.has(key)) continue;
+      const claims = new Set(n.claim_ids);
+      const ev = s.blocks.filter((b) => b.claim_ids.some((c) => claims.has(c))).flatMap((b) => b.evidence_ids);
+      const refs = [...new Set(ev)].slice(0, 3).flatMap((id) => {
+        const num = numbers.get(id);
+        return num ? [{ n: num, evidenceId: id }] : [];
+      });
+      byKey.set(key, { term: n.term.trim(), definition: n.definition, example: n.example, refs });
+    }
+  }
   for (const g of explanation.glossary) {
     const key = g.term.trim().toLowerCase();
     if (!byKey.has(key)) byKey.set(key, { term: g.term.trim(), definition: g.definition, refs: [] });
@@ -263,81 +277,51 @@ export function composeLimpid({
   out.push(
     // Couverture puis points clés, en pièces distinctes : ce qui ne tient pas dans l'écran
     // passe à la vue suivante au lieu d'être coupé.
-    <header key="cover" id="lim_cover" className="piece cover" {...attrs({})}>
-      <p className="eyebrow cover-eyebrow">
+    // V5 : titre compact (aucune couverture plein écran), immédiatement suivi du résumé.
+    <header key="head" id="lim_cover" className="piece lim-head" {...attrs({})}>
+      <p className="eyebrow lim-head-eyebrow">
         {isDemo && <span className="badge badge-demo">{t.demo.badge}</span>} {modeLabel ? `${modeLabel} · ` : ""}{t.reader.eyebrow(chapters.length, notions.length)}
       </p>
-      <h1 className="cover-title">{blueprint.title}</h1>
+      <h1 className="lim-head-title">{blueprint.title}</h1>
       {status}
     </header>,
+    <section key="keypoints" id="lim_keypoints" className="piece keypoints" aria-labelledby="kp-h" {...attrs({})}>
+      <h2 id="kp-h" className="keypoints-title">{t.lim.keyPoints}</h2>
+      <ul>{keyPoints.map((k, i) => <li key={i}><Rich text={k} ctx={ctx} linkTerms={false} /></li>)}</ul>
+      {explanation.short_result && <p className="notice short-result" role="note">{t.lim.shortResult}</p>}
+    </section>,
   );
-  // Points clés par groupes de 3 : un long encadré passe sur deux vues au lieu d'être coupé.
-  const kpGroups = chunks(keyPoints, 3);
-  kpGroups.forEach((group, g) => {
-    const last = g === kpGroups.length - 1;
-    out.push(
-      <section
-        key={`keypoints-${g}`}
-        id={g === 0 ? "lim_keypoints" : `lim_keypoints_${g + 1}`}
-        className={`piece keypoints${g > 0 ? " keypoints-cont" : ""}`}
-        aria-labelledby="kp-h"
-        {...attrs({ breakAfter: last })}
-      >
-        {g === 0 && <h2 id="kp-h" className="keypoints-title">{t.lim.keyPoints}</h2>}
-        <ul>{group.map((k, i) => <li key={g * 3 + i}><Rich text={k} ctx={ctx} linkTerms={false} /></li>)}</ul>
-        {last && explanation.short_result && <p className="notice short-result" role="note">{t.lim.shortResult}</p>}
-      </section>,
-    );
-  });
 
-  let wrapCount = 0;
   ordered.forEach(({ s, bs }, si) => {
     const placed = bs.visual_ids.flatMap((id) => (visuals.get(id) ? [visuals.get(id)!] : []));
-    const where = (v: VisualSpec) => v.placement ?? (v.kind === "illustration" ? "before" : "after");
     out.push(
       <div key={`h-${s.id}`} id={s.id} className="piece section-head" {...attrs({ keep: true, section: s.id })}>
-        <p className="eyebrow section-n">{si + 1} / {ordered.length}</p>
+        <p className="eyebrow section-n">{t.lim.chapterLabel(si + 1)}</p>
         <h2>{s.question}</h2>
       </div>,
     );
-    for (const v of placed.filter((v) => where(v) === "before")) out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
-    const margins = placed.filter((v) => where(v) === "margin");
-    // Incrustations : chaque visuel « wrap » rejoint un bloc de texte de la partie (celui que
-    // vise le dessin, sinon le plus long), côtés alternés ; sans bloc adapté, il suit la partie.
-    const floats = new Map<string, React.ReactNode>();
-    const unplaced: VisualSpec[] = [];
-    for (const v of placed.filter((x) => where(x) === "wrap")) {
-      const asset = v.kind === "illustration" ? assets[String((v.data as { asset_id?: unknown }).asset_id ?? "")] : undefined;
-      if (v.kind === "illustration" && !asset) continue;
-      const wanted = String((v.data as { block_id?: unknown }).block_id ?? "");
-      const textual = s.blocks.filter((b) => !floats.has(b.id) && ["fact", "definition", "inference", "caution", "list", "complement"].includes(b.type));
-      const anchor = textual.find((b) => b.id === wanted) ?? [...textual].sort((a, c) => c.text.length - a.text.length).find((b) => b.text.length >= 140);
-      if (!anchor) {
-        unplaced.push(v);
-        continue;
-      }
-      floats.set(anchor.id, <WrapFigure key={v.id} visual={v} asset={asset} side={wrapCount++ % 2 === 0 ? "right" : "left"} />);
-    }
+    // V5 : une figure prend toute la largeur, après l'explication qu'elle accompagne (jamais
+    // de texte qui l'entoure sur mobile). Illustration après le premier bloc, données ensuite.
+    const illustrations = placed.filter((v) => v.kind === "illustration");
+    const others = placed.filter((v) => v.kind !== "illustration" && v.kind !== "drawing");
     s.blocks.forEach((b, bi) => {
-      const pieces = blockPieces(b, s.id, ctx, floats.get(b.id));
-      const margin = bi === 0 ? margins.shift() : undefined;
-      // Visuel « en marge » : associé au premier bloc (côte à côte sur grand écran, empilé sur mobile).
-      if (margin && pieces.length === 1) {
-        const paired = visualPiece(margin, s.id, ctx, assets, showIllustrations, pieces[0]);
-        out.push(paired ?? pieces[0]);
-      } else {
-        if (margin) margins.unshift(margin);
-        out.push(...pieces);
-      }
+      out.push(...blockPieces(b, s.id, ctx));
+      if (bi === 0) for (const v of illustrations) out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
     });
-    for (const v of [...placed.filter((v) => where(v) === "after" || where(v) === "center"), ...margins, ...unplaced]) {
-      out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
+    for (const v of others) out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
+    if (s.retain?.length) {
+      out.push(
+        <aside key={`ret-${s.id}`} id={`ret_${s.id}`} className="piece retain" aria-label={t.lim.retain} {...attrs({ section: s.id })}>
+          <p className="retain-title">{t.lim.retain}</p>
+          <ul>{s.retain.map((r, i) => <li key={i}><Rich text={r} ctx={ctx} linkTerms={false} /></li>)}</ul>
+        </aside>,
+      );
     }
     const ckp = checkpoints.get(s.id);
     if (ckp?.length) {
       out.push(
-        <div key={`ckp-${s.id}`} id={`ckp_${s.id}`} className="piece piece-checkpoint" {...attrs({ section: s.id, breakBefore: true, breakAfter: true })}>
-          <Checkpoint id={`ckp_${s.id}`} sectionId={s.id} exercises={ckp} />
+        <div key={`ckp-${s.id}`} id={`ckp_${s.id}`} className="piece piece-checkpoint" {...attrs({ section: s.id })}>
+          <ChapterCheck id={`ckp_${s.id}`} sectionId={s.id} title={s.question} exercises={ckp} />
         </div>,
       );
     }
