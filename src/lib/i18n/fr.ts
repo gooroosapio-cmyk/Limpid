@@ -1006,7 +1006,7 @@ export const fr = {
     retry: "Reprendre",
     cancel: "Annuler la tâche",
     cancelPending: "annulation demandée",
-    stages: { validation: "Validation", extraction: "Lecture", comprehension: "Compréhension", explication: "Explication", verification: "Vérification", mise_en_page: "Mise en page" } as Record<string, string>,
+    stages: { validation: "Validation", extraction: "Lecture", comprehension: "Compréhension", explication: "Explication", verification: "Vérification", plan: "Plan", mise_en_page: "Mise en page" } as Record<string, string>,
     jobsTable: "Tableau des tâches récentes (défilement horizontal possible)",
     none: "Rien pour l'instant.",
     date: "Date",

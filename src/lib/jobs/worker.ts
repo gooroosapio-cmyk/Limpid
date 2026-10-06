@@ -30,8 +30,9 @@ import { svgSize } from "@/lib/visuals/svg";
 import { generateDrawings } from "@/lib/engine/drawings";
 import { generateExercises } from "@/lib/engine/exercises";
 import {
-  generateReport,
   PROMPT_VERSION,
+  understand,
+  write,
   regenerateExplanation,
   regenerateSection,
   reverifyKnowledge,
@@ -39,7 +40,8 @@ import {
   type Variation,
 } from "@/lib/engine/pipeline";
 import { visualConfig } from "@/lib/visuals/config";
-import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
+import { carryIllustrations, illustrate, mergeVisualPasses, pendingIllustrations, type AssetRow } from "@/lib/visuals/illustrate";
+import { loadUnderstanding, loadWriting, saveUnderstanding, saveWriting } from "./checkpoints";
 import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { finishJobReservation } from "@/lib/billing/wallet";
@@ -109,10 +111,10 @@ const DRAWING_BUDGET = { tier: "quality" as const, maxInputTokens: 40_000, maxOu
  * Exercices du support (points de contrôle et bilan), rédigés une fois avec la version.
  * Un échec n'empêche jamais le rapport : le lecteur pourra demander un test plus tard.
  */
-async function storeExercises(job: JobRow, versionId: string, explanation: ExplanationObject, knowledge: KnowledgeObject, evidenceIds: Set<string>, controller: AbortController) {
-  let set: ExerciseSet;
+/** Exercices du support ; un échec laisse le rapport sans exercices (jamais bloquant). */
+async function prepareExercises(job: JobRow, explanation: ExplanationObject, knowledge: KnowledgeObject, evidenceIds: Set<string>, controller: AbortController): Promise<ExerciseSet | null> {
   try {
-    set = await generateExercises(getProvider(), {
+    return await generateExercises(getProvider(), {
       explanation,
       knowledge,
       evidenceIds,
@@ -125,15 +127,25 @@ async function storeExercises(job: JobRow, versionId: string, explanation: Expla
   } catch (e) {
     if (e instanceof ProviderError && e.usage) await recordUsage(job, "exercises", 0, e.usage);
     console.error("exercises", e instanceof ProviderError ? e.code : (e as Error).name);
-    return;
+    return null;
   }
+}
+
+async function saveExercises(job: JobRow, versionId: string, set: ExerciseSet | null) {
+  if (!set) return;
   await adminClient()
     .from("report_quizzes")
     .upsert({ owner_id: job.owner_id, report_version_id: versionId, scope_key: "exercises", questions: set }, { onConflict: "report_version_id,scope_key" });
 }
 
+async function storeExercises(job: JobRow, versionId: string, explanation: ExplanationObject, knowledge: KnowledgeObject, evidenceIds: Set<string>, controller: AbortController) {
+  await saveExercises(job, versionId, await prepareExercises(job, explanation, knowledge, evidenceIds, controller));
+}
+
 /** Au-delà de cette durée après la réservation, la génération repart dans une nouvelle invocation. */
 const REQUEUE_AFTER_MS = 120_000;
+/** Après la rédaction, temps restant minimal (fonction de 300 s) pour finir visuels et exercices. */
+const REQUEUE_BEFORE_VISUALS_MS = 190_000;
 
 class JobFailure extends Error {
   constructor(
@@ -415,7 +427,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
   const preferences = await preferencesOf(job.owner_id);
   const provider = getProvider();
 
-  const out = await generateReport(provider, {
+  const input = {
     sourceId: `src_${sourceIds[0]}`,
     sourceIds: sourceIds.map((id) => `src_${id}`),
     segments,
@@ -427,16 +439,46 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     preferences,
     signal: controller.signal,
     budgets: {
-      comprehension: { tier: "fast", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-      explanation: { tier: "quality", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      explanation: { tier: "quality" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      plan: { tier: "lite" as const, maxInputTokens: 60_000, maxOutputTokens: 4_000, timeoutMs: 60_000 },
     },
-    onStage: (stage) => setStage(job.id, stage),
-    onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
+    onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
+    onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
     verifyClaims: process.env.LIMPID_VERIFY_CLAIMS !== "off",
     template: job.params.template ?? null,
     visualMode: job.params.visual_mode ?? "auto",
-  });
-  const blueprint = await runIllustrations(job, await runDrawings(job, out.explanation, out.blueprint, controller), controller);
+    plan: process.env.LIMPID_PLAN !== "off",
+  };
+
+  // Reprise par étape : une sortie déjà validée pour cette tâche n'est ni refaite ni repayée.
+  let understanding = await loadUnderstanding(job.id);
+  if (!understanding) {
+    understanding = await understand(provider, input);
+    await saveUnderstanding(job.id, understanding);
+    if (Date.now() - claimedAt > REQUEUE_AFTER_MS && understanding.validation.blocking_errors.length === 0) {
+      await requeue(job.id);
+      return "requeued";
+    }
+  }
+  let out = await loadWriting(job.id, understanding);
+  if (!out) {
+    out = await write(provider, input, understanding);
+    await saveWriting(job.id, out);
+    if (Date.now() - claimedAt > REQUEUE_BEFORE_VISUALS_MS && out.validation.explanation.blocking_errors.length === 0) {
+      await requeue(job.id);
+      return "requeued";
+    }
+  }
+
+  // Dessins, illustrations et exercices en parallèle : aucun ne dépend des autres.
+  const evidenceIds = new Set(out.evidence.map((e) => e.id));
+  const [drawn, illustrated, exercises] = await Promise.all([
+    runDrawings(job, out.explanation, out.blueprint, controller),
+    runIllustrations(job, out.blueprint, controller),
+    prepareExercises(job, out.explanation, out.knowledge, evidenceIds, controller),
+  ]);
+  const blueprint = mergeVisualPasses(out.blueprint, drawn, illustrated);
 
   await setStage(job.id, "mise_en_page");
   const model = (await db.from("usage_ledger").select("model").eq("job_id", job.id).limit(1).maybeSingle()).data?.model;
@@ -505,7 +547,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     .single();
   // Le trigger refuse l'écriture si le rapport a été supprimé entre-temps.
   if (version.error || !version.data) throw new JobFailure("persist_version");
-  await storeExercises(job, version.data.id, out.explanation, out.knowledge, new Set(out.evidence.map((e) => e.id)), controller);
+  await saveExercises(job, version.data.id, exercises);
 
   const rep = await db
     .from("reports")
@@ -692,7 +734,7 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
       comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
       explanation: { tier: "quality" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
     },
-    onStage: (stage: "comprehension" | "explication" | "verification") => setStage(job.id, stage),
+    onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
   };
   const sectionId = job.params.section_id;

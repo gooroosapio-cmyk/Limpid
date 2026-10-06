@@ -22,6 +22,7 @@ const STEP_OF_STAGE: Record<string, number> = {
   extraction: 0,
   comprehension: 1,
   verification: 1,
+  plan: 1,
   explication: 1,
   illustrations: 2,
   mise_en_page: 3,

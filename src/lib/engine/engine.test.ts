@@ -7,12 +7,16 @@ import {
   ExplanationDraft,
   generateReport,
   mostCautious,
+  normalizePlan,
+  understand,
+  write,
   regenerateExplanation,
   regenerateSection,
   simplerLevel,
   type GenerationInput,
 } from "./pipeline";
 import { ProviderError, type AIProvider, type StructuredRequest } from "./provider";
+import { UnderstandingCheckpoint, WritingCheckpoint } from "@/lib/jobs/checkpoints";
 import { locateQuote } from "./quotes";
 
 const TEXT = `Le cycle
@@ -84,9 +88,11 @@ class FakeProvider implements AIProvider {
   readonly name = "fake";
   readonly isDemo = false;
   calls: { stage: string; data: string[] }[] = [];
+  tiers: string[] = [];
   constructor(private readonly script: (Draft | ProviderError)[]) {}
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>) {
     this.calls.push({ stage: req.stage, data: req.untrustedData.map((d) => d.label) });
+    this.tiers.push(req.budget.tier);
     const next = this.script.shift();
     const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
     if (!next) throw new Error("script épuisé");
@@ -513,5 +519,60 @@ describe("réparations sûres du brouillon (V4)", () => {
     expect(fixed.sections[0]!.blocks[0]).not.toHaveProperty("limit");
     expect(fixed.sections[0]!.blocks[1]).toMatchObject({ type: "analogy", limit: "Un filtre retient, le sol laisse passer." });
     expect(ExplanationDraft).toBeDefined();
+  });
+});
+
+describe("plan et Pro ciblé (Atlas)", () => {
+  const plan = (difficulty: "standard" | "complexe", difficult: string[] = []) => ({
+    difficulty,
+    difficult_claim_ids: difficult,
+    chapters: [{ title: "Le cycle", claim_ids: ["clm_1", "clm_2"], visual: "schema" }],
+  });
+
+  it("plan léger entre compréhension et rédaction, transmis au rédacteur", async () => {
+    const fake = new FakeProvider([goodComp, plan("standard") as never, goodExpl]);
+    const out = await generateReport(fake, { ...input(), plan: true });
+    expect(out.status).toBe("validated");
+    expect(fake.calls.map((c) => c.stage)).toEqual(["comprehension", "plan", "explication"]);
+    expect(fake.tiers).toEqual(["fast", "lite", "quality"]);
+    expect(fake.calls[2]!.data).toEqual(["connaissance validee", "plan"]);
+  });
+
+  it("document complexe : rédaction confiée au modèle Pro", async () => {
+    const fake = new FakeProvider([goodComp, plan("complexe", ["clm_2"]) as never, goodExpl]);
+    await generateReport(fake, { ...input(), plan: true });
+    expect(fake.tiers[2]).toBe("complex");
+  });
+
+  it("un plan en échec ne bloque pas la rédaction", async () => {
+    const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
+    const fake = new FakeProvider([goodComp, new ProviderError("unavailable", "x", usage), goodExpl]);
+    const out = await generateReport(fake, { ...input(), plan: true });
+    expect(out.status).toBe("validated");
+    expect(fake.calls[2]!.data).toEqual(["connaissance validee"]);
+    expect(fake.tiers[2]).toBe("quality");
+  });
+
+  it("identifiants inconnus retirés ; sans passage difficile, pas de Pro", async () => {
+    const ko = (await generateReport(new FakeProvider([goodComp, goodExpl]), input())).knowledge;
+    const p = normalizePlan(
+      { difficulty: "complexe", difficult_claim_ids: ["clm_9"], chapters: [{ title: " A ", claim_ids: ["clm_1", "clm_9"], visual: "aucun" }, { title: "B", claim_ids: ["clm_9"], visual: "aucun" }] },
+      ko,
+      5,
+    );
+    expect(p).toEqual({ difficulty: "standard", difficult_claim_ids: [], chapters: [{ title: "A", claim_ids: ["clm_1"], visual: "aucun" }] });
+  });
+});
+
+describe("reprise par étape", () => {
+  it("la compréhension et la rédaction enregistrées se relisent à l'identique", async () => {
+    const u = await understand(new FakeProvider([goodComp, { difficulty: "standard", difficult_claim_ids: [], chapters: [{ title: "C", claim_ids: ["clm_1"], visual: "aucun" }] } as never]), { ...input(), plan: true });
+    const stored = UnderstandingCheckpoint.parse(JSON.parse(JSON.stringify(u)));
+    expect(stored).toEqual(u);
+    // La rédaction repart de la compréhension relue, sans nouvel appel de compréhension.
+    const fake = new FakeProvider([goodExpl]);
+    const out = await write(fake, input(), stored);
+    expect(fake.calls.map((c) => c.stage)).toEqual(["explication"]);
+    expect(WritingCheckpoint.safeParse(JSON.parse(JSON.stringify({ status: out.status, explanation: out.explanation, blueprint: out.blueprint, validation: { explanation: out.validation.explanation } }))).success).toBe(true);
   });
 });

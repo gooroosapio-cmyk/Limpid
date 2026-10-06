@@ -43,7 +43,7 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-05.1";
+export const PROMPT_VERSION = "2026-10-06.1";
 const MAX_REPAIRS = 2;
 
 /* ---------- Brouillons demandés au modèle ---------- */
@@ -239,17 +239,22 @@ export interface GenerationInput {
   language?: "fr" | "en" | null;
   preferences: PreferencesSnapshot;
   signal: AbortSignal;
-  budgets: { comprehension: StageBudget; explanation: StageBudget };
+  budgets: { comprehension: StageBudget; explanation: StageBudget; plan?: StageBudget };
   /** Appelé après chaque appel au fournisseur (journal de consommation). */
   onUsage?: (stage: string, attempt: number, usage: UsageReport) => void | Promise<void>;
   /** Appelé au début de chaque étape (progression affichée, heartbeat du worker). */
-  onStage?: (stage: "comprehension" | "explication" | "verification") => void | Promise<void>;
+  onStage?: (stage: "comprehension" | "explication" | "verification" | "plan") => void | Promise<void>;
   /** Vérification indépendante des affirmations contre leurs extraits (1 appel rapide). */
   verifyClaims?: boolean;
   /** Template imposé par le lecteur (sinon choisi par le rédacteur). */
   template?: z.infer<typeof TemplateId> | null;
   /** Visuels permis : « aucun » = texte seul, « schemas » = sans illustration. */
   visualMode?: VisualMode;
+  /**
+   * Plan préalable (Atlas) : chapitres, visuels prévus et passages difficiles, par le modèle
+   * léger ; un document jugé complexe est rédigé par le modèle Pro. Sans effet si absent.
+   */
+  plan?: boolean;
 }
 
 export interface GenerationOutput {
@@ -789,7 +794,16 @@ async function explanation(
   throw new Error("inaccessible");
 }
 
-export async function generateReport(provider: AIProvider, input: GenerationInput): Promise<GenerationOutput> {
+/** Compréhension validée (et plan) : point de reprise d'une génération interrompue. */
+export interface Understanding {
+  knowledge: KnowledgeObject;
+  evidence: Evidence[];
+  validation: ValidationResult;
+  plan: ReportPlan | null;
+}
+
+/** Compréhension, vérification indépendante puis plan : tout ce qui précède la rédaction. */
+export async function understand(provider: AIProvider, input: GenerationInput): Promise<Understanding> {
   if (input.segments.length === 0) throw new Error("Aucun segment à analyser.");
   const segments = new Map(input.segments.map((s) => [s.id, s]));
   await input.onStage?.("comprehension");
@@ -808,17 +822,103 @@ export async function generateReport(provider: AIProvider, input: GenerationInpu
       warnings: [...comp.validation.warnings, ...r.warnings].slice(0, 200),
     };
   }
+  let plan: ReportPlan | null = null;
+  if (input.plan) {
+    await input.onStage?.("plan");
+    plan = await planReport(provider, input, knowledge);
+  }
+  return { knowledge, evidence: comp.evidence, validation: knowledgeValidation, plan };
+}
+
+/** Rédaction à partir d'une compréhension validée (fraîche ou reprise). */
+export async function write(provider: AIProvider, input: GenerationInput, u: Understanding): Promise<GenerationOutput> {
   await input.onStage?.("explication");
   // Seules les preuves localisées et cohérentes passent à la suite.
-  const exp = await explanation(provider, input, knowledge, comp.evidence);
-  const ok = knowledgeValidation.blocking_errors.length === 0 && exp.validation.blocking_errors.length === 0;
+  const exp = await explanation(provider, { ...input, budgets: { ...input.budgets, explanation: explanationBudget(input.budgets.explanation, u.plan) } }, u.knowledge, u.evidence, u.plan ? planVariation(u.plan) : undefined);
+  const ok = u.validation.blocking_errors.length === 0 && exp.validation.blocking_errors.length === 0;
   return {
     status: ok ? "validated" : "incomplete",
-    knowledge,
-    evidence: comp.evidence,
+    knowledge: u.knowledge,
+    evidence: u.evidence,
     explanation: exp.explanation,
     blueprint: exp.blueprint,
-    validation: { knowledge: knowledgeValidation, explanation: exp.validation },
+    validation: { knowledge: u.validation, explanation: exp.validation },
+  };
+}
+
+export async function generateReport(provider: AIProvider, input: GenerationInput): Promise<GenerationOutput> {
+  return write(provider, input, await understand(provider, input));
+}
+
+/* ---------- Plan (Atlas : chapitres, visuels, passages difficiles) ---------- */
+
+export const PlanDraft = z.strictObject({
+  difficulty: z.enum(["standard", "complexe"]),
+  difficult_claim_ids: z.array(z.string().max(40)).max(40),
+  chapters: z
+    .array(
+      z.strictObject({
+        title: z.string().min(1).max(160),
+        claim_ids: z.array(z.string().max(40)).max(60),
+        visual: z.enum(["aucun", "schema", "graphique", "illustration"]),
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+export const ReportPlan = PlanDraft;
+export type ReportPlan = z.infer<typeof PlanDraft>;
+
+const PLAN_INSTRUCTIONS = (pages: number) =>
+  `Tu prépares le plan d'un support explicatif d'environ ${pages} pages à partir d'une connaissance validée (affirmations sourcées).
+Renvoie : des chapitres dans l'ordre de lecture (titre court, affirmations couvertes par leurs identifiants, visuel utile : aucun, schéma, graphique pour des nombres comparables, illustration pour une idée concrète) ; les affirmations difficiles à expliquer (raisonnement en plusieurs étapes, notions techniques, chiffres à interpréter, réserves subtiles) ; une difficulté globale « complexe » seulement si une part importante du document l'est.
+N'invente aucune affirmation : utilise uniquement les identifiants fournis.`;
+
+/** Garde les identifiants connus et un nombre de chapitres proportionné à la longueur visée. */
+export function normalizePlan(draft: ReportPlan, ko: KnowledgeObject, targetPages: number): ReportPlan | null {
+  const known = new Set(ko.claims.map((c) => c.id));
+  const chapters = draft.chapters
+    .map((c) => ({ ...c, title: c.title.trim(), claim_ids: [...new Set(c.claim_ids.filter((id) => known.has(id)))] }))
+    .filter((c) => c.title && c.claim_ids.length > 0)
+    .slice(0, Math.max(2, Math.min(12, targetPages + 2)));
+  if (chapters.length === 0) return null;
+  const difficult = [...new Set(draft.difficult_claim_ids.filter((id) => known.has(id)))];
+  return { difficulty: difficult.length ? draft.difficulty : "standard", difficult_claim_ids: difficult, chapters };
+}
+
+/** Un seul appel au modèle léger ; un échec laisse la rédaction sans plan (jamais bloquant). */
+export async function planReport(provider: AIProvider, input: GenerationInput, ko: KnowledgeObject): Promise<ReportPlan | null> {
+  const budget = input.budgets.plan ?? { tier: "lite" as const, maxInputTokens: 60_000, maxOutputTokens: 4_000, timeoutMs: 60_000 };
+  const claims = ko.claims.map((c) => ({ id: c.id, statement: c.statement, support_status: c.support_status, numbers: c.numbers.length, qualifiers: c.qualifiers }));
+  try {
+    const res = await provider.generateStructured({
+      stage: "plan",
+      schema: PlanDraft,
+      trustedInstructions: PLAN_INSTRUCTIONS(input.targetPages),
+      untrustedData: [{ label: "connaissance validee", text: JSON.stringify({ claims, concepts: ko.concepts.map((c) => ({ id: c.id, label: c.label, importance: c.importance })) }) }],
+      budget,
+      signal: input.signal,
+    });
+    await input.onUsage?.("plan", 0, res.usage);
+    return normalizePlan(res.value, ko, input.targetPages);
+  } catch (e) {
+    if (e instanceof ProviderError && e.usage) await input.onUsage?.("plan", 0, e.usage);
+    if (e instanceof ProviderError && e.code === "cancelled") throw e;
+    return null;
+  }
+}
+
+/** Pro ciblé : un document jugé complexe par le plan est rédigé par le modèle Pro. */
+export function explanationBudget(base: StageBudget, plan: ReportPlan | null): StageBudget {
+  return plan?.difficulty === "complexe" ? { ...base, tier: "complex" } : base;
+}
+
+/** Le plan devient une donnée de la rédaction ; les passages difficiles sont expliqués pas à pas. */
+export function planVariation(plan: ReportPlan): { instructions: string; data: { label: string; text: string }[] } {
+  return {
+    instructions:
+      "Un plan préparé est fourni : suis l'ordre et le découpage de ses chapitres (une section par chapitre, fusionne ou scinde seulement si la connaissance l'exige). Pour chaque affirmation listée comme difficile, explique pas à pas (étapes, puis un exemple ou une analogie selon l'approche).",
+    data: [{ label: "plan", text: JSON.stringify(plan) }],
   };
 }
 

@@ -12,7 +12,7 @@ import type { CoverView } from "@/lib/library/covers";
 import { Cover } from "./Cover";
 
 /** Étapes réelles du serveur (aucune durée simulée, aucun pourcentage). */
-const STAGES = ["validation", "extraction", "comprehension", "explication", "verification", "mise_en_page"] as const;
+const STAGES = ["validation", "extraction", "comprehension", "verification", "plan", "explication", "mise_en_page"] as const;
 
 interface RunningItem { id: string; title: string; cover: CoverView; sourceCount: number; stage: string | null }
 interface FailedItem { id: string; title: string; cover: CoverView; sourceCount: number; reason: string; retryable: boolean }
