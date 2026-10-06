@@ -5,7 +5,6 @@
  */
 import "server-only";
 import { imageSettingsFrom } from "@/lib/visuals/image-models";
-import { recraftConfigFromEnv } from "@/lib/visuals/recraft";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { adminMfaRequired, mfaStep } from "@/lib/auth/mfa";
@@ -79,7 +78,7 @@ export async function adminOverview() {
   const quotaStart = pacificMidnight(now);
 
   const [settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
-    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model").single(),
+    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
     db.from("usage_ledger").select("model").gte("created_at", quotaStart.toISOString()),
@@ -97,7 +96,8 @@ export async function adminOverview() {
   return {
     generationEnabled: settings.data?.generation_enabled ?? false,
     images: imageSettingsFrom(settings.data as Record<string, unknown> | null),
-    imageProviders: { recraft: !!recraftConfigFromEnv(), nanobanana: !!process.env.OPENROUTER_API_KEY?.trim() },
+    // Recraft, Seedream et Nano Banana passent tous par OpenRouter : une seule clé.
+    imageProviders: { recraft: !!process.env.OPENROUTER_API_KEY?.trim(), seedream: !!process.env.OPENROUTER_API_KEY?.trim(), nanobanana: !!process.env.OPENROUTER_API_KEY?.trim() },
     monthlyCapCents: Math.min(settings.data?.monthly_cap_cents ?? budget.monthlyCapCents, budget.monthlyCapCents),
     envCapCents: budget.monthlyCapCents,
     dailyAccountCapCents: budget.perAccountDailyCapCents,

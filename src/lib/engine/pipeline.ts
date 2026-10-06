@@ -43,7 +43,7 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-08.1";
+export const PROMPT_VERSION = "2026-10-08.2";
 /** Une seule réparation automatique par étape (kit V6) : chaque aller-retour coûte 30 à 80 s. */
 export const MAX_REPAIRS = 1;
 
@@ -122,7 +122,7 @@ export const ExplanationDraft = z.preprocess(repairDraftBlocks, z.strictObject({
         query: z.string().trim().min(2).max(60),
         subject: z.string().trim().min(1).max(120),
         alt_text: z.string().trim().min(1).max(300),
-        style: z.enum(["vector", "realistic", "diagram"]).optional(),
+        style: z.enum(["illustration", "vector", "realistic", "diagram"]).optional(),
         content: z.string().trim().max(600).optional(),
       }),
     )
@@ -644,7 +644,7 @@ export function buildBlueprint(
       const sec = ex.sections.find((x) => x.id === idea.section_id);
       const query = safeImageQuery(idea.query);
       const claimIds = sec ? [...new Set(sec.blocks.flatMap(blockClaimIds))].filter(supported).slice(0, 5) : [];
-      if (!sec || !query || claimIds.length === 0 || n >= 3) continue;
+      if (!sec || !query || claimIds.length === 0 || n >= 5) continue;
       const id = `vis_ill_${++n}`;
       // Schéma (graphique, tableau, processus) : pleine largeur sous le texte, jamais incrusté.
       const diagram = idea.style === "diagram" && !!idea.content;

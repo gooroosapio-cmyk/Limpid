@@ -51,7 +51,8 @@ export async function setImageSettings(form: FormData) {
   const vector = route("vector", "vector");
   const realistic = route("realistic", "realistic");
   const diagram = route("diagram", "diagram");
-  if (!vector || !realistic || !diagram) done("Modèle d'image invalide.");
+  const illustration = route("illustration", "illustration");
+  if (!vector || !realistic || !diagram || !illustration) done("Modèle d'image invalide.");
   const { error } = await adminClient()
     .from("app_settings")
     .update({
@@ -62,11 +63,13 @@ export async function setImageSettings(form: FormData) {
       image_realistic_model: realistic!.model,
       image_diagram_provider: diagram!.provider,
       image_diagram_model: diagram!.model,
+      image_illustration_provider: illustration!.provider,
+      image_illustration_model: illustration!.model,
       updated_at: new Date().toISOString(),
     })
     .eq("id", true);
   if (error) done("La modification n'a pas été enregistrée.");
-  await audit(user.id, "images.settings", null, { vector: vector!.model, realistic: realistic!.model, diagram: diagram!.model });
+  await audit(user.id, "images.settings", null, { illustration: illustration!.model, vector: vector!.model, realistic: realistic!.model, diagram: diagram!.model });
   done("Réglages des images enregistrés.");
 }
 

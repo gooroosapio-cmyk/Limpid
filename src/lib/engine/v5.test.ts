@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import { riskyClaim, type GenerationInput } from "./pipeline";
 import type { AIProvider, StructuredRequest } from "./provider";
-import { capChapters, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, diagramContentOk, imageCaps, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -230,9 +230,10 @@ describe("moteur V5 : plan", () => {
     expect(p.chapters.map((c) => c.claim_ids)).toEqual([["clm_1", "clm_2", "clm_3"], ["clm_4"]]);
   });
 
-  it("schéma généré : des étiquettes, jamais de chiffre (les valeurs passent par les composants)", () => {
+  it("schéma annoté : valeurs reprises des affirmations du chapitre, jamais inventées", () => {
     expect(diagramContentOk("Évaporation → Condensation → Pluie")).toBe(true);
-    expect(diagramContentOk("Hausse de 12,5 %")).toBe(false);
+    expect(diagramContentOk("Hausse de 12,5 % puis 3 000 €", ["Les prix montent de 12.5 % ; coût 3 000 €."])).toBe(true);
+    expect(diagramContentOk("Hausse de 40 %", ["Les prix montent de 12,5 %."])).toBe(false);
     expect(diagramContentOk("")).toBe(false);
   });
 
@@ -246,10 +247,12 @@ describe("moteur V5 : plan", () => {
     expect(unsourcedComponents([ok, bad, fictive, chart], statements)).toEqual(["blk_2"]);
   });
 
-  it("3 illustrations au plus, aucune en résumé fidèle ou en texte seul", () => {
+  it("images selon la taille (court : 1 image + 1 SVG), aucune en résumé fidèle ou en texte seul", () => {
+    expect([imageCaps(5), imageCaps(20), imageCaps(21)]).toEqual([{ images: 1, svg: 1 }, { images: 2, svg: 1 }, { images: 3, svg: 2 }]);
     const v = { kind: "vector", subject: "s", query_en: "q", purpose: "p", content: "" };
     const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1"], v), ch(["clm_2"], v), ch(["clm_3"], v), ch(["clm_4"], v)], excluded: [], limitations: [] };
-    expect(normalizePlanV5(draft, ko, input()).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(3);
+    // Court : le premier dessin reste SVG, le second devient une illustration simple, le reste est retiré.
+    expect(normalizePlanV5(draft, ko, input()).plan.chapters.map((c) => c.visual.kind)).toEqual(["vector", "illustration", "none", "none"]);
     expect(normalizePlanV5(draft, ko, input({ mode: "resume" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
     expect(normalizePlanV5(draft, ko, input({ visualMode: "aucun" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
   });

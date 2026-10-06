@@ -6,6 +6,7 @@ import { availableVisualModes, effectiveVisualMode, visualConfig } from "./confi
 import { creditText } from "./credit";
 import { illustrate, type AssetRow, type IllustrateDeps } from "./illustrate";
 import { DEFAULT_IMAGE_SETTINGS, diagramPrompt, imageAttempts, imageSettingsFrom } from "./image-models";
+import { bestMatch, libraryKeywords } from "./svg-library";
 import { checkImage, commonsCandidates, plainText, rankCandidates, relevance, unsplashCandidates, type Candidate } from "./sources";
 
 /** PNG valide minimal (en-tête IHDR lu par imageSize). */
@@ -155,9 +156,9 @@ function deps(over: Partial<IllustrateDeps> = {}): IllustrateDeps & { rows: Asse
     rows,
     calls,
     settings: DEFAULT_IMAGE_SETTINGS,
-    available: { recraft: true, nanobanana: true },
+    available: { recraft: true, seedream: true, nanobanana: true },
     render: async (route, style) => {
-      calls.push(`${style}:${route.provider}:${route.model}`);
+      calls.push(`${style}:${route.model}`);
       return { image: checkImage(png(960, 640))!, usage: usage(route.model) };
     },
     store: async (_img, ext) => `o/r/assets/x.${ext}`,
@@ -174,66 +175,93 @@ function styled(): ReportBlueprint {
   return { ...bp, visual_specs: bp.visual_specs.map((v, i) => ({ ...v, data: { ...v.data, ...(i === 0 ? { style: "vector" } : { style: "diagram", content: "Évaporation → Condensation → Pluie" }) } })) };
 }
 
-describe("illustrations V5 : route par type de visuel", () => {
-  it("illustration par Recraft, schéma par Gemini (réglages par défaut)", async () => {
+describe("illustrations : modèle par type de visuel (tous via OpenRouter)", () => {
+  it("SVG par Recraft V4.1 Vector, schéma par Seedream 5.0 Flash (réglages par défaut)", async () => {
     const d = deps();
     const out = await illustrate(styled(), "auto", d);
     expect(out.added).toBe(2);
-    expect(d.calls.sort()).toEqual(["diagram:nanobanana:google/gemini-3.1-flash-image", "vector:recraft:recraftv4_1_vector"]);
-    expect(d.rows.map((r) => r.provider).sort()).toEqual(["gemini", "recraft"]);
+    expect(d.calls.sort()).toEqual(["diagram:bytedance-seed/seedream-5-0-flash", "vector:recraft/recraft-v4.1-vector"]);
+    expect(d.rows.map((r) => r.provider).sort()).toEqual(["recraft", "seedream"]);
   });
 
-  it("repli sur l'autre fournisseur, appel échoué journalisé", async () => {
+  it("illustration simple par Recraft V4.1 Flash ; repli sur un autre modèle, appel échoué journalisé", async () => {
+    const one = { ...styled(), visual_specs: [{ ...styled().visual_specs[0]!, data: { ...styled().visual_specs[0]!.data, style: "illustration" } }] };
     const logged: string[] = [];
     const d = deps({
       render: async (route) => {
-        if (route.provider === "recraft") throw Object.assign(new Error("402"), { usage: usage(route.model) });
+        if (route.model === "recraft/recraft-v4.1-flash") throw Object.assign(new Error("402"), { usage: usage(route.model) });
         return { image: checkImage(png(960, 640))!, usage: usage(route.model) };
       },
-      onUsage: (route, attempt) => void logged.push(`${route.provider}:${attempt}`),
+      onUsage: (route, attempt) => void logged.push(`${route.model}:${attempt}`),
     });
-    const out = await illustrate({ ...styled(), visual_specs: [styled().visual_specs[0]!] }, "auto", d);
+    const out = await illustrate(one, "auto", d);
     expect(out.added).toBe(1);
-    expect(logged).toEqual(["recraft:1", "nanobanana:2"]);
+    expect(logged).toEqual(["recraft/recraft-v4.1-flash:1", "bytedance-seed/seedream-5-0-flash:2"]);
   });
 
-  it("réglage admin respecté, fournisseur absent ignoré, rien sans image exploitable", async () => {
-    const d = deps({ settings: { ...DEFAULT_IMAGE_SETTINGS, vector: { provider: "nanobanana", model: "google/gemini-3.1-flash-image" } }, available: { recraft: false, nanobanana: true } });
-    await illustrate({ ...styled(), visual_specs: [styled().visual_specs[0]!] }, "auto", d);
-    expect(d.calls).toEqual(["vector:nanobanana:google/gemini-3.1-flash-image"]);
-    const none = deps({ available: { recraft: false, nanobanana: false } });
+  it("banque SVG : un dessin existant est réutilisé, sans génération ; un nouveau y est versé", async () => {
+    const saved: string[] = [];
+    const svg = { bytes: Buffer.from("<svg/>"), mime: "image/svg+xml" as const, width: 400, height: 300, sha256: "a".repeat(64) };
+    const reuse = deps({ library: { find: async () => ({ image: svg, model: "recraft/recraft-v4.1-vector" }), save: async () => void saved.push("x") } });
+    const one = { ...styled(), visual_specs: [styled().visual_specs[0]!] };
+    expect((await illustrate(one, "auto", reuse)).added).toBe(1);
+    expect(reuse.calls).toEqual([]);
+    expect(reuse.rows[0]!.modifications).toMatch(/banque Limpid/);
+    const fresh = deps({
+      library: { find: async () => null, save: async (_i, q) => void saved.push(q) },
+      render: async (route) => ({ image: svg, usage: usage(route.model) }),
+    });
+    await illustrate(one, "auto", fresh);
+    expect(fresh.calls).toEqual([]);
+    expect(saved).toHaveLength(1);
+  });
+
+  it("aucune image en texte seul ou quand les illustrations sont coupées ; rien sans clé", async () => {
+    expect((await illustrate(styled(), "aucun", deps())).blueprint.visual_specs).toHaveLength(0);
+    const off = deps({ settings: { ...DEFAULT_IMAGE_SETTINGS, enabled: false } });
+    expect((await illustrate(styled(), "auto", off)).added).toBe(0);
+    expect(off.calls).toEqual([]);
+    const none = deps({ available: { recraft: false, seedream: false, nanobanana: false } });
     const out = await illustrate(styled(), "auto", none);
     expect(out.blueprint.visual_specs).toHaveLength(0);
     expect(out.blueprint.sections[0]!.visual_ids).toEqual([]);
   });
 
-  it("aucune image en texte seul ou quand les illustrations sont coupées", async () => {
-    expect((await illustrate(styled(), "aucun", deps())).blueprint.visual_specs).toHaveLength(0);
-    const off = deps({ settings: { ...DEFAULT_IMAGE_SETTINGS, enabled: false } });
-    expect((await illustrate(styled(), "auto", off)).added).toBe(0);
-    expect(off.calls).toEqual([]);
-  });
-
   it("« Schémas seulement » : le schéma reste, l'illustration décorative est retirée", async () => {
     const d = deps();
     const out = await illustrate(styled(), "schemas", d);
-    expect(d.calls).toEqual(["diagram:nanobanana:google/gemini-3.1-flash-image"]);
+    expect(d.calls).toEqual(["diagram:bytedance-seed/seedream-5-0-flash"]);
     expect(out.blueprint.visual_specs).toHaveLength(1);
   });
 });
 
 describe("catalogue des modèles d'image", () => {
-  it("réglages en base nettoyés : modèle inconnu ou incohérent → défaut du type", () => {
-    expect(imageSettingsFrom({ images_enabled: true, image_vector_provider: "recraft", image_vector_model: "google/gemini-3.1-flash-image", image_realistic_provider: "recraft", image_realistic_model: "recraftv4_1" })).toEqual({
+  it("réglages en base nettoyés : ancien identifiant ou sortie incohérente → défaut du type", () => {
+    expect(
+      imageSettingsFrom({ images_enabled: true, image_vector_provider: "recraft", image_vector_model: "recraft/recraft-v4.1-flash", image_realistic_provider: "recraft", image_realistic_model: "recraftv4_1", image_illustration_model: "recraft/recraft-v4.1" }),
+    ).toEqual({
       enabled: true,
+      illustration: { provider: "recraft", model: "recraft/recraft-v4.1" },
       vector: DEFAULT_IMAGE_SETTINGS.vector,
-      realistic: { provider: "recraft", model: "recraftv4_1" },
+      realistic: DEFAULT_IMAGE_SETTINGS.realistic,
       diagram: DEFAULT_IMAGE_SETTINGS.diagram,
     });
-    expect(imageAttempts("diagram", DEFAULT_IMAGE_SETTINGS, { recraft: true, nanobanana: true })).toEqual([
-      { provider: "nanobanana", model: "google/gemini-3.1-flash-image" },
-      { provider: "recraft", model: "recraftv4_1" },
+    expect(imageAttempts("diagram", DEFAULT_IMAGE_SETTINGS, { recraft: true, seedream: true, nanobanana: true })).toEqual([
+      { provider: "seedream", model: "bytedance-seed/seedream-5-0-flash" },
+      { provider: "recraft", model: "recraft/recraft-v4.1" },
     ]);
     expect(diagramPrompt("Cycle de l'eau", "ordre des étapes", "Évaporation → Pluie")).toMatch(/portrait 3:4.*Évaporation → Pluie.*symmetrical/s);
+  });
+
+  it("banque SVG : mots-clés génériques, correspondance suffisante seulement", () => {
+    expect(libraryKeywords("Water cycle 2024 and rain!")).toEqual(["water", "cycle", "rain"]);
+    const bank = [
+      { id: "a", keywords: ["water", "cycle"], uses: 3 },
+      { id: "b", keywords: ["water", "cycle", "rain"], uses: 1 },
+      { id: "c", keywords: ["water"], uses: 9 },
+    ];
+    expect(bestMatch(["water", "cycle", "rain"], bank)?.id).toBe("b");
+    expect(bestMatch(["water", "tax"], bank)).toBeNull();
+    expect(bestMatch(["volcano"], bank)).toBeNull();
   });
 });
