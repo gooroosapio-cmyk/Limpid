@@ -7,6 +7,8 @@ import { Icon } from "@/components/Icon";
 import { Wordmark } from "@/components/Logo";
 import { useT } from "@/lib/i18n/client";
 import { initials } from "@/lib/initials";
+import { useKeyboardState } from "@/components/shell/keyboard";
+import { navSection } from "@/components/shell/nav";
 
 /** En-tête compact (AppHeader) : logo, cloche (notifications réelles), avatar vers le profil. */
 function AppHeader({ email }: { email: string }) {
@@ -49,36 +51,39 @@ function AppHeader({ email }: { email: string }) {
   );
 }
 
-/** Barre basse flottante (BottomNavigation) : Bibliothèque, Créer (import), Paramètres. */
+const NAV = [
+  { key: "home", href: "/", icon: "home" },
+  { key: "library", href: "/bibliotheque", icon: "book" },
+  { key: "create", href: "/ajouter", icon: "plus-circle" },
+  { key: "settings", href: "/parametres", icon: "settings" },
+] as const;
+
+/**
+ * Navigation (V4) : Accueil, Bibliothèque, Créer, Paramètres. Barre basse sur mobile, rail
+ * latéral sur ordinateur. Masquée seulement quand le clavier virtuel est réellement ouvert.
+ */
 function BottomNavigation() {
   const t = useT();
   const pathname = usePathname();
-  const atLibrary = pathname === "/" || pathname.startsWith("/preparations") || pathname.startsWith("/sources");
-  const atCreate = pathname.startsWith("/ajouter");
-  const atSettings = ["/parametres", "/compte", "/offres", "/paiement", "/admin", "/a-propos", "/notifications"].some((p) => pathname.startsWith(p));
+  const current = navSection(pathname);
   return (
     <nav className="bottomnav" aria-label={t.nav.main}>
-      <Link href="/" className="bottomnav-item" aria-current={atLibrary ? "page" : undefined}>
-        <Icon name="book" size={26} />
-        <span>{t.nav.library}</span>
-      </Link>
-      <Link href="/ajouter" className="bottomnav-item" aria-current={atCreate ? "page" : undefined}>
-        <Icon name="plus-circle" size={26} />
-        <span>{t.shell.createLabel}</span>
-      </Link>
-      <Link href="/parametres" className="bottomnav-item" aria-current={atSettings ? "page" : undefined}>
-        <Icon name="settings" size={26} />
-        <span>{t.nav.settings}</span>
-      </Link>
+      {NAV.map((n) => (
+        <Link key={n.key} href={n.href} className="bottomnav-item" aria-current={current === n.key ? "page" : undefined}>
+          <Icon name={n.icon} size={22} />
+          <span>{t.v4.nav[n.key]}</span>
+        </Link>
+      ))}
     </nav>
   );
 }
 
 /**
- * Coquille de l'application connectée (V2.1) : en-tête (logo, cloche, avatar) et barre basse
- * à trois destinations. La lecture et l'aperçu d'une leçon les masquent (cf. v2.css).
+ * Coquille de l'application connectée (V4) : en-tête (logo, cloche, avatar) et navigation
+ * à quatre destinations. La lecture et l'aperçu d'une leçon les masquent (cf. v2.css).
  */
 export function AppShell({ email }: { email: string }) {
+  useKeyboardState();
   return (
     <>
       <AppHeader email={email} />

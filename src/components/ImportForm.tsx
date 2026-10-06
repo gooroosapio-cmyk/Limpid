@@ -290,7 +290,7 @@ export function ImportForm({
         );
         const ids = Array.isArray(data.reportIds) ? data.reportIds : [];
         toast(t.add.sent(ids.length));
-        router.push("/");
+        router.push("/bibliotheque");
         return;
       }
       let sourceIds = readyItems.map((x) => x.prepared!.sourceId);

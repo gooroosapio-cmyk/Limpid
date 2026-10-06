@@ -67,6 +67,7 @@ export default async function AccountPage() {
       <section aria-labelledby="prefs-h">
         <h2 id="prefs-h" className="profile-h">{p.preferences}</h2>
         <ul className="rows settings-rows">
+          <LinkRow href="/bienvenue?revoir=1" icon="learning" title={t.v4.help.learning[0]} sub={t.v4.help.learning[1]} />
           <LinkRow href="/parametres/preferences" icon="file" title={p.explanations} sub={explain} />
           <LinkRow href="/parametres#confort" icon="aa" title={t.compte.comfort} sub={p.comfortSub} />
           <LinkRow href="/parametres#langue" icon="globe" title={p.language} sub={lang === "fr" ? "Français" : "English"} />

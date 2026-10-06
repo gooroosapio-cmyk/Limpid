@@ -45,7 +45,7 @@ export function FolderTile({ folder }: { folder: FolderItem }) {
   const t = useT();
   return (
     <li className="folder-tile">
-      <Link href={`/?dossier=${folder.id}`}>
+      <Link href={`/bibliotheque?dossier=${folder.id}`}>
         <Cover cover={folder.cover} className="folder-tile-cover" />
         <span className="folder-tile-icon"><Icon name="folder" /></span>
         <span className="folder-tile-text">
@@ -346,7 +346,7 @@ export function LibraryBrowser({
           <div className="section-head">
             <h2 id="folders-h">{v.collections}</h2>
             {filter === "tous" && !searching && folders.length > 2 ? (
-              <Link href="/?filtre=dossiers">{v.seeAll} <Icon name="chevron" /></Link>
+              <Link href="/bibliotheque?filtre=dossiers">{v.seeAll} <Icon name="chevron" /></Link>
             ) : (
               !searching && newFolder
             )}
@@ -368,7 +368,7 @@ export function LibraryBrowser({
           {home ? (
             <div className="section-head">
               <h2 id="limpids-h">{v.yourLimpids}</h2>
-              {visible.length > HOME_COUNT && <Link href="/?filtre=prets">{v.seeAll} <Icon name="chevron" /></Link>}
+              {visible.length > HOME_COUNT && <Link href="/bibliotheque?filtre=prets">{v.seeAll} <Icon name="chevron" /></Link>}
             </div>
           ) : (
             <div className="section-head lib-count">

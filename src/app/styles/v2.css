@@ -172,7 +172,6 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 :root[data-mode="light"] .bottomnav-item[aria-current="page"] { color: #6a5a00; }
 .bottomnav-item:focus-visible { outline-offset: -4px; }
 /* Clavier ouvert (appareil tactile) : la barre se retire, le champ et l'action restent visibles. */
-@media (pointer: coarse) { .app:has(input:focus, textarea:focus) ~ .bottomnav, .app:has(input:focus, textarea:focus) .bottomnav { display: none; } }
 /* Lecture et aperçu de leçon : navigation propre à l'écran. */
 .app:has(.reader-immersive) .appbar, .app:has(.reader-immersive) .bottomnav,
 .app:has(.lesson-page) .appbar, .app:has(.lesson-page) .bottomnav { display: none; }

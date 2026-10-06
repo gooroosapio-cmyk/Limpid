@@ -1,5 +1,15 @@
 # Avancement
 
+## Phase 17 — V4, lot 1 : Accueil, navigation, connexion, première connexion (6 octobre 2026)
+
+- Dossier V4 (LIMPID_V4) : cadrage par QCM (lots fusionnés successivement, conservation sans expiration, connexion compacte, cartes 4/3, chat flottant seul, « Bonjour, Prénom. », initiales seulement).
+- Accueil (`/`) : salutation, Créer un Limpid, Reprendre, trois récents, lien Bibliothèque. Bibliothèque déplacée vers `/bibliotheque` ; les anciennes adresses `/?filtre=…`, `/?vue=…`, `/?q=…`, `/?dossier=…` y sont redirigées.
+- Navigation à quatre destinations (Accueil, Bibliothèque, Créer, Paramètres) : barre basse 64 px, rail latéral à partir de 1024 px ; les notifications ne sélectionnent plus Paramètres. La barre ne se masque plus au simple focus d'un champ : détection du clavier virtuel par `visualViewport` (hauteur perdue, sans zoom), rétablie à sa fermeture.
+- Connexion compacte (ordre V4, vrai bouton Créer un compte, erreurs sous le champ avec focus, adresse conservée) ; inscription au même gabarit.
+- Première connexion : questionnaire en cinq étapes (objectif, approche, familiarité, documents ≤ 3, attribution facultative), reprise à l'étape quittée, puis tutoriel en trois étapes ignorable et rejouable (Paramètres > Revoir le tutoriel ; Profil > Mon apprentissage). Comptes existants marqués comme accueillis, préférences intactes.
+- Jetons V4 (`styles/v4.css`) : couleurs, rayons 12/16/20, interface 14/20, titres 24/30, boutons 44 px, pied de page « Propulsé par gooroo » en bas des pages courtes.
+- Migration `20261016000000_v4_onboarding.sql` appliquée en production avant la mise en ligne.
+
 ## Phase 16.1 — Écrans alignés sur les maquettes, notifications, couvertures générées (6 octobre 2026)
 
 - Cadrage par QCM : barre basse Bibliothèque / Créer (import direct) / Paramètres ; profil par l'avatar en haut à droite et en tête des Paramètres ; cloche = vraies notifications ; initiales et nom affiché modifiable ; « J'ai une clé d'accès » mène à la récupération par email ; couvertures générées par Gemini, sans crédit ; recherche rétractable (loupe), filtres visibles ; date et heure sur chaque Limpid ; thème qui suit l'appareil (clair ou sombre), choix possible.

@@ -16,6 +16,7 @@ import "./styles/components.css";
 import "./styles/reader.css";
 import "./styles/pages.css";
 import "./styles/v2.css";
+import "./styles/v4.css";
 
 export const metadata: Metadata = {
   title: { default: "Limpid", template: "%s · Limpid" },

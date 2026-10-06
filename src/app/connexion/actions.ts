@@ -10,6 +10,10 @@ import { createUserClient } from "@/lib/supabase/server";
 export interface LoginState {
   status: "idle" | "sent" | "error";
   message: string;
+  /** Champ en cause (message affiché sous ce champ, focus après envoi). */
+  field?: "email" | "password";
+  /** Adresse saisie, rendue au formulaire après une erreur (rien n'est perdu). */
+  email?: string;
 }
 
 const Email = z.string().trim().toLowerCase().email().max(254);
@@ -27,14 +31,15 @@ async function siteUrl(): Promise<string> {
 /** Envoie un lien magique. Réponse identique que l'adresse soit autorisée ou non (pas d'énumération). */
 export async function sendMagicLink(_prev: LoginState, form: FormData): Promise<LoginState> {
   const t = (await getT()).auth;
-  const parsed = Email.safeParse(form.get("email"));
-  if (!parsed.success) return { status: "error", message: t.invalidEmail };
+  const typed = String(form.get("email") ?? "").slice(0, 254);
+  const parsed = Email.safeParse(typed);
+  if (!parsed.success) return { status: "error", message: t.invalidEmail, field: "email", email: typed };
   const email = parsed.data;
   const sent: LoginState = {
     status: "sent",
     message: t.linkSent,
   };
-  if (!(await recordAttempt("magic", email))) return { status: "error", message: t.tooMany };
+  if (!(await recordAttempt("magic", email))) return { status: "error", message: t.tooMany, email };
   if (!(await isAllowed(email))) return sent;
   await dropUnconfirmedAccount(email);
 
@@ -45,7 +50,7 @@ export async function sendMagicLink(_prev: LoginState, form: FormData): Promise<
   });
   if (error) {
     console.error("auth.signInWithOtp", error.status, error.code);
-    return { status: "error", message: t.sendFailed };
+    return { status: "error", message: t.sendFailed, email };
   }
   return sent;
 }
@@ -57,21 +62,22 @@ export async function sendMagicLink(_prev: LoginState, form: FormData): Promise<
  */
 export async function signInWithPassword(_prev: LoginState, form: FormData): Promise<LoginState> {
   const t = (await getT()).auth;
-  const parsed = Email.safeParse(form.get("email"));
+  const typed = String(form.get("email") ?? "").slice(0, 254);
+  const parsed = Email.safeParse(typed);
   const password = String(form.get("password") ?? "");
-  if (!parsed.success) return { status: "error", message: t.invalidEmail };
-  if (!password) return { status: "error", message: t.passwordMissing };
+  if (!parsed.success) return { status: "error", message: t.invalidEmail, field: "email", email: typed };
+  if (!password) return { status: "error", message: t.passwordMissing, field: "password", email: typed };
   const email = parsed.data;
   if (!(await recordAttempt("password", email))) {
-    return { status: "error", message: t.tooMany };
+    return { status: "error", message: t.tooMany, email };
   }
-  if (!(await isAllowed(email))) return { status: "error", message: t.wrong };
+  if (!(await isAllowed(email))) return { status: "error", message: t.wrong, email };
 
   const supabase = await createUserClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     if (error.code !== "invalid_credentials") console.error("auth.signInWithPassword", error.status, error.code);
-    return { status: "error", message: t.wrong };
+    return { status: "error", message: t.wrong, email };
   }
   redirect("/");
 }
@@ -79,8 +85,9 @@ export async function signInWithPassword(_prev: LoginState, form: FormData): Pro
 /** Mot de passe oublié : lien de récupération à usage unique, réponse neutre. */
 export async function requestPasswordReset(_prev: LoginState, form: FormData): Promise<LoginState> {
   const t = (await getT()).auth;
-  const parsed = Email.safeParse(form.get("email"));
-  if (!parsed.success) return { status: "error", message: t.invalidEmail };
+  const typed = String(form.get("email") ?? "").slice(0, 254);
+  const parsed = Email.safeParse(typed);
+  if (!parsed.success) return { status: "error", message: t.invalidEmail, field: "email", email: typed };
   const email = parsed.data;
   const sent: LoginState = {
     status: "sent",
@@ -106,23 +113,24 @@ export async function requestPasswordReset(_prev: LoginState, form: FormData): P
 export async function signUp(_prev: LoginState, form: FormData): Promise<LoginState> {
   const t = await getT();
   if (!(await signupOpen())) return { status: "error", message: t.signup.closed };
-  const parsed = Email.safeParse(form.get("email"));
-  if (!parsed.success) return { status: "error", message: t.auth.invalidEmail };
+  const typed = String(form.get("email") ?? "").slice(0, 254);
+  const parsed = Email.safeParse(typed);
+  if (!parsed.success) return { status: "error", message: t.auth.invalidEmail, field: "email", email: typed };
   const email = parsed.data;
   const password = String(form.get("password") ?? "");
   const problem = passwordProblem(password, email, t.auth.rules);
-  if (problem) return { status: "error", message: problem };
+  if (problem) return { status: "error", message: problem, field: "password", email };
   const sent: LoginState = { status: "sent", message: t.signup.sent };
-  if (!(await recordAttempt("signup", email))) return { status: "error", message: t.auth.tooMany };
+  if (!(await recordAttempt("signup", email))) return { status: "error", message: t.auth.tooMany, email };
   // Adresse d'administrateur : connexion par lien uniquement (même réponse, pas d'énumération).
   if (await isAdminAddress(email)) return sent;
   const supabase = await createUserClient();
   const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${await siteUrl()}/auth/callback` } });
   if (error) {
-    if (error.code === "weak_password") return { status: "error", message: t.auth.weakPassword };
+    if (error.code === "weak_password") return { status: "error", message: t.auth.weakPassword, field: "password", email };
     if (error.code === "user_already_exists" || error.code === "email_exists") return sent;
     console.error("auth.signUp", error.status, error.code);
-    return { status: "error", message: t.auth.sendFailed };
+    return { status: "error", message: t.auth.sendFailed, email };
   }
   return sent;
 }

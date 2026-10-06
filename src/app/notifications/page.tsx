@@ -33,7 +33,7 @@ export default async function NotificationsPage() {
       const plan = typeof i.data.plan === "string" ? (t.billing.planNames[i.data.plan] ?? i.data.plan) : "";
       const map = {
         report_ready: { icon: "check" as IconName, text: title ? n.reportReady(title) : n.reportReadyAnon, href: i.reportId ? `/rapports/${i.reportId}/apercu` : null },
-        report_failed: { icon: "alert" as IconName, text: n.reportFailed, href: "/?vue=preparations&filtre=a_verifier", tone: "danger" },
+        report_failed: { icon: "alert" as IconName, text: n.reportFailed, href: "/bibliotheque?vue=preparations&filtre=a_verifier", tone: "danger" },
         credits_added: { icon: "star" as IconName, text: n.creditsAdded(Number(i.data.credits ?? 0)), href: "/compte/credits" },
         plan_started: { icon: "star" as IconName, text: n.planStarted(plan), href: "/compte/credits" },
         plan_expiring: { icon: "clock" as IconName, text: "", href: "/offres" },

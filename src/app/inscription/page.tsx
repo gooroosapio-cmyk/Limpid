@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Screen } from "@/components/shell/Screen";
+import { Logo } from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
 import { signupOpen } from "@/lib/auth/password";
 import { getT } from "@/lib/i18n/server";
@@ -19,9 +19,10 @@ export default async function SignupPage() {
   const t = await getT();
   const open = await signupOpen();
   return (
-    <Screen>
+    <div className="auth">
+      <div className="auth-top"><Logo height={26} /></div>
       <h1>{t.signup.title}</h1>
-      <p className="lede">{t.signup.lede}</p>
+      <p className="auth-lede">{t.signup.lede}</p>
       {open ? (
         <>
           <OAuthButtons t={t} />
@@ -30,9 +31,10 @@ export default async function SignupPage() {
       ) : (
         <>
           <p className="notice">{t.signup.closed}</p>
-          <Link href="/connexion" className="btn">{t.signup.already}</Link>
+          <Link href="/connexion" className="btn btn-block">{t.signup.already}</Link>
         </>
       )}
-    </Screen>
+      <footer className="footer">{t.brand.poweredBy}</footer>
+    </div>
   );
 }
