@@ -1,19 +1,57 @@
 /**
- * Couverture générée (image Lite de Gemini, via OpenRouter ou Google) pour chaque leçon (V2.1) : décorative, sans texte, comprise
- * dans le prix de la leçon (aucun crédit), plafonnée par le budget IA. Un échec laisse le
- * dégradé de la banque : la leçon reste complète.
+ * Couverture de chaque cours (V5) : d'abord une photo Unsplash (aucun coût d'IA, affichée
+ * depuis Unsplash avec le crédit du photographe), sinon une image Nano Banana 2 Lite
+ * décorative et sans texte, plafonnée par le budget IA. Un échec laisse le dégradé de la
+ * banque : le cours reste complet.
  */
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { priceBasisFor, usageCents } from "@/lib/budget";
 import { getImageProvider } from "@/lib/engine";
-import { imageModelFor } from "@/lib/visuals/config";
+import { COVER_MODEL } from "@/lib/visuals/image-models";
+import { searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { assertBudget } from "@/lib/jobs/budget-guard";
 import { adminClient } from "@/lib/supabase/admin";
 
 export function coverGenerationEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  const keyed = !!env.OPENROUTER_API_KEY?.trim() || !!env.GEMINI_API_KEY?.trim();
-  return keyed && !!imageModelFor(env as NodeJS.ProcessEnv) && env.LIMPID_COVERS_GEMINI !== "off";
+  return !!env.OPENROUTER_API_KEY?.trim() && env.LIMPID_COVERS_GEMINI !== "off";
+}
+
+/** Adresse d'affichage d'une photo Unsplash recadrée en 4/3 (paramètres d'image d'Unsplash). */
+export function unsplashCoverUrl(imageUrl: string): string | null {
+  try {
+    const u = new URL(imageUrl);
+    if (u.protocol !== "https:" || u.hostname !== "images.unsplash.com") return null;
+    for (const [k, v] of Object.entries({ w: "1200", h: "900", fit: "crop", crop: "entropy", auto: "format", q: "75" })) u.searchParams.set(k, v);
+    return u.toString().slice(0, 600);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Photo Unsplash pour la couverture : premier résultat paysage de la requête (mots-clés anglais
+ * du plan, sinon le titre). Renvoie true si une photo est rattachée.
+ */
+export async function unsplashCover(input: { reportId: string; ownerId: string; query: string }): Promise<boolean> {
+  const key = process.env.UNSPLASH_ACCESS_KEY?.trim();
+  const query = input.query.replace(/[^\p{L}\p{N} -]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!key || query.length < 3) return false;
+  const found = (await searchUnsplash(query, key, 5_000, "landscape").catch(() => []))[0];
+  const url = found ? unsplashCoverUrl(found.imageUrl) : null;
+  if (!found || !url) return false;
+  const credit = { author: found.author, url: found.sourceUrl.split("?")[0]! };
+  const { error } = await adminClient().from("reports").update({ cover_url: url, cover_credit: credit }).eq("id", input.reportId).eq("owner_id", input.ownerId);
+  if (error) return false;
+  // Exigence de l'API Unsplash : signaler l'utilisation de la photo.
+  if (found.downloadLocation) await trackUnsplashDownload(found.downloadLocation, key);
+  return true;
+}
+
+/** Couverture d'un nouveau cours : Unsplash, sinon Nano Banana 2 Lite. */
+export async function chooseCover(input: { reportId: string; ownerId: string; title: string; hints: string[]; query: string; jobId?: string | null }): Promise<void> {
+  if (await unsplashCover({ reportId: input.reportId, ownerId: input.ownerId, query: input.query })) return;
+  await generateCover(input);
 }
 
 /** Consigne : une photographie éditoriale décorative, jamais une illustration pédagogique. */
@@ -37,7 +75,7 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
   } catch {
     return null;
   }
-  const model = imageModelFor()!;
+  const model = COVER_MODEL;
   const provider = getImageProvider();
   let out;
   try {
@@ -79,7 +117,7 @@ export async function generateCover(input: { reportId: string; ownerId: string; 
     return null;
   }
   const { data: prev } = await db.from("reports").select("cover_path").eq("id", input.reportId).maybeSingle();
-  const { error: upd } = await db.from("reports").update({ cover_path: path }).eq("id", input.reportId).eq("owner_id", input.ownerId);
+  const { error: upd } = await db.from("reports").update({ cover_path: path, cover_url: null, cover_credit: null }).eq("id", input.reportId).eq("owner_id", input.ownerId);
   if (upd) {
     await db.storage.from("exports").remove([path]);
     return null;

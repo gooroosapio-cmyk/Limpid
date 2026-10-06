@@ -4,6 +4,8 @@
  * comptes. Aucun contenu de document n'est exposé : seulement des compteurs et des codes.
  */
 import "server-only";
+import { imageSettingsFrom } from "@/lib/visuals/image-models";
+import { recraftConfigFromEnv } from "@/lib/visuals/recraft";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { adminMfaRequired, mfaStep } from "@/lib/auth/mfa";
@@ -77,7 +79,7 @@ export async function adminOverview() {
   const quotaStart = pacificMidnight(now);
 
   const [settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
-    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at").single(),
+    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
     db.from("usage_ledger").select("model").gte("created_at", quotaStart.toISOString()),
@@ -94,6 +96,8 @@ export async function adminOverview() {
 
   return {
     generationEnabled: settings.data?.generation_enabled ?? false,
+    images: imageSettingsFrom(settings.data as Record<string, unknown> | null),
+    imageProviders: { recraft: !!recraftConfigFromEnv(), nanobanana: !!process.env.OPENROUTER_API_KEY?.trim() },
     monthlyCapCents: Math.min(settings.data?.monthly_cap_cents ?? budget.monthlyCapCents, budget.monthlyCapCents),
     envCapCents: budget.monthlyCapCents,
     dailyAccountCapCents: budget.perAccountDailyCapCents,
@@ -104,7 +108,7 @@ export async function adminOverview() {
       since: quotaStart,
       limit: FREE_TIER_DAILY_REQUESTS,
       models: [...byModel.entries()].sort((a, b) => b[1] - a[1]),
-      configured: [process.env.LIMPID_MODEL_LITE, process.env.LIMPID_MODEL_EDITOR, process.env.LIMPID_MODEL_COMPLEX, process.env.LIMPID_MODEL_FAST, process.env.LIMPID_MODEL_QUALITY, ...(process.env.LIMPID_MODEL_FALLBACKS ?? "").split(",").map((m) => m.trim())].filter((m): m is string => !!m),
+      configured: [process.env.LIMPID_MODEL_LITE, process.env.LIMPID_MODEL_EDITOR, process.env.LIMPID_MODEL_COMPLEX, ...(process.env.LIMPID_MODEL_FALLBACKS ?? "").split(",").map((m) => m.trim())].filter((m): m is string => !!m),
     },
     emails: emails.data ?? [],
     jobs: jobs.data ?? [],

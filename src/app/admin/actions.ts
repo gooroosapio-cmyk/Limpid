@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cleanRoute, modelInfo, type ImageStyle } from "@/lib/visuals/image-models";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -36,6 +37,33 @@ export async function setMonthlyCap(form: FormData) {
   if (error) done("La modification n'a pas été enregistrée.");
   await audit(user.id, "budget.monthly_cap", null, { cents });
   done(`Plafond mensuel fixé à ${(cents / 100).toLocaleString("fr-FR")} €.`);
+}
+
+/** Fournisseur et modèle par type de visuel : valeur « fournisseur|modèle » du catalogue fermé. */
+export async function setImageSettings(form: FormData) {
+  const user = await requireAdmin();
+  const route = (key: string, style: ImageStyle) => {
+    const [provider, model] = String(form.get(key) ?? "").split("|");
+    const m = modelInfo(model ?? "");
+    return m && m.provider === provider ? cleanRoute(provider, model, style) : null;
+  };
+  const vector = route("vector", "vector");
+  const realistic = route("realistic", "realistic");
+  if (!vector || !realistic) done("Modèle d'image invalide.");
+  const { error } = await adminClient()
+    .from("app_settings")
+    .update({
+      images_enabled: form.get("images_enabled") === "on",
+      image_vector_provider: vector!.provider,
+      image_vector_model: vector!.model,
+      image_realistic_provider: realistic!.provider,
+      image_realistic_model: realistic!.model,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", true);
+  if (error) done("La modification n'a pas été enregistrée.");
+  await audit(user.id, "images.settings", null, { vector: vector!.model, realistic: realistic!.model });
+  done("Réglages des images enregistrés.");
 }
 
 const Email = z.string().trim().toLowerCase().email().max(254);

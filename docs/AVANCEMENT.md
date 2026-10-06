@@ -1,5 +1,21 @@
 # Avancement
 
+## Phase 19.2 — V5, lot B : images par type, couverture Unsplash, réglage admin (7 octobre 2026)
+
+### FAIT
+- Illustrations : 0 ou 1 par chapitre, 3 au plus par cours, seulement quand le plan les juge utiles. Type « vectoriel » (concept, analogie) ou « réaliste » (scène, lieu, objet).
+- Routage : Recraft V4.1 Vector par défaut pour le vectoriel, Nano Banana 2 Lite pour le réaliste ; repli automatique sur l'autre fournisseur ; images générées en parallèle ; appels échoués journalisés.
+- Console admin « Images des cours » : interrupteur général et, pour chaque type, fournisseur + modèle dans un catalogue fermé avec le prix unitaire (Recraft V4.1 Vector / Utility / Pro Vector, V4.1 Flash / V4.1 / Pro en image, Nano Banana 2 Lite / Nano Banana 2). Modèles d'un fournisseur sans clé désactivés.
+- Couverture : photo Unsplash (mots-clés anglais prévus par le plan, format paysage, affichée depuis Unsplash avec le crédit du photographe, téléchargement signalé à Unsplash), sinon Nano Banana 2 Lite. Crédit visible sur la page d'aperçu.
+- Recherche dans les banques d'images (Commons) et planche découpée retirées des illustrations.
+- Migration `20261021000000_v5_images.sql` appliquée en production avant fusion.
+
+### EN TEST
+- Vitest : route par type, repli croisé et journalisation, réglage admin, fournisseur absent, catalogue nettoyé.
+
+### NON TESTÉ
+- Appels réels Recraft, Nano Banana et Unsplash (clés absentes de l'environnement de développement).
+
 ## Phase 19.1 — V5, lot A : moteur par chapitres, prix selon la source (7 octobre 2026)
 
 ### FAIT

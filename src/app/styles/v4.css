@@ -534,3 +534,8 @@ dialog.chat-sheet::backdrop { background: var(--backdrop); }
 .bilan-corrections { margin: var(--s3) 0; }
 .bilan-corrections summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
 .bilan-corrections ol { padding-left: 1.2em; display: grid; gap: var(--s3); }
+.cover-credit { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.cover-credit a { color: inherit; }
+.admin-images { display: grid; gap: 12px; }
+.admin-select { display: grid; gap: 6px; font-weight: 600; }
+.admin-select select { min-height: 44px; max-width: 100%; }

@@ -1,20 +1,19 @@
 /**
- * Illustrations d'un rapport (cahier V2, § 9-10 ; Atlas). Ordre en mode auto : schémas (déjà
- * faits par le moteur), illustrations vectorielles Recraft (dans la limite du rapport), banque
- * autorisée (Commons, puis Unsplash si activé), puis planche Gemini Image si activée et dans le quota. Sinon le visuel est retiré : le texte validé reste seul.
+ * Illustrations d'un cours (V5) : 0 ou 1 par chapitre, 3 au plus, générées seulement quand le
+ * plan les juge utiles. Chaque illustration suit la route réglée pour son type dans la
+ * console admin (Recraft vectoriel en priorité, Nano Banana pour une scène réaliste), puis
+ * l'autre fournisseur en repli. Sans image exploitable, le visuel est retiré : le texte reste.
  * Une illustration n'est jamais une preuve ; ses crédits vivent dans visual_assets.
  */
 import type { ReportBlueprint, VisualMode } from "@/lib/contracts/schemas";
 import type { UsageReport } from "@/lib/engine/provider";
 import { IllustrationData } from "@/lib/render/visuals";
-import type { VisualConfig } from "./config";
-import { plateGrid, platePrompt, PLATE_MAX } from "./plate-prompt";
-import { rankCandidates, type Candidate, type StoredImage } from "./sources";
+import type { ImageProviderId, ImageRoute, ImageSettings, ImageStyle } from "./image-models";
+import { imageAttempts } from "./image-models";
+import type { Candidate, StoredImage } from "./sources";
 
-/** Illustrations par rapport (V4.1 : jusqu'à 4, générées si besoin en une seule planche). */
-export const MAX_ILLUSTRATIONS = 4;
-/** Temps total accordé à la recherche d'images (cahier : 8 s). */
-export const SEARCH_BUDGET_MS = 8_000;
+/** Illustrations par cours (kit V5 : 3 au plus). */
+export const MAX_ILLUSTRATIONS = 3;
 
 /** Image vectorielle assainie, prête à stocker. */
 export interface StoredVector {
@@ -45,31 +44,16 @@ export interface AssetRow {
 }
 
 export interface IllustrateDeps {
-  searchCommons(query: string, timeoutMs: number): Promise<Candidate[]>;
-  downloadCommons(c: Candidate, timeoutMs: number): Promise<StoredImage | null>;
-  searchUnsplash?(query: string, timeoutMs: number): Promise<Candidate[]>;
-  trackUnsplash?(location: string): Promise<void>;
-  generateImage?(prompt: string, aspectRatio: "1:1" | "16:9" | "3:2" | "4:3"): Promise<{ bytes: Buffer; mime: string; usage: UsageReport }>;
-  /** Découpe une planche en images à fond transparent (une par case). */
-  cutPlate?(bytes: Buffer, n: number): Promise<(StoredImage | null)[]>;
-  onImageUsage?(attempt: number, usage: UsageReport): Promise<void> | void;
-  /** Images générées ce mois-ci par le compte. */
-  generatedThisMonth(): Promise<number>;
-  /** Illustration vectorielle (Recraft) : SVG déjà assaini. */
-  generateVector?(item: { subject: string; purpose: string; altText: string }): Promise<{ vector: StoredVector; usage: UsageReport }>;
-  onVectorUsage?(attempt: number, usage: UsageReport): Promise<void> | void;
-  /** Illustrations vectorielles encore permises pour ce rapport (Atlas : 1 / 2 / 4). */
-  vectorBudget?: number;
+  settings: ImageSettings;
+  /** Fournisseurs configurés (clé présente). */
+  available: Record<ImageProviderId, boolean>;
+  /** Génère une image pour une route ; SVG déjà assaini, image matricielle déjà contrôlée. */
+  render(route: ImageRoute, style: ImageStyle, item: { subject: string; purpose: string; altText: string }): Promise<{ image: StoredImage | StoredVector; usage: UsageReport }>;
+  onUsage?(route: ImageRoute, attempt: number, usage: UsageReport): Promise<void> | void;
   /** Dépôt privé ; renvoie le chemin, ou null en cas d'échec. */
   store(img: StoredImage | StoredVector, ext: "jpg" | "png" | "svg"): Promise<string | null>;
   /** Enregistre l'actif ; renvoie son identifiant, ou null. */
   insertAsset(row: AssetRow): Promise<string | null>;
-  now?(): number;
-}
-
-/** Consigne d'image (cahier, § 10) : brève, expurgée, sans texte ni chiffre. */
-export function imagePrompt(subject: string, purpose: string, altText: string): string {
-  return `Crée une illustration pédagogique de ${subject}, pour montrer ${purpose}. Style éditorial simple, fond clair, palette ivoire, encre et jaune doux, format 4:3. Respecte uniquement ces éléments validés : ${altText}. Aucun texte, logo, chiffre ni détail documentaire inventé. Cette image sera légendée comme illustration générée.`;
 }
 
 function withoutVisual(bp: ReportBlueprint, id: string): ReportBlueprint {
@@ -87,22 +71,6 @@ function withAsset(bp: ReportBlueprint, id: string, assetId: string): ReportBlue
   };
 }
 
-/**
- * Réunit deux passes lancées en parallèle sur le même plan : les dessins (ajout ou
- * remplacement des visuels « drawing ») et les illustrations (actif posé ou visuel retiré).
- * Les deux ne touchent jamais les mêmes visuels.
- */
-export function mergeVisualPasses(base: ReportBlueprint, drawn: ReportBlueprint, illustrated: ReportBlueprint): ReportBlueprint {
-  const baseIllustrations = new Set(base.visual_specs.filter((v) => v.kind === "illustration").map((v) => v.id));
-  const kept = new Map(illustrated.visual_specs.filter((v) => baseIllustrations.has(v.id)).map((v) => [v.id, v]));
-  const dropped = new Set([...baseIllustrations].filter((id) => !kept.has(id)));
-  return {
-    ...drawn,
-    visual_specs: drawn.visual_specs.filter((v) => !dropped.has(v.id)).map((v) => kept.get(v.id) ?? v),
-    sections: drawn.sections.map((s) => ({ ...s, visual_ids: s.visual_ids.filter((id) => !dropped.has(id)) })),
-  };
-}
-
 export function pendingIllustrations(bp: ReportBlueprint) {
   return bp.visual_specs.flatMap((v) => {
     if (v.kind !== "illustration") return [];
@@ -114,182 +82,60 @@ export function pendingIllustrations(bp: ReportBlueprint) {
 export async function illustrate(
   blueprint: ReportBlueprint,
   mode: VisualMode,
-  config: VisualConfig,
   deps: IllustrateDeps,
 ): Promise<{ blueprint: ReportBlueprint; notes: string[]; added: number }> {
-  const now = deps.now ?? Date.now;
-  const deadline = now() + SEARCH_BUDGET_MS;
   const notes: string[] = [];
   let bp = blueprint;
   let added = 0;
   const pending = pendingIllustrations(bp);
-  if (mode === "aucun" || mode === "schemas") {
+  if (mode === "aucun" || mode === "schemas" || !deps.settings.enabled) {
     for (const p of pending) bp = withoutVisual(bp, p.spec.id);
     return { blueprint: bp, notes, added };
   }
-  const useGemini = config.geminiImage && !!deps.generateImage && (mode === "gemini" || mode === "auto");
-  let generated = useGemini ? await deps.generatedThisMonth() : 0;
-  let imageAttempt = 0;
-
   const items = pending.slice(0, MAX_ILLUSTRATIONS);
-  const found = new Map<string, string>();
-
-  // Illustrations conceptuelles vectorielles (Recraft) : sans texte ni chiffre, dans la limite du rapport.
-  let vectorsLeft = mode === "auto" || mode === "gemini" ? (deps.generateVector ? (deps.vectorBudget ?? 0) : 0) : 0;
-  let vectorAttempt = 0;
-  const tryVector = async ({ spec, data }: (typeof items)[number]): Promise<string | null> => {
-    if (vectorsLeft <= 0 || !deps.generateVector) return null;
-    vectorsLeft--;
-    vectorAttempt++;
-    try {
-      const out = await deps.generateVector({ subject: data.subject, purpose: spec.purpose, altText: spec.alt_text });
-      await deps.onVectorUsage?.(vectorAttempt, out.usage);
-      const path = await deps.store(out.vector, "svg");
-      if (!path) return null;
-      return deps.insertAsset({
-        provider: "recraft",
-        kind: "generated",
-        query: data.query,
-        source_url: null,
-        remote_url: null,
-        storage_path: path,
-        mime: out.vector.mime,
-        width: out.vector.width,
-        height: out.vector.height,
-        byte_size: out.vector.bytes.length,
-        sha256: out.vector.sha256,
-        author: null,
-        license: null,
-        license_url: null,
-        modifications: "Illustration vectorielle générée, nettoyée (aucun script ni lien externe)",
-        model: out.usage.model,
-      });
-    } catch (e) {
-      const usage = (e as { usage?: UsageReport }).usage;
-      if (usage) await deps.onVectorUsage?.(vectorAttempt, usage);
-      return null;
-    }
-  };
-  for (const it of items) {
-    if (vectorsLeft <= 0) break;
-    const id = await tryVector(it);
-    if (id) found.set(it.spec.id, id);
-  }
-
-  // Banque autorisée : Commons d'abord (stocké, PDF possible), Unsplash ensuite (web seulement).
-  const tryWeb = async ({ data }: (typeof items)[number]): Promise<string | null> => {
-    if (config.commons && now() < deadline) {
-      const candidates = await deps.searchCommons(data.query, Math.max(500, deadline - now())).catch(() => []);
-      for (const c of rankCandidates(data.query, candidates).slice(0, 2)) {
-        if (now() >= deadline) break;
-        const img = await deps.downloadCommons(c, Math.max(500, deadline - now())).catch(() => null);
-        if (!img) continue;
-        const path = await deps.store(img, img.mime === "image/png" ? "png" : "jpg");
-        if (!path) continue;
-        return deps.insertAsset({
-          provider: "commons",
-          kind: c.kind,
-          query: data.query,
-          source_url: c.sourceUrl,
-          remote_url: null,
-          storage_path: path,
-          mime: img.mime,
-          width: img.width,
-          height: img.height,
-          byte_size: img.bytes.length,
-          sha256: img.sha256,
-          author: c.author,
-          license: c.license,
-          license_url: c.licenseUrl,
-          modifications: c.modifications,
-          model: null,
-        });
-      }
-    }
-    if (config.unsplash && deps.searchUnsplash && now() < deadline) {
-      const candidates = await deps.searchUnsplash(data.query, Math.max(500, deadline - now())).catch(() => []);
-      const c = rankCandidates(data.query, candidates)[0];
-      if (c) {
-        if (c.downloadLocation) await deps.trackUnsplash?.(c.downloadLocation);
-        return deps.insertAsset({
-          provider: "unsplash",
-          kind: c.kind,
-          query: data.query,
-          source_url: c.sourceUrl,
-          remote_url: c.imageUrl,
-          storage_path: null,
-          mime: null,
-          width: c.width,
-          height: c.height,
-          byte_size: null,
-          sha256: null,
-          author: c.author,
-          license: c.license,
-          license_url: c.licenseUrl,
-          modifications: null,
-          model: null,
-        });
-      }
-    }
-    return null;
-  };
-
-  // Planche : toutes les illustrations restantes en UNE génération, découpées sans fond.
-  const tryPlate = async (todo: typeof items) => {
-    if (!useGemini || !deps.cutPlate || todo.length === 0 || generated >= config.monthlyGenerated) return;
-    const batch = todo.slice(0, Math.min(PLATE_MAX, config.monthlyGenerated - generated));
-    imageAttempt++;
-    try {
-      const prompt = platePrompt(batch.map(({ spec, data }) => ({ subject: data.subject, purpose: spec.purpose, altText: spec.alt_text })));
-      const out = await deps.generateImage!(prompt, plateGrid(batch.length).aspectRatio);
-      await deps.onImageUsage?.(imageAttempt, out.usage);
-      const cells = await deps.cutPlate(out.bytes, batch.length);
-      for (const [k, cell] of cells.entries()) {
-        const item = batch[k];
-        if (!cell || !item) continue;
-        const path = await deps.store(cell, "png");
-        if (!path) continue;
-        const id = await deps.insertAsset({
-          provider: "gemini",
-          kind: "generated",
-          query: item.data.query,
-          source_url: null,
-          remote_url: null,
-          storage_path: path,
-          mime: cell.mime,
-          width: cell.width,
-          height: cell.height,
-          byte_size: cell.bytes.length,
-          sha256: cell.sha256,
-          author: null,
-          license: null,
-          license_url: null,
-          modifications: "Découpée d'une planche, fond rendu transparent",
-          model: out.usage.model,
-        });
-        if (id) {
-          found.set(item.spec.id, id);
-          generated++;
+  const results = await Promise.all(
+    items.map(async ({ spec, data }, n) => {
+      const style: ImageStyle = data.style === "realistic" ? "realistic" : "vector";
+      const routes = imageAttempts(style, deps.settings, deps.available);
+      for (const [k, route] of routes.entries()) {
+        const attempt = n * 10 + k + 1;
+        try {
+          const out = await deps.render(route, style, { subject: data.subject, purpose: spec.purpose, altText: spec.alt_text });
+          await deps.onUsage?.(route, attempt, out.usage);
+          const svg = out.image.mime === "image/svg+xml";
+          const path = await deps.store(out.image, svg ? "svg" : out.image.mime === "image/png" ? "png" : "jpg");
+          if (!path) continue;
+          const id = await deps.insertAsset({
+            provider: route.provider === "recraft" ? "recraft" : "gemini",
+            kind: "generated",
+            query: data.query,
+            source_url: null,
+            remote_url: null,
+            storage_path: path,
+            mime: out.image.mime,
+            width: out.image.width,
+            height: out.image.height,
+            byte_size: out.image.bytes.length,
+            sha256: out.image.sha256,
+            author: null,
+            license: null,
+            license_url: null,
+            modifications: svg ? "Illustration vectorielle générée, nettoyée (aucun script ni lien externe)" : "Illustration générée",
+            model: out.usage.model,
+          });
+          if (id) return id;
+        } catch (e) {
+          // Un appel échoué peut être facturé : il est journalisé, puis l'autre fournisseur est essayé.
+          const usage = (e as { usage?: UsageReport }).usage;
+          if (usage) await deps.onUsage?.(route, attempt, usage);
+          if ((e as { code?: string }).code === "cancelled") throw e;
         }
       }
-    } catch (e) {
-      // Un appel image échoué peut quand même être facturé : il est journalisé.
-      const usage = (e as { usage?: UsageReport }).usage;
-      if (usage) await deps.onImageUsage?.(imageAttempt, usage);
-    }
-  };
-
-  const rest = () => items.filter((it) => !found.has(it.spec.id));
-  if (mode === "gemini") {
-    await tryPlate(rest());
-    for (const it of rest()) { const id = await tryWeb(it); if (id) found.set(it.spec.id, id); }
-  } else {
-    for (const it of rest()) { const id = await tryWeb(it); if (id) found.set(it.spec.id, id); }
-    await tryPlate(rest());
-  }
-
-  for (const { spec, data } of items) {
-    const assetId = found.get(spec.id);
+      return null;
+    }),
+  );
+  for (const [k, { spec, data }] of items.entries()) {
+    const assetId = results[k];
     if (assetId) {
       bp = withAsset(bp, spec.id, assetId);
       added++;
@@ -298,7 +144,6 @@ export async function illustrate(
       notes.push(`Aucune illustration exploitable pour « ${data.subject} » : texte seul.`);
     }
   }
-  // Au-delà du maximum : retirées sans recherche.
   for (const p of pending.slice(MAX_ILLUSTRATIONS)) bp = withoutVisual(bp, p.spec.id);
   return { blueprint: bp, notes, added };
 }

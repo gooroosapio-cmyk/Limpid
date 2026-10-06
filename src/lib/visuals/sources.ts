@@ -174,8 +174,9 @@ export function unsplashCandidates(json: unknown): Candidate[] {
   return out;
 }
 
-export async function searchUnsplash(query: string, accessKey: string, timeoutMs = 4_000): Promise<Candidate[]> {
-  const url = `https://api.unsplash.com/search/photos?${new URLSearchParams({ query, per_page: String(MAX_CANDIDATES), content_filter: "high" })}`;
+export async function searchUnsplash(query: string, accessKey: string, timeoutMs = 4_000, orientation?: "landscape"): Promise<Candidate[]> {
+  const params = new URLSearchParams({ query, per_page: String(MAX_CANDIDATES), content_filter: "high", ...(orientation ? { orientation } : {}) });
+  const url = `https://api.unsplash.com/search/photos?${params}`;
   const res = await fetch(url, {
     headers: { Authorization: `Client-ID ${accessKey}`, "Accept-Version": "v1" },
     signal: AbortSignal.timeout(timeoutMs),
