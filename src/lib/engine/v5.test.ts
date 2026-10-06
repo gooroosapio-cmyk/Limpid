@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import { riskyClaim, type GenerationInput } from "./pipeline";
 import type { AIProvider, StructuredRequest } from "./provider";
-import { capChapters, diagramContentOk, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -221,7 +221,7 @@ describe("moteur V5 : plan", () => {
     missing_information: [],
     coverage: { segments_total: 1, segments_processed: 1, unreadable_locators: [], partial: false },
   };
-  const ch = (claim_ids: string[], visual = visualNone) => ({ title: "T", objective: "O", claim_ids, difficulty: "standard" as const, notions: [], visual: visual as PlanV5["chapters"][number]["visual"] });
+  const ch = (claim_ids: string[], visual = visualNone) => ({ title: "T", objective: "O", claim_ids, difficulty: "standard" as const, approach: "livre" as const, notions: [], visual: visual as PlanV5["chapters"][number]["visual"] });
 
   it("chaque affirmation dans un seul chapitre, oubliées rattachées au plus proche", () => {
     const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1", "clm_9"]), ch(["clm_1", "clm_4"])], excluded: [], limitations: [] };
@@ -230,10 +230,20 @@ describe("moteur V5 : plan", () => {
     expect(p.chapters.map((c) => c.claim_ids)).toEqual([["clm_1", "clm_2", "clm_3"], ["clm_4"]]);
   });
 
-  it("schéma : chiffres repris des affirmations du chapitre, sinon illustration simple", () => {
-    expect(diagramContentOk("Hausse de 12,5 % puis 3 000 €", ["Les prix montent de 12.5 % ; coût 3 000 €."])).toBe(true);
-    expect(diagramContentOk("Hausse de 40 %", ["Les prix montent de 12,5 %."])).toBe(false);
-    expect(diagramContentOk("", ["x"])).toBe(false);
+  it("schéma généré : des étiquettes, jamais de chiffre (les valeurs passent par les composants)", () => {
+    expect(diagramContentOk("Évaporation → Condensation → Pluie")).toBe(true);
+    expect(diagramContentOk("Hausse de 12,5 %")).toBe(false);
+    expect(diagramContentOk("")).toBe(false);
+  });
+
+  it("composants chiffrés : valeurs reprises des affirmations citées, sauf exemple annoncé", () => {
+    const statements = new Map([["clm_1", "Sur 200 €, 30 % vont au loyer."]]);
+    const base = { text: "Part du loyer", claim_ids: ["clm_1"], evidence_ids: [] };
+    const ok = { ...base, id: "blk_1", type: "proportion" as const, base: 200, percent: 30, unit: "€", part_label: "Loyer", rest_label: "Reste", interactive: true, example: false };
+    const bad = { ...ok, id: "blk_2", percent: 45 };
+    const fictive = { ...bad, id: "blk_3", example: true };
+    const chart = { ...base, id: "blk_4", type: "chart" as const, chart_type: "bar" as const, unit: "%", points: [{ label: "Loyer", value: 30 }, { label: "Autre", value: null }] };
+    expect(unsourcedComponents([ok, bad, fictive, chart], statements)).toEqual(["blk_2"]);
   });
 
   it("3 illustrations au plus, aucune en résumé fidèle ou en texte seul", () => {
@@ -248,7 +258,7 @@ describe("moteur V5 : plan", () => {
 describe("moteur V5 : 15 chapitres au plus", () => {
   it("réunit les chapitres voisins les plus légers, sans perdre d'affirmation", () => {
     const none = { kind: "none" as const, subject: "", query_en: "", purpose: "", content: "" };
-    const chapters = Array.from({ length: 20 }, (_, i) => ({ title: `C${i}`, objective: `O${i}`, claim_ids: Array.from({ length: i % 3 === 0 ? 1 : 4 }, (_, k) => `clm_${i}_${k}`), difficulty: (i === 5 ? "difficile" : "standard") as "standard" | "difficile", notions: [], visual: none }));
+    const chapters = Array.from({ length: 20 }, (_, i) => ({ title: `C${i}`, objective: `O${i}`, claim_ids: Array.from({ length: i % 3 === 0 ? 1 : 4 }, (_, k) => `clm_${i}_${k}`), difficulty: (i === 5 ? "difficile" : "standard") as "standard" | "difficile", approach: "livre" as const, notions: [], visual: none }));
     const out = capChapters(chapters);
     expect(out).toHaveLength(15);
     expect(out.flatMap((c) => c.claim_ids)).toEqual(chapters.flatMap((c) => c.claim_ids));

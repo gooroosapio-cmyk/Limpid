@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { DeleteReport } from "@/components/DeleteReport";
 import { JobProgress } from "@/components/JobProgress";
 import { composeLimpid } from "@/components/reader/v4/Pieces";
-import { LimpidScreen } from "@/components/reader/v4/LimpidScreen";
+import { chapterQuizzes, LimpidScreen } from "@/components/reader/v4/LimpidScreen";
 import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import { readDisplayPrefs } from "@/lib/display/prefs";
@@ -92,6 +92,7 @@ export default async function ReportPage({
   return (
     <LimpidScreen
       doc={doc}
+      quizzes={chapterQuizzes(report.explanation.sections)}
       reportId={report.isCurrent ? id : null}
       versionId={report.versionId}
       initialAnchor={report.progressAnchor}

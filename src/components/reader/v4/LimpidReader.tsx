@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import type { Exercise } from "@/lib/contracts/schemas";
+import type { ChapterQuestion, Exercise } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
 import { AskPanel } from "../AskPanel";
 import { ANCHOR_RE, progressKey, useAnnex } from "../annex-link";
 import { Bilan } from "./Bilan";
+import { ChapterQuiz } from "./ChapterCheck";
 import { ReaderCtx, type ReaderApi } from "./context";
 import { OptionsPanel, type OptionsData } from "./OptionsPanel";
 import { ReformulatePanel } from "./ReformulatePanel";
@@ -18,11 +20,35 @@ export interface Chapter {
   title: string;
 }
 
+/** Pièce de premier niveau de l'article, rattachée à un chapitre. */
+interface Unit {
+  el: HTMLElement;
+  chapter: number;
+  /** Après le dernier chapitre (fin du Limpid, bilan, annexes) : sous la fin du dernier chapitre. */
+  tail: boolean;
+}
+
+/** Durées de la transition entre chapitres (sortie + entrée ≈ 280 ms, kit V6 § 06). */
+const OUT_MS = 110;
+const IN_MS = 170;
+/** Balayage horizontal intentionnel : distance minimale et dominance sur le vertical. */
+const SWIPE_MIN = 80;
+
+function reducedMotion(): boolean {
+  return document.documentElement.dataset.motion === "reduit" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /**
- * Lecteur V5 (kit Présentation V5) : une vraie lecture continue, chapitres dans le flux, sans
- * pages d'écran, sans compteur de vues et sans bouton flottant. En-tête discret (Fermer,
- * chapitre courant), barre basse Sommaire / Question / Options. Le retour ferme d'abord un
- * panneau ; fermer un panneau rend la position de lecture intacte.
+ * Lecteur V6 (kit Présentation V6, § 06) : un chapitre à la fois. Dans le chapitre, défilement
+ * vertical naturel, sans hauteur fixe ; le défilement ne change jamais de chapitre. À la fin :
+ * « Fin du chapitre », QCM facultatif, puis Précédent / Suivant ; un balayage horizontal
+ * intentionnel n'est accepté que dans cette zone. Le résumé d'ouverture accompagne le chapitre 1,
+ * la fin du Limpid (bilan, annexes) suit le dernier. Toute ancre (sommaire, sources, notions,
+ * « Revoir ce point », retour d'annexe) ouvre d'abord le chapitre qui la contient.
+ *
+ * Les pièces sont rendues par le serveur dans un seul article : le lecteur masque celles des
+ * autres chapitres (attribut `data-chapter-off`) et place la fin de chapitre (portail React)
+ * juste après la dernière pièce du chapitre ouvert.
  */
 export function LimpidReader({
   reportId,
@@ -32,12 +58,15 @@ export function LimpidReader({
   bilan,
   insufficient,
   options,
+  quizzes = {},
   children,
 }: {
   reportId: string | null;
   versionId: string | null;
   chapters: Chapter[];
   initialAnchor: string | null;
+  /** QCM de fin de chapitre (V6), par identifiant de chapitre. */
+  quizzes?: Record<string, ChapterQuestion[]>;
   bilan: Exercise[] | null;
   insufficient: boolean;
   options: OptionsData;
@@ -47,7 +76,16 @@ export function LimpidReader({
   const router = useRouter();
   const annex = useAnnex();
   const deckRef = useRef<HTMLDivElement>(null);
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const colRef = useRef<HTMLDivElement>(null);
+  const [index, setIndex] = useState(0);
+  const indexRef = useRef(0);
+  const busyRef = useRef(false);
+  const [motion, setMotion] = useState<"" | "out-next" | "out-prev" | "in-next" | "in-prev">("");
+  // Fin de chapitre : nœud hors React déplacé sous la dernière pièce du chapitre ouvert.
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const chapter: Chapter | null = chapters[index] ?? null;
   const [askOpened, setAskOpened] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
   const tocDialog = useRef<HTMLDialogElement>(null);
@@ -63,8 +101,68 @@ export function LimpidReader({
   const markedRead = useRef(false);
   const anchorRef = useRef<string | null>(null);
   const titles = useMemo(() => Object.fromEntries(chapters.map((c) => [c.id, c.title])), [chapters]);
-  const chapterIndex = chapter ? chapters.findIndex((c) => c.id === chapter.id) : -1;
+  const chapterIndex = chapter ? index : -1;
 
+  /** Pièces de premier niveau de l'article et leur chapitre (le résumé va au chapitre 1). */
+  const units = useCallback((): Unit[] => {
+    const col = colRef.current;
+    const root = col?.querySelector<HTMLElement>(".lim") ?? col;
+    if (!root) return [];
+    const ids = new Map(chapters.map((c, i) => [c.id, i]));
+    const list: { el: HTMLElement; chapter: number | null }[] = [];
+    for (const el of Array.from(root.children) as HTMLElement[]) {
+      if (el.dataset.chapterEnd !== undefined) continue;
+      const sec = el.dataset.section ?? el.querySelector<HTMLElement>("[data-section]")?.dataset.section;
+      list.push({ el, chapter: sec !== undefined && ids.has(sec) ? ids.get(sec)! : null });
+    }
+    const lastSectioned = list.findLastIndex((u) => u.chapter !== null);
+    let current = 0;
+    return list.map((u, i) => {
+      if (u.chapter !== null) current = u.chapter;
+      return { el: u.el, chapter: u.chapter ?? current, tail: u.chapter === null && i > lastSectioned };
+    });
+  }, [chapters]);
+
+  /** Affiche les pièces du chapitre `i` (les autres sont masquées) et y place la fin de chapitre. */
+  const apply = useCallback(
+    (i: number) => {
+      if (!chapters.length) return;
+      const all = units();
+      let anchor: HTMLElement | null = null;
+      for (const u of all) {
+        // QCM V6 du chapitre : l'ancien point de contrôle (fenêtre) n'est plus proposé.
+        const replaced = u.el.id.startsWith("ckp_") && !!quizzes[u.el.id.slice(4)]?.length;
+        if (u.chapter === i && !replaced) u.el.removeAttribute("data-chapter-off");
+        else u.el.setAttribute("data-chapter-off", "");
+        if (u.chapter === i && !u.tail) anchor = u.el;
+      }
+      if (host && anchor && anchor.nextSibling !== host) anchor.after(host);
+    },
+    [chapters.length, units, quizzes, host],
+  );
+
+  /** Chapitre qui contient un élément de la lecture (null : hors de l'article). */
+  const chapterOf = useCallback(
+    (el: Element): number | null => {
+      if (host?.contains(el)) return indexRef.current;
+      return units().find((u) => u.el.contains(el))?.chapter ?? null;
+    },
+    [units, host],
+  );
+
+  // Nœud de la fin de chapitre, créé côté client seulement.
+  useEffect(() => {
+    const el = document.createElement("div");
+    el.dataset.chapterEnd = "";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- nœud DOM du portail, créé une fois après le montage
+    setHost(el);
+    return () => el.remove();
+  }, []);
+
+  // Pièces masquées / fin de chapitre : à chaque changement de chapitre ou de contenu.
+  useEffect(() => {
+    apply(index);
+  }, [apply, index, children]);
   // Ouverture directe depuis l'aperçu : « Demander à Limpid », le bilan ou les options (?ouvrir=…).
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -93,19 +191,81 @@ export function LimpidReader({
     target?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   }, []);
 
-  // Le cours s'ouvre en tête ; seule une ancre explicite de retour d'annexe (`?a=`) est suivie.
+  /** Ouvre le chapitre `i` : masque les autres, remonte en tête, focus sur le titre. */
+  const openChapter = useCallback(
+    (i: number, opts: { animate?: boolean; focus?: boolean; then?: () => void } = {}) => {
+      if (i < 0 || i >= chapters.length || busyRef.current) return;
+      const from = indexRef.current;
+      const finish = () => {
+        indexRef.current = i;
+        setIndex(i);
+        apply(i);
+        if (opts.then) opts.then();
+        else {
+          const deck = deckRef.current;
+          if (deck) deck.scrollTop = 0;
+        }
+        if (opts.focus !== false) {
+          const title = document.getElementById(chapters[i]!.id)?.querySelector<HTMLElement>("h1, h2");
+          if (title) {
+            if (!title.hasAttribute("tabindex")) title.setAttribute("tabindex", "-1");
+            title.focus({ preventScroll: true });
+          }
+        }
+      };
+      if (i === from) return finish();
+      const dir = i > from ? "next" : "prev";
+      if (opts.animate === false || reducedMotion()) return finish();
+      busyRef.current = true;
+      setMotion(`out-${dir}`);
+      window.setTimeout(() => {
+        finish();
+        setMotion(`in-${dir}`);
+        window.setTimeout(() => {
+          setMotion("");
+          busyRef.current = false;
+        }, IN_MS);
+      }, OUT_MS);
+    },
+    [chapters, apply],
+  );
+
+  /** Va à un élément : ouvre d'abord son chapitre, puis y défile. */
+  const reach = useCallback(
+    (id: string, smooth: boolean) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const target = chapterOf(el);
+      const isTitle = chapters.some((c) => c.id === id);
+      if (target === null || target === indexRef.current) {
+        if (isTitle && target !== null) openChapter(target, { animate: false });
+        else scrollToId(id, smooth);
+        return;
+      }
+      openChapter(target, { animate: smooth, focus: isTitle, then: isTitle ? undefined : () => requestAnimationFrame(() => scrollToId(id)) });
+    },
+    [chapterOf, chapters, openChapter, scrollToId],
+  );
+
+  // Le cours s'ouvre en tête ; seule une ancre explicite (retour d'annexe `?a=`, `#ancre`) est suivie.
   useEffect(() => {
     const url = new URL(window.location.href);
     const back = url.searchParams.get("a");
-    if (!back || !ANCHOR_RE.test(back)) return;
+    const hash = decodeURIComponent(url.hash.slice(1));
+    const anchor = back && ANCHOR_RE.test(back) ? back : hash && ANCHOR_RE.test(hash) ? hash : null;
+    if (!anchor || !host) return;
     void document.fonts.ready.then(() => {
-      scrollToId(back);
-      url.searchParams.delete("a");
-      window.history.replaceState(window.history.state, "", url.toString());
+      reach(anchor, false);
+      if (back) {
+        url.searchParams.delete("a");
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
     });
-  }, [scrollToId]);
+    // Une seule fois, dès que la fin de chapitre est en place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [host]);
 
-  // Chapitre courant (en-tête, sommaire) et position de lecture enregistrée, au défilement.
+  // Position de lecture enregistrée, au défilement (pièces du chapitre ouvert seulement).
   useEffect(() => {
     const deck = deckRef.current;
     if (!deck) return;
@@ -118,11 +278,10 @@ export function LimpidReader({
         const pieces = deck.querySelectorAll<HTMLElement>("[data-piece]");
         let current: HTMLElement | null = null;
         for (const p of pieces) {
+          if (p.closest("[data-chapter-off]")) continue;
           if (p.getBoundingClientRect().top <= line) current = p;
           else break;
         }
-        const sec = current?.closest<HTMLElement>("[data-section]")?.dataset.section ?? current?.dataset.section;
-        setChapter(chapters.find((c) => c.id === sec) ?? null);
         anchorRef.current = current?.id ?? null;
         clearTimeout(settle);
         settle = setTimeout(() => {
@@ -149,7 +308,7 @@ export function LimpidReader({
       cancelAnimationFrame(raf);
       clearTimeout(settle);
     };
-  }, [chapters, reportId]);
+  }, [reportId]);
 
   const closeAll = useCallback(() => [tocDialog, optionsDialog, askDialog, bilanDialog, reformDialog].forEach((d) => d.current?.close()), []);
 
@@ -166,13 +325,13 @@ export function LimpidReader({
       },
       goTo: (id) => {
         closeAll();
-        scrollToId(id, true);
+        reach(id, true);
       },
       // Kit V5 : le bilan a sa page entière (démonstration : fenêtre, sans enregistrement).
       openBilan: () => (reportId ? router.push(`/rapports/${reportId}/bilan`) : bilanDialog.current?.showModal()),
       openReformulate: () => reformDialog.current?.showModal(),
     }),
-    [reportId, versionId, scrollToId, closeAll, router],
+    [reportId, versionId, scrollToId, closeAll, router, reach],
   );
 
   function close() {
@@ -208,15 +367,66 @@ export function LimpidReader({
         <button type="button" className="rtop-close" onClick={close} aria-label={t.lim.closeLabel}>
           <Icon name="back" /> <span className="sr-only">{t.lim.close}</span>
         </button>
-        <p className="rtop-chapter" aria-live="off">{chapter?.title ?? options.title}</p>
+        <p className="rtop-chapter" aria-live="off">{chapter ? t.lim.chapterOf(index + 1, chapters.length) : options.title}</p>
         <button type="button" className="rtop-more" aria-label={t.lim.options} aria-haspopup="dialog" onClick={() => optionsDialog.current?.showModal()}>
           <Icon name="more" />
         </button>
       </header>
 
       <div ref={deckRef} className="deck continuous" tabIndex={0} role="region" aria-label={t.lim.deckLabel}>
-        <div className="deck-col">{children}</div>
+        <div ref={colRef} className="deck-col chapters" data-motion={motion || undefined}>{children}</div>
       </div>
+
+      {host && chapter &&
+        createPortal(
+          <section
+            className="chapter-end"
+            aria-label={t.lim.chapterEnd}
+            onTouchStart={(e) => {
+              const target = e.target as HTMLElement;
+              const t0 = e.touches[0];
+              // Balayage seulement sur la zone elle-même : jamais depuis un contrôle (choix, bouton).
+              touch.current = e.touches.length === 1 && t0 && !target.closest("button, a, input, label, select, textarea, [data-no-swipe]") ? { x: t0.clientX, y: t0.clientY } : null;
+            }}
+            onTouchEnd={(e) => {
+              const start = touch.current;
+              touch.current = null;
+              const t1 = e.changedTouches[0];
+              if (!start || !t1 || String(window.getSelection() ?? "").length > 0) return;
+              const dx = t1.clientX - start.x;
+              const dy = t1.clientY - start.y;
+              if (Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(dy) * 2) openChapter(index + (dx < 0 ? 1 : -1));
+            }}
+            onTouchCancel={() => { touch.current = null; }}
+          >
+            <div className="chapter-end-sep">
+              <p className="chapter-end-title">{t.lim.chapterEnd}</p>
+              <p className="chapter-end-sub">{index < chapters.length - 1 ? t.lim.chapterEndNext : t.lim.chapterEndLast}</p>
+            </div>
+            {chapters.map((c, i) =>
+              quizzes[c.id]?.length ? (
+                <div key={c.id} className="chapter-end-quiz" hidden={i !== index}>
+                  <ChapterQuiz sectionId={c.id} quiz={quizzes[c.id]!} onSkip={() => nextRef.current?.focus()} />
+                </div>
+              ) : null,
+            )}
+            <nav className="chapter-nav" aria-label={t.lim.chapterNav}>
+              <button type="button" className="btn chapter-prev" disabled={index === 0} onClick={() => openChapter(index - 1)}>
+                <Icon name="back" size={18} /> {t.lim.prevChapter}
+              </button>
+              {index < chapters.length - 1 ? (
+                <button ref={nextRef} type="button" className="btn btn-primary chapter-next" onClick={() => openChapter(index + 1)}>
+                  {t.lim.nextChapter} <Icon name="arrow" size={18} />
+                </button>
+              ) : (
+                <button ref={nextRef} type="button" className="btn chapter-next" aria-haspopup="dialog" onClick={() => tocDialog.current?.showModal()}>
+                  <Icon name="list" size={18} /> {t.lim.toc}
+                </button>
+              )}
+            </nav>
+          </section>,
+          host,
+        )}
 
       <nav className="rbar rbar-v5" aria-label={t.lim.readerBar}>
         <button type="button" className="rb" aria-haspopup="dialog" onClick={() => tocDialog.current?.showModal()}>

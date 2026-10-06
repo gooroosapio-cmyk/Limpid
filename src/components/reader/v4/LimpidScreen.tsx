@@ -3,9 +3,14 @@ import { AnnexProvider } from "../annex-link";
 import { Immersive } from "../Immersive";
 import { NotionsProvider, type Notion } from "../Notions";
 import { SourcesProvider } from "../Sources";
-import type { Exercise } from "@/lib/contracts/schemas";
+import type { ChapterQuestion, Exercise, Section } from "@/lib/contracts/schemas";
 import { LimpidReader } from "./LimpidReader";
 import type { OptionsData } from "./OptionsPanel";
+
+/** QCM de fin de chapitre (V6) par chapitre : seuls les chapitres qui en ont un. */
+export function chapterQuizzes(sections: Pick<Section, "id" | "quiz">[]): Record<string, ChapterQuestion[]> {
+  return Object.fromEntries(sections.flatMap((s) => (s.quiz?.length ? [[s.id, s.quiz]] : [])));
+}
 
 /** Écran de lecture : notions et accès aux annexes (page à part) autour du lecteur paginé. */
 export function LimpidScreen({
@@ -18,6 +23,7 @@ export function LimpidScreen({
   options,
   annexBase,
   originalHref,
+  quizzes,
 }: {
   doc: { chapters: { id: string; title: string }[]; notions: Notion[]; entries: SourceEntry[]; pieces: React.ReactNode };
   reportId: string | null;
@@ -29,6 +35,8 @@ export function LimpidScreen({
   /** Page Annexes du même rapport et de la même version. */
   annexBase: string;
   originalHref: string | null;
+  /** QCM de fin de chapitre (V6), cf. `chapterQuizzes`. */
+  quizzes?: Record<string, ChapterQuestion[]>;
 }) {
   return (
     <Immersive>
@@ -43,6 +51,7 @@ export function LimpidScreen({
             bilan={bilan}
             insufficient={insufficient}
             options={options}
+            quizzes={quizzes}
           >
             <article className="lim" aria-label={options.title}>{doc.pieces}</article>
           </LimpidReader>

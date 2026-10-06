@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { V6_MODES } from "@/lib/contracts/schemas";
 import { createUserClient } from "@/lib/supabase/server";
 
 const one = <T extends [string, ...string[]]>(values: T) =>
@@ -50,7 +51,8 @@ const Field = z
     familiarity: z.enum(["aucune", "bases", "maitrise"]).nullable(),
     goal: z.enum(["comprendre", "reviser", "appliquer", "decider"]).nullable(),
     example_domain: z.enum(["quotidien", "travail", "sciences", "sans_preference"]).nullable(),
-    default_mode: z.enum(["tres_simple", "claire", "resume", "revision"]).nullable(),
+    // V6 : seules les quatre approches sont proposées (les anciennes restent lisibles).
+    default_mode: z.enum(V6_MODES).nullable(),
     explanation_lang: z.enum(["fr", "en"]).nullable(),
   })
   .partial()
