@@ -1,5 +1,35 @@
 # Avancement
 
+## Phase 20 — V6 : vitesse de génération, approches, composants du lecteur (8 octobre 2026)
+
+### FAIT
+- Vitesse (rapport réel du 6 octobre : 20 min, dont ~11 min d'attente entre deux exécutions) :
+  relance immédiate du worker (`POST /api/worker`, `CRON_SECRET`) quand une exécution atteint sa
+  limite de 300 s ; lecture par morceaux de ~5 pages en parallèle (8 à la fois) ; réflexion
+  « basse » (extraction, plan, exercices) ; chapitres par Flash (réflexion « moyenne » si
+  difficile), une seule réparation, Pro seulement en dernier recours ; plus de second passage
+  d'enrichissement ; vérification ciblée (chiffres, conditions, exceptions, statut incertain).
+- Publication progressive : version publiée dès le chapitre 1, mise à jour à chaque chapitre ;
+  l'écran de préparation ouvre le cours ; images et exercices après publication.
+- Approches V6 : Par défaut (le plan choisit livre, parcours ou atelier par chapitre), Livre
+  interactif, Parcours guidé, Atelier visuel ; sélecteur de niveau supprimé.
+- Composants du lecteur dessinés par le code à partir de valeurs exactes : étapes, frise, tableau
+  comparatif, proportion (curseur), calcul (5 opérations sûres), graphique (barres / courbe +
+  tableau), détail repliable, illustrations de contexte locales (8 SVG CC0) ; équivalents PDF.
+  Valeurs non retrouvées dans les affirmations citées → réparation, sinon paragraphe.
+- QCM de chapitre (0 à 3) produits avec le chapitre, corrigés sur place ; bilan /20 conservé
+  sans répéter ces questions. « L'essentiel » en puces par chapitre.
+- Lecteur : un chapitre à la fois, transition horizontale en fin de chapitre seulement (boutons,
+  balayage volontaire), mouvement réduit respecté, focus sur le titre.
+- Import : limites permanentes masquées ; message précis sous le fichier refusé.
+- Lectures paginées (segments, preuves) au-delà de 1 000 lignes ; journal des erreurs du
+  fournisseur avec le code HTTP (sans contenu).
+- Migration `20261024000000_v6.sql` (contraintes élargies seulement), appliquée.
+
+### NON TESTÉ
+- Génération réelle avec les nouveaux réglages (dernières tâches en échec immédiat côté
+  OpenRouter : clé ou limite de dépense à vérifier).
+
 ## Phase 19.5 — Couvertures Pixabay, 15 chapitres au plus (7 octobre 2026)
 
 ### FAIT
