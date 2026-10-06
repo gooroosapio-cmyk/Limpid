@@ -22,7 +22,7 @@ export function LoginForm() {
 
   return (
     <form action={pwAction} className="login" aria-describedby={`${base}-status`}>
-      <label htmlFor={`${base}-email`}>{t.login.email}</label>
+      <label htmlFor={`${base}-email`}>{t.login.v2Email}</label>
       <div className="field">
         <Icon name="mail" />
         <input id={`${base}-email`} name="email" type="email" autoComplete="username" inputMode="email" placeholder={t.login.emailPlaceholder} required />
@@ -55,7 +55,7 @@ export function LoginForm() {
         {pwPending ? t.login.signingIn : t.login.signIn}
       </button>
       <button type="submit" formAction={linkAction} formNoValidate className="btn-link login-magic" disabled={pending} onClick={() => setLast("link")}>
-        {linkPending ? t.login.sending : t.login.magicLink}
+        {linkPending ? t.login.sending : t.login.v2Magic}
       </button>
     </form>
   );

@@ -58,6 +58,7 @@ export function LimpidReader({
   const [suspended, setSuspended] = useState(false);
   const [chapter, setChapter] = useState<Chapter | null>(chapters[0] ?? null);
   const [askOpened, setAskOpened] = useState(false);
+  const [askQuestion, setAskQuestion] = useState("");
   // Une référence par boîte de dialogue (et non un objet de références, illisible pour React).
   const tocDialog = useRef<HTMLDialogElement>(null);
   const optionsDialog = useRef<HTMLDialogElement>(null);
@@ -90,10 +91,13 @@ export function LimpidReader({
     const url = new URL(window.location.href);
     const open = url.searchParams.get("ouvrir");
     if (!open) return;
+    const question = (url.searchParams.get("q") ?? "").slice(0, 500);
     url.searchParams.delete("ouvrir");
+    url.searchParams.delete("q");
     window.history.replaceState(window.history.state, "", url.toString());
     if (open === "demander") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- action demandée par l'adresse, une seule fois
+      setAskQuestion(question);
       setAskOpened(true);
       askDialog.current?.showModal();
     } else if (open === "bilan" && bilan) {
@@ -411,7 +415,7 @@ export function LimpidReader({
 
       <dialog ref={askDialog} className="sheet side ask-sheet" aria-labelledby="ask-h">
         {head("ask-h", t.lim.discussLabel, askDialog)}
-        {!reportId ? <p className="notice">{t.ask.unavailable}</p> : askOpened && <AskPanel reportId={reportId} section={chapter ? { id: chapter.id, title: chapter.title } : null} />}
+        {!reportId ? <p className="notice">{t.ask.unavailable}</p> : askOpened && <AskPanel reportId={reportId} section={chapter ? { id: chapter.id, title: chapter.title } : null} initialQuestion={askQuestion} />}
       </dialog>
 
       <dialog ref={bilanDialog} className="sheet side quiz-sheet" aria-labelledby="bilan-h">

@@ -3,8 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/Icon";
-import { ModeIcon } from "@/components/ModeIcon";
+import { Icon, type IconName } from "@/components/Icon";
+import { Illustration } from "@/components/Illustration";
 import { toast } from "@/components/shell/Toasts";
 import { MODES, type Mode } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
@@ -39,6 +39,8 @@ interface Item {
 const CONCURRENCY = 2;
 
 const MAX_PASTED = 50_000;
+const MODE_ICONS: Record<Mode, IconName> = { tres_simple: "bulb", claire: "book", resume: "file", revision: "bars" };
+
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
 
 class FormError extends Error {
@@ -350,7 +352,7 @@ export function ImportForm({
             onKeyDown={(e) => onTabKey(e, i)}
             disabled={busy}
           >
-            <Icon name={id === "file" ? "file" : id === "link" ? "link" : "list"} size={18} /> {t.add.tabs[id]}
+            <Icon name={id === "file" ? "file" : id === "link" ? "link" : "lines"} size={24} /> {t.add.tabs[id]}
           </button>
         ))}
       </div>
@@ -381,7 +383,7 @@ export function ImportForm({
                 e.target.value = "";
               }}
             />
-            {items.length === 0 ? (
+            {items.length < maxFiles && (
               <label
                 htmlFor={`${base}-file`}
                 className={dragging ? "upload dragging" : "upload"}
@@ -396,11 +398,13 @@ export function ImportForm({
                   add(e.dataTransfer.files);
                 }}
               >
-                <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={26} /></span>
-                <span className="upload-title">{t.add.choose}</span>
-                <span className="muted small">{t.add.formats} · {t.add.limits(maxFileMb, maxPages)}</span>
+                <Illustration name="import" fallback="papier" className="upload-art" eager />
+                <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={30} /></span>
+                <span className="upload-title">{items.length ? t.add.addMore : t.add.v2.addDocuments}</span>
+                <span className="upload-sub">{t.add.v2.formats}</span>
               </label>
-            ) : (
+            )}
+            {items.length > 0 && (
               <>
                 <ul className="filelist" aria-label={t.add.files}>
                   {items.map((it) => {
@@ -452,15 +456,10 @@ export function ImportForm({
                     );
                   })}
                 </ul>
-                {items.length < maxFiles && (
-                  <label htmlFor={`${base}-file`} className="btn btn-block add-more" aria-disabled={busy}>
-                    <Icon name="plus" /> {t.add.addMore}
-                  </label>
-                )}
                 {failedItems.length > 0 && <p className="notice notice-warn small" role="status">{t.add.blockedByError}</p>}
               </>
             )}
-            <p className="muted small add-limits">{t.add.ocrAuto} {t.add.maxFiles(maxFiles)}</p>
+            <p className="muted small add-limits">{t.add.limits(maxFileMb, maxPages)} · {t.add.ocrAuto} {t.add.maxFiles(maxFiles)}</p>
           </>
         )}
         {tab === "link" && (
@@ -505,22 +504,24 @@ export function ImportForm({
       )}
 
       <fieldset className="modes" disabled={busy}>
-        <legend>{t.add.modesLegend}</legend>
+        <legend>{t.add.v2.approach}</legend>
         <div className="mode-grid">
           {MODES.map((m) => (
             <label key={m} className={`mode-card${mode === m ? " is-selected" : ""}`}>
               <input type="radio" className="sr-only" name={`${base}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} aria-describedby={`${base}-mode-${m}`} />
-              <ModeIcon mode={m} />
-              <strong>{t.add.modes[m]?.title}</strong>
-              <span id={`${base}-mode-${m}`} className="mode-desc">{t.add.modes[m]?.desc}</span>
-              <span className="mode-check" aria-hidden="true"><Icon name="check" size={14} /></span>
+              <span className="mode-ic" aria-hidden="true"><Icon name={MODE_ICONS[m]} size={30} /></span>
+              <span className="mode-txt">
+                <strong>{t.add.modes[m]?.title}</strong>
+                <span id={`${base}-mode-${m}`} className="mode-desc">{t.add.v2.modeShort[m]}</span>
+              </span>
+              <span className="mode-check" aria-hidden="true"><Icon name="check" size={16} /></span>
             </label>
           ))}
         </div>
       </fieldset>
 
       <Link href="/parametres/preferences" className="row settings-row import-prefs">
-        <span className="row-icon"><Icon name="sliders" /></span>
+        <span className="row-icon"><Icon name="settings" /></span>
         <span className="row-text"><b>{t.add.v2.levelLength[0]}</b><small>{t.add.v2.levelLength[1]}</small></span>
         <Icon name="chevron" className="row-chevron" />
       </Link>
@@ -543,11 +544,11 @@ export function ImportForm({
         disabled={!ready}
         aria-describedby={missing ? `${base}-missing` : undefined}
       >
-        {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : quote ? t.billing.createCost(quote) : t.add.create}{" "}
+        {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : t.add.v2.continue}{" "}
         {phase.step !== "creating" && <Icon name="arrow" />}
       </button>
       {missing && <p id={`${base}-missing`} className="muted small center">{missing}</p>}
-      {count === 1 && !quote && <p className="muted small center">{t.billing.createCostFrom(8)}</p>}
+      {count === 1 && <p className="muted small center">{quote ? t.add.v2.cost(quote) : t.billing.createCostFrom(8)}</p>}
     </form>
   );
 }

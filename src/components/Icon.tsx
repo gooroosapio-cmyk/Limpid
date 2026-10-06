@@ -123,6 +123,18 @@ const PATHS = {
   "trash": (
     <><path d="M3 6h18M6 6l1 15h10l1-15M9 6V3h6v3M10 10v7M14 10v7" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
   ),
+  "kebab": (
+    <><path d="M12 5h.01M12 12h.01M12 19h.01" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
+  "aa": (
+    <><text x="1" y="18" fontSize="17" fontFamily="Inter, system-ui, sans-serif" fontWeight="400" fill="currentColor">Aa</text></>
+  ),
+  "bell": (
+    <><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5Zm4 2.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
+  "send": (
+    <><path d="M21 3 10 14M21 3l-7 18-4-7-7-4Z" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
   "mail": (
     <><path d="M3 6h18v12H3Zm0 0 9 7 9-7" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
   ),

@@ -4,7 +4,7 @@
  */
 import "server-only";
 import { Mode } from "@/lib/contracts/schemas";
-import { coverFor, coverView, type CoverView } from "@/lib/library/covers";
+import { lessonCover, type CoverView } from "@/lib/library/covers";
 import { createUserClient } from "@/lib/supabase/server";
 
 export type LibraryState = "ready" | "running" | "failed";
@@ -42,7 +42,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
   let query = supabase
     .from("reports")
     .select(
-      "id, title, created_at, mode, folder_id, favorite, cover_id, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(status, stage, error_code, created_at), report_progress(read_at, updated_at), report_sources(source_id)",
+      "id, title, created_at, mode, folder_id, favorite, cover_id, cover_path, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(status, stage, error_code, created_at), report_progress(read_at, updated_at), report_sources(source_id)",
     )
     .eq("is_demo", false)
     .order("created_at", { ascending: false })
@@ -75,7 +75,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
       errorCode: !ready && !running ? (job?.error_code ?? null) : null,
       sourceCount: Math.max(1, ((r.report_sources as unknown as unknown[] | null) ?? []).length),
       favorite: r.favorite === true,
-      cover: coverView(coverFor(r.id, r.cover_id as string | null)),
+      cover: lessonCover(r.id, r.cover_id as string | null, r.cover_path as string | null),
       openedAt: p?.updated_at ?? null,
       stage: running ? (job?.stage ?? null) : null,
     };

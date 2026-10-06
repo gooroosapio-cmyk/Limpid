@@ -35,6 +35,10 @@ export async function deleteAccount(userId: string): Promise<{ ok: boolean; step
   const known = (files ?? []).map((f) => f.storage_path as string);
   steps.files_known = known.length === 0 || !(await db.storage.from("sources").remove(known)).error;
   for (const b of BUCKETS) steps[`files_${b}`] = await removePrefix(b, userId);
+  // Couvertures générées (rangées par Limpid, hors du préfixe du compte).
+  const { data: covers } = await db.from("reports").select("cover_path").eq("owner_id", userId).not("cover_path", "is", null);
+  const coverPaths = (covers ?? []).map((c) => c.cover_path as string);
+  steps.files_covers = coverPaths.length === 0 || !(await db.storage.from("exports").remove(coverPaths)).error;
 
   for (const table of ["comprehension_answers", "report_quizzes", "exports", "reports", "sources", "reader_preferences"] as const) {
     steps[`rows_${table}`] = !(await db.from(table).delete().eq("owner_id", userId)).error;

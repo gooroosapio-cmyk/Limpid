@@ -23,7 +23,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }, // alpha privée
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
-  appleWebApp: { capable: true, title: "Limpid", statusBarStyle: "black-translucent" },
+  appleWebApp: {
+    capable: true,
+    title: "Limpid",
+    statusBarStyle: "black-translucent",
+    startupImage: [
+      { url: "/splash/limpid-splash-1170x2532.png", media: "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" },
+      { url: "/splash/limpid-splash-1290x2796.png", media: "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
@@ -31,7 +39,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#0E110F",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F5F4EC" },
+    { media: "(prefers-color-scheme: dark)", color: "#0E110F" },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

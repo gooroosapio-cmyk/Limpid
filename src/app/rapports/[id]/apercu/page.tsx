@@ -3,11 +3,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { Cover } from "@/components/library/Cover";
-import { LogoMark } from "@/components/Logo";
+import { Wordmark } from "@/components/Logo";
+import { Illustration } from "@/components/Illustration";
 import { ReportLink } from "@/components/ReportLink";
 import { requireUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/server";
-import { coverFor, coverView } from "@/lib/library/covers";
+import { lessonCover } from "@/lib/library/covers";
 import { loadReport } from "@/lib/reports/load";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -31,8 +32,8 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   if (!report) notFound();
   if (report.state !== "ready") redirect(`/rapports/${id}`);
   const supabase = await createUserClient();
-  const { data: extra } = await supabase.from("reports").select("cover_id").eq("id", id).maybeSingle();
-  const cover = coverView(coverFor(id, (extra?.cover_id as string | null) ?? null));
+  const { data: extra } = await supabase.from("reports").select("cover_id, cover_path").eq("id", id).maybeSingle();
+  const cover = lessonCover(id, (extra?.cover_id as string | null) ?? null, (extra?.cover_path as string | null) ?? null);
   const tab: Tab = (TABS as readonly string[]).includes(onglet ?? "") ? (onglet as Tab) : "apercu";
   const l = t.lesson;
   const ex = report.explanation;
@@ -46,15 +47,16 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
       <header className="lesson-hero">
         <Cover cover={cover} className="lesson-hero-cover" eager />
         <div className="lesson-hero-bar">
-          <Link href="/" className="ib ib-round" aria-label={l.back}><Icon name="back" /></Link>
-          <span className="brand lesson-hero-brand" aria-hidden="true"><LogoMark /><b>limpid</b></span>
-          <Link href={`/rapports/${id}?ouvrir=options`} className="ib ib-round" aria-label={l.options}><Icon name="more" /></Link>
+          <Link href="/" className="ib lesson-bar-btn" aria-label={l.back}><Icon name="back" size={26} /></Link>
+          <span className="brand lesson-hero-brand" aria-hidden="true"><Wordmark /></span>
+          <Link href={`/rapports/${id}?ouvrir=options`} className="ib lesson-bar-btn" aria-label={l.options}><Icon name="more" size={26} /></Link>
         </div>
         <div className="lesson-hero-text">
           <h1>{report.title}</h1>
-          <p className="status status-ready">
+          <p className="lesson-meta">
             <Icon name="layers" /> <span>{t.library.v2.sources(report.documents.length || 1)}</span>
-            <span aria-hidden="true">·</span> <span>{t.library.v2.ready}</span> <Icon name="check" />
+            <span aria-hidden="true">·</span> <span>{t.library.v2.ready.toLowerCase()}</span>
+            <span className="lesson-ok" aria-hidden="true"><Icon name="check" size={16} /></span>
           </p>
         </div>
       </header>
@@ -70,13 +72,11 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
           <>
             <section aria-labelledby="essential-h">
               <h2 id="essential-h">{l.essential}</h2>
-              {essential.length === 1 ? <p className="lesson-lede">{essential[0]}</p> : (
-                <ul className="lesson-points">{essential.map((p) => <li key={p}>{p}</li>)}</ul>
-              )}
+              <p className="lesson-lede">{essential.join(" ")}</p>
             </section>
             {idea && (
               <aside className="lesson-idea" aria-label={l.idea}>
-                <Icon name="bulb" size={28} />
+                <Icon name="bulb" size={40} />
                 <div>
                   <p className="lesson-idea-eyebrow">{l.idea}</p>
                   <p className="lesson-idea-text">{idea}</p>
@@ -88,7 +88,8 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
               <ul className="lesson-further">
                 <li>
                   <ReportLink href={`/rapports/${id}`} className="further-card" immersive>
-                    <Icon name="file" size={28} />
+                    <Illustration name="lecon-presentation" fallback="papier" className="further-bg" />
+                    <Icon name="file" size={34} />
                     <b>{l.presentation[0]}</b>
                     <small>{l.presentation[1]}</small>
                     <span className="further-go" aria-hidden="true"><Icon name="arrow" /></span>
@@ -96,8 +97,9 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
                 </li>
                 {hasQuiz && (
                   <li>
-                    <ReportLink href={`/rapports/${id}?ouvrir=bilan`} className="further-card" immersive>
-                      <Icon name="quiz" size={28} />
+                    <ReportLink href={`/rapports/${id}?ouvrir=bilan`} className="further-card further-quiz" immersive>
+                      <Illustration name="lecon-quiz" fallback="mineral" className="further-bg" />
+                      <Icon name="quiz" size={34} />
                       <b>{l.quiz[0]}</b>
                       <small>{l.quiz[1]}</small>
                       <span className="further-go" aria-hidden="true"><Icon name="arrow" /></span>
@@ -174,13 +176,15 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
         )}
       </div>
 
-      <div className="ask-bar">
-        <ReportLink href={`/rapports/${id}?ouvrir=demander`} className="ask-bar-link" immersive>
-          <Icon name="spark" />
-          <span>{l.ask}</span>
-          <span className="ask-bar-go" aria-hidden="true"><Icon name="arrow" /></span>
-        </ReportLink>
-      </div>
+      {/* Demander à Limpid : la question ouvre le volet de discussion du lecteur, pré-remplie (rien n'est envoyé sans geste). */}
+      <form className="ask-bar" action={`/rapports/${id}`} method="get" role="search">
+        <input type="hidden" name="ouvrir" value="demander" />
+        <Icon name="spark" />
+        <span className="ask-bar-sep" aria-hidden="true" />
+        <label htmlFor="ask-q" className="sr-only">{l.ask}</label>
+        <input id="ask-q" name="q" type="text" placeholder={l.ask} maxLength={500} autoComplete="off" enterKeyHint="send" />
+        <button type="submit" className="ask-bar-go" aria-label={l.askSend}><Icon name="send" /></button>
+      </form>
     </div>
   );
 }

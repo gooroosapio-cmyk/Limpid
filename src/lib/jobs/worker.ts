@@ -41,6 +41,8 @@ import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow } f
 import { downloadCommons, searchCommons, searchUnsplash, trackUnsplashDownload } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { finishJobReservation } from "@/lib/billing/wallet";
+import { generateCover } from "@/lib/library/cover-gen";
+import { notify } from "@/lib/notifications";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/source-set";
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
@@ -784,6 +786,7 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
     await finish(job.id, status, null);
     // Module livré : le prix réservé devient une consommation (une seule fois).
     await finishJobReservation(job.id, status === "succeeded" || status === "incomplete_check");
+    if (job.report_id && (status === "succeeded" || status === "incomplete_check")) await afterDelivery(job);
   } catch (e) {
     const f = failureOf(e);
     console.error("job", job.id, f.code);
@@ -793,8 +796,31 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
     if (e instanceof ProviderError && e.issues.length) await recordSchemaIssues(job, e);
     // Échec technique ou annulation d'un nouveau rapport : le crédit du jour est rendu.
     if (job.kind === "generate_report" && job.report_id) await recordLimitEvent(job.owner_id, CREDIT_RETURNED, job.report_id);
+    if (job.report_id && f.status !== "cancelled") {
+      await notify(job.owner_id, "report_failed", `job:${job.id}:failed`, { reportId: job.report_id, data: { code: f.code } }).catch(() => undefined);
+    }
   }
   return { id: job.id, requeued: false };
+}
+
+/**
+ * Après une livraison : notification « prête », puis couverture générée pour un nouveau
+ * Limpid qui n'en a pas encore (décorative, comprise dans le prix ; un échec ne change rien).
+ */
+async function afterDelivery(job: JobRow) {
+  const reportId = job.report_id!;
+  const db = adminClient();
+  const { data: report } = await db
+    .from("reports")
+    .select("title, cover_path, report_versions!reports_current_version_fk(explanation)")
+    .eq("id", reportId)
+    .maybeSingle();
+  await notify(job.owner_id, "report_ready", `job:${job.id}:ready`, { reportId, data: { title: report?.title ?? null } }).catch(() => undefined);
+  if (job.kind !== "generate_report" || !report || report.cover_path) return;
+  const explanation = (report.report_versions as unknown as { explanation: { key_points?: string[] } } | null)?.explanation;
+  await generateCover({ reportId, ownerId: job.owner_id, title: report.title as string, hints: explanation?.key_points ?? [], jobId: job.id }).catch((e) =>
+    console.error("cover", (e as Error).message),
+  );
 }
 
 /** Vide la file dans la limite de temps donnée (appel depuis after() ou le cron). */

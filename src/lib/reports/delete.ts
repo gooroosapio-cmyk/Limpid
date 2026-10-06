@@ -47,6 +47,9 @@ export async function deleteReport(ownerId: string, reportId: string): Promise<"
   const { data: assets } = await db.from("visual_assets").select("storage_path").eq("report_id", reportId).not("storage_path", "is", null);
   const assetPaths = (assets ?? []).map((x) => x.storage_path as string);
   steps.asset_files = assetPaths.length === 0 || !(await db.storage.from("exports").remove(assetPaths)).error;
+  // Couverture générée (décorative) : effacée avec le Limpid.
+  const { data: coverRow } = await db.from("reports").select("cover_path").eq("id", reportId).maybeSingle();
+  steps.cover_file = !coverRow?.cover_path || !(await db.storage.from("exports").remove([coverRow.cover_path as string])).error;
 
   // Documents du Limpid (un ou plusieurs) : effacés, sauf s'ils servent encore un autre Limpid.
   const { data: set } = await db.from("report_sources").select("source_id").eq("report_id", reportId);

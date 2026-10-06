@@ -19,10 +19,11 @@ type Turn = { q: string; a: Answer | null; error?: string };
  * Poser une question au document (kit V3, écran 09) : lié à la partie lue, réponses courtes
  * avec extraits vérifiés, suites proposées. L'échange reste sur cet écran (non enregistré).
  */
-export function AskPanel({ reportId, section }: { reportId: string; section: { id: string; title: string } | null }) {
+export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId: string; section: { id: string; title: string } | null; initialQuestion?: string }) {
   const L = useT();
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [text, setText] = useState("");
+  // Question saisie depuis l'aperçu de la leçon : pré-remplie, jamais envoyée sans geste.
+  const [text, setText] = useState(initialQuestion);
   const [scope, setScope] = useState<{ id: string; title: string } | null>(section);
   const [pending, setPending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);

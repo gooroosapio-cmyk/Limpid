@@ -1,52 +1,56 @@
-# Limpid V2 — Ressources graphiques à fournir
+# Limpid V2.1 — Ressources graphiques à fournir
 
-Hors images des rapports et couvertures de leçons. Tant qu'un fichier n'est pas livré, l'écran affiche un dégradé de la même famille : rien n'est cassé, aucune requête vers un fichier absent.
+**Reçu et intégré (pack production, 6 octobre 2026)** : logos SVG (`public/brand/`), icônes d'application (`public/icons/`, favicon `src/app/icon.svg`), illustrations `connexion`, `bibliotheque-vide`, `import`, `offres`, `profil-offre` (1× et @2x, `public/illustrations/`), image de partage (`src/app/opengraph-image.png`), écrans de démarrage iPhone (`public/splash/`), planche source (`docs/assets/`).
 
-## 1. Marque (prioritaire)
+**Reste à fournir** : `offres-actuelle`, `offres-plus`, `lecon-presentation`, `lecon-quiz` et, en option, `dossier-1…6` (tableau A ci-dessous).
 
-| Élément | Fichier attendu | Format | Taille / règles |
-|---|---|---|---|
-| Logo complet, version sombre (livre ouvert + « limpid ») | `public/brand/limpid-signature-sombre.svg` | SVG vectoriel, texte vectorisé | viewBox serré, sans marge ; couleurs #F5F4EC + #F1D94E |
-| Logo complet, version claire (Papier) | `public/brand/limpid-signature-claire.svg` | SVG | encre #15180F + #F1D94E |
-| Emblème seul (livre ouvert) | `public/brand/limpid-embleme.svg` | SVG | carré 24 × 24 ou 48 × 48, trait en `currentColor` si possible |
-| Planche de ressources V2 (source) | `LIMPID_Ressources_V2.svg` | SVG d'origine | seule la capture PNG a été reçue ; le SVG permettra de reprendre les tracés exacts |
+Les couvertures des leçons sont **générées par Gemini** (aucune image à fournir). Tant qu'une ressource ci-dessous n'est pas livrée, l'écran affiche un dégradé de la même famille de couleurs : rien n'est cassé.
 
-## 2. Icône d'application (remplace l'ancienne)
+**Format commun des images** : WebP, qualité ~80, moins de 200 Ko, ambiance sombre (fond proche de #0E110F), **aucun texte dans l'image**, sujet du côté indiqué. Fournir aussi la version 2× (même nom + `@2x`) si possible.
 
-Emblème « livre ouvert » sur fond jaune #F1D94E (planche, « 03 / Emblème compact »).
+## A. Images des écrans (prioritaires pour coller aux maquettes)
 
-| Fichier | Format | Taille |
+| # | Écran / emplacement (maquette) | Nom du fichier | Taille | Sujet et cadrage |
+|---|---|---|---|---|
+| 1 | Connexion — grande image du haut | `connexion.webp` | 1170 × 870 | livre ouvert lumineux, rubans verts ; logo posé en haut à gauche, bas de l'image sombre |
+| 2 | Import — zone « Ajouter des documents » | `import.webp` | 1170 × 520 | feuilles et pages en mouvement, centre dégagé (bouton + jaune au centre), bas sombre |
+| 3 | Votre espace — carte « Découverte / crédits » | `profil-offre.webp` | 1170 × 540 | vague dorée à droite, gauche sombre (texte) |
+| 4 | Offres — en-tête en haut à droite | `offres.webp` | 1170 × 1000 | pages de livre dorées en éventail, coin haut droit ; gauche/bas transparents vers le noir |
+| 5 | Offres — carte « Votre offre » | `offres-actuelle.webp` | 900 × 600 | coin de livre vert sauge, à droite |
+| 6 | Offres — carte « Pour aller plus loin » | `offres-plus.webp` | 900 × 800 | feuilles dorées lumineuses, à droite |
+| 7 | Leçon — carte « Présentation » | `lecon-presentation.webp` | 600 × 400 | livre ouvert, à droite, gauche sombre |
+| 8 | Leçon — carte « Quiz » | `lecon-quiz.webp` | 600 × 400 | empreinte de main sur roche (ou objet neutre), à droite |
+| 9 | Bibliothèque vide (premier lancement) | `bibliotheque-vide.webp` | 1170 × 540 | livre ouvert / lumière douce |
+| 10 | Collections (tuiles de dossiers) — facultatif | `dossier-1.webp` … `dossier-6.webp` | 600 × 300 | objets de bureau (livres, crayons…), à droite |
+
+Emplacement : `public/illustrations/`. Activation : nom ajouté dans `READY` (`src/components/Illustration.tsx`) — je m'en charge à la réception.
+
+## B. Marque
+
+| Élément | Fichier | Format |
 |---|---|---|
-| `public/icons/limpid-192.png` | PNG | 192 × 192 |
-| `public/icons/limpid-512.png` | PNG | 512 × 512 |
-| `public/icons/limpid-maskable-512.png` | PNG | 512 × 512, motif dans le cercle central de 80 % (zone sûre) |
-| `public/icons/apple-touch-icon.png` | PNG | 180 × 180, fond plein (pas de transparence) |
-| `src/app/icon.svg` | SVG | favicon carré |
+| Logo complet (livre ouvert + « limpid ») version sombre | `limpid-signature-sombre.svg` | SVG, texte vectorisé |
+| Logo complet version claire | `limpid-signature-claire.svg` | SVG |
+| Emblème seul (livre ouvert) | `limpid-embleme.svg` | SVG carré |
+| Planche source | `LIMPID_Ressources_V2.svg` | SVG d'origine (seule la capture PNG a été reçue) |
 
-## 3. Illustrations d'écran (décoratives)
+## C. Icône d'application (emblème sur fond jaune #F1D94E)
 
-Format commun : **WebP**, qualité ~80, **moins de 150 Ko**, fond sombre compatible #0E110F, sujet décentré vers la droite (le texte s'écrit à gauche ou en bas), aucune information indispensable dans l'image. Fournir aussi une version 2× si possible (même nom suffixé `@2x`).
+| Fichier | Taille |
+|---|---|
+| `limpid-192.png` | 192 × 192 |
+| `limpid-512.png` | 512 × 512 |
+| `limpid-maskable-512.png` | 512 × 512, motif dans les 80 % centraux |
+| `apple-touch-icon.png` | 180 × 180, fond plein |
+| `icon.svg` (favicon) | SVG carré |
 
-| Écran | Fichier | Ratio / taille | Rendu affiché |
-|---|---|---|---|
-| Connexion (livre ouvert lumineux) | `public/illustrations/connexion.webp` | 2,4:1 — 1200 × 500 | 140 px de haut sur mobile |
-| Bibliothèque vide (accueil sans historique) | `public/illustrations/bibliotheque-vide.webp` | 2:1 — 1200 × 600 | 180 px |
-| Profil, carte « offre et crédits » | `public/illustrations/profil-offre.webp` | 2:1 — 1200 × 600 | moitié droite de la carte, fondue |
-| Import, zone d'ajout (pages en mouvement) | `public/illustrations/import.webp` | 2:1 — 1200 × 600 | réservé (zone d'ajout) |
-| Offres, en-tête (feuilles dorées) | `public/illustrations/offres.webp` | 3:2 — 1200 × 800 | réservé (en-tête des offres) |
+## D. Facultatif
 
-Activation : ajouter le nom dans `READY` (`src/components/Illustration.tsx`).
+| Fichier | Taille |
+|---|---|
+| `og-limpid.jpg` (aperçu des liens partagés) | 1200 × 630 |
+| Écrans de démarrage iPhone | 1170 × 2532 et 1290 × 2796 (PNG) |
 
-## 4. Partage et installation (facultatif)
+## Déjà en place
 
-| Fichier | Format | Taille |
-|---|---|---|
-| `public/og-limpid.jpg` (aperçu des liens partagés) | JPEG ou PNG | 1200 × 630 |
-| Écrans de démarrage iOS | PNG | facultatif, 1170 × 2532 et 1290 × 2796 |
-
-## 5. Déjà en place, rien à fournir
-
-- Police **Inter** auto-hébergée (`public/fonts/Inter.woff2`, graisses 400 / 500 / 600 utilisées).
-- Icônes d'interface (grille 24 × 24, trait 1,75, `currentColor`) : dessinées dans `src/components/Icon.tsx`.
-- Logos Google et Apple des boutons de connexion : versions officielles intégrées.
-- Avatars : initiales du compte (aucune photo inventée).
+Police Inter ; icônes d'interface ; logos Google et Apple officiels ; avatars en initiales (nom affiché modifiable) ; couvertures de leçons générées par Gemini.
