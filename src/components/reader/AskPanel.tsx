@@ -18,8 +18,9 @@ type Turn = { q: string; a: Answer | null; error?: string };
 const draftKey = (reportId: string) => `limpid-ask-draft-${reportId}`;
 
 /**
- * Demander à Limpid (V4, § 8) : portée claire « Ce Limpid » / « Cette section », réponses
- * courtes avec extraits vérifiés, Arrêter pendant la réponse, Réessayer après une erreur.
+ * « Une question ? » (kit V5) : une pastille de contexte (« Tout le cours » ou « À propos de :
+ * chapitre »), réponses courtes avec extraits vérifiés, champ de 1 à 4 lignes, Arrêter pendant
+ * la réponse, Réessayer après une erreur ; les suggestions disparaissent après le premier message.
  * Le brouillon reste dans la session ; rien n'est envoyé sans geste ; l'échange n'est pas
  * enregistré. Le fil ne saute pas en bas si l'on relit un message plus ancien.
  */
@@ -96,13 +97,18 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
 
   return (
     <div className="ask-panel">
-      <div className="ask-scope-v4" role="radiogroup" aria-label={v.scope}>
-        <button type="button" role="radio" aria-checked={!scope} className="ask-scope-opt" onClick={() => setScoped(false)}>{v.thisLimpid}</button>
-        {section && (
-          <button type="button" role="radio" aria-checked={!!scope} className="ask-scope-opt" onClick={() => setScoped(true)}>{v.thisSection}</button>
-        )}
-      </div>
-      <p className="meta ask-scope-note">{scope ? v.sectionNote(scope.title) : v.limpidNote}</p>
+      {/* Kit V5 : une seule pastille de contexte, modifiable d'un toucher. */}
+      <button
+        type="button"
+        className="ask-pill"
+        aria-label={v.scope}
+        aria-pressed={!!scope}
+        disabled={!section}
+        onClick={() => setScoped((x) => !x)}
+      >
+        {scope ? v.about(scope.title) : v.wholeCourse}
+        {section && <Icon name="refresh" size={14} />}
+      </button>
 
       <div className="ask-thread" aria-live="polite" ref={threadRef} onScroll={onScroll}>
         {turns.length === 0 && (
@@ -173,7 +179,7 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
         <label htmlFor="ask-input" className="sr-only">{L.ask.label}</label>
         <textarea
           id="ask-input"
-          rows={1}
+          rows={Math.min(4, Math.max(1, text.split("\n").length, Math.ceil(text.length / 38)))}
           maxLength={500}
           value={text}
           placeholder={L.ask.placeholder}
@@ -195,7 +201,7 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
           </button>
         )}
       </form>
-      <p className="muted small ask-private">{L.ask.private}</p>
+      <p className="muted small ask-private">{v.verify}</p>
     </div>
   );
 }

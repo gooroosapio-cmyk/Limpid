@@ -193,31 +193,12 @@ export const demoBlueprint: ReportBlueprint = {
   sections: [
     { section_id: "sec_1", visual_ids: [], page_hint: 1 },
     { section_id: "sec_2", visual_ids: [], page_hint: 2 },
-    { section_id: "sec_3", visual_ids: ["vis_flow"], page_hint: 3 },
+    { section_id: "sec_3", visual_ids: [], page_hint: 3 },
     { section_id: "sec_4", visual_ids: [], page_hint: 4 },
     { section_id: "sec_5", visual_ids: [], page_hint: 5 },
   ],
-  visual_specs: [
-    {
-      id: "vis_flow",
-      kind: "flow",
-      purpose: "Montrer l'enchaînement des étapes du cycle",
-      claim_ids: ["clm_3", "clm_5", "clm_6", "clm_7"],
-      evidence_ids: ["ev_3", "ev_5", "ev_6", "ev_7"],
-      data: {
-        steps: [
-          { label: "Évaporation", claim_id: "clm_3" },
-          { label: "Condensation", claim_id: "clm_5" },
-          { label: "Précipitations", claim_id: "clm_6" },
-          { label: "Ruissellement", claim_id: "clm_7" },
-        ],
-        cyclic: true,
-      },
-      alt_text: "Schéma en boucle : évaporation, puis condensation en nuages, puis précipitations, puis ruissellement vers les océans, et le cycle recommence.",
-      caption: "Les grandes étapes du cycle de l'eau",
-      illustrative_only: false,
-    },
-  ],
+  // V5 : aucun schéma tracé par le code.
+  visual_specs: [],
   source_index: demoEvidence.map((e) => e.id),
   layout_warnings: [],
 };

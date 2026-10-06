@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import type { Exercise } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
-import { paginate, viewOf, type View } from "@/lib/reader/paginate";
 import { AskPanel } from "../AskPanel";
 import { ANCHOR_RE, progressKey, useAnnex } from "../annex-link";
 import { Bilan } from "./Bilan";
@@ -14,17 +13,16 @@ import { OptionsPanel, type OptionsData } from "./OptionsPanel";
 import { ReformulatePanel } from "./ReformulatePanel";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 
-const CONTINUOUS_KEY = "limpid-continuous";
-
 export interface Chapter {
   id: string;
   title: string;
 }
 
 /**
- * Lecteur plein écran (V4, § 7 à 10) : vues composées à partir des hauteurs mesurées des
- * pièces, carrousel vertical une vue à la fois (ou lecture continue), barre basse Sommaire /
- * progression / Options, bouton flottant Discuter. Le retour ferme d'abord un panneau.
+ * Lecteur V5 (kit Présentation V5) : une vraie lecture continue, chapitres dans le flux, sans
+ * pages d'écran, sans compteur de vues et sans bouton flottant. En-tête discret (Fermer,
+ * chapitre courant), barre basse Sommaire / Question / Options. Le retour ferme d'abord un
+ * panneau ; fermer un panneau rend la position de lecture intacte.
  */
 export function LimpidReader({
   reportId,
@@ -49,17 +47,9 @@ export function LimpidReader({
   const router = useRouter();
   const annex = useAnnex();
   const deckRef = useRef<HTMLDivElement>(null);
-  const viewsRef = useRef<View[]>([]);
-  const piecesRef = useRef<HTMLElement[]>([]);
-  const sizeRef = useRef({ w: 0, h: 0 });
-  const [views, setViews] = useState<View[]>([]);
-  const [current, setCurrent] = useState(0);
-  const [continuous, setContinuous] = useState(false);
-  const [suspended, setSuspended] = useState(false);
-  const [chapter, setChapter] = useState<Chapter | null>(chapters[0] ?? null);
+  const [chapter, setChapter] = useState<Chapter | null>(null);
   const [askOpened, setAskOpened] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
-  // Une référence par boîte de dialogue (et non un objet de références, illisible pour React).
   const tocDialog = useRef<HTMLDialogElement>(null);
   const optionsDialog = useRef<HTMLDialogElement>(null);
   const askDialog = useRef<HTMLDialogElement>(null);
@@ -72,21 +62,10 @@ export function LimpidReader({
   useDialogHistory(reformDialog);
   const markedRead = useRef(false);
   const anchorRef = useRef<string | null>(null);
-  /** Ancre de retour d'annexe (`?a=`) : undefined = pas encore lue. */
-  const backAnchor = useRef<string | null | undefined>(undefined);
-  /** Première composition faite : avant, une position de défilement n'est pas une lecture. */
-  const laidOut = useRef(false);
   const titles = useMemo(() => Object.fromEntries(chapters.map((c) => [c.id, c.title])), [chapters]);
+  const chapterIndex = chapter ? chapters.findIndex((c) => c.id === chapter.id) : -1;
 
-  useEffect(() => {
-    try {
-      // Préférence de l'appareil, lue après l'hydratation (le serveur ne la connaît pas).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setContinuous(localStorage.getItem(CONTINUOUS_KEY) === "1");
-    } catch {}
-  }, []);
-
-  // Ouverture directe depuis l'aperçu de la leçon : « Demander à Limpid » ou le quiz (?ouvrir=…).
+  // Ouverture directe depuis l'aperçu : « Demander à Limpid », le bilan ou les options (?ouvrir=…).
   useEffect(() => {
     const url = new URL(window.location.href);
     const open = url.searchParams.get("ouvrir");
@@ -107,172 +86,59 @@ export function LimpidReader({
     }
   }, [bilan]);
 
-  const pieceIndex = useCallback((id: string) => piecesRef.current.findIndex((p) => p.id === id), []);
-
-
-  const scrollToPiece = useCallback((index: number, smooth = false) => {
-    const deck = deckRef.current;
-    const views = viewsRef.current;
-    if (!deck || index < 0) return;
-    const v = views[viewOf(views, index)];
-    const target = piecesRef.current[v ? v.start : index];
-    if (!target) return;
-    const pad = parseFloat(getComputedStyle(deck).paddingTop) || 0;
-    deck.scrollTo({ top: target.offsetTop - pad, behavior: smooth ? "smooth" : "auto" });
+  /** Défile jusqu'à un élément (compensation de l'en-tête par scroll-margin en CSS). */
+  const scrollToId = useCallback((id: string, smooth = false) => {
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   }, []);
 
-  /** Mesure les pièces rendues et compose les vues ; l'ancre de lecture est conservée. */
-  const layout = useCallback(
-    (keepAnchor: string | null) => {
-      const deck = deckRef.current;
-      if (!deck) return;
-      const pieces = [...deck.querySelectorAll<HTMLElement>("[data-piece]")];
-      piecesRef.current = pieces;
-      for (const p of pieces) {
-        p.style.marginBottom = "";
-        p.classList.remove("view-start");
-      }
-      const cs = getComputedStyle(deck);
-      const pads = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-      const available = deck.clientHeight - pads;
-      const tops = pieces.map((p) => p.offsetTop);
-      const last = pieces[pieces.length - 1];
-      const lastBottom = last ? last.offsetTop + last.offsetHeight + (parseFloat(getComputedStyle(last).marginBottom) || 0) : 0;
-      const metrics = pieces.map((p, i) => ({
-        height: (tops[i + 1] ?? lastBottom) - tops[i]!,
-        keepWithNext: p.dataset.keep === "1",
-        breakBefore: p.dataset.breakBefore === "1",
-        breakAfter: p.dataset.breakAfter === "1",
-      }));
-      const v = paginate(metrics, available);
-      viewsRef.current = v;
-      if (!continuous) {
-        for (const view of v) {
-          pieces[view.start]?.classList.add("view-start");
-          if (!view.oversized) {
-            const end = pieces[view.end]!;
-            const mb = parseFloat(getComputedStyle(end).marginBottom) || 0;
-            // Pas d'une vue = hauteur de l'écran de lecture : la vue suivante ne déborde jamais
-            // dans les marges réservées (barre, bouton Discuter).
-            end.style.marginBottom = `${mb + Math.max(0, available - view.height) + pads}px`;
-          }
-        }
-      }
-      setViews(v);
-      if (keepAnchor) {
-        const i = pieceIndex(keepAnchor);
-        if (i >= 0) scrollToPiece(i);
-      }
-    },
-    [continuous, pieceIndex, scrollToPiece],
-  );
-
-  // Première composition (polices chargées), puis à chaque changement réel de taille.
+  // Le cours s'ouvre en tête ; seule une ancre explicite de retour d'annexe (`?a=`) est suivie.
   useEffect(() => {
-    const deck = deckRef.current;
-    if (!deck) return;
-    // V4 : un Limpid s'ouvre toujours en tête (la position de lecture enregistrée reste une
-    // information, jamais un saut imposé) ; seule une ancre explicite (`?a=`) est suivie.
-    let saved: string | null = null;
-    // Retour d'annexe : l'adresse porte l'ancre exacte de lecture (`?a=`), lue une seule fois
-    // puis retirée de l'adresse une fois la vue rétablie.
-    if (backAnchor.current === undefined) {
-      const back = new URL(window.location.href).searchParams.get("a");
-      backAnchor.current = back && ANCHOR_RE.test(back) ? back : null;
-    }
-    if (backAnchor.current) {
-      saved = backAnchor.current;
-      anchorRef.current = backAnchor.current;
-    }
-    let cancelled = false;
+    const url = new URL(window.location.href);
+    const back = url.searchParams.get("a");
+    if (!back || !ANCHOR_RE.test(back)) return;
     void document.fonts.ready.then(() => {
-      if (cancelled) return;
-      sizeRef.current = { w: deck.clientWidth, h: deck.clientHeight };
-      layout(saved);
-      laidOut.current = true;
-      if (backAnchor.current) {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("a");
-        window.history.replaceState(window.history.state, "", url.toString());
-      }
+      scrollToId(back);
+      url.searchParams.delete("a");
+      window.history.replaceState(window.history.state, "", url.toString());
     });
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const relayout = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => layout(anchorRef.current), 160);
-    };
-    // Taille de l'écran : ignore les petites variations des barres du navigateur.
-    const deckObs = new ResizeObserver(() => {
-      const { w, h } = sizeRef.current;
-      if (Math.abs(deck.clientWidth - w) > 1 || Math.abs(deck.clientHeight - h) > 48) {
-        sizeRef.current = { w: deck.clientWidth, h: deck.clientHeight };
-        relayout();
-      }
-    });
-    deckObs.observe(deck);
-    // Contenu d'une pièce (correction affichée, police agrandie) : nouvelle composition.
-    const pieceObs = new ResizeObserver(() => relayout());
-    deck.querySelectorAll("[data-piece]").forEach((p) => pieceObs.observe(p));
-    const attrObs = new MutationObserver(relayout);
-    attrObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-text"] });
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-      deckObs.disconnect();
-      pieceObs.disconnect();
-      attrObs.disconnect();
-    };
-  }, [layout]);
+  }, [scrollToId]);
 
-  // Vue affichée, chapitre courant, transition « page tournée », progression enregistrée.
+  // Chapitre courant (en-tête, sommaire) et position de lecture enregistrée, au défilement.
   useEffect(() => {
     const deck = deckRef.current;
     if (!deck) return;
     let raf = 0;
     let settle: ReturnType<typeof setTimeout> | undefined;
-    let shown = -1;
     const onScroll = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const views = viewsRef.current;
-        const pieces = piecesRef.current;
-        if (!views.length) return;
-        const y = deck.scrollTop + deck.clientHeight * 0.35;
-        let idx = 0;
-        for (let i = 0; i < views.length; i++) if ((pieces[views[i]!.start]?.offsetTop ?? 0) <= y) idx = i;
-        if (!laidOut.current) return;
-        setCurrent(idx);
-        const start = pieces[views[idx]!.start];
-        anchorRef.current = start?.id ?? null;
-        const sec = start?.closest<HTMLElement>("[data-section]")?.dataset.section ?? start?.dataset.section;
-        const ch = chapters.find((c) => c.id === sec);
-        if (ch) setChapter(ch);
+        const line = deck.getBoundingClientRect().top + deck.clientHeight * 0.3;
+        const pieces = deck.querySelectorAll<HTMLElement>("[data-piece]");
+        let current: HTMLElement | null = null;
+        for (const p of pieces) {
+          if (p.getBoundingClientRect().top <= line) current = p;
+          else break;
+        }
+        const sec = current?.closest<HTMLElement>("[data-section]")?.dataset.section ?? current?.dataset.section;
+        setChapter(chapters.find((c) => c.id === sec) ?? null);
+        anchorRef.current = current?.id ?? null;
         clearTimeout(settle);
         settle = setTimeout(() => {
-          if (idx === shown) return;
-          shown = idx;
-          const v = views[idx]!;
-          for (let k = v.start; k <= v.end; k++) {
-            const p = pieces[k];
-            if (!p) continue;
-            p.classList.remove("turn-in");
-            void p.offsetWidth;
-            p.classList.add("turn-in");
+          const id = anchorRef.current;
+          if (!id) return;
+          try {
+            localStorage.setItem(progressKey(reportId ?? "demo"), id);
+          } catch {}
+          if (reportId && deck.scrollTop > 40) {
+            void fetch(`/api/reports/${reportId}/progress`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ anchor: id, read: !markedRead.current }),
+            }).catch(() => undefined);
+            markedRead.current = true;
           }
-          if (start?.id) {
-            try {
-              localStorage.setItem(progressKey(reportId ?? "demo"), start.id);
-            } catch {}
-            if (reportId) {
-              void fetch(`/api/reports/${reportId}/progress`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ anchor: start.id, read: !markedRead.current }),
-              }).catch(() => undefined);
-              markedRead.current = true;
-            }
-          }
-        }, 180);
+        }, 600);
       });
     };
     deck.addEventListener("scroll", onScroll, { passive: true });
@@ -282,29 +148,29 @@ export function LimpidReader({
       cancelAnimationFrame(raf);
       clearTimeout(settle);
     };
-  }, [chapters, reportId, views]);
+  }, [chapters, reportId]);
+
+  const closeAll = useCallback(() => [tocDialog, optionsDialog, askDialog, bilanDialog, reformDialog].forEach((d) => d.current?.close()), []);
 
   const api: ReaderApi = useMemo(
     () => ({
       reportId,
       versionId,
-      suspend: (on) => setSuspended(on),
+      // Lecture continue : rien à suspendre.
+      suspend: () => {},
       continueAfter: (id) => {
-        setSuspended(false);
-        const i = pieceIndex(id);
-        if (i < 0) return;
-        const v = viewOf(viewsRef.current, i);
-        const next = viewsRef.current[v + 1];
-        scrollToPiece(next ? next.start : i, true);
+        const el = document.getElementById(id);
+        const next = el?.closest("[data-piece]")?.nextElementSibling as HTMLElement | null;
+        if (next?.id) scrollToId(next.id, true);
       },
       goTo: (id) => {
-        [tocDialog, optionsDialog, askDialog, bilanDialog, reformDialog].forEach((d) => d.current?.close());
-        scrollToPiece(pieceIndex(id), true);
+        closeAll();
+        scrollToId(id, true);
       },
       openBilan: () => bilanDialog.current?.showModal(),
       openReformulate: () => reformDialog.current?.showModal(),
     }),
-    [reportId, versionId, pieceIndex, scrollToPiece],
+    [reportId, versionId, scrollToId, closeAll],
   );
 
   function close() {
@@ -317,14 +183,11 @@ export function LimpidReader({
     }
   }
 
-  function toggleContinuous(on: boolean) {
-    setContinuous(on);
-    try {
-      localStorage.setItem(CONTINUOUS_KEY, on ? "1" : "0");
-    } catch {}
+  function openAsk() {
+    setAskOpened(true);
+    askDialog.current?.showModal();
   }
 
-  const total = Math.max(1, views.length);
   const head = (id: string, title: string, ref: React.RefObject<HTMLDialogElement | null>) => (
     <>
       <div className="sheet-grip" aria-hidden="true" />
@@ -341,41 +204,25 @@ export function LimpidReader({
     <ReaderCtx.Provider value={api}>
       <header className="rtop">
         <button type="button" className="rtop-close" onClick={close} aria-label={t.lim.closeLabel}>
-          <Icon name="close" /> <span>{t.lim.close}</span>
+          <Icon name="back" /> <span className="sr-only">{t.lim.close}</span>
         </button>
-        {chapter && <p className="rtop-chapter" aria-live="off">{chapter.title}</p>}
+        <p className="rtop-chapter" aria-live="off">{chapter?.title ?? options.title}</p>
+        <button type="button" className="rtop-more" aria-label={t.lim.options} aria-haspopup="dialog" onClick={() => optionsDialog.current?.showModal()}>
+          <Icon name="more" />
+        </button>
       </header>
 
-      <div
-        ref={deckRef}
-        className={`deck${continuous ? " continuous" : ""}${suspended ? " no-snap" : ""}`}
-        tabIndex={0}
-        role="region"
-        aria-label={t.lim.deckLabel}
-      >
+      <div ref={deckRef} className="deck continuous" tabIndex={0} role="region" aria-label={t.lim.deckLabel}>
         <div className="deck-col">{children}</div>
       </div>
 
-      <button type="button" className="discuss" aria-label={t.lim.discussLabel} aria-haspopup="dialog" onClick={() => { setAskOpened(true); askDialog.current?.showModal(); }}>
-        <Icon name="chat" /> <span>{t.lim.discuss}</span>
-      </button>
-
-      <nav className="rbar" aria-label={t.lim.toc}>
+      <nav className="rbar rbar-v5" aria-label={t.lim.readerBar}>
         <button type="button" className="rb" aria-haspopup="dialog" onClick={() => tocDialog.current?.showModal()}>
           <Icon name="list" /> <span>{t.lim.toc}</span>
         </button>
-        <div
-          className="rprogress"
-          role="progressbar"
-          aria-label={t.lim.progress}
-          aria-valuemin={1}
-          aria-valuemax={total}
-          aria-valuenow={current + 1}
-          aria-valuetext={t.lim.progressLabel(current + 1, total)}
-        >
-          <span className="rprogress-n" aria-hidden="true">{current + 1} / {total}</span>
-          <span className="rprogress-bar" aria-hidden="true"><i ref={(el) => { if (el) el.style.width = `${((current + 1) / total) * 100}%`; }} /></span>
-        </div>
+        <button type="button" className="rb" aria-haspopup="dialog" onClick={openAsk}>
+          <Icon name="chat" /> <span>{t.lim.questionBtn}</span>
+        </button>
         <button type="button" className="rb" aria-haspopup="dialog" onClick={() => optionsDialog.current?.showModal()}>
           <Icon name="more" /> <span>{t.lim.options}</span>
         </button>
@@ -383,8 +230,12 @@ export function LimpidReader({
 
       <dialog ref={tocDialog} className="sheet side" aria-labelledby="toc-h">
         {head("toc-h", t.reader.inThisReport, tocDialog)}
+        {chapterIndex >= 0 && <p className="muted small toc-where">{t.lim.chapterOf(chapterIndex + 1, chapters.length)}</p>}
         <nav className="toc" aria-labelledby="toc-h">
           <ol>
+            <li>
+              <a href="#lim_keypoints" onClick={(e) => { e.preventDefault(); api.goTo("lim_keypoints"); }}>{t.lim.keyPoints}</a>
+            </li>
             {chapters.map((c) => (
               <li key={c.id}>
                 <a href={`#${c.id}`} aria-current={chapter?.id === c.id ? "location" : undefined} onClick={(e) => { e.preventDefault(); api.goTo(c.id); }}>
@@ -403,8 +254,6 @@ export function LimpidReader({
         {head("opt-h", t.lim.options, optionsDialog)}
         <OptionsPanel
           data={options}
-          continuous={continuous}
-          onContinuous={toggleContinuous}
           onNavigate={() => optionsDialog.current?.close()}
           annexHref={(hash) => annex?.href(hash, anchorRef.current) ?? `#${hash}`}
           onAnnex={(hash) => annex?.open(hash, anchorRef.current)}
@@ -412,7 +261,7 @@ export function LimpidReader({
       </dialog>
 
       <dialog ref={askDialog} className="sheet side ask-sheet" aria-labelledby="ask-h">
-        {head("ask-h", t.lim.discussLabel, askDialog)}
+        {head("ask-h", t.lim.questionTitle, askDialog)}
         {!reportId ? <p className="notice">{t.ask.unavailable}</p> : askOpened && <AskPanel reportId={reportId} section={chapter ? { id: chapter.id, title: chapter.title } : null} initialQuestion={askQuestion} />}
       </dialog>
 

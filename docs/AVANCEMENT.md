@@ -1,5 +1,19 @@
 # Avancement
 
+## Phase 19.3 — V5, lot C : lecture continue, notions, chat simplifié, taille du texte (7 octobre 2026)
+
+### FAIT
+- Lecteur réécrit en lecture continue : plus de pagination mesurée, de carrousel, de compteur « 4 / 7 » ni de bouton flottant « Discuter ».
+- Titre compact suivi immédiatement de « L'essentiel » en puces (un seul bloc) ; chapitres dans le flux séparés par un filet, libellé « Chapitre n » ; figure pleine largeur après le premier paragraphe (aucun texte qui l'entoure) ; encadré « À retenir » ; invitation « Vérifier ce chapitre · n questions » ouvrant une mini-interrogation (une question à la fois, correction immédiate, 5 au plus, « Passer » jamais compté comme réussi).
+- En-tête : Retour, chapitre courant, Options. Barre basse stable : Sommaire, Question, Options. Sommaire avec « Chapitre n sur N ».
+- Notions à toucher : définition et exemple préproduits par le moteur V5 (aucun appel IA au toucher), source citée.
+- Chat « Une question ? » : une pastille de contexte (« Tout le cours » / « À propos de : chapitre »), champ de 1 à 4 lignes, Envoyer/Arrêter ; mention « non enregistré » retirée.
+- Options → Affichage : taille du texte 16 / 18 / 20 px, sans régénération.
+- Démonstration : schéma tracé par le code retiré.
+
+### EN TEST
+- Rendu Playwright 390 px, sombre et clair : aucun débordement horizontal ; sommaire, options et taille 20 px vérifiés à l'écran.
+
 ## Phase 19.2 — V5, lot B : images par type, couverture Unsplash, réglage admin (7 octobre 2026)
 
 ### FAIT
