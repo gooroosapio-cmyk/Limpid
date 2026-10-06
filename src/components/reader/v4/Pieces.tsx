@@ -171,6 +171,9 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
         );
       });
     }
+    default:
+      // V6 : composants du lecteur (à raccorder) — repli texte.
+      return [piece("block", <p><Rich text={b.text} ctx={ctx} /> {refs}</p>)];
   }
 }
 

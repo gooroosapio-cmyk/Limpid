@@ -171,6 +171,14 @@ export const MODE_GUIDE: Record<Mode, string> = {
     "RÉSUMÉ FIDÈLE : conserve les termes importants et le sens du document, condense l'essentiel ; AUCUNE analogie, AUCUN exemple inventé, AUCUN complément extérieur.",
   revision:
     "RÉVISION ACTIVE : des fiches courtes et denses (une notion par section : l'essentiel à retenir, 1 à 3 blocs), conçues pour être suivies d'exercices ; pas de longue prose.",
+  // V6 : toujours très simple au départ, puis approfondi autant que la notion le demande.
+  auto: "PAR DÉFAUT : l'approche de chaque chapitre est indiquée (livre, parcours ou atelier) ; commence toujours très simplement, puis approfondis autant que nécessaire.",
+  livre:
+    "LIVRE INTERACTIF : question → l'essentiel → petits paragraphes d'une idée → visuel proche du texte qu'il éclaire → exemple → conditions et limites → QCM utile.",
+  parcours:
+    "PARCOURS GUIDÉ : prérequis → notions en étapes courtes et ordonnées (bloc steps quand l'ordre compte) → exemple → étape suivante ; aucune étape imposée ni verrouillée.",
+  atelier:
+    "ATELIER VISUEL : question → explication préalable → représentation exacte (chart, proportion, calculation, comparison, timeline) → ce qu'on peut faire varier → interprétation ; pas de manipulation si la relation n'est pas définie par la source.",
 };
 
 /** Nombre de pages pédagogiques prévu selon la richesse de la source et l'approche (repère, pas une promesse). */

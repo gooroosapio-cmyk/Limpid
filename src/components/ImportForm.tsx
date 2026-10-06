@@ -44,7 +44,7 @@ const LEVEL_CHOICES = ["ultra_simple", "grand_public", "etudiant", "professionne
 const CONCURRENCY = 2;
 
 const MAX_PASTED = 50_000;
-const MODE_ICONS: Record<Mode, IconName> = { tres_simple: "bulb", claire: "book", resume: "file", revision: "bars" };
+const MODE_ICONS: Record<Mode, IconName> = { tres_simple: "bulb", claire: "book", resume: "file", revision: "bars", auto: "spark", livre: "book", parcours: "list", atelier: "bars" };
 
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
 

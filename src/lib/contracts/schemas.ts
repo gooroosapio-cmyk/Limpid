@@ -46,10 +46,17 @@ export const TargetPages = z.number().int().min(1).max(18);
 export type TargetPages = z.infer<typeof TargetPages>;
 
 /**
- * Quatre approches choisies à l'import (V4) : très simple, explication claire, résumé fidèle,
- * révision active. Un seul support est produit par génération.
+ * Approches choisies à l'import. V6 : « auto » (Par défaut : le plan choisit l'approche
+ * dominante), « livre » (Livre interactif), « parcours » (Parcours guidé), « atelier » (Atelier
+ * visuel). Les quatre approches V4 restent lisibles pour les cours déjà produits.
  */
-export const MODES = ["tres_simple", "claire", "resume", "revision"] as const;
+export const MODES = ["tres_simple", "claire", "resume", "revision", "auto", "livre", "parcours", "atelier"] as const;
+/** Approches proposées à l'import (V6). */
+export const V6_MODES = ["auto", "livre", "parcours", "atelier"] as const;
+/** Approche effective d'un chapitre (V6). */
+export const APPROACHES = ["livre", "parcours", "atelier"] as const;
+export const Approach = z.enum(APPROACHES);
+export type Approach = z.infer<typeof Approach>;
 export const Mode = z.enum(MODES);
 export type Mode = z.infer<typeof Mode>;
 
@@ -172,6 +179,14 @@ const blockBase = {
   evidence_ids: ids(20),
 };
 
+/** Opérations de calcul manipulables (kit V6) : aucune autre n'est évaluée. */
+export const CALCULATIONS = ["share", "sum", "difference", "ratio", "percent_change"] as const;
+/** Illustrations de contexte locales (kit V6, CC0), servies depuis /illustrations/scenes/. */
+export const SCENES = ["home-work", "childcare", "science", "reading", "story", "process", "landscape", "resources"] as const;
+const sourced = { claim_ids: ids(10), evidence_ids: ids(10) };
+const stepItem = z.strictObject({ title: z.string().trim().min(1).max(160), text: mediumText, ...sourced });
+const eventItem = z.strictObject({ date: z.string().trim().min(1).max(60), title: z.string().trim().min(1).max(160), text: mediumText, ...sourced });
+
 /** Variante d'un exemple ou d'une analogie, affichée sans nouvel appel IA (« Autre exemple »). */
 export const ExampleVariant = z.strictObject({ text: longText, limit: mediumText.nullable() });
 
@@ -196,6 +211,53 @@ export const Block = z.discriminatedUnion("type", [
   }),
   // Complément absent de la source : signalé « Complément », jamais référencé comme sourcé.
   z.strictObject({ type: z.literal("complement"), ...blockBase }),
+  /* V6 : composants du lecteur, dessinés par le code à partir de données exactes (jamais d'image). */
+  // Étapes d'une procédure : ordre obligatoire conservé ; text = phrase d'introduction.
+  z.strictObject({ type: z.literal("steps"), items: z.array(stepItem).min(2).max(12), ...blockBase }),
+  // Frise : ordre chronologique ou narratif annoncé ; text = introduction.
+  z.strictObject({ type: z.literal("timeline"), order: z.enum(["chronologique", "narratif"]), events: z.array(eventItem).min(2).max(12), ...blockBase }),
+  // Tableau comparatif : en-têtes, puis lignes (cellule vide = valeur manquante, jamais zéro).
+  z.strictObject({
+    type: z.literal("comparison"),
+    columns: z.array(z.string().trim().min(1).max(80)).min(2).max(5),
+    rows: z.array(z.strictObject({ cells: z.array(z.string().trim().max(300)).min(2).max(5), ...sourced })).min(1).max(15),
+    ...blockBase,
+  }),
+  // Part d'un tout : base, pourcentage, part et reste ; curseur si interactive (simulation locale).
+  z.strictObject({
+    type: z.literal("proportion"),
+    base: z.number().finite().positive(),
+    percent: z.number().finite().min(0).max(100),
+    unit: z.string().trim().max(20),
+    part_label: z.string().trim().min(1).max(60),
+    rest_label: z.string().trim().min(1).max(60),
+    interactive: z.boolean(),
+    /** Valeurs d'un exemple pédagogique (affiché « Exemple fictif »), sinon reprises de la source. */
+    example: z.boolean(),
+    ...blockBase,
+  }),
+  // Graphique (barres ou courbe) + tableau équivalent ; valeur absente = null, jamais inventée.
+  z.strictObject({
+    type: z.literal("chart"),
+    chart_type: z.enum(["bar", "line"]),
+    unit: z.string().trim().max(20),
+    points: z.array(z.strictObject({ label: z.string().trim().min(1).max(60), value: z.number().finite().nullable() })).min(2).max(12),
+    ...blockBase,
+  }),
+  // Calcul manipulable : 5 opérations sûres, aucune expression évaluée ; steps = calcul décomposé.
+  z.strictObject({
+    type: z.literal("calculation"),
+    formula_id: z.enum(CALCULATIONS),
+    variables: z.array(z.strictObject({ label: z.string().trim().min(1).max(60), value: z.number().finite(), unit: z.string().trim().max(20) })).length(2),
+    steps: z.array(mediumText).max(6),
+    interactive: z.boolean(),
+    example: z.boolean(),
+    ...blockBase,
+  }),
+  // Détail secondaire repliable : summary = intitulé, text = contenu (développé dans le PDF).
+  z.strictObject({ type: z.literal("details"), summary: shortText, ...blockBase }),
+  // Illustration de contexte du catalogue local (aucune génération) : text = légende.
+  z.strictObject({ type: z.literal("scene"), asset: z.enum(SCENES), ...blockBase }),
 ]);
 export type Block = z.infer<typeof Block>;
 
@@ -208,6 +270,24 @@ export const Notion = z.strictObject({
 });
 export type Notion = z.infer<typeof Notion>;
 
+/**
+ * QCM de chapitre (kit V6) : 1 à 3 questions produites avec le chapitre, corrigées sur place
+ * sans appel IA ; une explication par choix ; jamais une note de maîtrise.
+ */
+export const ChapterQuestion = z
+  .strictObject({
+    id,
+    prompt: mediumText,
+    choices: z.array(z.string().trim().min(1).max(300)).min(2).max(4),
+    correct_index: z.number().int().min(0).max(3),
+    explanations: z.array(mediumText).min(2).max(4),
+    /** Bloc à revoir en cas d'erreur (identifiant du chapitre), ou null. */
+    revisit_block_id: id.nullable(),
+    claim_ids: ids(10),
+  })
+  .refine((q) => q.correct_index < q.choices.length && q.explanations.length === q.choices.length, "choix, bonne réponse et explications incohérents");
+export type ChapterQuestion = z.infer<typeof ChapterQuestion>;
+
 export const Section = z.strictObject({
   id,
   question: shortText,
@@ -219,6 +299,12 @@ export const Section = z.strictObject({
   notions: z.array(Notion).max(8).optional(),
   /** V5 : chapitre rédigé par le modèle le plus capable (passage difficile). */
   difficult: z.boolean().optional(),
+  /** V6 : approche du chapitre (Par défaut : choisie par le plan). */
+  approach: Approach.optional(),
+  /** V6 : « L'essentiel » du chapitre, en puces. */
+  essential: z.array(shortText).max(6).optional(),
+  /** V6 : QCM facultatif de fin de chapitre. */
+  quiz: z.array(ChapterQuestion).max(3).optional(),
 });
 export type Section = z.infer<typeof Section>;
 
@@ -370,12 +456,27 @@ export const ExerciseSet = z.strictObject({
 });
 export type ExerciseSet = z.infer<typeof ExerciseSet>;
 
-/** Toutes les affirmations citées par un bloc (y compris les éléments d'une liste). */
-export function blockClaimIds(b: Block): string[] {
-  return b.type === "list" ? [...b.claim_ids, ...b.items.flatMap((i) => i.claim_ids)] : b.claim_ids;
+/** Éléments sourcés imbriqués d'un bloc (liste, étapes, frise, lignes d'un tableau). */
+function nested(b: Block): { claim_ids: string[]; evidence_ids: string[] }[] {
+  switch (b.type) {
+    case "list":
+    case "steps":
+      return b.items;
+    case "timeline":
+      return b.events;
+    case "comparison":
+      return b.rows;
+    default:
+      return [];
+  }
 }
 
-/** Toutes les preuves citées par un bloc (y compris les éléments d'une liste). */
+/** Toutes les affirmations citées par un bloc (y compris ses éléments imbriqués). */
+export function blockClaimIds(b: Block): string[] {
+  return [...b.claim_ids, ...nested(b).flatMap((i) => i.claim_ids)];
+}
+
+/** Toutes les preuves citées par un bloc (y compris ses éléments imbriqués). */
 export function blockEvidenceIds(b: Block): string[] {
-  return b.type === "list" ? [...b.evidence_ids, ...b.items.flatMap((i) => i.evidence_ids)] : b.evidence_ids;
+  return [...b.evidence_ids, ...nested(b).flatMap((i) => i.evidence_ids)];
 }
