@@ -508,7 +508,7 @@ export const fr = {
     v2: {
       count: (n: number) => (n > 1 ? `${n} leçons` : n === 1 ? "1 leçon" : "Aucune leçon"),
       generateCover: "Changer de couverture",
-      generateNote: "Une autre illustration Pixabay sur le même thème.",
+      generateNote: "Une autre illustration sur le même thème.",
       generating: "Recherche d’une couverture…",
       generated: "Nouvelle couverture prête.",
       generateFailed: "La couverture n'a pas pu être créée. Réessayez plus tard.",
@@ -1005,7 +1005,7 @@ export const fr = {
       vector: "Illustrations vectorielles (concepts, analogies)",
       realistic: "Scènes réalistes (lieu, objet, situation)",
       missingKey: "clé absente",
-      note: "Couverture : illustration Pixabay choisie selon le thème du document (aucune image générée). Aucun dessin ni graphique n'est tracé par le code.",
+      note: "Couverture : illustration Pixabay choisie selon le thème du document, sinon image Gemini (Nano Banana 2 Lite). Aucun dessin ni graphique n'est tracé par le code.",
     },
     capLabel: (max: number) => `Plafond mensuel, en euros (${max} € au plus, fixé par la configuration du serveur)`,
     save: "Enregistrer",

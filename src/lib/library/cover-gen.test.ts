@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coverQuery, pixabayHits } from "./cover-gen";
+import { coverGenerationEnabled, coverPrompt, coverQuery, pixabayHits } from "./cover-gen";
 
 describe("couvertures Pixabay", () => {
   it("garde les images Pixabay assez larges, avec page publique et auteur", () => {
@@ -18,5 +18,14 @@ describe("couvertures Pixabay", () => {
     expect(coverQuery("water cycle, rain!", "Le cycle")).toEqual({ q: "water cycle rain", lang: "en" });
     expect(coverQuery("", "Comprendre la simulation financière du projet")).toEqual({ q: "Comprendre simulation financière projet", lang: "fr" });
     expect(coverQuery("", "Le")).toBeNull();
+  });
+
+  it("repli Gemini : consigne sans texte, active avec OpenRouter seul", () => {
+    const p = coverPrompt("Le cycle de l'eau", "water cycle");
+    expect(p).toContain("Le cycle de l'eau — water cycle");
+    expect(p).toContain("Aucun texte");
+    expect(coverGenerationEnabled({ OPENROUTER_API_KEY: "k" })).toBe(true);
+    expect(coverGenerationEnabled({ OPENROUTER_API_KEY: "k", LIMPID_COVERS_GEMINI: "off" })).toBe(false);
+    expect(coverGenerationEnabled({ PIXABAY_API_KEY: "p" })).toBe(true);
   });
 });

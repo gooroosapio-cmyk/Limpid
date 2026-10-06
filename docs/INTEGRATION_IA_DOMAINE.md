@@ -39,13 +39,13 @@ Limpid génère 1, 2 ou 4 illustrations vectorielles par rapport court, standard
 
 ## 2 bis. Pixabay (couvertures)
 
-Les couvertures sont des illustrations de la banque Pixabay, choisies d'après le thème du document (mots-clés prévus par le plan, sinon le titre). Aucune image n'est générée par l'IA pour la couverture.
+Les couvertures sont des illustrations de la banque Pixabay, choisies d'après le thème du document (mots-clés prévus par le plan, sinon le titre). Si Pixabay ne trouve rien, une image décorative sans texte est générée par Gemini (Nano Banana 2 Lite, via OpenRouter, comptée dans le budget IA).
 
 1. Créez un compte gratuit sur **pixabay.com** (ou connectez-vous).
 2. Ouvrez **https://pixabay.com/api/docs/** : une fois connecté, votre clé apparaît dans la section « Parameters » (paramètre `key`, en vert).
 3. Dans **Vercel** → *Settings* → *Environment Variables* (Production) : `PIXABAY_API_KEY` = cette clé, puis **Redeploy**.
 4. Supprimez `UNSPLASH_ACCESS_KEY` et `LIMPID_ILLUSTRATIONS_UNSPLASH` (plus utilisées).
-5. Vérification : **Administration → Diagnostic** affiche « Couvertures (Pixabay) : illustration Pixabay selon le thème du document ». Créez un cours : sa carte reçoit une illustration ; l'aperçu affiche « Illustration : auteur · Pixabay ».
+5. Vérification : **Administration → Diagnostic** affiche « Couvertures (Pixabay, sinon Gemini) : illustration Pixabay selon le thème du document, sinon image Gemini ». Créez un cours : sa carte reçoit une illustration ; l'aperçu affiche « Illustration : auteur » (le nom de Pixabay n'est pas affiché).
 
 Fonctionnement : Limpid cherche d'abord une illustration (format paysage, recherche sécurisée), sinon une image Pixabay de tout type ; l'image est téléchargée, recadrée en 4/3 et servie par Limpid (Pixabay interdit l'affichage permanent depuis ses serveurs). Dans la bibliothèque, « Changer de couverture » propose une autre illustration sur le même thème. Limite de l'API : 100 requêtes par minute, largement suffisant.
 
