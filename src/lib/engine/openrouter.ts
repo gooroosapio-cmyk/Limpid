@@ -43,6 +43,8 @@ function model(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
 
 /** Modèle de texte par défaut (OpenRouter) : lecture, plan, rédaction Feynman, QCM, chat. */
 export const DEFAULT_TEXT_MODEL = "openai/gpt-6-luna-pro";
+/** Modèle de secours (autre fournisseur) quand le modèle principal refuse ou est indisponible. */
+export const DEFAULT_FALLBACK_MODEL = "google/gemini-3.8-flash";
 
 /** Les modèles OpenAI de raisonnement (GPT-6, o-series) refusent le paramètre temperature. */
 export function acceptsTemperature(model: string): boolean {
@@ -64,7 +66,8 @@ export function openRouterConfigFromEnv(env: NodeJS.ProcessEnv = process.env): O
       editor: model(env, "LIMPID_MODEL_EDITOR", DEFAULT_TEXT_MODEL),
       complex: model(env, "LIMPID_MODEL_COMPLEX", DEFAULT_TEXT_MODEL),
     },
-    fallbackModels: (env.LIMPID_MODEL_FALLBACKS ?? "")
+    // Secours par défaut : Gemini 3.8 Flash (autre fournisseur) si Luna Pro refuse ou est indisponible.
+    fallbackModels: (env.LIMPID_MODEL_FALLBACKS?.trim() ? env.LIMPID_MODEL_FALLBACKS : DEFAULT_FALLBACK_MODEL)
       .split(",")
       .map((m) => m.trim())
       .filter((m) => MODEL_RE.test(m))
@@ -114,6 +117,9 @@ export function errorCodeFor(status: number, message: string): ProviderError["co
   if (status === 400 && /token|context|too long|maximum context/i.test(message)) return "context_overflow";
   if (status === 403 && /moderat|flag|safety/i.test(message)) return "refused";
   if (status === 408) return "timeout_ambiguous";
+  if (status === 401) return "auth";
+  if (status === 403) return "forbidden";
+  if (status === 400 || status === 404 || status === 422) return "bad_request";
   return "unavailable";
 }
 
@@ -147,7 +153,8 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
       const status = res.ok ? Number(json.error?.code) || 500 : res.status;
       const message = String(json.error?.message ?? "");
       const usage = { ...base, durationMs: Date.now() - started };
-      throw new ProviderError(errorCodeFor(status, message), `OpenRouter : erreur HTTP ${status}.`, usage);
+      // Message du fournisseur (ex. « Key limit exceeded ») : jamais le contenu du document.
+      throw new ProviderError(errorCodeFor(status, message), `OpenRouter : erreur HTTP ${status} — ${message.slice(0, 160)}`, usage);
     }
     return json;
   }
@@ -163,7 +170,8 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
       try {
         return await this.generateWith(models[i]!, final);
       } catch (e) {
-        const switchable = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited");
+        // Modèle indisponible ou requête refusée par ce modèle : le modèle de secours prend le relais.
+        const switchable = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited" || e.code === "bad_request");
         if (!switchable || i >= models.length - 1) throw e;
       }
     }
