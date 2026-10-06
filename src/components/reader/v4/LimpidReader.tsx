@@ -269,7 +269,7 @@ export function LimpidReader({
 
       <dialog ref={bilanDialog} className="sheet side quiz-sheet" aria-labelledby="bilan-h">
         {head("bilan-h", t.lim.bilanTitle, bilanDialog)}
-        <Bilan
+        {!reportId && <Bilan
           initial={bilan}
           insufficient={insufficient}
           reportId={reportId}
@@ -277,7 +277,7 @@ export function LimpidReader({
           titles={titles}
           onClose={() => bilanDialog.current?.close()}
           onGoTo={(id) => api.goTo(id)}
-        />
+        />}
       </dialog>
 
       <dialog ref={reformDialog} className="sheet side" aria-labelledby="ref-h">

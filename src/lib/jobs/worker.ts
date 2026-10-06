@@ -37,7 +37,7 @@ import {
   type Variation,
 } from "@/lib/engine/pipeline";
 import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow, type IllustrateDeps } from "@/lib/visuals/illustrate";
-import { imageSettingsFrom, modelInfo, type ImageProviderId, type ImageSettings } from "@/lib/visuals/image-models";
+import { diagramPrompt, imageSettingsFrom, modelInfo, type ImageProviderId, type ImageSettings } from "@/lib/visuals/image-models";
 import { jobStore } from "./checkpoints";
 import { generateV5, PlanCheckpoint } from "@/lib/engine/v5";
 import { checkImage } from "@/lib/visuals/sources";
@@ -143,7 +143,7 @@ const REQUEUE_AFTER_MS = 120_000;
 /** Fenêtre de génération d'une invocation (fonction de 300 s) : aucun appel long lancé au-delà. */
 const GENERATION_WINDOW_MS = 270_000;
 /** Cours prêt plus tard que cela : illustrations et exercices dans une nouvelle invocation. */
-const REQUEUE_BEFORE_VISUALS_MS = 200_000;
+const REQUEUE_BEFORE_VISUALS_MS = 120_000;
 
 /** Modèles réellement utilisés : lecture (compréhension) et rédaction (chapitres), pour l'étiquette. */
 async function jobModels(jobId: string): Promise<{ reading: string | null; writing: string | null }> {
@@ -557,7 +557,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
 async function imageSettings(): Promise<ImageSettings> {
   const { data } = await adminClient()
     .from("app_settings")
-    .select("images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model")
+    .select("images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model")
     .maybeSingle();
   return imageSettingsFrom(data as Record<string, unknown> | null);
 }
@@ -581,18 +581,25 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
     render: async (route, style, item) => {
       // Plafonds vérifiés avant chaque image ; un refus laisse le cours sans image.
       await checkBudget(job.owner_id);
-      const prompt = style === "realistic" ? realisticPrompt(item.subject, item.purpose, item.altText) : vectorPrompt(item.subject, item.purpose, item.altText);
+      const prompt =
+        style === "diagram"
+          ? diagramPrompt(item.subject, item.altText, item.content)
+          : style === "realistic"
+            ? realisticPrompt(item.subject, item.purpose, item.altText)
+            : vectorPrompt(item.subject, item.purpose, item.altText);
+      // Schéma : portrait 3/4 pour l'écran du téléphone (Recraft, en repli, n'a que le carré).
+      const recraftSize = style === "diagram" ? "1:1" : "4:3";
       if (route.provider === "recraft") {
         if (!recraft) throw new ProviderError("not_configured", "Recraft absent.");
         if (modelInfo(route.model)?.output === "svg") {
-          const out = await generateVector(recraft, { prompt, model: route.model, size: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+          const out = await generateVector(recraft, { prompt, model: route.model, size: recraftSize, signal: controller.signal, timeoutMs: 90_000 });
           const bytes = Buffer.from(out.svg, "utf8");
           const { width, height } = svgSize(out.svg);
           return { image: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
         }
-        return generateRaster(recraft, { prompt, model: route.model, size: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+        return generateRaster(recraft, { prompt, model: route.model, size: recraftSize, signal: controller.signal, timeoutMs: 90_000 });
       }
-      const out = await getImageProvider().generateIllustration({ model: route.model, prompt, aspectRatio: "4:3", signal: controller.signal, timeoutMs: 90_000 });
+      const out = await getImageProvider().generateIllustration({ model: route.model, prompt, aspectRatio: style === "diagram" ? "3:4" : "4:3", signal: controller.signal, timeoutMs: 90_000 });
       const image = checkImage(out.bytes);
       if (!image) throw new ProviderError("empty", "Image inexploitable.", out.usage);
       return { image, usage: out.usage };
@@ -798,7 +805,7 @@ function failureOf(e: unknown): JobFailure {
  * Réserve et exécute au plus une tâche. Renvoie l'identifiant traité (et s'il a été remis
  * en file), ou null si la file est vide.
  */
-export async function runOneJob(workerId: string): Promise<{ id: string; requeued: boolean } | null> {
+export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENERATION_WINDOW_MS): Promise<{ id: string; requeued: boolean } | null> {
   const db = adminClient();
   const { data, error } = await db.rpc("claim_job", { p_worker: workerId, p_lease_seconds: WORKER_LEASE_SECONDS });
   if (error) {
@@ -809,7 +816,8 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
   if (!job) return null;
 
   const controller = new AbortController();
-  const claimedAt = Date.now();
+  // Deuxième tâche d'une même invocation : sa fenêtre se termine avec celle de l'invocation.
+  const claimedAt = Math.min(Date.now(), deadlineMs - GENERATION_WINDOW_MS);
   try {
     let status: string;
     if (job.kind === "generate_report") status = await runGenerate(job, controller, claimedAt);
@@ -819,7 +827,7 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
     await finish(job.id, status, null);
     // Module livré : le prix réservé devient une consommation (une seule fois).
     await finishJobReservation(job.id, status === "succeeded" || status === "incomplete_check");
-    if (job.report_id && (status === "succeeded" || status === "incomplete_check")) await afterDelivery(job);
+    if (job.report_id && (status === "succeeded" || status === "incomplete_check")) await afterDelivery(job, claimedAt);
   } catch (e) {
     const f = failureOf(e);
     console.error("job", job.id, f.code);
@@ -840,7 +848,7 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
  * Après une livraison : notification « prête », puis couverture pour un nouveau Limpid qui n'en
  * a pas encore : illustration Pixabay, sinon image Gemini (un échec ne change rien).
  */
-async function afterDelivery(job: JobRow) {
+async function afterDelivery(job: JobRow, claimedAt: number) {
   const reportId = job.report_id!;
   const db = adminClient();
   const { data: report } = await db
@@ -852,7 +860,9 @@ async function afterDelivery(job: JobRow) {
   if (job.kind !== "generate_report" || !report || report.cover_path || report.cover_url) return;
   // Mots-clés anglais prévus par le plan pour la couverture (thème du document).
   const plan = await jobStore(job.id).load("plan", PlanCheckpoint).catch(() => null);
-  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, query: plan?.plan.cover_query_en ?? "", jobId: job.id }).catch((e) =>
+  // Image Gemini (jusqu'à 90 s) seulement s'il reste le temps dans l'invocation ; sinon Pixabay seul.
+  const generated = Date.now() - claimedAt < 170_000;
+  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, query: plan?.plan.cover_query_en ?? "", jobId: job.id, generated }).catch((e) =>
     console.error("cover", (e as Error).message),
   );
 }
@@ -860,8 +870,9 @@ async function afterDelivery(job: JobRow) {
 /** Vide la file dans la limite de temps donnée (appel depuis after() ou le cron). */
 export async function drainQueue(workerId: string, deadlineMs: number): Promise<number> {
   let n = 0;
-  while (Date.now() < deadlineMs) {
-    const done = await runOneJob(workerId);
+  // Une nouvelle tâche seulement s'il reste au moins une minute à l'invocation.
+  while (deadlineMs - Date.now() > 60_000) {
+    const done = await runOneJob(workerId, deadlineMs);
     if (!done) break;
     n++;
     // Une tâche remise en file repart dans une autre invocation (relancée par le suivi).

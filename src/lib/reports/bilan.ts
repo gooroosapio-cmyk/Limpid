@@ -69,21 +69,22 @@ export async function submitBilan(userId: string, reportId: string, input: z.inf
   const exercises = d.questions.map((q) => q.exercise);
   const result = gradeBilan(exercises, input.answers, d.chapters.map((c) => c.id));
   if (result.total > 0) {
-    await adminClient()
+    // Index unique partiel (owner_id, attempt_key) : un upsert ne peut pas le cibler ; un double
+    // envoi de la même clé échoue en 23505 et compte comme déjà enregistré.
+    const total = Math.min(25, result.total);
+    const { error } = await adminClient()
       .from("quiz_attempts")
-      .upsert(
-        {
-          owner_id: userId,
-          report_version_id: d.versionId,
-          kind: "bilan",
-          section_id: null,
-          score: result.score,
-          total: Math.min(25, result.total),
-          answers: result.questions.map((q) => ({ id: q.id, correct: q.correct, ratio: q.correct === null ? null : q.correct ? 1 : 0 })),
-          attempt_key: input.attempt_key,
-        },
-        { onConflict: "owner_id,attempt_key", ignoreDuplicates: true },
-      );
+      .insert({
+        owner_id: userId,
+        report_version_id: d.versionId,
+        kind: "bilan",
+        section_id: null,
+        score: Math.min(result.score, total),
+        total,
+        answers: result.questions.map((q) => ({ id: q.id, correct: q.correct, ratio: q.correct === null ? null : q.correct ? 1 : 0 })),
+        attempt_key: input.attempt_key,
+      });
+    if (error && error.code !== "23505") console.error("bilan.attempt", error.code, error.message);
   }
   return result;
 }

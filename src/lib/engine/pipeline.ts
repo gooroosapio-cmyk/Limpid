@@ -43,7 +43,7 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-07.1";
+export const PROMPT_VERSION = "2026-10-07.2";
 export const MAX_REPAIRS = 2;
 
 /* ---------- Brouillons demandés au modèle ---------- */
@@ -121,7 +121,8 @@ export const ExplanationDraft = z.preprocess(repairDraftBlocks, z.strictObject({
         query: z.string().trim().min(2).max(60),
         subject: z.string().trim().min(1).max(120),
         alt_text: z.string().trim().min(1).max(300),
-        style: z.enum(["vector", "realistic"]).optional(),
+        style: z.enum(["vector", "realistic", "diagram"]).optional(),
+        content: z.string().trim().max(600).optional(),
       }),
     )
     .max(4)
@@ -616,24 +617,30 @@ export function buildBlueprint(
     }
   }
 
-  if (visualMode !== "aucun" && visualMode !== "schemas") {
+  if (visualMode !== "aucun") {
     let n = 0;
     for (const idea of draft.illustrations ?? []) {
+      // « Schémas seulement » : aucune illustration décorative, les schémas restent.
+      if (visualMode === "schemas" && !(idea.style === "diagram" && idea.content)) continue;
       const sec = ex.sections.find((x) => x.id === idea.section_id);
       const query = safeImageQuery(idea.query);
       const claimIds = sec ? [...new Set(sec.blocks.flatMap(blockClaimIds))].filter(supported).slice(0, 5) : [];
       if (!sec || !query || claimIds.length === 0 || n >= 3) continue;
       const id = `vis_ill_${++n}`;
+      // Schéma (graphique, tableau, processus) : pleine largeur sous le texte, jamais incrusté.
+      const diagram = idea.style === "diagram" && !!idea.content;
+      const style = idea.style === "diagram" && !diagram ? "vector" : idea.style;
       visuals.push({
         id,
         kind: "illustration",
-        purpose: "Illustrer une idée (sans valeur de preuve)",
+        purpose: diagram ? "Schématiser des éléments du chapitre (sans valeur de preuve)" : "Illustrer une idée (sans valeur de preuve)",
         claim_ids: claimIds,
         evidence_ids: [],
-        data: { query, subject: idea.subject, asset_id: null, ...(idea.style ? { style: idea.style } : {}) },
+        data: { query, subject: idea.subject, asset_id: null, ...(style ? { style } : {}), ...(diagram ? { content: idea.content } : {}) },
         alt_text: idea.alt_text,
         caption: idea.subject,
         illustrative_only: true,
+        ...(diagram ? { size: "wide" as const, placement: "after" as const } : {}),
       });
       place(id, claimIds, sec.id);
     }
@@ -654,7 +661,7 @@ export function buildBlueprint(
       page_hint: Math.min(18, Math.floor(i / perPage) + 1),
     })),
     // Intentions de composition par nature de visuel ; le lecteur les adapte à l'écran.
-    visual_specs: visuals.map((x) => ({ ...x, ...VISUAL_LAYOUT[x.kind] })),
+    visual_specs: visuals.map((x) => ({ ...VISUAL_LAYOUT[x.kind], ...x })),
     source_index: evidence.filter((e) => used.has(e.id)).map((e) => e.id),
     layout_warnings: warnings,
   };

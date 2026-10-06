@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import type { GenerationInput } from "./pipeline";
 import type { AIProvider, StructuredRequest } from "./provider";
-import { capChapters, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, diagramContentOk, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -33,7 +33,7 @@ const comp = {
   missing_information: [],
 };
 
-const visualNone = { kind: "none", subject: "", query_en: "", purpose: "" };
+const visualNone = { kind: "none", subject: "", query_en: "", purpose: "", content: "" };
 const plan = {
   title: "Le cycle de l'eau",
   key_points: ["L'eau s'évapore grâce au Soleil.", "Les océans contiennent presque toute l'eau."],
@@ -212,8 +212,14 @@ describe("moteur V5 : plan", () => {
     expect(p.chapters.map((c) => c.claim_ids)).toEqual([["clm_1", "clm_2", "clm_3"], ["clm_4"]]);
   });
 
+  it("schéma : chiffres repris des affirmations du chapitre, sinon illustration simple", () => {
+    expect(diagramContentOk("Hausse de 12,5 % puis 3 000 €", ["Les prix montent de 12.5 % ; coût 3 000 €."])).toBe(true);
+    expect(diagramContentOk("Hausse de 40 %", ["Les prix montent de 12,5 %."])).toBe(false);
+    expect(diagramContentOk("", ["x"])).toBe(false);
+  });
+
   it("3 illustrations au plus, aucune en résumé fidèle ou en texte seul", () => {
-    const v = { kind: "vector", subject: "s", query_en: "q", purpose: "p" };
+    const v = { kind: "vector", subject: "s", query_en: "q", purpose: "p", content: "" };
     const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1"], v), ch(["clm_2"], v), ch(["clm_3"], v), ch(["clm_4"], v)], excluded: [], limitations: [] };
     expect(normalizePlanV5(draft, ko, input()).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(3);
     expect(normalizePlanV5(draft, ko, input({ mode: "resume" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
@@ -223,7 +229,7 @@ describe("moteur V5 : plan", () => {
 
 describe("moteur V5 : 15 chapitres au plus", () => {
   it("réunit les chapitres voisins les plus légers, sans perdre d'affirmation", () => {
-    const none = { kind: "none" as const, subject: "", query_en: "", purpose: "" };
+    const none = { kind: "none" as const, subject: "", query_en: "", purpose: "", content: "" };
     const chapters = Array.from({ length: 20 }, (_, i) => ({ title: `C${i}`, objective: `O${i}`, claim_ids: Array.from({ length: i % 3 === 0 ? 1 : 4 }, (_, k) => `clm_${i}_${k}`), difficulty: (i === 5 ? "difficile" : "standard") as "standard" | "difficile", notions: [], visual: none }));
     const out = capChapters(chapters);
     expect(out).toHaveLength(15);

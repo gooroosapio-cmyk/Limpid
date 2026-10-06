@@ -1,7 +1,7 @@
 /**
  * Illustrations d'un cours (V5) : 0 ou 1 par chapitre, 3 au plus, générées seulement quand le
- * plan les juge utiles. Chaque illustration suit la route réglée pour son type dans la
- * console admin (Recraft vectoriel en priorité, Nano Banana pour une scène réaliste), puis
+ * plan les juge utiles. Chaque image suit la route réglée pour son type dans la console admin
+ * (Recraft pour les illustrations, Gemini pour les schémas composés pour le téléphone), puis
  * l'autre fournisseur en repli. Sans image exploitable, le visuel est retiré : le texte reste.
  * Une illustration n'est jamais une preuve ; ses crédits vivent dans visual_assets.
  */
@@ -48,7 +48,7 @@ export interface IllustrateDeps {
   /** Fournisseurs configurés (clé présente). */
   available: Record<ImageProviderId, boolean>;
   /** Génère une image pour une route ; SVG déjà assaini, image matricielle déjà contrôlée. */
-  render(route: ImageRoute, style: ImageStyle, item: { subject: string; purpose: string; altText: string }): Promise<{ image: StoredImage | StoredVector; usage: UsageReport }>;
+  render(route: ImageRoute, style: ImageStyle, item: { subject: string; purpose: string; altText: string; content: string }): Promise<{ image: StoredImage | StoredVector; usage: UsageReport }>;
   onUsage?(route: ImageRoute, attempt: number, usage: UsageReport): Promise<void> | void;
   /** Dépôt privé ; renvoie le chemin, ou null en cas d'échec. */
   store(img: StoredImage | StoredVector, ext: "jpg" | "png" | "svg"): Promise<string | null>;
@@ -87,20 +87,25 @@ export async function illustrate(
   const notes: string[] = [];
   let bp = blueprint;
   let added = 0;
-  const pending = pendingIllustrations(bp);
-  if (mode === "aucun" || mode === "schemas" || !deps.settings.enabled) {
+  let pending = pendingIllustrations(bp);
+  if (mode === "aucun" || !deps.settings.enabled) {
     for (const p of pending) bp = withoutVisual(bp, p.spec.id);
     return { blueprint: bp, notes, added };
+  }
+  if (mode === "schemas") {
+    // « Schémas seulement » : les illustrations décoratives sont retirées, les schémas restent.
+    for (const p of pending) if (!(p.data.style === "diagram" && p.data.content)) bp = withoutVisual(bp, p.spec.id);
+    pending = pendingIllustrations(bp);
   }
   const items = pending.slice(0, MAX_ILLUSTRATIONS);
   const results = await Promise.all(
     items.map(async ({ spec, data }, n) => {
-      const style: ImageStyle = data.style === "realistic" ? "realistic" : "vector";
+      const style: ImageStyle = data.style === "realistic" || (data.style === "diagram" && data.content) ? data.style : "vector";
       const routes = imageAttempts(style, deps.settings, deps.available);
       for (const [k, route] of routes.entries()) {
         const attempt = n * 10 + k + 1;
         try {
-          const out = await deps.render(route, style, { subject: data.subject, purpose: spec.purpose, altText: spec.alt_text });
+          const out = await deps.render(route, style, { subject: data.subject, purpose: spec.purpose, altText: spec.alt_text, content: data.content ?? "" });
           await deps.onUsage?.(route, attempt, out.usage);
           const svg = out.image.mime === "image/svg+xml";
           const path = await deps.store(out.image, svg ? "svg" : out.image.mime === "image/png" ? "png" : "jpg");
@@ -120,7 +125,7 @@ export async function illustrate(
             author: null,
             license: null,
             license_url: null,
-            modifications: svg ? "Illustration vectorielle générée, nettoyée (aucun script ni lien externe)" : "Illustration générée",
+            modifications: svg ? "Illustration vectorielle générée, nettoyée (aucun script ni lien externe)" : style === "diagram" ? "Schéma généré" : "Illustration générée",
             model: out.usage.model,
           });
           if (id) return id;

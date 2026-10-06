@@ -179,11 +179,11 @@ export async function geminiCover(input: { reportId: string; ownerId: string; ti
 }
 
 /** Couverture selon le thème : Pixabay (gratuit), sinon Gemini. Renvoie le chemin, ou null. */
-export async function themeCover(input: { reportId: string; ownerId: string; keywords: string; title: string; pick?: number; jobId?: string | null }): Promise<string | null> {
-  return (await pixabayCover(input)) ?? (await geminiCover(input));
+export async function themeCover(input: { reportId: string; ownerId: string; keywords: string; title: string; pick?: number; jobId?: string | null; generated?: boolean }): Promise<string | null> {
+  return (await pixabayCover(input)) ?? (input.generated === false ? null : await geminiCover(input));
 }
 
 /** Couverture d'un nouveau cours (après livraison) : Pixabay, sinon Gemini, sinon rien. */
-export async function chooseCover(input: { reportId: string; ownerId: string; title: string; query: string; jobId?: string | null }): Promise<void> {
-  await themeCover({ reportId: input.reportId, ownerId: input.ownerId, keywords: input.query, title: input.title, jobId: input.jobId });
+export async function chooseCover(input: { reportId: string; ownerId: string; title: string; query: string; jobId?: string | null; generated?: boolean }): Promise<void> {
+  await themeCover({ reportId: input.reportId, ownerId: input.ownerId, keywords: input.query, title: input.title, jobId: input.jobId, generated: input.generated });
 }
