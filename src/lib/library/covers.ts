@@ -41,19 +41,21 @@ export interface CoverView {
   id: CoverId;
   image: string | null;
   tones: [string, string, string];
-  /** Photo Unsplash : auteur et page de la photo (crédit obligatoire là où elle s'affiche en grand). */
-  credit?: { author: string | null; url: string } | null;
+  /** Image d'une banque (Pixabay, Unsplash) : auteur et page de l'image, crédités sur l'aperçu. */
+  credit?: { author: string | null; url: string; source: "pixabay" | "unsplash" } | null;
 }
 
 export function coverView(id: CoverId): CoverView {
   return { id, image: COVER_IMAGES.has(id) ? `/covers/${id}.webp` : null, tones: COVER_TONES[id] };
 }
 
-/** Crédit Unsplash enregistré avec la couverture (forme contrôlée, liens Unsplash seulement). */
-export function coverCredit(v: unknown): { author: string | null; url: string } | null {
+/** Crédit enregistré avec la couverture (forme contrôlée, liens Pixabay ou Unsplash seulement). */
+export function coverCredit(v: unknown): { author: string | null; url: string; source: "pixabay" | "unsplash" } | null {
   const c = v as { author?: unknown; url?: unknown } | null;
-  if (!c || typeof c.url !== "string" || !c.url.startsWith("https://unsplash.com/")) return null;
-  return { author: typeof c.author === "string" ? c.author.slice(0, 120) : null, url: c.url };
+  if (!c || typeof c.url !== "string") return null;
+  const source = c.url.startsWith("https://pixabay.com/") ? "pixabay" : c.url.startsWith("https://unsplash.com/") ? "unsplash" : null;
+  if (!source) return null;
+  return { author: typeof c.author === "string" ? c.author.slice(0, 120) : null, url: c.url, source };
 }
 
 /**
@@ -70,6 +72,7 @@ export function lessonCover(
   if (chosen) return base;
   if (photo?.url?.startsWith("https://images.unsplash.com/")) return { ...base, image: photo.url, credit: coverCredit(photo.credit) };
   if (!generatedPath) return base;
+  const credit = coverCredit(photo?.credit);
   const key = generatedPath.split("/").pop()!.replace(/\.[a-z]+$/, "").slice(0, 12);
-  return { ...base, image: `/api/reports/${reportId}/cover?k=${key}` };
+  return { ...base, image: `/api/reports/${reportId}/cover?k=${key}`, credit };
 }

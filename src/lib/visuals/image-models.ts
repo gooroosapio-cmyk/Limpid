@@ -31,9 +31,6 @@ export const DEFAULT_MODEL: Record<ImageProviderId, Record<ImageStyle, string>> 
   nanobanana: { vector: "google/gemini-3.1-flash-lite-image", realistic: "google/gemini-3.1-flash-lite-image" },
 };
 
-/** Couverture de repli (cadrage V5) : Nano Banana 2 Lite. */
-export const COVER_MODEL = "google/gemini-3.1-flash-lite-image";
-
 export interface ImageRoute {
   provider: ImageProviderId;
   model: string;

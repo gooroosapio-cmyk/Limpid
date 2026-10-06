@@ -58,6 +58,7 @@ export const fr = {
     },
     preview: {
       photoBy: "Photo :",
+      illustrationBy: "Illustration :",
       keyNotions: "Notions clés",
       presentation: "Présentation",
       quiz: "QCM",
@@ -506,9 +507,9 @@ export const fr = {
   library: {
     v2: {
       count: (n: number) => (n > 1 ? `${n} leçons` : n === 1 ? "1 leçon" : "Aucune leçon"),
-      generateCover: "Générer une couverture",
-      generateNote: "Image décorative créée par l'IA, sans crédit.",
-      generating: "Création de la couverture…",
+      generateCover: "Changer de couverture",
+      generateNote: "Une autre illustration Pixabay sur le même thème.",
+      generating: "Recherche d’une couverture…",
       generated: "Nouvelle couverture prête.",
       generateFailed: "La couverture n'a pas pu être créée. Réessayez plus tard.",
       generateTooSoon: "Une couverture vient d'être créée : réessayez dans quelques minutes.",
@@ -1004,7 +1005,7 @@ export const fr = {
       vector: "Illustrations vectorielles (concepts, analogies)",
       realistic: "Scènes réalistes (lieu, objet, situation)",
       missingKey: "clé absente",
-      note: "Couverture : photo Unsplash, sinon Nano Banana 2 Lite. Aucun dessin ni graphique n'est tracé par le code.",
+      note: "Couverture : illustration Pixabay choisie selon le thème du document (aucune image générée). Aucun dessin ni graphique n'est tracé par le code.",
     },
     capLabel: (max: number) => `Plafond mensuel, en euros (${max} € au plus, fixé par la configuration du serveur)`,
     save: "Enregistrer",

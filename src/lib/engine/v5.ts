@@ -49,6 +49,8 @@ const txt = (max: number) => z.string().trim().min(1).max(max);
 export const SINGLE_PASS_CHARS = 60_000;
 /** Taille visée d'un fragment de lecture (découpe aux frontières de segments). */
 export const FRAGMENT_CHARS = 40_000;
+/** Chapitres par cours, au plus (un long cours regroupe davantage d'objectifs par chapitre). */
+export const MAX_CHAPTERS = 15;
 /** Illustrations narratives : 0 ou 1 par chapitre, 3 au plus par cours (kit V5). */
 export const MAX_ILLUSTRATIONS = 3;
 
@@ -216,7 +218,7 @@ export type PlanV5 = z.infer<typeof PlanV5Draft>;
 
 const PLAN_INSTRUCTIONS = (input: GenerationInput) => `Tu établis le plan d'un cours Limpid à partir de TOUTES les affirmations validées d'une ou plusieurs sources. Ne rédige pas encore le cours.
 - title : titre informatif et court. cover_query_en : 2 à 5 mots-clés anglais décrivant une photo de couverture évocatrice et concrète (objet, lieu, matière), sans chiffre ni nom propre. key_points : 3 à 7 idées essentielles DISTINCTES, une phrase chacune (le résumé « L'essentiel »).
-- chapters : dans l'ordre pédagogique (prérequis d'abord, puis le sommaire réel de la source quand il est logique). Un chapitre = une question à comprendre, 2 à 5 objectifs liés, environ 3 à 15 affirmations. AUCUN quota de pages ou d'écrans : une source courte donne 2 à 4 chapitres, une source riche autant qu'il en faut (jusqu'à 40). Ne fusionne pas des notions sans lien pour réduire le nombre ; scinde un chapitre qui porte plusieurs objectifs.
+- chapters : dans l'ordre pédagogique (prérequis d'abord, puis le sommaire réel de la source quand il est logique). Un chapitre = une question à comprendre, 2 à 5 objectifs liés, environ 3 à 15 affirmations. AUCUN quota de pages ou d'écrans : une source courte donne 2 à 4 chapitres, une source riche davantage, mais ${MAX_CHAPTERS} chapitres AU PLUS : pour un long document, regroupe les notions voisines en chapitres plus riches (davantage d'objectifs par chapitre) plutôt que d'en multiplier le nombre.
 - title (chapitre) : une question ou un apprentissage précis, jamais « Partie 1 ». objective : ce que le lecteur saura faire ou comprendre.
 - claim_ids : les affirmations que ce chapitre explique. Chaque affirmation "supported" ou "partial" pertinente apparaît dans UN chapitre, ou dans excluded avec sa raison (doublon, détail sans intérêt pour comprendre). Aucune notion centrale, aucun chiffre qui change la conclusion, aucune réserve ou exception ne peut être exclue.
 - difficulty "difficile" : raisonnement en plusieurs étapes, calcul ou formule, notion technique dense, réserve subtile ; sinon "standard". Sois exigeant : la plupart des chapitres sont "standard".
@@ -239,6 +241,35 @@ function planPayload(ko: KnowledgeObject): string {
     contradictions: ko.contradictions.map((c) => ({ claim_ids: c.claim_ids, description: c.description.slice(0, 300) })),
     missing_information: ko.missing_information.slice(0, 30),
   });
+}
+
+type PlanChapter = PlanV5["chapters"][number];
+
+/**
+ * 15 chapitres au plus : tant qu'il y en a trop, les deux chapitres voisins les plus légers
+ * sont réunis (ordre de lecture conservé, aucune affirmation perdue).
+ */
+export function capChapters(chapters: PlanChapter[], max = MAX_CHAPTERS): PlanChapter[] {
+  const out = chapters.map((c) => ({ ...c, claim_ids: [...c.claim_ids], notions: [...c.notions] }));
+  while (out.length > max) {
+    let at = 0;
+    let best = Infinity;
+    for (let i = 0; i < out.length - 1; i++) {
+      const size = out[i]!.claim_ids.length + out[i + 1]!.claim_ids.length;
+      if (size < best) [best, at] = [size, i];
+    }
+    const a = out[at]!;
+    const b = out[at + 1]!;
+    out.splice(at, 2, {
+      title: a.title,
+      objective: `${a.objective} ; ${b.objective}`.slice(0, 400),
+      claim_ids: [...a.claim_ids, ...b.claim_ids],
+      difficulty: a.difficulty === "difficile" || b.difficulty === "difficile" ? "difficile" : "standard",
+      notions: [...new Set([...a.notions, ...b.notions])].slice(0, 6),
+      visual: a.visual.kind !== "none" ? a.visual : b.visual,
+    });
+  }
+  return out;
 }
 
 /** Affirmations qui devraient être expliquées : soutenues ou partielles. */
@@ -284,6 +315,8 @@ export function normalizePlanV5(draft: PlanV5, ko: KnowledgeObject, input: Gener
       chapters[best]!.claim_ids.push(id);
     }
   }
+  const capped = capChapters(chapters);
+  chapters.splice(0, chapters.length, ...capped);
   // Visuels : jamais en « texte seul » ; sans image en mode résumé fidèle ; 3 au plus.
   const noImages = input.visualMode === "aucun" || input.visualMode === "schemas" || input.mode === "resume";
   let budget = noImages ? 0 : MAX_ILLUSTRATIONS;
@@ -292,7 +325,7 @@ export function normalizePlanV5(draft: PlanV5, ko: KnowledgeObject, input: Gener
     if (ok) budget--;
     else ch.visual = { kind: "none", subject: "", query_en: "", purpose: "" };
   }
-  return { plan: { ...draft, chapters: chapters.slice(0, 40), excluded }, orphans: chapters.length ? orphans : [] };
+  return { plan: { ...draft, chapters, excluded }, orphans: chapters.length ? orphans : [] };
 }
 
 async function makePlan(provider: AIProvider, input: GenerationInput, ko: KnowledgeObject): Promise<PlanV5> {

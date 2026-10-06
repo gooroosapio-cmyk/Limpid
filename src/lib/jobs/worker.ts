@@ -837,23 +837,22 @@ export async function runOneJob(workerId: string): Promise<{ id: string; requeue
 }
 
 /**
- * Après une livraison : notification « prête », puis couverture générée pour un nouveau
- * Limpid qui n'en a pas encore (décorative, comprise dans le prix ; un échec ne change rien).
+ * Après une livraison : notification « prête », puis illustration Pixabay en couverture pour un
+ * nouveau Limpid qui n'en a pas encore (aucune IA, gratuite ; un échec ne change rien).
  */
 async function afterDelivery(job: JobRow) {
   const reportId = job.report_id!;
   const db = adminClient();
   const { data: report } = await db
     .from("reports")
-    .select("title, cover_path, cover_url, report_versions!reports_current_version_fk(explanation)")
+    .select("title, cover_path, cover_url")
     .eq("id", reportId)
     .maybeSingle();
   await notify(job.owner_id, "report_ready", `job:${job.id}:ready`, { reportId, data: { title: report?.title ?? null } }).catch(() => undefined);
   if (job.kind !== "generate_report" || !report || report.cover_path || report.cover_url) return;
-  const explanation = (report.report_versions as unknown as { explanation: { key_points?: string[] } } | null)?.explanation;
-  // Mots-clés anglais prévus par le plan pour la photo de couverture.
+  // Mots-clés anglais prévus par le plan pour la couverture (thème du document).
   const plan = await jobStore(job.id).load("plan", PlanCheckpoint).catch(() => null);
-  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, hints: explanation?.key_points ?? [], query: plan?.plan.cover_query_en ?? "", jobId: job.id }).catch((e) =>
+  await chooseCover({ reportId, ownerId: job.owner_id, title: report.title as string, query: plan?.plan.cover_query_en ?? "" }).catch((e) =>
     console.error("cover", (e as Error).message),
   );
 }
