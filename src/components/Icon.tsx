@@ -3,6 +3,12 @@
  * couleur héritée du texte. Toujours décoratives ou accompagnées d'un libellé.
  */
 const PATHS = {
+  "learning": (
+    <><path d="m2 8 10-5 10 5-10 5Z M6 10v7q6 5 12 0v-7M22 8v9" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
+  "quiz-v4": (
+    <><rect x="4" y="3" width="16" height="18" rx="3" fill="none" stroke="currentColor" strokeWidth="1.75"/><path d="m7 9 2 2 3-4M14 9h3M7 15h2M12 15h5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></>
+  ),
   "folder": (
     <><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2.2h8.4A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round"/></>
   ),

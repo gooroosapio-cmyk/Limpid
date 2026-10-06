@@ -127,7 +127,7 @@ export function Preparations({ running, failed, initialTab }: { running: Running
       )}
 
       <p className="prep-back">
-        <Link href="/" className="btn-link"><Icon name="back" size={18} /> {p.back}</Link>
+        <Link href="/bibliotheque" className="btn-link"><Icon name="back" size={18} /> {p.back}</Link>
       </p>
     </>
   );

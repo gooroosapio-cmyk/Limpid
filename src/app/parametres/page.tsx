@@ -65,6 +65,7 @@ export default async function SettingsPage() {
       <section aria-labelledby="set-app" className="settings-block">
         <h2 id="set-app" className="eyebrow">{t.compte.aboutHeading}</h2>
         <ul className="rows">
+          <LinkRow href="/bienvenue/tutoriel" icon="bulb" title={t.v4.help.tutorial[0]} sub={t.v4.help.tutorial[1]} />
           <LinkRow href="/a-propos" icon="info" title={t.compte.about[0]} sub={t.compte.about[1]} />
           <LinkRow href="/compte/installer" icon="download" title={t.compte.rows.install![0]} sub={t.compte.rows.install![1]} />
           <LinkRow href="/compte/donnees" icon="shield" title={t.compte.rows.data![0]} sub={t.compte.rows.data![1]} />

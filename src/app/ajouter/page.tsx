@@ -51,7 +51,7 @@ export default async function AddPage({ searchParams }: { searchParams: Promise<
         <Link href="/compte/donnees">{t.add.privacyLink}</Link>
       </p>
       <div className="add-foot">
-        <Link href="/" className="btn btn-block">{t.add.seeMine}</Link>
+        <Link href="/bibliotheque" className="btn btn-block">{t.add.seeMine}</Link>
       </div>
     </Screen>
   );

@@ -1,244 +1,121 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";
-import { FolderActions, NewFolder } from "@/components/library/FolderDialogs";
+import { Cover } from "@/components/library/Cover";
 import { LibraryMemory } from "@/components/library/LibraryMemory";
-import { LibraryBrowser, type ResumeItem } from "@/components/library/LibraryBrowser";
-import { Preparations } from "@/components/library/Preparations";
-import { type RowData } from "@/components/library/ReportRow";
+import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
-import { demoBlueprint } from "@/lib/demo/cycle-eau";
 import { getLang, getT } from "@/lib/i18n/server";
-import { coverFor, coverView } from "@/lib/library/covers";
 import { loadLibrary, whenLabel, type LibraryItem } from "@/lib/library/load";
+import { onboardingRedirect, onboardingState } from "@/lib/onboarding";
 import { createUserClient } from "@/lib/supabase/server";
-import { Illustration } from "@/components/Illustration";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
-  return { title: t.library.title };
+  return { title: t.v4.home.title };
 }
 
-const FILTERS = ["tous", "recents", "dossiers", "prets", "favoris"] as const;
-type Filter = (typeof FILTERS)[number];
-const KIND_LABELS: Record<string, string> = { pdf: "PDF", docx: "DOCX", txt: "TXT", paste: "Texte", url: "Lien", png: "Image", jpeg: "Image", webp: "Image" };
+const LIBRARY_PARAMS = ["vue", "q", "filtre", "dossier"];
+const RECENT = 3;
 
-function href(params: { vue?: string; q?: string; filtre?: string; dossier?: string }): string {
-  const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
-  const s = sp.toString();
-  return s ? `/?${s}` : "/";
+/** Prénom affiché : premier mot du nom choisi dans le profil (jamais déduit de l'adresse). */
+function firstName(name: string | null | undefined): string | null {
+  const first = name?.trim().split(/\s+/)[0];
+  return first ? first.slice(0, 24) : null;
 }
 
 /**
- * Bibliothèque, page principale (V2 « galerie ») : recherche, rail de filtres, Reprendre,
- * collections et leçons ; vue Préparations (en cours, à vérifier) ; documents sources.
+ * Accueil (V4, § 1) : salutation, Créer un Limpid, Reprendre (s'il existe un contenu déjà
+ * ouvert), trois récents au plus et lien Bibliothèque. Données réelles uniquement.
  */
-export default async function HomeLibraryPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ vue?: string; q?: string; filtre?: string; dossier?: string }>;
-}) {
+export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  // Anciennes adresses de la bibliothèque (/?filtre=…, /?vue=…) : redirigées, paramètres conservés.
+  const sp = await searchParams;
+  if (LIBRARY_PARAMS.some((k) => k in sp)) {
+    const qs = new URLSearchParams(Object.entries(sp).filter(([k]) => LIBRARY_PARAMS.includes(k))).toString();
+    redirect(`/bibliotheque?${qs}`);
+  }
   const [t, lang] = await Promise.all([getT(), getLang()]);
   await requireUser();
-  const sp = await searchParams;
-  const view = sp.vue === "sources" ? "sources" : sp.vue === "preparations" ? "preparations" : "rapports";
-  const q = (sp.q ?? "").trim().slice(0, 80);
-  const filter: Filter = (FILTERS as readonly string[]).includes(sp.filtre ?? "") ? (sp.filtre as Filter) : "tous";
   const supabase = await createUserClient();
+  const { data: profile, error } = await supabase.from("profiles").select("display_name, onboarding_step, onboarding_done_at, tutorial_done_at").maybeSingle();
+  // Lecture impossible : jamais de questionnaire imposé par erreur à un compte existant.
+  const next = error ? null : onboardingRedirect(onboardingState(profile));
+  if (next) redirect(next);
 
-  if (view === "sources") {
-    const { data: sources } = await supabase
-      .from("sources")
-      .select("id, title, kind, page_count, byte_size, storage_path, original_url, original_purged_at, created_at, reports!report_sources(id)")
-      .eq("is_demo", false)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    const items = (sources ?? []).map((s) => {
-      const report = (s.reports as unknown as { id: string }[] | null)?.[0];
-      const hasOriginal = s.kind === "url" ? !!s.original_url : !!s.storage_path;
-      const meta = [
-        KIND_LABELS[s.kind] ?? s.kind,
-        s.page_count ? t.added.pageCount(s.page_count) : null,
-        s.byte_size ? t.added.size(s.byte_size) : null,
-        !hasOriginal && s.kind !== "paste" ? t.library.originalGone : null,
-        !report ? t.library.noReport : null,
-      ].filter(Boolean).join(" · ");
-      return { id: s.id, title: s.title, meta, href: report ? `/rapports/${report.id}` : `/sources/${s.id}`, gone: !hasOriginal && s.kind !== "paste", isUrl: s.kind === "url" };
-    });
-    return (
-      <Screen>
-        <h1>{t.library.documents}</h1>
-        <p className="lede">{t.library.sourcesLede}</p>
-        {items.length === 0 ? (
-          <p className="muted">{t.library.sourcesEmpty}</p>
-        ) : (
-          <ul className="rows stagger">
-            {items.map((s) => (
-              <li key={s.id}>
-                <Link href={s.href} className="row">
-                  <span className="row-icon"><Icon name={s.isUrl ? "link" : "file"} /></span>
-                  <span className="row-text"><b>{s.title}</b><small>{s.meta}</small></span>
-                  <Icon name="chevron" className="row-chevron" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-        {items.some((s) => s.gone) && (
-          <section aria-labelledby="recover-h">
-            <h2 className="eyebrow">{t.library.recover}</h2>
-            <div className="card recover">
-              <Icon name="alert" />
-              <h3 id="recover-h">{t.library.recoverTitle}</h3>
-              <p>{t.library.recoverText}</p>
-              <Link href="/ajouter" className="btn btn-block">{t.library.recoverCta}</Link>
-            </div>
-          </section>
-        )}
-      </Screen>
-    );
-  }
-
-  const { folders, items, error } = await loadLibrary();
-  const v = t.library.v2;
-
-  if (view === "preparations") {
-    const running = items.filter((i) => i.state === "running" || i.updating);
-    const failed = items.filter((i) => i.state === "failed");
-    return (
-      <Screen>
-        <Preparations
-          running={running.map((i) => ({ id: i.id, title: i.title, cover: i.cover, sourceCount: i.sourceCount, stage: i.stage }))}
-          failed={failed.map((i) => ({ id: i.id, title: i.title, cover: i.cover, sourceCount: i.sourceCount, reason: t.jobErrors[i.errorCode ?? "unknown"] ?? t.jobErrors.unknown ?? "" }))}
-          initialTab={sp.filtre === "a_verifier" ? "failed" : "running"}
-        />
-      </Screen>
-    );
-  }
-
-  const folder = sp.dossier ? (folders.find((f) => f.id === sp.dossier) ?? null) : null;
-  const { data: prefs } = await supabase.from("reader_preferences").select("recent_searches").maybeSingle();
-  const recent = Array.isArray(prefs?.recent_searches) ? (prefs.recent_searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 5) : [];
-  const folderNames = new Map(folders.map((f) => [f.id, f.name]));
-  const toRow = (i: LibraryItem): RowData => ({
-    id: i.id,
-    title: i.title,
-    state: i.state,
-    unread: i.unread,
-    folderId: i.folderId,
-    folderName: i.folderId ? (folderNames.get(i.folderId) ?? null) : null,
-    sub: whenLabel(i.createdAt, lang, t.library.today, t.library.yesterday),
-    reason: i.state === "failed" ? (t.jobErrors[i.errorCode ?? "unknown"] ?? t.jobErrors.unknown) : undefined,
-    favorite: i.favorite,
-    cover: i.cover,
-    sourceCount: i.sourceCount,
-  });
-  const scoped = folder ? items.filter((i) => i.folderId === folder.id) : items;
-  // Préparations et échecs vivent dans leur propre vue ; la galerie montre les leçons prêtes.
-  const lessons = scoped.filter((i) => i.state === "ready");
-  const byOpened = (a: LibraryItem, b: LibraryItem) => (b.openedAt ?? b.createdAt).localeCompare(a.openedAt ?? a.createdAt);
-  const shown =
-    filter === "favoris" ? lessons.filter((i) => i.favorite) : filter === "recents" ? [...lessons].sort(byOpened).slice(0, 24) : lessons;
-  const running = scoped.filter((i) => i.state === "running" || i.updating).length;
-  const failed = scoped.filter((i) => i.state === "failed").length;
-  const last = lessons.filter((i) => i.openedAt).sort(byOpened)[0];
-  const resume: ResumeItem | null = last
-    ? { id: last.id, title: last.title, cover: last.cover, sourceCount: last.sourceCount, opened: whenLabel(last.openedAt!, lang, t.library.today, t.library.yesterday).split(" · ")[0]!.toLowerCase() }
-    : null;
-  const emptyLibrary = !folder && items.length === 0 && folders.length === 0 && !error;
-  const emptyText = filter === "favoris" ? v.noFavorites : folder ? t.library.folderEmpty : t.library.noneInFilter;
-
-  if (emptyLibrary) {
-    return (
-      <Screen>
-        <LibraryMemory />
-        <div className="page-title">
-          <h1>{t.library.title}</h1>
-          <p>{v.subtitle}</p>
-        </div>
-        <section className="lib-empty-v2 stagger">
-          <Illustration name="bibliotheque-vide" fallback="lumiere" className="lib-empty-cover" eager />
-          <h2>{v.emptyTitle}</h2>
-          <p className="muted">{v.emptyText}</p>
-          <Link href="/ajouter" className="btn btn-primary btn-block">{t.library.emptyCta} <Icon name="arrow" /></Link>
-          <NewFolder />
-          <ReportLink href="/rapports/demo" className="btn-link" immersive>{t.library.example}</ReportLink>
-        </section>
-      </Screen>
-    );
-  }
-
-  const railItems: { key: string; href: string; current: boolean }[] = [
-    ...FILTERS.map((f) => ({ key: f, href: href({ dossier: folder?.id, filtre: f === "tous" ? undefined : f }), current: filter === f })),
-    { key: "en_cours", href: href({ vue: "preparations" }), current: false },
-  ];
-  const order = ["tous", "recents", "dossiers", "prets", "en_cours", "favoris"];
-  railItems.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  const h = t.v4.home;
+  const { items } = await loadLibrary({ limit: 40 });
+  const byOpened = (a: LibraryItem, b: LibraryItem) => (b.openedAt ?? "").localeCompare(a.openedAt ?? "");
+  const resume = items.filter((i) => i.state === "ready" && i.openedAt).sort(byOpened)[0] ?? null;
+  const recent = items.filter((i) => i.id !== resume?.id).slice(0, RECENT);
+  const when = (iso: string) => whenLabel(iso, lang, t.library.today, t.library.yesterday);
 
   return (
-    <Screen>
+    <Screen className="home-page">
       <LibraryMemory />
-      {folder && (
-        <nav className="crumbs" aria-label={t.library.folders}>
-          <Link href="/"><Icon name="back" size={18} /> {t.library.backToLibrary}</Link>
-        </nav>
+      <h1 className="home-hello">{h.hello(firstName(profile?.display_name))}</h1>
+
+      <Link href="/ajouter" className="home-create">
+        <span className="home-create-plus" aria-hidden="true"><Icon name="plus" size={22} /></span>
+        <span className="home-create-text">
+          <b>{h.create}</b>
+          <small>{h.createSub}</small>
+        </span>
+        <Icon name="arrow" className="home-create-arrow" />
+      </Link>
+
+      {resume && (
+        <section aria-labelledby="home-resume-h" className="home-section">
+          <h2 id="home-resume-h">{h.resume}</h2>
+          <div className="home-resume">
+            <Cover cover={resume.cover} className="home-thumb" eager />
+            <div className="home-resume-text">
+              <b>{resume.title}</b>
+              <small className="meta">{h.opened(when(resume.openedAt!).toLowerCase())}</small>
+            </div>
+            <ReportLink href={`/rapports/${resume.id}`} className="btn btn-primary home-resume-cta">{h.continue}</ReportLink>
+          </div>
+        </section>
       )}
-      <LibraryBrowser
-        title={folder ? folder.name : t.library.title}
-        subtitle={folder || filter !== "tous" ? null : v.subtitle}
-        folder={folder ? { id: folder.id, name: folder.name } : null}
-        folders={folder ? [] : folders.map((f) => ({ ...f, cover: coverView(coverFor(f.id, null)) }))}
-        allFolders={folders.map((f) => ({ id: f.id, name: f.name }))}
-        rows={shown.map(toRow)}
-        root={!folder}
-        filter={filter}
-        initialQuery={q}
-        recent={recent}
-        resume={resume}
-        emptyText={emptyText}
-        newFolder={<NewFolder />}
-        headerExtra={folder ? <FolderActions id={folder.id} name={folder.name} count={scoped.length} /> : undefined}
-        rail={
-          <nav className="utabs lib-rail" aria-label={t.library.filters}>
-            {railItems.map((r) => (
-              <Link key={r.key} href={r.href} aria-current={r.current ? "true" : undefined}>{v.filters[r.key]}</Link>
-            ))}
-          </nav>
-        }
-        preparations={
-          running + failed > 0 ? (
-            <Link href={href({ vue: "preparations", filtre: running ? undefined : "a_verifier" })} className="prep-banner">
-              <Icon name={failed && !running ? "alert" : "hourglass"} />
-              <span><b>{v.prep.title}</b><small>{v.preparationsLink(running, failed)}</small></span>
-              <Icon name="chevron" className="row-chevron" />
-            </Link>
-          ) : null
-        }
-        footer={
-          !folder ? (
-            <ul className="rows lib-extra">
-              <li>
-                <ReportLink href="/rapports/demo" className="row" immersive>
-                  <span className="row-icon"><Icon name="star" /></span>
-                  <span className="row-text"><b>{demoBlueprint.title}</b><small>{t.library.demoTitle} · {t.demo.badge}</small></span>
+
+      {recent.length > 0 ? (
+        <section aria-labelledby="home-recent-h" className="home-section">
+          <div className="home-section-head">
+            <h2 id="home-recent-h">{h.recent}</h2>
+            <Link href="/bibliotheque" className="see-all">{h.seeAll} <Icon name="chevron" size={18} /></Link>
+          </div>
+          <ul className="home-list">
+            {recent.map((i) => (
+              <li key={i.id}>
+                <ReportLink href={i.state === "ready" ? `/rapports/${i.id}/apercu` : `/rapports/${i.id}`} className="home-row">
+                  <Cover cover={i.cover} className="home-thumb" />
+                  <span className="home-row-text">
+                    <b>{i.title}</b>
+                    <small className="meta">
+                      {i.state === "running" ? h.preparing : i.state === "failed" ? h.interrupted : when(i.createdAt)}
+                    </small>
+                  </span>
                   <Icon name="chevron" className="row-chevron" />
                 </ReportLink>
               </li>
-              <li>
-                <Link href={href({ vue: "sources" })} className="row">
-                  <span className="row-icon"><Icon name="file" /></span>
-                  <span className="row-text"><b>{t.library.documents}</b></span>
-                  <Icon name="chevron" className="row-chevron" />
-                </Link>
-              </li>
-            </ul>
-          ) : undefined
-        }
-      />
+            ))}
+          </ul>
+        </section>
+      ) : (
+        !resume && (
+          <section className="home-empty">
+            <h2>{h.emptyTitle}</h2>
+            <p className="muted">{h.emptyText}</p>
+            <ReportLink href="/rapports/demo" className="btn-link" immersive>{h.example}</ReportLink>
+          </section>
+        )
+      )}
+
+      <Link href="/bibliotheque" className="home-library-link">
+        <Icon name="book" /> <span>{h.seeLibrary}</span> <Icon name="chevron" className="row-chevron" />
+      </Link>
     </Screen>
   );
 }

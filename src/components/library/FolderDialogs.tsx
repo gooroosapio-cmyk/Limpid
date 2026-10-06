@@ -114,7 +114,7 @@ export function FolderActions({ id, name, count }: { id: string; name: string; c
     setBusy(false);
     if (!res?.ok) return toast(t.library.actionFailed, "error");
     del.current?.close();
-    router.push("/");
+    router.push("/bibliotheque");
     router.refresh();
   }
 

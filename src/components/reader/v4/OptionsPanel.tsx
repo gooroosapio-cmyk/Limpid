@@ -116,7 +116,7 @@ export function OptionsPanel({
     setBusy(true);
     const res = await fetch(`/api/reports/${data.reportId}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) {
-      router.push("/");
+      router.push("/bibliotheque");
       router.refresh();
     } else {
       setError(t.common.deleteFailed);

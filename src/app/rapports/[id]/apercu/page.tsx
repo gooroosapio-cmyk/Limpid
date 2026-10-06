@@ -47,7 +47,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
       <header className="lesson-hero">
         <Cover cover={cover} className="lesson-hero-cover" eager />
         <div className="lesson-hero-bar">
-          <Link href="/" className="ib lesson-bar-btn" aria-label={l.back}><Icon name="back" size={26} /></Link>
+          <Link href="/bibliotheque" className="ib lesson-bar-btn" aria-label={l.back}><Icon name="back" size={26} /></Link>
           <span className="brand lesson-hero-brand" aria-hidden="true"><Wordmark /></span>
           <Link href={`/rapports/${id}?ouvrir=options`} className="ib lesson-bar-btn" aria-label={l.options}><Icon name="more" size={26} /></Link>
         </div>

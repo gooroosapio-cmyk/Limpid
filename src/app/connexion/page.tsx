@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { getT } from "@/lib/i18n/server";
-import Link from "next/link";
-import { signupOpen } from "@/lib/auth/password";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { Icon } from "@/components/Icon";
 import { LoginForm } from "./LoginForm";
@@ -15,21 +13,22 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.login.title };
 }
 
+/**
+ * Connexion (V4, § 5) : écran compact qui tient sans défiler à 360 × 740. Ordre : logo,
+ * Connexion, Google, « ou », e-mail, mot de passe, Se connecter, Créer un compte, lien,
+ * confidentialité, pied de page. Petite illustration décorative, masquée si l'écran est bas.
+ */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ erreur?: string; compte?: string; session?: string }> }) {
   const t = await getT();
   if (await currentUser()) redirect("/");
   const { erreur, compte, session } = await searchParams;
-  const open = await signupOpen();
   return (
-    <div className="page page-enter login-page">
-      <div className="login-hero">
-        <Illustration name="connexion" fallback="lumiere" className="login-art" eager />
-        <div className="login-brand"><Logo height={34} /></div>
+    <div className="auth">
+      <div className="auth-top">
+        <Logo height={26} />
+        <Illustration name="connexion" fallback="lumiere" className="auth-illustration" eager />
       </div>
-      <div className="page-title login-title">
-        <h1>{t.login.v2Title}</h1>
-        <p>{t.login.v2Subtitle}</p>
-      </div>
+      <h1>{t.v4.login.title}</h1>
       {compte === "supprime" && <p className="notice" role="status">{t.account.deleted}</p>}
       {session && session in t.devices.expired && (
         <p className="notice" role="status">{t.devices.expired[session as keyof typeof t.devices.expired]}</p>
@@ -40,12 +39,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </p>
       )}
       <OAuthButtons t={t} />
-      <LoginForm />
-      <p className="login-signup-line">
-        {t.login.noAccount} <Link href="/inscription">{t.signup.create}</Link>
-        {!open && <span className="muted"> · {t.signup.closed}</span>}
-      </p>
-      <p className="login-private"><Icon name="lock" size={22} /> {t.login.private}</p>
+      <LoginForm signupHref="/inscription" />
+      <p className="auth-private"><Icon name="shield" size={18} /> {t.v4.login.private}</p>
+      <footer className="footer">{t.brand.poweredBy}</footer>
     </div>
   );
 }
