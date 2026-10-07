@@ -17,7 +17,9 @@ import {
   type AIProvider,
   type ImageAspect,
   type ImageProvider,
+  type ModelRole,
   type ModelTier,
+  type StageBudget,
   type StructuredRequest,
   type StructuredResponse,
   type UsageReport,
@@ -29,9 +31,10 @@ const MODEL_RE = /^[a-z0-9][a-z0-9._\-]*\/[a-z0-9][a-z0-9.:_\-]{1,100}$/;
 
 export interface OpenRouterConfig {
   apiKey: string;
-  models: Record<"lite" | "editor" | "complex", string>;
-  /** Replis déclarés, essayés dans l'ordre si le modèle principal est indisponible. */
-  fallbackModels: string[];
+  /** Registre : un modèle par rôle (identifiants vérifiés dans le catalogue OpenRouter). */
+  models: Record<ModelRole, string>;
+  /** Repli par rôle (autre fournisseur, jamais plus coûteux), essayé si le principal échoue. */
+  fallbacks: Record<ModelRole, string>;
   /** Adresse publique du site (en-tête HTTP-Referer, recommandé par OpenRouter). */
   siteUrl: string;
 }
@@ -41,46 +44,66 @@ function model(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
   return v && MODEL_RE.test(v) ? v : fallback;
 }
 
-/** Modèle de texte par défaut (OpenRouter) : lecture, plan, rédaction Feynman, QCM, chat. */
-export const DEFAULT_TEXT_MODEL = "openai/gpt-6-luna-pro";
-/** Modèle de secours (autre fournisseur) quand le modèle principal refuse ou est indisponible. */
-export const DEFAULT_FALLBACK_MODEL = "google/gemini-3.8-flash";
+/**
+ * Registre par défaut (prompt V2, catalogue OpenRouter vérifié le 7 octobre 2026). Structure :
+ * GLM-5.3 Flash, ou DeepSeek V4.1 Flash pour une source complexe. Rédaction pédagogique :
+ * MiMo-V2.6-Pro. Chat, reformulations et contrôle courant (texte et images) : GPT-6 Luna.
+ * Expertise et audit Pro : GPT-6.1 Sol, jamais sans rôle « expert » explicite.
+ */
+export const DEFAULT_MODELS: Record<ModelRole, string> = {
+  structure: "z-ai/glm-5.3-flash",
+  structure_complex: "deepseek/deepseek-v4.1-flash",
+  writer: "xiaomi/mimo-v2.6-pro",
+  chat: "openai/gpt-6-luna",
+  controller: "openai/gpt-6-luna",
+  expert: "openai/gpt-6.1-sol",
+};
+/** Replis : un autre fournisseur de même gamme ; Sol n'est jamais un repli. */
+export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
+  structure: "deepseek/deepseek-v4.1-flash",
+  structure_complex: "z-ai/glm-5.3-flash",
+  writer: "openai/gpt-6-luna",
+  chat: "z-ai/glm-5.3-flash",
+  controller: "z-ai/glm-5.3-flash",
+  expert: "openai/gpt-6-luna",
+};
+/** Variables d'environnement du registre (prompt V2). */
+const ROLE_ENV: Record<ModelRole, string> = {
+  structure: "MODEL_STRUCTURE_STANDARD",
+  structure_complex: "MODEL_STRUCTURE_COMPLEX",
+  writer: "MODEL_WRITER",
+  chat: "MODEL_CHAT",
+  controller: "MODEL_CONTROLLER_DEFAULT",
+  expert: "MODEL_EXPERT_PRO",
+};
+const ROLES = Object.keys(DEFAULT_MODELS) as ModelRole[];
 
 /** Les modèles OpenAI de raisonnement (GPT-6, o-series) refusent le paramètre temperature. */
 export function acceptsTemperature(model: string): boolean {
   return !/^~?openai\//.test(model);
 }
 
-/**
- * Configuration lue dans l'environnement. Défauts (comparatif IA du 6 octobre 2026) : GPT-6
- * Luna Pro pour toutes les tâches de texte (lecture, plan, rédaction, QCM, chat) ; un chapitre
- * difficile ou une réparation de dernier recours garde le même modèle avec une réflexion haute.
- */
+/** Configuration lue dans l'environnement : registre par rôle, défauts ci-dessus. */
 export function openRouterConfigFromEnv(env: NodeJS.ProcessEnv = process.env): OpenRouterConfig {
   const apiKey = env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) throw new ProviderError("not_configured", "OpenRouter n'est pas configuré (clé manquante).");
   return {
     apiKey,
-    models: {
-      lite: model(env, "LIMPID_MODEL_LITE", DEFAULT_TEXT_MODEL),
-      editor: model(env, "LIMPID_MODEL_EDITOR", DEFAULT_TEXT_MODEL),
-      complex: model(env, "LIMPID_MODEL_COMPLEX", DEFAULT_TEXT_MODEL),
-    },
-    // Secours par défaut : Gemini 3.8 Flash (autre fournisseur) si Luna Pro refuse ou est indisponible.
-    fallbackModels: (env.LIMPID_MODEL_FALLBACKS?.trim() ? env.LIMPID_MODEL_FALLBACKS : DEFAULT_FALLBACK_MODEL)
-      .split(",")
-      .map((m) => m.trim())
-      .filter((m) => MODEL_RE.test(m))
-      .slice(0, 3),
+    models: Object.fromEntries(ROLES.map((r) => [r, model(env, ROLE_ENV[r], DEFAULT_MODELS[r])])) as Record<ModelRole, string>,
+    fallbacks: Object.fromEntries(ROLES.map((r) => [r, model(env, `${ROLE_ENV[r]}_FALLBACK`, DEFAULT_FALLBACKS[r])])) as Record<ModelRole, string>,
     siteUrl: siteUrl(env),
   };
 }
 
-/** Modèle d'un niveau : lite → Flash-Lite, fast/quality → Flash, complex → Pro. */
-export function modelForTier(config: OpenRouterConfig, tier: ModelTier): string {
-  if (tier === "lite") return config.models.lite;
-  if (tier === "complex") return config.models.complex;
-  return config.models.editor;
+/** Modèles de texte du registre (affichage admin), sans exiger la clé. */
+export function registeredModels(env: NodeJS.ProcessEnv = process.env): string[] {
+  return [...new Set(ROLES.map((r) => model(env, ROLE_ENV[r], DEFAULT_MODELS[r])))];
+}
+
+/** Rôle d'un appel : explicite, sinon déduit du niveau (jamais l'expert par déduction). */
+export function roleOf(budget: Pick<StageBudget, "tier" | "role">): ModelRole {
+  if (budget.role) return budget.role;
+  return budget.tier === "lite" || budget.tier === "fast" ? "chat" : "writer";
 }
 
 type ContentPart =
@@ -160,11 +183,9 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
   }
 
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>> {
-    const primary = modelForTier(this.config, req.budget.tier);
-    // Dernière correction de schéma : le modèle plus capable (Pro) reprend la main.
-    const escalate = req.preferFallback && primary !== this.config.models.complex ? [this.config.models.complex] : [];
-    const models = [...new Set([...escalate, primary, ...this.config.fallbackModels])];
-    // Même modèle pour tous les niveaux (Luna Pro) : la dernière correction réfléchit davantage.
+    const role = roleOf(req.budget);
+    const models = [...new Set([this.config.models[role], this.config.fallbacks[role]])];
+    // Dernière correction de schéma : même modèle, réflexion haute (aucune escalade payante).
     const final = req.preferFallback ? { ...req, budget: { ...req.budget, reasoning: "high" as const } } : req;
     for (let i = 0; ; i++) {
       try {
@@ -319,7 +340,9 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
 
 /** Modèle servi par l'API Images (et non par la complétion de chat). */
 export function usesImagesApi(model: string): boolean {
-  return !/^google\/.+-image/.test(model);
+  // API Images : modèles d'image dédiés (Recraft, Seedream…). Nano Banana et GPT Image passent
+  // par la complétion de chat avec sortie image.
+  return /^(recraft|bytedance-seed|black-forest-labs)\//.test(model);
 }
 
 /** Recraft n'accepte que 1:1, 4:3, 3:4, 16:9, 9:16 : rapport le plus proche. */

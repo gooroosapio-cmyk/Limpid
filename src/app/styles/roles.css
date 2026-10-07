@@ -56,3 +56,6 @@
 .block-label { display: flex; align-items: center; gap: 6px; }
 .retain-title { display: inline-flex; align-items: center; gap: 6px; }
 .block-label .icon, .retain-title .icon { flex: none; }
+
+/* Images détourées (fond transparent) : toujours sur un support ivoire, jamais inversées */
+figure.illustration.cutout img { background: #f7f6ef; }

@@ -107,7 +107,7 @@ export async function askModel(provider: AIProvider, input: AskRequest, explanat
       { label: "echanges precedents", text: (input.history ?? []).map((h) => `Q : ${h.q}\nR : ${h.a}`).join("\n\n") || "aucun" },
       { label: "question du lecteur", text: input.question },
     ],
-    budget: { tier: "fast", maxInputTokens: 12_000, maxOutputTokens: 2_000, timeoutMs: 60_000 },
+    budget: { tier: "fast", role: "chat", maxInputTokens: 12_000, maxOutputTokens: 2_000, timeoutMs: 60_000 },
     signal,
   });
 }

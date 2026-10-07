@@ -1,7 +1,7 @@
 /**
- * Consignes des images générées (Recraft, Seedream via l'API Images d'OpenRouter) : jamais de
- * texte ni de chiffre inventé dans une illustration ; palette Limpid. Les appels eux-mêmes
- * passent par le fournisseur OpenRouter (une seule clé, coût réel relevé).
+ * Consignes des images générées (Nano Banana 2.1, secours GPT Image 2, via OpenRouter) : jamais
+ * de texte ni de chiffre inventé dans une illustration ; palette Limpid. Le fond des dessins est
+ * imposé à part (magenta à détourer, voir cutout.ts).
  */
 import "server-only";
 
@@ -20,7 +20,7 @@ export function vectorPrompt(subject: string, purpose: string, altText: string):
   return [
     `Flat vector editorial illustration of ${subject}, to show ${purpose}.`,
     `Only these validated elements: ${altText}.`,
-    "Calm composition, generous negative space, soft ivory, ink green and warm yellow palette.",
+    "Calm composition, generous negative space, ink green, dark ink and warm yellow palette, clean outlines.",
     "No text, no letters, no numbers, no axes, no charts, no logos, no recognisable faces.",
   ].join(" ").slice(0, 1_000);
 }

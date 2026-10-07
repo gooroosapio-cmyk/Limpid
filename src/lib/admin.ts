@@ -9,6 +9,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { adminMfaRequired, mfaStep } from "@/lib/auth/mfa";
 import { budget } from "@/lib/config";
+import { registeredModels } from "@/lib/engine/openrouter";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -97,7 +98,7 @@ export async function adminOverview() {
     generationEnabled: settings.data?.generation_enabled ?? false,
     images: imageSettingsFrom(settings.data as Record<string, unknown> | null),
     // Recraft, Seedream et Nano Banana passent tous par OpenRouter : une seule clé.
-    imageProviders: { recraft: !!process.env.OPENROUTER_API_KEY?.trim(), seedream: !!process.env.OPENROUTER_API_KEY?.trim(), nanobanana: !!process.env.OPENROUTER_API_KEY?.trim() },
+    imageProviders: { nanobanana: !!process.env.OPENROUTER_API_KEY?.trim(), gptimage: !!process.env.OPENROUTER_API_KEY?.trim() },
     monthlyCapCents: Math.min(settings.data?.monthly_cap_cents ?? budget.monthlyCapCents, budget.monthlyCapCents),
     envCapCents: budget.monthlyCapCents,
     dailyAccountCapCents: budget.perAccountDailyCapCents,
@@ -108,7 +109,7 @@ export async function adminOverview() {
       since: quotaStart,
       limit: FREE_TIER_DAILY_REQUESTS,
       models: [...byModel.entries()].sort((a, b) => b[1] - a[1]),
-      configured: [process.env.LIMPID_MODEL_LITE, process.env.LIMPID_MODEL_EDITOR, process.env.LIMPID_MODEL_COMPLEX, ...(process.env.LIMPID_MODEL_FALLBACKS ?? "").split(",").map((m) => m.trim())].filter((m): m is string => !!m),
+      configured: registeredModels(),
     },
     emails: emails.data ?? [],
     jobs: jobs.data ?? [],

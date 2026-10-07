@@ -26,7 +26,7 @@ export interface StoredVector {
 }
 
 export interface AssetRow {
-  provider: Candidate["provider"] | "gemini" | "recraft" | "seedream";
+  provider: Candidate["provider"] | "gemini" | "recraft" | "seedream" | "openai";
   kind: "photo" | "illustration" | "generated";
   query: string;
   source_url: string | null;
@@ -144,7 +144,7 @@ export async function illustrate(
           if (!path) continue;
           if (svg) await deps.library?.save(out.image as StoredVector, data.query, out.usage.model).catch(() => undefined);
           const id = await deps.insertAsset({
-            provider: route.provider === "nanobanana" ? "gemini" : route.provider,
+            provider: route.provider === "nanobanana" ? "gemini" : "openai",
             kind: "generated",
             query: data.query,
             source_url: null,
@@ -158,7 +158,7 @@ export async function illustrate(
             author: null,
             license: null,
             license_url: null,
-            modifications: svg ? "Illustration vectorielle générée, nettoyée (aucun script ni lien externe)" : style === "diagram" ? "Schéma généré" : "Illustration générée",
+            modifications: svg ? "Illustration vectorielle générée, nettoyée (aucun script ni lien externe)" : out.image.mime === "image/png" && style !== "realistic" ? (style === "diagram" ? "Schéma généré, détouré (fond transparent)" : "Illustration générée, détourée (fond transparent)") : style === "diagram" ? "Schéma généré" : "Illustration générée",
             model: out.usage.model,
           });
           if (id) return id;

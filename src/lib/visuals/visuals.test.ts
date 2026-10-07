@@ -156,7 +156,7 @@ function deps(over: Partial<IllustrateDeps> = {}): IllustrateDeps & { rows: Asse
     rows,
     calls,
     settings: DEFAULT_IMAGE_SETTINGS,
-    available: { recraft: true, seedream: true, nanobanana: true },
+    available: { nanobanana: true, gptimage: true },
     render: async (route, style) => {
       calls.push(`${style}:${route.model}`);
       return { image: checkImage(png(960, 640))!, usage: usage(route.model) };
@@ -176,27 +176,28 @@ function styled(): ReportBlueprint {
 }
 
 describe("illustrations : modèle par type de visuel (tous via OpenRouter)", () => {
-  it("SVG par Recraft V4.1 Vector, schéma par Seedream 5.0 Flash (réglages par défaut)", async () => {
+  it("dessin et schéma par Nano Banana 2.1 (réglages par défaut)", async () => {
     const d = deps();
     const out = await illustrate(styled(), "auto", d);
     expect(out.added).toBe(2);
-    expect(d.calls.sort()).toEqual(["diagram:bytedance-seed/seedream-5-0-flash", "vector:recraft/recraft-v4.1-vector"]);
-    expect(d.rows.map((r) => r.provider).sort()).toEqual(["recraft", "seedream"]);
+    expect(d.calls.sort()).toEqual(["diagram:google/gemini-nano-banana-2.1", "vector:google/gemini-nano-banana-2.1"]);
+    expect(d.rows.map((r) => r.provider)).toEqual(["gemini", "gemini"]);
   });
 
-  it("illustration simple par Recraft V4.1 Flash ; repli sur un autre modèle, appel échoué journalisé", async () => {
+  it("échec de Nano Banana : un seul secours GPT Image 2, appel échoué journalisé", async () => {
     const one = { ...styled(), visual_specs: [{ ...styled().visual_specs[0]!, data: { ...styled().visual_specs[0]!.data, style: "illustration" } }] };
     const logged: string[] = [];
     const d = deps({
       render: async (route) => {
-        if (route.model === "recraft/recraft-v4.1-flash") throw Object.assign(new Error("402"), { usage: usage(route.model) });
+        if (route.model === "google/gemini-nano-banana-2.1") throw Object.assign(new Error("402"), { usage: usage(route.model) });
         return { image: checkImage(png(960, 640))!, usage: usage(route.model) };
       },
       onUsage: (route, attempt) => void logged.push(`${route.model}:${attempt}`),
     });
     const out = await illustrate(one, "auto", d);
     expect(out.added).toBe(1);
-    expect(logged).toEqual(["recraft/recraft-v4.1-flash:1", "bytedance-seed/seedream-5-0-flash:2"]);
+    expect(logged).toEqual(["google/gemini-nano-banana-2.1:1", "openai/gpt-5.4-image-2:2"]);
+    expect(d.rows[0]!.provider).toBe("openai");
   });
 
   it("banque SVG : un dessin existant est réutilisé, sans génération ; un nouveau y est versé", async () => {
@@ -221,7 +222,7 @@ describe("illustrations : modèle par type de visuel (tous via OpenRouter)", () 
     const off = deps({ settings: { ...DEFAULT_IMAGE_SETTINGS, enabled: false } });
     expect((await illustrate(styled(), "auto", off)).added).toBe(0);
     expect(off.calls).toEqual([]);
-    const none = deps({ available: { recraft: false, seedream: false, nanobanana: false } });
+    const none = deps({ available: { nanobanana: false, gptimage: false } });
     const out = await illustrate(styled(), "auto", none);
     expect(out.blueprint.visual_specs).toHaveLength(0);
     expect(out.blueprint.sections[0]!.visual_ids).toEqual([]);
@@ -230,25 +231,27 @@ describe("illustrations : modèle par type de visuel (tous via OpenRouter)", () 
   it("« Schémas seulement » : le schéma reste, l'illustration décorative est retirée", async () => {
     const d = deps();
     const out = await illustrate(styled(), "schemas", d);
-    expect(d.calls).toEqual(["diagram:bytedance-seed/seedream-5-0-flash"]);
+    expect(d.calls).toEqual(["diagram:google/gemini-nano-banana-2.1"]);
     expect(out.blueprint.visual_specs).toHaveLength(1);
   });
 });
 
 describe("catalogue des modèles d'image", () => {
-  it("réglages en base nettoyés : ancien identifiant ou sortie incohérente → défaut du type", () => {
+  it("réglages en base nettoyés : un ancien Recraft ou Seedream retombe sur Nano Banana", () => {
     expect(
-      imageSettingsFrom({ images_enabled: true, image_vector_provider: "recraft", image_vector_model: "recraft/recraft-v4.1-flash", image_realistic_provider: "recraft", image_realistic_model: "recraftv4_1", image_illustration_model: "recraft/recraft-v4.1" }),
+      imageSettingsFrom({ images_enabled: true, image_vector_provider: "recraft", image_vector_model: "recraft/recraft-v4.1-vector", image_realistic_model: "bytedance-seed/seedream-5-0-flash", image_illustration_model: "openai/gpt-5.4-image-2" }),
     ).toEqual({
       enabled: true,
-      illustration: { provider: "recraft", model: "recraft/recraft-v4.1" },
+      illustration: { provider: "gptimage", model: "openai/gpt-5.4-image-2" },
       vector: DEFAULT_IMAGE_SETTINGS.vector,
       realistic: DEFAULT_IMAGE_SETTINGS.realistic,
       diagram: DEFAULT_IMAGE_SETTINGS.diagram,
     });
-    expect(imageAttempts("diagram", DEFAULT_IMAGE_SETTINGS, { recraft: true, seedream: true, nanobanana: true })).toEqual([
-      { provider: "seedream", model: "bytedance-seed/seedream-5-0-flash" },
-      { provider: "recraft", model: "recraft/recraft-v4.1" },
+    expect(DEFAULT_IMAGE_SETTINGS.vector.model).toBe("google/gemini-nano-banana-2.1");
+    // Une tentative principale et un seul secours.
+    expect(imageAttempts("diagram", DEFAULT_IMAGE_SETTINGS, { nanobanana: true, gptimage: true })).toEqual([
+      { provider: "nanobanana", model: "google/gemini-nano-banana-2.1" },
+      { provider: "gptimage", model: "openai/gpt-5.4-image-2" },
     ]);
     expect(diagramPrompt("Cycle de l'eau", "ordre des étapes", "Évaporation → Pluie")).toMatch(/portrait 3:4.*Évaporation → Pluie.*symmetrical/s);
   });

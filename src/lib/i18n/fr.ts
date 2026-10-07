@@ -1069,7 +1069,7 @@ export const fr = {
       realistic: "Scènes réalistes (lieu, objet, situation)",
       diagram: "Schémas annotés (format téléphone, valeurs reprises de la source)",
       missingKey: "clé absente",
-      note: "Tous les modèles passent par OpenRouter. Couverture : Pixabay selon le thème du document, sinon Seedream 5.0 Flash. Images par cours selon la taille : 1 à 3 images et 1 à 2 SVG ; graphiques, proportions et tableaux exacts sont dessinés par le lecteur.",
+      note: "Tous les modèles passent par OpenRouter. Couverture : Pixabay selon le thème du document, sinon Nano Banana 2.1. Toutes les illustrations : Nano Banana 2.1, GPT Image 2 seulement en secours (une fois par image) ; schémas et dessins livrés sans arrière-plan. Graphiques, proportions et tableaux exacts sont dessinés par le lecteur.",
     },
     capLabel: (max: number) => `Plafond mensuel, en euros (${max} € au plus, fixé par la configuration du serveur)`,
     save: "Enregistrer",
