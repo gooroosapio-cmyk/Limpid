@@ -28,7 +28,12 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   add("Fournisseur IA", p !== "demo", p === "openrouter" ? "OpenRouter (clé présente)" : p === "gemini" ? "Gemini direct (clé présente)" : "Mode démonstration : OPENROUTER_API_KEY absente");
   if (p === "openrouter") {
     const c = openRouterConfigFromEnv();
-    add("Modèles texte", true, `lecture, plan, rédaction, QCM et chat : ${c.models.editor} · chapitres difficiles : ${c.models.complex} (réflexion haute) · repli : ${c.fallbackModels.join(", ") || "aucun"}`);
+    const m = c.models;
+    add(
+      "Modèles texte",
+      true,
+      `structure : ${m.structure} (complexe : ${m.structure_complex}) · rédaction : ${m.writer} · chat et contrôle : ${m.chat} / ${m.controller} · expert Pro : ${m.expert}`,
+    );
   } else {
     add(
       "Modèles Gemini",
@@ -37,8 +42,8 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
     );
   }
   const or = present("OPENROUTER_API_KEY");
-  add("Images (Recraft, Seedream via OpenRouter)", or, or ? "clé OpenRouter présente (modèles réglés dans « Images des cours »)" : "OPENROUTER_API_KEY absente : aucune image générée");
-  add("Couvertures (Pixabay, sinon Seedream)", present("PIXABAY_API_KEY"), present("PIXABAY_API_KEY") ? "illustration Pixabay selon le thème du document, sinon Seedream 5.0 Flash" : "PIXABAY_API_KEY absente : Seedream 5.0 Flash à chaque couverture (payante)");
+  add("Images (Nano Banana 2.1, secours GPT Image 2)", or, or ? "clé OpenRouter présente : toutes les illustrations par Nano Banana 2.1, GPT Image 2 seulement en secours" : "OPENROUTER_API_KEY absente : aucune image générée");
+  add("Couvertures (Pixabay, sinon Nano Banana)", present("PIXABAY_API_KEY"), present("PIXABAY_API_KEY") ? "illustration Pixabay selon le thème du document, sinon Nano Banana 2.1" : "PIXABAY_API_KEY absente : Nano Banana 2.1 à chaque couverture (payante)");
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
   add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || `absente : ${siteUrl()} par défaut`);

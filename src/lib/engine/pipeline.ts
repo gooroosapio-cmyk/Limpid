@@ -473,7 +473,7 @@ export async function verifyClaims(
     schema: VerificationDraft,
     instructions: VERIFY_INSTRUCTIONS,
     data: [{ label: "affirmations et extraits", text: verificationPayload({ ...ko, claims: ko.claims.filter((c) => risky.has(c.id)) }, evidence, segments) }],
-    budget: { ...input.budgets.comprehension, reasoning: "low" },
+    budget: { ...input.budgets.comprehension, role: "controller", reasoning: "low" },
   });
   const verdicts = new Map(draft.verdicts.map((x) => [x.claim_id, x]));
   const claims = ko.claims.map((c) => {

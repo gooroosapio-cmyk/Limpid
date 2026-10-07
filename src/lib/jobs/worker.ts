@@ -29,7 +29,6 @@ import { CREDIT_RETURNED, recordLimitEvent } from "./limits";
 import { getImageProvider, getProvider } from "@/lib/engine";
 import { realisticPrompt, vectorPrompt } from "@/lib/visuals/recraft";
 import { svgLibrary } from "@/lib/visuals/svg-library";
-import { sanitizeSvg, svgSize } from "@/lib/visuals/svg";
 import { generateExercises } from "@/lib/engine/exercises";
 import {
   PROMPT_VERSION,
@@ -41,7 +40,8 @@ import {
   type Variation,
 } from "@/lib/engine/pipeline";
 import { carryIllustrations, illustrate, pendingIllustrations, type AssetRow, type IllustrateDeps } from "@/lib/visuals/illustrate";
-import { diagramPrompt, imageSettingsFrom, modelInfo, type ImageProviderId, type ImageSettings } from "@/lib/visuals/image-models";
+import { diagramPrompt, imageSettingsFrom, transparentStyle, type ImageProviderId, type ImageSettings } from "@/lib/visuals/image-models";
+import { cutout, KEY_BACKGROUND_PROMPT } from "@/lib/visuals/cutout";
 import { jobStore } from "./checkpoints";
 import { generateV5, PlanCheckpoint } from "@/lib/engine/v5";
 import { checkImage } from "@/lib/visuals/sources";
@@ -54,6 +54,7 @@ import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/so
 import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
 import { BUCKET, purgeDate, purgeOriginal } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
+import { profileOf, structureRoute } from "@/lib/engine/routing";
 import type { JobStage } from "./state";
 
 export const WORKER_LEASE_SECONDS = 300;
@@ -105,7 +106,7 @@ const SECTION_CHANGE_REASON: Record<Variation, string> = {
   reformulate: "autre_formulation",
 };
 
-const EXERCISE_BUDGET = { tier: "quality" as const, maxInputTokens: 60_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const };
+const EXERCISE_BUDGET = { tier: "quality" as const, role: "writer" as const, maxInputTokens: 60_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const };
 
 /**
  * Exercices du support (points de contrôle et bilan), rédigés une fois avec la version.
@@ -316,7 +317,7 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
         maxPages: limits.maxOcrPages,
         pages: pages ?? undefined,
         signal: controller.signal,
-        budget: { tier: "fast", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+        budget: { tier: "fast", role: "chat", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
         onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
       });
     } catch (e) {
@@ -457,6 +458,8 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
   const segments = await loadSourceSet(sourceIds);
   const preferences = await preferencesOf(job.owner_id);
   const provider = getProvider();
+  // Structure : GLM pour une source standard, DeepSeek pour une source complexe (règle locale).
+  const structure = structureRoute(profileOf(segments.map((x) => x.text), sourceIds.length));
 
   const input = {
     sourceId: `src_${sourceIds[0]}`,
@@ -469,11 +472,11 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     language: job.params.language ?? null,
     preferences,
     signal: controller.signal,
-    // Niveaux par défaut (3.8 Flash) ; le moteur passe un chapitre difficile au modèle Pro.
+    // Registre par rôle : structure (GLM ou DeepSeek), rédaction (MiMo), contrôle (Luna).
     budgets: {
-      comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000, reasoning: "low" as const },
-      explanation: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
-      plan: { tier: "fast" as const, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const },
+      comprehension: { tier: "fast" as const, role: structure.role, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000, reasoning: "low" as const },
+      explanation: { tier: "fast" as const, role: "writer" as const, maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
+      plan: { tier: "fast" as const, role: structure.role, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const },
     },
     onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),
@@ -633,10 +636,10 @@ async function imageSettings(): Promise<ImageSettings> {
   return imageSettingsFrom(data as Record<string, unknown> | null);
 }
 
-/** Modèles d'image utilisables : tous servis par OpenRouter (Recraft, Seedream, Nano Banana). */
+/** Modèles d'image utilisables : Nano Banana 2.1 et son secours GPT Image 2, via OpenRouter. */
 function imageProviders(): Record<ImageProviderId, boolean> {
   const on = activeProvider() === "openrouter";
-  return { recraft: on, seedream: on, nanobanana: on || activeProvider() === "gemini" };
+  return { nanobanana: on || activeProvider() === "gemini", gptimage: on };
 }
 
 /** Illustrations prévues par le plan (0–1 par chapitre, 3 au plus) ; un échec n'arrête jamais le cours. */
@@ -651,29 +654,23 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
     render: async (route, style, item) => {
       // Plafonds vérifiés avant chaque image ; un refus laisse le cours sans image.
       await checkBudget(job.owner_id);
-      const prompt =
+      const cut = transparentStyle(style);
+      const base =
         style === "diagram"
           ? diagramPrompt(item.subject, item.altText, item.content)
           : style === "realistic"
             ? realisticPrompt(item.subject, item.purpose, item.altText)
             : vectorPrompt(item.subject, item.purpose, item.altText);
+      // Visuel technique ou dessin : fond magenta uniforme, retiré ensuite par le serveur.
+      const prompt = cut ? `${base} ${KEY_BACKGROUND_PROMPT}` : base;
       // Schéma : portrait 3/4 pour l'écran du téléphone.
       const out = await getImageProvider().generateIllustration({ model: route.model, prompt, aspectRatio: style === "diagram" ? "3:4" : "4:3", signal: controller.signal, timeoutMs: 90_000 });
-      if (out.mime === "image/svg+xml" || modelInfo(route.model)?.output === "svg") {
-        // SVG nettoyé avant stockage : aucun script, lien externe ni gestionnaire d'événement.
-        let svg: string;
-        try {
-          svg = sanitizeSvg(out.bytes.toString("utf8"));
-        } catch {
-          throw new ProviderError("empty", "SVG inexploitable.", out.usage);
-        }
-        const bytes = Buffer.from(svg, "utf8");
-        const { width, height } = svgSize(svg);
-        return { image: { bytes, mime: "image/svg+xml" as const, width, height, sha256: createHash("sha256").update(bytes).digest("hex") }, usage: out.usage };
-      }
-      const image = checkImage(out.bytes);
-      if (!image) throw new ProviderError("empty", "Image inexploitable.", out.usage);
-      return { image, usage: out.usage };
+      if (!checkImage(out.bytes)) throw new ProviderError("empty", "Image inexploitable.", out.usage);
+      if (!cut) return { image: checkImage(out.bytes)!, usage: out.usage };
+      // Détourage contrôlé : un échec (fond absent, sujet effacé) passe au secours, jamais publié.
+      const result = await cutout(out.bytes);
+      if (!result.ok) throw new ProviderError("empty", `Détourage impossible : ${result.reason}.`, out.usage);
+      return { image: result.image, usage: out.usage };
     },
     library: svgLibrary(db),
     onUsage: (route, attempt, u) => recordUsage(job, `illustrations_${route.provider}`, attempt, u),
@@ -775,8 +772,8 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
     preferences: await preferencesOf(job.owner_id),
     signal: controller.signal,
     budgets: {
-      comprehension: { tier: "fast" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-      explanation: { tier: "quality" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      comprehension: { tier: "fast" as const, role: "structure" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      explanation: { tier: "quality" as const, role: "writer" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
     },
     onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),

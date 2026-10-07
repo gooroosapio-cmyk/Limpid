@@ -1098,7 +1098,7 @@ export const en: Dict = {
       realistic: "Realistic scenes (place, object, situation)",
       diagram: "Annotated diagrams (phone format, values taken from the source)",
       missingKey: "key missing",
-      note: "All models go through OpenRouter. Cover: Pixabay based on the document theme, otherwise Seedream 5.0 Flash. Images per course by size: 1 to 3 images and 1 to 2 SVGs; exact charts, proportions and tables are drawn by the reader.",
+      note: "All models go through OpenRouter. Cover: Pixabay based on the document theme, otherwise Nano Banana 2.1. All illustrations: Nano Banana 2.1, GPT Image 2 only as a fallback (once per image); diagrams and drawings delivered without background. Exact charts, proportions and tables are drawn by the reader.",
     },
     capLabel: (max: number) => `Monthly cap, in euros (${max} € max, set by the server configuration)`,
     save: "Save",

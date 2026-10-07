@@ -54,7 +54,7 @@ export async function askGrade(provider: AIProvider, check: Check, quotes: strin
       { label: "extraits de la source", text: quotes.join("\n") || "aucun" },
       { label: "reponse du lecteur", text: answer },
     ],
-    budget: { tier: "fast", maxInputTokens: 8_000, maxOutputTokens: 2_000, timeoutMs: 60_000 },
+    budget: { tier: "fast", role: "controller", maxInputTokens: 8_000, maxOutputTokens: 2_000, timeoutMs: 60_000 },
     signal,
   });
   const covered = new Map(res.value.points.map((p) => [p.index, p.covered]));

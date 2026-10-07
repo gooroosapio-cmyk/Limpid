@@ -81,7 +81,7 @@ function ComparisonTable({ data, caption }: { data: ComparisonData; caption: Rea
 
 export function Credit({ asset }: { asset: AssetView }) {
   const t = useT();
-  if (asset.provider === "gemini" || asset.provider === "recraft" || asset.provider === "seedream") return <span className="credit">{t.visuals.generated}</span>;
+  if (asset.provider === "gemini" || asset.provider === "recraft" || asset.provider === "seedream" || asset.provider === "openai") return <span className="credit">{t.visuals.generated}</span>;
   const via = asset.provider === "commons" ? "Wikimedia Commons" : "Unsplash";
   const licenseUrl = safeHref(asset.licenseUrl);
   const sourceUrl = safeHref(asset.sourceUrl);
@@ -164,7 +164,8 @@ export function VisualFigure({
       if (!showIllustrations || !d.success || !asset) return null;
       const diagram = d.data.style === "diagram";
       return (
-        <figure className={`visual illustration${diagram ? " diagram" : ""}`}>
+        // Dessin ou schéma détouré : posé sur un support ivoire, lisible en clair comme en sombre.
+        <figure className={`visual illustration${diagram ? " diagram" : ""}${d.data.style === "realistic" ? "" : " cutout"}`}>
           {/* Actif vérifié (type, taille, dimensions) et servi par Limpid ou l'hébergeur autorisé. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset.src} alt={v.alt_text} width={asset.width} height={asset.height} loading="lazy" decoding="async" />

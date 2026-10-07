@@ -639,6 +639,7 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
   const statements = new Map(c.ko.claims.map((x) => [x.id, x.statement]));
   const budgetFor = (repair: number): StageBudget => ({
     ...input.budgets.explanation,
+    role: "writer",
     tier: repair > 0 && difficult ? "complex" : "fast",
     reasoning: repair > 0 && difficult ? "high" : difficult ? "medium" : "low",
     maxOutputTokens: Math.max(input.budgets.explanation.maxOutputTokens, 16_000),

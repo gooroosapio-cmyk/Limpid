@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { activeProvider } from "@/lib/config";
-import { errorCodeFor, modelForTier, openRouterConfigFromEnv, OpenRouterProvider, stripFence } from "./openrouter";
+import { DEFAULT_MODELS, errorCodeFor, openRouterConfigFromEnv, OpenRouterProvider, roleOf, stripFence } from "./openrouter";
 import { ProviderError } from "./provider";
 
 const env = { OPENROUTER_API_KEY: "sk-or-test" } as unknown as NodeJS.ProcessEnv;
@@ -14,16 +14,26 @@ function reply(body: unknown, status = 200) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("OpenRouter : configuration et routage", () => {
-  it("GPT-6 Luna Pro par défaut pour tout le texte, remplaçable", () => {
+  it("registre par rôle (prompt V2), remplaçable par variable", () => {
     const c = openRouterConfigFromEnv(env);
-    expect(c.models).toEqual({ lite: "openai/gpt-6-luna-pro", editor: "openai/gpt-6-luna-pro", complex: "openai/gpt-6-luna-pro" });
-    expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_EDITOR: "google/gemini-3.5-flash" }).models.editor).toBe("google/gemini-3.5-flash");
+    expect(c.models).toEqual({
+      structure: "z-ai/glm-5.3-flash",
+      structure_complex: "deepseek/deepseek-v4.1-flash",
+      writer: "xiaomi/mimo-v2.6-pro",
+      chat: "openai/gpt-6-luna",
+      controller: "openai/gpt-6-luna",
+      expert: "openai/gpt-6.1-sol",
+    });
+    expect(openRouterConfigFromEnv({ ...env, MODEL_WRITER: "google/gemini-3.8-flash" }).models.writer).toBe("google/gemini-3.8-flash");
     // Identifiant douteux ignoré.
-    expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_COMPLEX: "x; rm -rf" }).models.complex).toBe("openai/gpt-6-luna-pro");
+    expect(openRouterConfigFromEnv({ ...env, MODEL_EXPERT_PRO: "x; rm -rf" }).models.expert).toBe("openai/gpt-6.1-sol");
+    // Sol n'est jamais un repli.
+    expect(Object.values(c.fallbacks)).not.toContain(DEFAULT_MODELS.expert);
   });
-  it("niveaux : lite → Flash-Lite, fast/quality → Flash, complex → Pro", () => {
-    const c = openRouterConfigFromEnv(env);
-    expect(["lite", "fast", "quality", "complex"].map((t) => modelForTier(c, t as never))).toEqual([c.models.lite, c.models.editor, c.models.editor, c.models.complex]);
+  it("rôle déduit du niveau, jamais l'expert par déduction", () => {
+    const roles = (["lite", "fast", "quality", "complex"] as const).map((tier) => roleOf({ tier }));
+    expect(roles).toEqual(["chat", "chat", "writer", "writer"]);
+    expect(roleOf({ tier: "fast", role: "structure" })).toBe("structure");
   });
   it("OpenRouter actif dès que sa clé est présente ; sans clé, démonstration", () => {
     expect(activeProvider(env)).toBe("openrouter");
@@ -57,7 +67,7 @@ describe("OpenRouter : appels", () => {
     const p = new OpenRouterProvider(openRouterConfigFromEnv(env));
     const out = await p.generateStructured(req());
     expect(out.value).toEqual({ answer: "ok" });
-    expect(out.usage).toMatchObject({ provider: "openrouter", model: "openai/gpt-6-luna-pro", inputTokens: 10, outputTokens: 5, costUsd: 0.0004 });
+    expect(out.usage).toMatchObject({ provider: "openrouter", model: "openai/gpt-6-luna", inputTokens: 10, outputTokens: 5, costUsd: 0.0004 });
     // Modèle OpenAI de raisonnement : pas de température (require_parameters la rendrait bloquante).
     expect(calls[0]!.body.temperature).toBeUndefined();
     expect(calls[0]!.body.response_format).toMatchObject({ type: "json_schema" });
@@ -78,24 +88,22 @@ describe("OpenRouter : appels", () => {
     await p.generateStructured(req("fast", true));
     await p.generateStructured(req("complex"));
     expect(bodies.map((b) => [b.model, (b.reasoning as { effort?: string } | undefined)?.effort])).toEqual([
-      ["openai/gpt-6-luna-pro", "high"],
-      ["openai/gpt-6-luna-pro", "high"],
+      ["openai/gpt-6-luna", "high"],
+      ["xiaomi/mimo-v2.6-pro", "high"],
     ]);
-    // Un modèle d'un autre fournisseur garde sa température.
-    expect(openRouterConfigFromEnv({ ...env, LIMPID_MODEL_EDITOR: "google/gemini-3.8-flash" }).models.editor).toBe("google/gemini-3.8-flash");
   });
 
-  it("requête refusée par Luna Pro (400) : Gemini 3.8 Flash prend le relais", async () => {
+  it("requête refusée par Luna (400) : GLM-5.3 Flash prend le relais", async () => {
     const models: string[] = [];
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
       models.push(body.model);
-      if (body.model === "openai/gpt-6-luna-pro") return reply({ error: { code: 400, message: "Unsupported parameter" } }, 400);
+      if (body.model === "openai/gpt-6-luna") return reply({ error: { code: 400, message: "Unsupported parameter" } }, 400);
       return reply({ choices: [{ finish_reason: "stop", message: { content: '{"answer":"ok"}' } }], usage: {} });
     });
     const out = await new OpenRouterProvider(openRouterConfigFromEnv(env)).generateStructured(req());
     expect(out.value).toEqual({ answer: "ok" });
-    expect(models).toEqual(["openai/gpt-6-luna-pro", "google/gemini-3.8-flash"]);
+    expect(models).toEqual(["openai/gpt-6-luna", "z-ai/glm-5.3-flash"]);
     // Clé refusée : aucun secours (inutile), erreur précise.
     vi.stubGlobal("fetch", async () => reply({ error: { code: 401, message: "No auth" } }, 401));
     await expect(new OpenRouterProvider(openRouterConfigFromEnv(env)).generateStructured(req())).rejects.toMatchObject({ code: "auth" });

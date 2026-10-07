@@ -95,7 +95,7 @@ export async function askQuiz(provider: AIProvider, text: string, n: number, sig
     schema: QuizDraft,
     trustedInstructions: INSTRUCTIONS(n),
     untrustedData: [{ label: "explication du rapport", text }],
-    budget: { tier: "fast", maxInputTokens: 16_000, maxOutputTokens: 6_000, timeoutMs: 75_000 },
+    budget: { tier: "fast", role: "writer", maxInputTokens: 16_000, maxOutputTokens: 6_000, timeoutMs: 75_000 },
     signal,
   });
 }
