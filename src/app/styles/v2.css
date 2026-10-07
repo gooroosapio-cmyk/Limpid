@@ -274,7 +274,7 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 .lesson-actions .lesson-more { margin-left: auto; }
 .lesson-fav .icon.is-on { color: var(--yellow); }
 .lesson-fav .icon.is-on path { fill: currentColor; }
-.lesson-more .icon path { stroke-width: 3; }
+.lesson-more .icon :is(path, circle) { stroke-width: 3; }
 .lesson-check { position: absolute; z-index: 2; top: 14px; left: 14px; width: 22px; height: 22px; margin: 0; accent-color: var(--yellow); }
 .lesson.is-selected .lesson-hit { box-shadow: 0 0 0 3px var(--yellow); }
 /* Liste : miniature, titre, statut et menu sur des axes constants */
@@ -543,7 +543,7 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 .status { white-space: nowrap; min-width: 0; }
 .status-ok { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--sage); color: #0e110f; }
 .status .status-ok .icon { width: 12px; height: 12px; color: #0e110f; }
-.status-ok .icon path { stroke-width: 3.4; }
+.status-ok .icon :is(path, circle) { stroke-width: 3.4; }
 .lesson-date { font-size: 12px; line-height: 16px; color: #c3c9c1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lesson-list .lesson-date { color: var(--muted); }
 .lesson-actions { inset: 10px 10px auto; }
@@ -562,7 +562,7 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 .lesson-meta .icon { width: 20px; height: 20px; }
 .lesson-ok { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--sage); color: #0e110f; }
 .lesson-ok .icon { width: 13px; height: 13px; }
-.lesson-ok .icon path { stroke-width: 3.2; }
+.lesson-ok .icon :is(path, circle) { stroke-width: 3.2; }
 .lesson-body .utabs { margin-top: 4px; }
 .lesson-body h2 { font-size: 24px; line-height: 30px; font-weight: 700; margin: var(--s5) 0 var(--s2); }
 .lesson-lede { font-size: 17px; line-height: 26px; color: var(--muted); margin: 0; }
@@ -614,7 +614,7 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 .mode-card.is-selected { background: #1f2c25; border-color: rgb(169 201 183 / 60%); }
 :root[data-mode="light"] .mode-card.is-selected { background: var(--green-pale); }
 .mode-check { top: -8px; right: -8px; width: 26px; height: 26px; background: var(--sage); color: #0e110f; box-shadow: 0 0 0 3px var(--bg); }
-.mode-check .icon path { stroke-width: 3; }
+.mode-check .icon :is(path, circle) { stroke-width: 3; }
 .import-prefs { min-height: 60px; border: 1px solid var(--line); border-radius: 16px; }
 .add-page form > .btn-primary { min-height: 56px; font-size: 18px; border-radius: 18px; }
 

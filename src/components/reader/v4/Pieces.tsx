@@ -5,6 +5,7 @@
  * aucune pièce n'est tronquée, réduite ou masquée. Rendu serveur, sans HTML injecté.
  */
 import { Fragment } from "react";
+import { Icon, type IconName } from "@/components/Icon";
 import type { Block, Evidence, ExerciseSet, ExplanationObject, ReportBlueprint, SourceSegment, VisualSpec } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
 import { parseRich, splitParagraph } from "@/lib/reader/rich";
@@ -83,8 +84,8 @@ function attrs(a: PieceAttrs) {
   };
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <span className="block-label">{children}</span>;
+function Label({ icon, children }: { icon?: IconName; children: React.ReactNode }) {
+  return <span className="block-label">{icon && <Icon name={icon} size={14} />}{children}</span>;
 }
 
 /** Une pièce par bloc ; une liste longue est découpée en groupes (numérotation conservée). */
@@ -103,7 +104,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
   );
   switch (b.type) {
     case "fact":
-      if (b.emphasis === "key") return [piece("block block-key", <><Label>{t.lim.keyIdea}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
+      if (b.emphasis === "key") return [piece("block block-key", <><Label icon="key-idea">{t.lim.keyIdea}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
       if (float) return [piece("block", <p><Rich text={b.text} ctx={ctx} /> {refs}</p>)];
       // Long paragraphe : paragraphes successifs (fins de phrase), références après la dernière.
       return splitParagraph(b.text).map((part, k, all) => (
@@ -115,13 +116,13 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
       return [
         piece(
           "block block-definition",
-          <><Label>{t.lim.definition}</Label><p><dfn>{b.term}</dfn> — <Rich text={b.text} ctx={ctx} linkTerms={false} /> {refs}</p></>,
+          <><Label icon="definition">{t.lim.definition}</Label><p><dfn>{b.term}</dfn> — <Rich text={b.text} ctx={ctx} linkTerms={false} /> {refs}</p></>,
         ),
       ];
     case "inference":
       return [piece("block block-inference", <><Label>{t.lim.inference}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
     case "caution":
-      return [piece("block block-caution", <><Label>{t.lim.caution}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
+      return [piece("block block-caution", <><Label icon="caution">{t.lim.caution}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
     case "complement":
       return [piece("block block-complement", <><Label>{t.lim.complement}</Label><p><Rich text={b.text} ctx={ctx} linkTerms={false} /></p></>)];
     case "analogy":
@@ -133,7 +134,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
           {v.limit && <p className="limit"><strong>{t.lim.limit}</strong> {v.limit}</p>}
         </Fragment>
       ));
-      return [piece(`block block-${b.type === "analogy" ? "analogy" : "example"}`, <ExampleBlock label={b.type === "analogy" ? t.lim.analogy : t.lim.example} variants={variants} />)];
+      return [piece(`block block-${b.type === "analogy" ? "analogy" : "example"}`, <ExampleBlock icon={b.type === "analogy" ? "analogy" : "example"} label={b.type === "analogy" ? t.lim.analogy : t.lim.example} variants={variants} />)];
     }
     case "formula":
       return [
@@ -420,7 +421,7 @@ export function composeLimpid({
     if (s.retain?.length) {
       out.push(
         <aside key={`ret-${s.id}`} id={`ret_${s.id}`} className="piece retain" aria-label={t.lim.retain} {...attrs({ section: s.id })}>
-          <p className="retain-title">{t.lim.retain}</p>
+          <p className="retain-title"><Icon name="retain" size={14} />{t.lim.retain}</p>
           <ul>{s.retain.map((r, i) => <li key={i}><Rich text={r} ctx={ctx} linkTerms={false} /></li>)}</ul>
         </aside>,
       );

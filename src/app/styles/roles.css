@@ -47,3 +47,8 @@
 
 /* Réussite : vert ; erreur : jamais un rouge punitif (pointillé + « À revoir ») */
 .cquiz-choice.is-right { border-color: var(--role-success); background: var(--tint-success); }
+
+/* Icône de rôle devant l'étiquette (même couleur que l'étiquette) */
+.block-label { display: flex; align-items: center; gap: 6px; }
+.retain-title { display: inline-flex; align-items: center; gap: 6px; }
+.block-label .icon, .retain-title .icon { flex: none; }

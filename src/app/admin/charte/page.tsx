@@ -21,6 +21,15 @@ const roleClass: Record<(typeof ROLE_ORDER)[number], { dot: string; text: string
   success: { dot: "tw:bg-success", text: "tw:text-success" },
   example: { dot: "tw:bg-example", text: "tw:text-example" },
 };
+const ROLE_ICONS = [
+  { icon: "definition", role: "notion" },
+  { icon: "formula", role: "notion" },
+  { icon: "key-idea", role: "alert" },
+  { icon: "caution", role: "alert" },
+  { icon: "example", role: "example" },
+  { icon: "analogy", role: "example" },
+  { icon: "success", role: "success" },
+] as const;
 const surfaceClass: Record<keyof typeof SURFACES, string> = { bg: "tw:bg-bg", surface: "tw:bg-surface", elevated: "tw:bg-elevated" };
 const PAIRS = { ...TEXT, ...ROLES };
 
@@ -53,7 +62,7 @@ export default async function ChartePage() {
         <h2 id="ch-text">{t.textTitle}</h2>
         <p className="tw:text-muted">{t.textIntro}</p>
         <Themes labels={labels}>
-          <ul className="tw:grid tw:gap-3">
+          <ul className="tw:m-0 tw:grid tw:list-none tw:gap-3 tw:p-0">
             {ROLE_ORDER.map((r) => (
               <li key={r} className="tw:grid tw:grid-cols-[28px_1fr] tw:items-start tw:gap-3">
                 <span className={`tw:mt-1 tw:block tw:size-5 tw:rounded-pill ${roleClass[r].dot}`} aria-hidden="true" />
@@ -137,9 +146,27 @@ export default async function ChartePage() {
         </div>
       </section>
 
+      <section className="tw:mt-8 tw:grid tw:gap-4" aria-labelledby="ch-role-icons">
+        <h2 id="ch-role-icons">{t.roleIconsTitle}</h2>
+        <p className="tw:text-muted">{t.roleIconsIntro}</p>
+        <Themes labels={labels}>
+          <ul className="tw:m-0 tw:flex tw:list-none tw:flex-wrap tw:gap-x-5 tw:gap-y-3 tw:p-0">
+            {ROLE_ICONS.map((r) => (
+              <li key={r.icon} className={`role-${r.role} text-role tw:flex tw:items-center tw:gap-2 tw:text-caption tw:font-bold tw:uppercase tw:tracking-label`}>
+                <Icon name={r.icon} size={16} />
+                {t.roleIconLabels[r.icon]}
+              </li>
+            ))}
+            <li className="tw:flex tw:items-center tw:gap-2 tw:text-caption tw:font-bold tw:uppercase tw:tracking-label">
+              <span className="hl-mark tw:flex tw:items-center tw:gap-2"><Icon name="retain" size={16} />{t.roleIconLabels.retain}</span>
+            </li>
+          </ul>
+        </Themes>
+      </section>
+
       <section className="tw:mt-8 tw:grid tw:gap-3" aria-labelledby="ch-icons">
         <h2 id="ch-icons">{t.iconsTitle}</h2>
-        <ul className="tw:grid tw:grid-cols-[repeat(auto-fill,minmax(88px,1fr))] tw:gap-2">
+        <ul className="tw:m-0 tw:grid tw:list-none tw:grid-cols-[repeat(auto-fill,minmax(88px,1fr))] tw:gap-2 tw:p-0">
           {ICON_NAMES.map((n) => (
             <li key={n} className="tw:grid tw:justify-items-center tw:gap-1 tw:rounded-control tw:border tw:border-line tw:p-2 tw:text-caption tw:text-muted">
               <Icon name={n} size={24} />
