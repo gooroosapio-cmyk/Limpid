@@ -113,6 +113,7 @@ export function InstallPrompt() {
         <button type="button" className="btn btn-primary btn-block" onClick={install}>{t.pwa.installBtn}</button>
       )}
       <button type="button" className="btn btn-block" onClick={dismiss}>{mode === "ios" ? t.pwa.understood : t.pwa.later}</button>
+      <p className="muted small install-hint">{t.pwa.installLaterHint}</p>
     </dialog>
   );
 }

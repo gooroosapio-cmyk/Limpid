@@ -762,6 +762,7 @@ export const en: Dict = {
   pwa: {
     installSub: "Open your courses in one tap from your home screen, even offline.",
     installBtn: "Install the app",
+    installLaterHint: "You can also install it at any time from Settings.",
     later: "Later",
     understood: "Got it",
     iosStep1: "Tap the browser's Share button",
@@ -1353,6 +1354,10 @@ export const en: Dict = {
     quizWrong: "To review.",
     quizGood: (g: number, n: number) => `${g} correct answer${s(g)} out of ${n}`,
     quizAgain: "Start again",
+    quizNext: "Next",
+    quizFinish: "Finish",
+    quizLater: "Later",
+    quizNewLot: "Other questions",
     chapterLabel: (i: number) => `Chapter ${i}`,
     retain: "Key takeaways",
     checkChapter: (n: number) => `Check this chapter · ${n} question${n > 1 ? "s" : ""}`,

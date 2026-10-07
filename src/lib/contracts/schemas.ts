@@ -304,7 +304,8 @@ export const Section = z.strictObject({
   /** V6 : « L'essentiel » du chapitre, en puces. */
   essential: z.array(shortText).max(6).optional(),
   /** V6 : QCM facultatif de fin de chapitre. */
-  quiz: z.array(ChapterQuestion).max(3).optional(),
+  /** Banque du chapitre (2 à 8) ; le lecteur en présente 2 ou 3 par visite. */
+  quiz: z.array(ChapterQuestion).max(8).optional(),
 });
 export type Section = z.infer<typeof Section>;
 

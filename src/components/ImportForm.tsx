@@ -13,7 +13,6 @@ import { useLang, useT } from "@/lib/i18n/client";
 import { ACTION_PRICES } from "@/lib/billing/catalog";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 
-type Tab = "file" | "link" | "text";
 type Phase = { step: "idle" } | { step: "reading" } | { step: "creating" };
 type Output = "common" | "each";
 
@@ -43,7 +42,6 @@ type V6Mode = (typeof V6_MODES)[number];
 /** Envois et lectures simultanés au plus (le reste attend son tour). */
 const CONCURRENCY = 2;
 
-const MAX_PASTED = 50_000;
 const MODE_ICONS: Record<Mode, IconName> = { tres_simple: "bulb", claire: "book", resume: "file", revision: "bars", auto: "spark", livre: "book", parcours: "list", atelier: "bars" };
 
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
@@ -151,33 +149,24 @@ function precheck(t: Dict, f: File, maxFileMb: number, lang: string): string | n
  */
 export function ImportForm({
   enabled,
-  urlEnabled,
   maxFileMb = 20,
   maxPages = 100,
   maxFiles = 5,
-  initialTab = "file",
   defaultMode = "auto",
 }: {
   enabled: boolean;
-  urlEnabled: boolean;
   maxFileMb?: number;
   maxPages?: number;
   maxFiles?: number;
-  /** Onglet ouvert à l'arrivée (menu : texte, PDF, lien). */
-  initialTab?: Tab;
   /** Dernier choix explicite (approche V6), sinon Par défaut. */
   defaultMode?: Mode;
 }) {
   const t = useT();
   const lang = useLang();
-  const tabs: Tab[] = urlEnabled ? ["file", "link", "text"] : ["file", "text"];
-  const [tab, setTab] = useState<Tab>(tabs.includes(initialTab) ? initialTab : "file");
   // V6 : un seul réglage, « Votre approche » (aucun niveau) ; un ancien choix V4 revient à Par défaut.
   const [mode, setMode] = useState<V6Mode>((V6_MODES as readonly string[]).includes(defaultMode) ? (defaultMode as V6Mode) : "auto");
   const [items, setItems] = useState<Item[]>([]);
   const [output, setOutput] = useState<Output>("common");
-  const [url, setUrl] = useState("");
-  const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
   const [error, setError] = useState<string | null>(null);
   /** Message sous la console (sélection trop nombreuse) ; les fichiers déjà là restent. */
@@ -288,7 +277,7 @@ export function ImportForm({
 
   const readyItems = items.filter((x) => x.status === "ready" && x.prepared);
   // Devis fixe dès que les documents sont lus (Limpid commun) : affiché sur le bouton.
-  const quoteKey = tab === "file" && !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
+  const quoteKey = !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
   const quote = quoted && quoted.key === quoteKey ? quoted.credits : null;
   useEffect(() => {
     if (!quoteKey) return;
@@ -303,39 +292,31 @@ export function ImportForm({
   }, [quoteKey]);
   const pendingItems = items.filter((x) => x.status !== "ready" && x.status !== "error");
   const failedItems = items.filter((x) => x.status === "error");
-  const many = tab === "file" && items.length > 1;
+  const many = items.length > 1;
   const ready =
     enabled &&
     !busy &&
-    (tab === "file"
-      ? readyItems.length > 0 && pendingItems.length === 0 && failedItems.length === 0
-      : tab === "link"
-        ? /^https?:\/\/\S+\.\S+/.test(url.trim())
-        : text.trim().length >= 20);
+    readyItems.length > 0 &&
+    pendingItems.length === 0 &&
+    failedItems.length === 0;
 
   /** Condition manquante, dite à côté du bouton désactivé. */
   const missing = !enabled || busy
     ? null
-    : tab === "file"
-      ? failedItems.length > 0
-        ? t.add.v2.needFix
-        : pendingItems.length > 0
-          ? t.add.v2.needWait
-          : readyItems.length === 0
-            ? t.add.v2.needFile
-            : null
-      : tab === "link"
-        ? (/^https?:\/\/\S+\.\S+/.test(url.trim()) ? null : t.add.v2.needLink)
-        : text.trim().length >= 20
-          ? null
-          : t.add.v2.needText;
+    : failedItems.length > 0
+      ? t.add.v2.needFix
+      : pendingItems.length > 0
+        ? t.add.v2.needWait
+        : readyItems.length === 0
+          ? t.add.v2.needFile
+          : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ready) return;
     setError(null);
     try {
-      if (tab === "file" && many && output === "each") {
+      if (many && output === "each") {
         setPhase({ step: "creating" });
         const data = await postJson(
           "/api/reports/batch",
@@ -348,11 +329,7 @@ export function ImportForm({
         router.push("/bibliotheque");
         return;
       }
-      let sourceIds = readyItems.map((x) => x.prepared!.sourceId);
-      if (tab !== "file") {
-        setPhase({ step: "reading" });
-        sourceIds = [(await prepare(tab === "link" ? { source: "url", url: url.trim() } : { source: "text", text })).sourceId];
-      }
+      const sourceIds = readyItems.map((x) => x.prepared!.sourceId);
       setPhase({ step: "creating" });
       const data = await postJson("/api/reports", { source_ids: sourceIds, mode, idempotency_key: key.current }, t.add.failed, t);
       router.push(`/rapports/${String(data.reportId)}`);
@@ -366,13 +343,6 @@ export function ImportForm({
       setPhase({ step: "idle" });
       key.current = crypto.randomUUID();
     }
-  }
-
-  function onTabKey(e: React.KeyboardEvent, i: number) {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
-    setTab(next);
-    document.getElementById(`${base}-tab-${next}`)?.focus();
   }
 
   const statusOf = (it: Item) =>
@@ -393,28 +363,8 @@ export function ImportForm({
 
   return (
     <form onSubmit={submit} aria-busy={busy} className="import">
-      <div className="seg import-tabs" role="tablist" aria-label={t.add.tabsLabel}>
-        {tabs.map((id, i) => (
-          <button
-            key={id}
-            id={`${base}-tab-${id}`}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            aria-controls={`${base}-panel`}
-            tabIndex={tab === id ? 0 : -1}
-            onClick={() => setTab(id)}
-            onKeyDown={(e) => onTabKey(e, i)}
-            disabled={busy}
-          >
-            <Icon name={id === "file" ? "file" : id === "link" ? "link" : "lines"} size={24} /> {t.add.tabs[id]}
-          </button>
-        ))}
-      </div>
-
-      <div id={`${base}-panel`} role="tabpanel" aria-labelledby={`${base}-tab-${tab}`} className="import-panel">
-        {tab === "file" && (
-          <>
+      <div className="import-panel">
+        <>
             <input
               ref={inputRef}
               id={`${base}-file`}
@@ -515,29 +465,7 @@ export function ImportForm({
               </>
             )}
             {consoleNote && <p className="import-note" role="alert">{consoleNote}</p>}
-          </>
-        )}
-        {tab === "link" && (
-          <>
-            <label htmlFor={`${base}-url`}>{t.add.linkLabel}</label>
-            <input id={`${base}-url`} type="url" inputMode="url" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} autoComplete="off" />
-          </>
-        )}
-        {tab === "text" && (
-          <>
-            <label htmlFor={`${base}-text`}>{t.add.textLabel}</label>
-            <textarea
-              id={`${base}-text`}
-              value={text}
-              maxLength={MAX_PASTED}
-              placeholder={t.add.textPlaceholder}
-              onChange={(e) => setText(e.target.value)}
-              disabled={busy}
-              aria-describedby={`${base}-count`}
-            />
-            <p id={`${base}-count`} className="muted small text-count">{t.add.textCount(text.length, MAX_PASTED)}</p>
-          </>
-        )}
+        </>
       </div>
 
       {many && (

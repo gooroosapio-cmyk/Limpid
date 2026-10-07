@@ -403,13 +403,12 @@ export function LimpidReader({
               <p className="chapter-end-title">{t.lim.chapterEnd}</p>
               <p className="chapter-end-sub">{index < chapters.length - 1 ? t.lim.chapterEndNext : t.lim.chapterEndLast}</p>
             </div>
-            {chapters.map((c, i) =>
-              quizzes[c.id]?.length ? (
-                <div key={c.id} className="chapter-end-quiz" hidden={i !== index}>
-                  <ChapterQuiz sectionId={c.id} quiz={quizzes[c.id]!} onSkip={() => nextRef.current?.focus()} />
-                </div>
-              ) : null,
-            )}
+            {/* Seul le chapitre ouvert : y revenir plus tard remonte le QCM = nouvelle visite, nouveau lot. */}
+            {chapters[index] && quizzes[chapters[index].id]?.length ? (
+              <div key={chapters[index].id} className="chapter-end-quiz">
+                <ChapterQuiz sectionId={chapters[index].id} quiz={quizzes[chapters[index].id]!} onSkip={() => nextRef.current?.focus()} />
+              </div>
+            ) : null}
             <nav className="chapter-nav" aria-label={t.lim.chapterNav}>
               <button type="button" className="btn chapter-prev" disabled={index === 0} onClick={() => openChapter(index - 1)}>
                 <Icon name="back" size={18} /> {t.lim.prevChapter}

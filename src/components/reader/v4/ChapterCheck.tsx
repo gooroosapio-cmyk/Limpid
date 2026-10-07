@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 import type { ChapterQuestion, Exercise } from "@/lib/contracts/schemas";
 import { useT } from "@/lib/i18n/client";
+import { drawLot } from "@/lib/reader/quiz-draw";
 import { useReader } from "./context";
 import { ExerciseView, type ExerciseResult } from "./ExerciseView";
 
@@ -108,27 +109,55 @@ interface QuizAnswer {
 }
 
 /**
- * QCM de chapitre (kit V6, § 09) : dans le flux, en fin de chapitre, jamais dans une fenêtre.
- * « Facultatif · n question(s) », questions empilées, choix uniques ; Valider corrige sur place
- * (explication du choix fait, sans appel IA), « Revoir ce point » mène au bloc concerné. Passer
- * ne compte ni comme réussite ni comme échec et ne bloque jamais le chapitre suivant ; aucun
- * score de maîtrise, seulement « x bonnes réponses sur n » une fois toutes les réponses données.
+ * Mini-QCM de chapitre : à chaque visite, un lot de 2 questions (3 si la banque est riche)
+ * est tiré localement dans la banque du chapitre (2 à 8), en évitant le lot précédent ; aucun
+ * appel IA. Une question à la fois : choisir → Valider → correction (verte ou rouge, avec
+ * texte et icône) et explication → Suivant. « Plus tard » ne compte ni comme réussite ni
+ * comme échec et ne bloque jamais la suite.
  */
 export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; quiz: ChapterQuestion[]; onSkip?: () => void }) {
   const t = useT();
   const reader = useReader();
   const base = useId();
-  const items = quiz.slice(0, 3);
-  const [picked, setPicked] = useState<Record<string, number>>({});
-  const [answers, setAnswers] = useState<Record<string, QuizAnswer>>({});
+  const memo = `limpid-quiz:${reader.reportId ?? "demo"}:${sectionId}`;
+  // Tirage après le montage (le hasard ne doit pas différer entre serveur et navigateur).
+  const [items, setItems] = useState<ChapterQuestion[] | null>(null);
+  const [step, setStep] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [skipped, setSkipped] = useState(false);
-  const [run, setRun] = useState(0);
-  const done = items.every((q) => answers[q.id]);
-  const good = items.filter((q) => answers[q.id]?.correct).length;
+  const promptRef = useRef<HTMLLegendElement>(null);
 
-  async function record(all: Record<string, QuizAnswer>) {
-    if (!reader.reportId || !reader.versionId) return;
-    const list = items.map((q) => ({ id: q.id, correct: all[q.id]?.correct ?? null, ratio: null }));
+  const draw = useCallback(
+    (avoid?: string[]) => {
+      let previous = avoid ?? [];
+      try {
+        if (!avoid) previous = JSON.parse(sessionStorage.getItem(memo) ?? "[]") as string[];
+      } catch {}
+      const lot = drawLot(quiz, previous);
+      try {
+        sessionStorage.setItem(memo, JSON.stringify(lot.map((q) => q.id)));
+      } catch {}
+      setItems(lot);
+      setStep(0);
+      setPicked(null);
+      setAnswers([]);
+      setSkipped(false);
+    },
+    [quiz, memo],
+  );
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- tirage local à l'arrivée sur le chapitre
+  useEffect(() => draw(), [draw]);
+
+  if (!items?.length) return null;
+  const q = items[step]!;
+  const answer = answers[step];
+  const done = items.every((_, k) => answers[k]);
+  const good = answers.filter((a) => a.correct).length;
+
+  async function record(all: QuizAnswer[]) {
+    if (!reader.reportId || !reader.versionId || !items) return;
+    const list = items.map((x, k) => ({ id: x.id, correct: all[k]?.correct ?? null, ratio: null }));
     await fetch(`/api/reports/${reader.reportId}/attempts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -136,81 +165,92 @@ export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; qu
     }).catch(() => undefined);
   }
 
-  function validate(q: ChapterQuestion) {
-    const choice = picked[q.id];
-    if (choice === undefined || answers[q.id]) return;
-    const all = { ...answers, [q.id]: { choice, correct: choice === q.correct_index } };
+  function validate() {
+    if (picked === null || answer || !items) return;
+    const all = [...answers];
+    all[step] = { choice: picked, correct: picked === q.correct_index };
     setAnswers(all);
-    if (items.every((x) => all[x.id])) void record(all);
+    if (all.filter(Boolean).length === items.length) void record(all);
   }
 
-  function again() {
-    setPicked({});
-    setAnswers({});
-    setSkipped(false);
-    setRun((r) => r + 1);
+  function next() {
+    setStep((s) => s + 1);
+    setPicked(null);
+    requestAnimationFrame(() => promptRef.current?.focus());
   }
 
+  const name = `${base}-${q.id}`;
   return (
     <section className="cquiz" aria-labelledby={`${base}-h`}>
       <h3 id={`${base}-h`} className="cquiz-head">{t.lim.quizOptional(items.length)}</h3>
-      {items.map((q, qi) => {
-        const answer = answers[q.id];
-        const name = `${base}-${run}-${q.id}`;
-        return (
-          <fieldset key={`${run}-${q.id}`} className="cquiz-q" data-answered={answer ? "" : undefined}>
-            <legend className="cquiz-prompt">{items.length > 1 ? `${qi + 1}. ` : ""}{q.prompt}</legend>
-            <div className="cquiz-choices">
-              {q.choices.map((c, ci) => {
-                const state = !answer ? "" : ci === answer.choice ? (answer.correct ? " is-right" : " is-wrong") : ci === q.correct_index ? " is-answer" : "";
-                return (
-                  <label key={ci} className={`cquiz-choice${state}`}>
-                    <input type="radio" name={name} value={ci} checked={picked[q.id] === ci} disabled={!!answer} onChange={() => setPicked((p) => ({ ...p, [q.id]: ci }))} />
-                    <span>{c}</span>
-                  </label>
-                );
-              })}
-            </div>
-            {!answer && (
-              <button type="button" className="btn cquiz-validate" disabled={picked[q.id] === undefined} onClick={() => validate(q)}>
-                {t.lim.validate}
-              </button>
+      {skipped ? (
+        <p className="muted small" role="status">{t.lim.quizSkipped}</p>
+      ) : (
+        <>
+        <p className="quiz-progress cquiz-progress">{t.lim.question(step + 1, items.length)}</p>
+        <fieldset key={q.id} className="cquiz-q" data-answered={answer ? "" : undefined}>
+          <legend ref={promptRef} tabIndex={-1} className="cquiz-prompt">{q.prompt}</legend>
+          <div className="cquiz-choices">
+            {q.choices.map((c, ci) => {
+              const state = !answer ? "" : ci === answer.choice ? (answer.correct ? " is-right" : " is-wrong") : ci === q.correct_index ? " is-answer" : "";
+              return (
+                <label key={ci} className={`cquiz-choice${state}`}>
+                  <input type="radio" name={name} value={ci} checked={picked === ci} disabled={!!answer} onChange={() => setPicked(ci)} />
+                  <span>{c}</span>
+                </label>
+              );
+            })}
+          </div>
+          {!answer && (
+            <button type="button" className="btn cquiz-validate" disabled={picked === null} onClick={validate}>
+              {t.lim.validate}
+            </button>
+          )}
+          <div aria-live="polite">
+            {answer && (
+              <div className={`cquiz-feedback ${answer.correct ? "is-right" : "is-wrong"}`}>
+                <p>
+                  <strong>
+                    <Icon name={answer.correct ? "check" : "alert"} size={16} /> {answer.correct ? t.lim.quizRight : t.lim.quizWrong}
+                  </strong>{" "}
+                  {q.explanations[answer.choice]}
+                </p>
+                {!answer.correct && q.revisit_block_id && (
+                  <button type="button" className="btn cquiz-revisit" onClick={() => reader.goTo(q.revisit_block_id!)}>
+                    <Icon name="book" size={16} /> {t.lim.quizRevisit}
+                  </button>
+                )}
+              </div>
             )}
-            <div aria-live="polite">
-              {answer && (
-                <div className={`cquiz-feedback ${answer.correct ? "is-right" : "is-wrong"}`}>
-                  <p>
-                    <strong>{answer.correct ? <><Icon name="check" size={16} /> {t.lim.quizRight}</> : t.lim.quizWrong}</strong>{" "}
-                    {q.explanations[answer.choice]}
-                  </p>
-                  {q.revisit_block_id && (
-                    <button type="button" className="btn cquiz-revisit" onClick={() => reader.goTo(q.revisit_block_id!)}>
-                      <Icon name="book" size={16} /> {t.lim.quizRevisit}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </fieldset>
-        );
-      })}
+          </div>
+          {answer && step < items.length - 1 && (
+            <button type="button" className="btn btn-primary cquiz-next" onClick={next}>
+              {t.lim.quizNext}
+            </button>
+          )}
+        </fieldset>
+        </>
+      )}
       {done ? (
         <div className="cquiz-done">
           <p role="status">{t.lim.quizGood(good, items.length)}</p>
-          <button type="button" className="btn-link" onClick={again}>{t.lim.quizAgain}</button>
+          {quiz.length > items.length && (
+            <button type="button" className="btn-link" onClick={() => draw(items.map((x) => x.id))}>{t.lim.quizNewLot}</button>
+          )}
         </div>
       ) : (
-        <button
-          type="button"
-          className="btn cquiz-skip"
-          aria-pressed={skipped}
-          onClick={() => {
-            setSkipped(true);
-            onSkip?.();
-          }}
-        >
-          {skipped ? t.lim.quizSkipped : t.lim.quizSkip}
-        </button>
+        !skipped && (
+          <button
+            type="button"
+            className="btn cquiz-skip"
+            onClick={() => {
+              setSkipped(true);
+              onSkip?.();
+            }}
+          >
+            {t.lim.quizLater}
+          </button>
+        )
       )}
       <p className="muted small cquiz-note">{t.lim.quizNote}</p>
     </section>
