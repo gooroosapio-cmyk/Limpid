@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon, ICON_NAMES } from "@/components/Icon";
+import { Illustration } from "@/components/Illustration";
 import { Screen } from "@/components/shell/Screen";
 import { requireAdmin } from "@/lib/admin";
 import { contrastMatrix, ROLES, SURFACES, TEXT } from "@/lib/design/palette";
@@ -127,6 +128,21 @@ export default async function ChartePage() {
             </div>
           </div>
         </Themes>
+      </section>
+
+      <section className="tw:mt-8 tw:grid tw:gap-4" aria-labelledby="ch-motion">
+        <h2 id="ch-motion">{t.motionTitle}</h2>
+        <ul className="tw:m-0 tw:grid tw:list-disc tw:gap-2 tw:pl-5 tw:text-base">
+          {t.motionRules.map((r) => <li key={r}>{r}</li>)}
+        </ul>
+        <div className="tw:grid tw:gap-3 tw:md:grid-cols-[2fr_3fr]">
+          <Illustration name="offres" fallback="ambre" className="charte-art tw:h-56 tw:rounded-card" />
+          <div className="tw:grid tw:gap-3">
+            {t.motionDemo.map((d) => (
+              <div key={d} data-reveal className="tw:rounded-card tw:border tw:border-line tw:bg-surface tw:p-4 tw:font-semibold">{d}</div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="tw:mt-8 tw:grid tw:gap-3" aria-labelledby="ch-contrast">
