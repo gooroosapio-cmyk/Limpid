@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { Icon } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
 import { computeCalculation, formatNumber, formulaText, inDomain, resultUnit, variableDomain, type FormulaId } from "@/lib/render/calc";
 
@@ -64,7 +65,7 @@ export function Calculation({
   return (
     <div className="v6-card v6-calc">
       <div className="v6-card-head">
-        <span className="block-label">{t.formulas[formula]}</span>
+        <span className="block-label"><Icon name="formula" size={14} />{t.formulas[formula]}</span>
         {example && <span className="v6-pill">{t.example}</span>}
       </div>
       <p className="v6-intro">{intro} {refs}</p>

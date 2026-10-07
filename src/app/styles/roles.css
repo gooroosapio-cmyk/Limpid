@@ -1,0 +1,54 @@
+/*
+ * Rôles pédagogiques dans le lecteur (charte : /admin/charte).
+ *   bleu   notion     définition, formule, terme du glossaire
+ *   rouge  important  idée clé (étoile) · attention (triangle) : même couleur, icônes différentes
+ *   violet exemple    exemple, analogie, calcul résolu
+ *   vert   réussite   bonne réponse
+ *   jaune  à retenir  marqueur de fond
+ * Les couleurs portent l'étiquette, le filet et l'icône ; le corps du texte reste en encre.
+ */
+
+.block-definition, .block-formula, .term { --role: var(--role-notion); --tint: var(--tint-notion); }
+.block-key, .block-caution { --role: var(--role-alert); --tint: var(--tint-alert); }
+.block-analogy, .block-example, .v6-calc { --role: var(--role-example); --tint: var(--tint-example); }
+
+.block-definition .block-label, .block-formula .block-label,
+.block-key .block-label, .block-caution .block-label,
+.block-analogy .block-label, .block-example .block-label,
+.v6-calc .block-label { color: var(--role); }
+
+.block-definition { padding-left: 16px; border-left: 3px solid var(--role); }
+.block-definition dfn { color: var(--role); }
+.block-key { background: var(--tint); border-left: 3px solid var(--role); }
+.block-caution { border-left-color: var(--role); }
+.block-analogy, .block-example { border-left: 3px solid var(--role); }
+.block-example { background: var(--surface); }
+.block-analogy { background: var(--tint); }
+.block-analogy .limit { color: var(--muted); }
+.v6-calc { border-left: 3px solid var(--role); }
+
+/* Termes du glossaire : bleu notion, souligné en pointillé, ouvre l'explication */
+.term {
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-decoration: underline dotted var(--role);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}
+.term:hover, .term[aria-expanded="true"] { background: var(--tint); color: var(--ink); text-decoration-style: solid; }
+
+/* À retenir : marqueur jaune */
+.retain {
+  border-left-color: var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 10%, transparent);
+}
+.retain-title { display: inline-block; background: var(--mark); color: var(--ink); padding: 1px 6px; border-radius: 3px; }
+
+/* Réussite : vert ; erreur : jamais un rouge punitif (pointillé + « À revoir ») */
+.cquiz-choice.is-right { border-color: var(--role-success); background: var(--tint-success); }
+
+/* Icône de rôle devant l'étiquette (même couleur que l'étiquette) */
+.block-label { display: flex; align-items: center; gap: 6px; }
+.retain-title { display: inline-flex; align-items: center; gap: 6px; }
+.block-label .icon, .retain-title .icon { flex: none; }

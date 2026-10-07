@@ -4,30 +4,7 @@
 
 /* Limpid V2 « Galerie éditoriale » : suit le mode de l'appareil (sombre ou clair), choix possible ; Inter seule. */
 :root {
-  /* Palette V2 (galerie sombre) */
-  --bg: #0e110f;
-  --surface: #171d19;
-  --elevated: #212a24;
-  --ink: #f5f4ec;
-  --muted: #aeb6ae;
-  --yellow: #f1d94e;
-  --yellow-hover: #dac13a;
-  --on-yellow: #15180f;
-  --sage: #a9c9b7;
-  --green: var(--sage);
-  --danger: #e4a69b;
-  --line: rgb(245 244 236 / 12%);
-  --line-strong: rgb(245 244 236 / 22%);
-  --soft: #1c231e;
-  --pale: rgb(241 217 78 / 14%);
-  --green-pale: rgb(169 201 183 / 14%);
-  --danger-pale: rgb(228 166 155 / 14%);
-  --glass: rgb(25 32 27 / 90%);
-  --backdrop: rgb(0 0 0 / 62%);
-  --shadow: 0 12px 32px rgb(0 0 0 / 18%);
-  --shadow-lift: 0 16px 40px rgb(0 0 0 / 32%);
-  --halo: radial-gradient(60% 80% at 85% 0%, rgb(241 217 78 / 8%), transparent 70%);
-
+  /* Couleurs : voir tokens.css (source unique). */
   /* Anciens noms conservés (composants existants) */
   --ivoire: var(--bg); --encre: var(--ink); --jaune: var(--yellow); --jaune-doux: var(--pale);
   --vert: var(--green); --gris: var(--muted); --blanc: var(--surface); --bordure: var(--line);
@@ -55,40 +32,13 @@
   --t-press: 110ms; --t-release: 160ms; --t-route: 200ms; --t-tab: 180ms; --t-panel: 240ms; --t-loop: 1800ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-  color-scheme: dark;
 }
 @media (max-width: 359px) { :root { --pad: 16px; } }
-
-/* Clair (« Papier ») : choisi explicitement, ou par défaut si l'appareil est en mode clair. */
-:root[data-mode="light"] {
-  --bg: #f5f4ec; --surface: #ffffff; --elevated: #efeee6; --ink: #1b1f1c; --muted: #565c56;
-  --yellow: #f1d94e; --yellow-hover: #dac13a; --on-yellow: #15180f;
-  --sage: #3f6b55; --danger: #a23b2a; --line: rgb(27 31 28 / 12%); --line-strong: rgb(27 31 28 / 24%);
-  --soft: #ebeae2; --pale: #faefb4; --green-pale: #e3ede6; --danger-pale: #f7e4e0;
-  --glass: rgb(255 255 255 / 92%); --backdrop: rgb(27 31 28 / 42%);
-  --shadow: 0 12px 32px rgb(27 31 28 / 10%); --shadow-lift: 0 16px 40px rgb(27 31 28 / 16%);
-  --halo: radial-gradient(60% 80% at 85% 0%, rgb(241 217 78 / 18%), transparent 70%);
-  color-scheme: light;
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-mode="dark"]):not([data-mode="light"]) {
-    --bg: #f5f4ec; --surface: #ffffff; --elevated: #efeee6; --ink: #1b1f1c; --muted: #565c56;
-    --yellow: #f1d94e; --yellow-hover: #dac13a; --on-yellow: #15180f;
-    --sage: #3f6b55; --danger: #a23b2a; --line: rgb(27 31 28 / 12%); --line-strong: rgb(27 31 28 / 24%);
-    --soft: #ebeae2; --pale: #faefb4; --green-pale: #e3ede6; --danger-pale: #f7e4e0;
-    --glass: rgb(255 255 255 / 92%); --backdrop: rgb(27 31 28 / 42%);
-    --shadow: 0 12px 32px rgb(27 31 28 / 10%); --shadow-lift: 0 16px 40px rgb(27 31 28 / 16%);
-    --halo: radial-gradient(60% 80% at 85% 0%, rgb(241 217 78 / 18%), transparent 70%);
-    color-scheme: light;
-  }
-}
 
 /* Confort de lecture (réglages de l'appareil, sans IA) */
 :root[data-text="petit"] { --scale: 0.92; }
 :root[data-text="grand"] { --scale: 1.12; }
 :root[data-text="tres-grand"] { --scale: 1.25; }
-:root[data-contrast="fort"] { --muted: #d6dbd4; --line: rgb(245 244 236 / 34%); }
-:root[data-contrast="fort"][data-mode="light"] { --muted: #3a3f3a; --line: rgb(27 31 28 / 40%); }
 
 /* ---------- Base ---------- */
 

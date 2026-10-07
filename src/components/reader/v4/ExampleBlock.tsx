@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Icon } from "@/components/Icon";
+import { Icon, type IconName } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
 
 /**
@@ -9,14 +9,14 @@ import { useT } from "@/lib/i18n/client";
  * l'exemple sur place, sans requête IA. Toutes les variantes sont superposées pour réserver
  * la hauteur de la plus longue : changer d'exemple ne décale ni ne coupe la page.
  */
-export function ExampleBlock({ label, variants }: { label: string; variants: React.ReactNode[] }) {
+export function ExampleBlock({ icon, label, variants }: { icon?: IconName; label: string; variants: React.ReactNode[] }) {
   const t = useT();
   const [i, setI] = useState(0);
   const n = variants.length;
   return (
     <div className="example-block">
       <div className="example-head">
-        <span className="block-label">{label}</span>
+        <span className="block-label">{icon && <Icon name={icon} size={14} />}{label}</span>
         {n > 1 && (
           <button type="button" className="example-next" onClick={() => setI((x) => (x + 1) % n)} aria-label={`${t.lim.otherExample} (${t.lim.exampleOf(((i + 1) % n) + 1, n)})`}>
             <Icon name="refresh" size={16} /> {t.lim.otherExample}
