@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import { riskyClaim, type GenerationInput } from "./pipeline";
 import type { AIProvider, StructuredRequest } from "./provider";
-import { capChapters, diagramContentOk, imageCaps, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -247,14 +247,19 @@ describe("moteur V5 : plan", () => {
     expect(unsourcedComponents([ok, bad, fictive, chart], statements)).toEqual(["blk_2"]);
   });
 
-  it("images selon la taille (court : 1 image + 1 SVG), aucune en résumé fidèle ou en texte seul", () => {
-    expect([imageCaps(5), imageCaps(20), imageCaps(21)]).toEqual([{ images: 1, svg: 1 }, { images: 2, svg: 1 }, { images: 3, svg: 2 }]);
+  it("images selon le forfait et l'approche (une place gardée à la couverture), aucune en résumé fidèle ou en texte seul", () => {
     const v = { kind: "vector", subject: "s", query_en: "q", purpose: "p", content: "" };
-    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1"], v), ch(["clm_2"], v), ch(["clm_3"], v), ch(["clm_4"], v)], excluded: [], limitations: [] };
-    // Court : le premier dessin reste SVG, le second devient une illustration simple, le reste est retiré.
-    expect(normalizePlanV5(draft, ko, input()).plan.chapters.map((c) => c.visual.kind)).toEqual(["vector", "illustration", "none", "none"]);
-    expect(normalizePlanV5(draft, ko, input({ mode: "resume" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
-    expect(normalizePlanV5(draft, ko, input({ visualMode: "aucun" })).plan.chapters.filter((c) => c.visual.kind !== "none")).toHaveLength(0);
+    const chapters = Array.from({ length: 6 }, (_, i) => ch([`clm_${(i % 4) + 1}`], v));
+    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters, excluded: [], limitations: [] };
+    const count = (o: Parameters<typeof input>[0]) => normalizePlanV5(draft, ko, input(o)).plan.chapters.filter((c) => c.visual.kind !== "none").length;
+    // Gratuit et Essentiel : 2 au total, dont 1 gardée pour la couverture.
+    expect(count({ tier: "free" })).toBe(1);
+    // Plus, livre interactif : 4 dont 1 pour la couverture.
+    expect(count({ tier: "plus", mode: "livre" })).toBe(3);
+    // Pro : 10 au plus ; ici limité par les 4 chapitres du plan (une image par chapitre).
+    expect(count({ tier: "pro", mode: "parcours" })).toBe(4);
+    expect(count({ tier: "pro", mode: "resume" })).toBe(0);
+    expect(count({ tier: "pro", visualMode: "aucun" })).toBe(0);
   });
 });
 

@@ -4,6 +4,7 @@
  * écritures passent par les fonctions SQL transactionnelles (verrou par compte).
  */
 import "server-only";
+import { aiTier, INTERNAL_PRO_QUOTAS, isInternalPro, type AiTier } from "./tier";
 import { ACTION_PRICES, PLANS, quotaWindows, REPORT_UNIT_ACTIONS, type Action, type PlanCode } from "./catalog";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -22,6 +23,10 @@ export interface Wallet {
   nextGrant: { at: string; credits: number } | null;
   /** Plafonds de rapports (jour UTC, semaine du lundi) ; null : administrateur, sans plafond. */
   quotas: Quotas | null;
+  /** Parcours IA (OCR, Sol, images) : Gratuit et Essentiel → free, Plus, Pro. */
+  aiTier: AiTier;
+  /** Droit Pro interne (adresse configurée) : parcours Pro, aucune offre payée simulée. */
+  internalPro: boolean;
 }
 
 export interface Quotas {
@@ -176,10 +181,10 @@ export async function getWallet(userId: string): Promise<Wallet> {
   // Plafonds de l'offre (le mode Recharge suit ceux d'Essentiel). Administrateurs : sans
   // plafond de rythme, mais les crédits restent dus (jamais d'accès illimité).
   const limits = PLANS[mode === "free" ? "free" : plan].limits;
-  const quotas =
-    profile?.role === "admin"
-      ? null
-      : quotaState((unitRows ?? []).map((r) => r.created_at as string), { day: limits.dailyReports, week: limits.weeklyReports }, now);
+  // Droit Pro interne : plafonds élevés mais bornés (jamais illimités).
+  const internalPro = isInternalPro(user?.user?.email);
+  const rhythm = internalPro ? INTERNAL_PRO_QUOTAS : { day: limits.dailyReports, week: limits.weeklyReports };
+  const quotas = profile?.role === "admin" ? null : quotaState((unitRows ?? []).map((r) => r.created_at as string), rhythm, now);
   return {
     available: valid.reduce((n, l) => n + l.available, 0),
     reserved: lotRows.reduce((n, l) => n + l.reserved, 0),
@@ -189,6 +194,8 @@ export async function getWallet(userId: string): Promise<Wallet> {
     accessEndsAt,
     nextGrant,
     quotas,
+    aiTier: aiTier(plan, mode, internalPro),
+    internalPro,
   };
 }
 

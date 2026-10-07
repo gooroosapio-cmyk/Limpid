@@ -13,6 +13,7 @@
  * Chaque étape validée est enregistrée (fragments, plan, chapitres) : une tâche longue
  * s'étend sur plusieurs invocations sans refaire ni repayer le travail fait.
  */
+import { imageCap } from "@/lib/billing/tier";
 import { z } from "zod";
 import {
   APPROACHES,
@@ -56,18 +57,8 @@ export const SINGLE_PASS_CHARS = 12_000;
 export const FRAGMENT_CHARS = 12_000;
 /** Chapitres par cours, au plus (un long cours regroupe davantage d'objectifs par chapitre). */
 export const MAX_CHAPTERS = 15;
-/** Illustrations narratives : 0 ou 1 par chapitre, 3 au plus par cours (kit V5). */
-export const MAX_ILLUSTRATIONS = 5;
-
-/**
- * Images générées selon la taille du cours (comparatif IA) : court (≤ 8 pages) 1 image + 1 SVG,
- * standard (≤ 20 pages) 2 + 1, long 3 + 2. Les composants dessinés par le code ne comptent pas.
- */
-export function imageCaps(pages: number): { images: number; svg: number } {
-  if (pages <= 8) return { images: 1, svg: 1 };
-  if (pages <= 20) return { images: 2, svg: 1 };
-  return { images: 3, svg: 2 };
-}
+/** Illustrations : 0 ou 1 par chapitre, 10 au plus par cours (Pro ; plafond réel selon le forfait). */
+export const MAX_ILLUSTRATIONS = 10;
 
 /* ---------- Points de reprise ---------- */
 
@@ -363,9 +354,11 @@ export function normalizePlanV5(draft: PlanV5, ko: KnowledgeObject, input: Gener
   // taille du cours (images d'une part, SVG d'autre part).
   const noImages = input.visualMode === "aucun" || input.mode === "resume";
   const diagramsOnly = input.visualMode === "schemas";
-  const caps = imageCaps(Math.ceil(input.segments.reduce((n, x) => n + x.text.length, 0) / 2_500));
-  let images = noImages ? 0 : caps.images;
-  let svg = noImages ? 0 : caps.svg;
+  // Plafond du forfait et de l'approche (couverture éventuelle comprise : une place lui est
+  // gardée) ; dessins, schémas et scènes partagent la même enveloppe (Nano Banana).
+  const total = Math.max(1, imageCap(input.tier ?? "plus", input.mode) - 1);
+  let images = noImages ? 0 : total;
+  let svg = images;
   const statements = new Map(ko.claims.map((c) => [c.id, c.statement]));
   const forced = (APPROACHES as readonly string[]).includes(input.mode ?? "") ? (input.mode as Approach) : null;
   for (const ch of chapters) {
@@ -379,8 +372,8 @@ export function normalizePlanV5(draft: PlanV5, ko: KnowledgeObject, input: Gener
     const isSvg = ch.visual.kind === "vector";
     const ok = ch.visual.kind !== "none" && (!diagramsOnly || ch.visual.kind === "diagram") && ch.visual.subject.trim() && (isSvg ? svg > 0 : images > 0);
     if (ok) {
-      if (isSvg) svg--;
-      else images--;
+      images--;
+      svg = images;
     } else ch.visual = { kind: "none", subject: "", query_en: "", purpose: "", content: "" };
   }
   return { plan: { ...draft, chapters, excluded }, orphans: chapters.length ? orphans : [] };
@@ -637,9 +630,11 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
   const base = chapterInstructions(input, difficult, approach);
   const claimIds = new Set(c.chapter.claim_ids);
   const statements = new Map(c.ko.claims.map((x) => [x.id, x.statement]));
+  // Réparation d'un chapitre difficile : Sol pour un compte Pro (deux fois au plus par génération).
+  const expertRepair = difficult && input.tier === "pro" && (input.expert?.left ?? 0) > 0;
   const budgetFor = (repair: number): StageBudget => ({
     ...input.budgets.explanation,
-    role: "writer",
+    role: repair > 0 && expertRepair && input.expert!.left-- > 0 ? "expert" : "writer",
     tier: repair > 0 && difficult ? "complex" : "fast",
     reasoning: repair > 0 && difficult ? "high" : difficult ? "medium" : "low",
     maxOutputTokens: Math.max(input.budgets.explanation.maxOutputTokens, 16_000),

@@ -669,6 +669,7 @@ export const en: Dict = {
     provider_auth: "The AI service key was rejected (invalid or revoked). The administrator must check it.",
     provider_forbidden: "The AI service refused the request: key spending limit reached or model not allowed.",
     provider_bad_request: "The AI model rejected the request. The Limpid team has been notified.",
+    plan_ocr: "This document contains scanned pages: reading them is reserved for the Pro plan. No credit was charged.",
     provider_rate_limited: "The AI service is limiting requests. Try again in a few minutes.",
     provider_quota_exhausted: "The AI's daily quota has been reached. Try again tomorrow.",
     provider_timeout: "The AI service did not respond in time.",
@@ -979,6 +980,7 @@ export const en: Dict = {
     footer: (page: number, total: number) => `Limpid · AI-generated explanation, check the cited sources · page ${page} / ${total}`,
     watermark: "Made with Limpid · free version",
     cycle: "↺ then the cycle starts again",
+    notionsTitle: "Key notions, by chapter",
     exercises: "Exercises",
     exercisesIntro: "Answer without looking at the answer key, provided separately.",
     answerKey: "Exercise answer key",
@@ -1540,6 +1542,7 @@ export const en: Dict = {
         `Your plan keeps up to ${limit} generated Limpids. Delete a Limpid or choose a bigger plan: a top-up does not change this limit.`,
       planSources: (limit: number) =>
         limit === 1 ? "The free plan creates one Limpid per document. Choose “One Limpid per document” or a paid plan." : `Your plan accepts up to ${limit} documents per Limpid.`,
+      planOcr: "This document contains scanned pages (images of text): reading them is reserved for the Pro plan. Upgrade to Pro, or replace it with a digital version (selectable text). No credit was used.",
     },
     seeOffers: "See plans",
     topup: "Top up my credits",

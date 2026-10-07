@@ -1,7 +1,8 @@
 /**
  * Export PDF d'un Limpid (V4, § 12). Rendu déterministe côté serveur à partir du document
  * structuré : aucun appel IA, aucune ressource externe, police intégrée (Inter, OFL), style
- * unique. Même contenu et même numérotation des sources que le lecteur, sans annexes ni glossaire développé (composé pour le papier).
+ * unique. Même contenu et même numérotation des sources que le lecteur, sans annexes ni glossaire développé (composé pour le papier) ;
+ * notions importantes du cours en fin de document, groupées par chapitre. Tailles : mobile + 0,5 pt.
  * Les exercices (sans réponses) et leur corrigé sont des exports distincts ; le filigrane
  * discret des exports gratuits est décidé par le serveur.
  */
@@ -38,40 +39,40 @@ function registerFonts() {
 const C = { ivoire: "#F7F6F2", encre: "#20211F", jaune: "#F2D94E", jauneDoux: "#FAEFB4", vert: "#396451", gris: "#61655E", bordure: "#DCDAD2" };
 
 const s = StyleSheet.create({
-  page: { fontFamily: "Inter", fontSize: 10.5, lineHeight: 1.5, color: C.encre, paddingTop: 48, paddingBottom: 56, paddingHorizontal: 52 },
-  brand: { fontSize: 9, fontWeight: 700, color: C.gris, marginBottom: 14 },
+  page: { fontFamily: "Inter", fontSize: 11, lineHeight: 1.5, color: C.encre, paddingTop: 48, paddingBottom: 56, paddingHorizontal: 52 },
+  brand: { fontSize: 9.5, fontWeight: 700, color: C.gris, marginBottom: 14 },
   badges: { flexDirection: "row", gap: 6, marginBottom: 8 },
-  badge: { fontSize: 8, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.jauneDoux },
-  badgeDemo: { fontSize: 8, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.encre, color: C.ivoire },
-  title: { fontSize: 22, fontWeight: 700, lineHeight: 1.2, marginBottom: 14 },
-  meta: { fontSize: 9, color: C.gris, marginBottom: 16 },
+  badge: { fontSize: 8.5, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.jauneDoux },
+  badgeDemo: { fontSize: 8.5, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.encre, color: C.ivoire },
+  title: { fontSize: 22.5, fontWeight: 700, lineHeight: 1.2, marginBottom: 14 },
+  meta: { fontSize: 9.5, color: C.gris, marginBottom: 16 },
   boxTitle: { fontWeight: 700, marginBottom: 4 },
-  h2: { fontSize: 14, fontWeight: 700, lineHeight: 1.25, marginTop: 14, marginBottom: 8 },
+  h2: { fontSize: 14.5, fontWeight: 700, lineHeight: 1.25, marginTop: 14, marginBottom: 8 },
   p: { marginBottom: 8 },
   li: { flexDirection: "row", marginBottom: 3 },
   bullet: { width: 12 },
   number: { width: 18 },
-  formula: { fontFamily: "Courier", fontSize: 11, padding: 8, borderWidth: 1, borderColor: C.bordure, borderRadius: 6, marginBottom: 6 },
+  formula: { fontFamily: "Courier", fontSize: 11.5, padding: 8, borderWidth: 1, borderColor: C.bordure, borderRadius: 6, marginBottom: 6 },
   exercise: { borderWidth: 1, borderColor: C.bordure, borderRadius: 8, padding: 10, marginBottom: 8 },
   lines: { borderBottomWidth: 0.5, borderBottomColor: C.bordure, height: 18 },
-  watermark: { position: "absolute", top: 20, left: 52, right: 52, fontSize: 7.5, color: C.gris, textAlign: "right" },
+  watermark: { position: "absolute", top: 20, left: 52, right: 52, fontSize: 8, color: C.gris, textAlign: "right" },
   liText: { flex: 1 },
-  label: { fontSize: 8, fontWeight: 700, color: C.vert, textTransform: "uppercase", marginBottom: 2 },
+  label: { fontSize: 8.5, fontWeight: 700, color: C.vert, textTransform: "uppercase", marginBottom: 2 },
   block: { marginBottom: 8 },
   muted: { color: C.gris },
   italic: { fontStyle: "italic" },
-  ref: { fontSize: 7, color: C.vert },
+  ref: { fontSize: 7.5, color: C.vert },
   toc: { borderWidth: 1, borderColor: C.bordure, borderRadius: 8, padding: 10, marginBottom: 8 },
   flow: { alignItems: "center", marginVertical: 8 },
   flowBox: { borderWidth: 1, borderColor: C.encre, borderRadius: 6, paddingVertical: 5, paddingHorizontal: 10, width: 220, backgroundColor: "#FFFFFF" },
   flowLabel: { textAlign: "center" },
-  arrow: { fontSize: 11, color: C.gris, marginVertical: 1 },
-  caption: { fontSize: 9, color: C.gris, textAlign: "center", marginTop: 4 },
+  arrow: { fontSize: 11.5, color: C.gris, marginVertical: 1 },
+  caption: { fontSize: 9.5, color: C.gris, textAlign: "center", marginTop: 4 },
   check: { borderWidth: 1, borderColor: C.bordure, borderRadius: 8, padding: 10, marginBottom: 8 },
-  source: { fontSize: 9, marginBottom: 6 },
+  source: { fontSize: 9.5, marginBottom: 6 },
   // Ancré par le haut (A4 = 842 pt) : avec un interligne hérité, react-pdf n'affiche pas
   // un texte dynamique ancré par le bas.
-  footer: { position: "absolute", top: 806, left: 52, right: 52, fontSize: 8, color: C.gris },
+  footer: { position: "absolute", top: 806, left: 52, right: 52, fontSize: 8.5, color: C.gris },
 });
 
 /** Style unique du PDF (V4) : sobre, lisible à l'impression. */
@@ -437,7 +438,7 @@ function VisualPdf({ v, numbers, d, images }: { v: VisualSpec; numbers: Map<stri
         </Svg>
         {/* Étiquettes reprises sous le dessin (le texte SVG n'est pas sélectionnable dans un PDF). */}
         {dd.data.shapes.some((sh) => sh.t === "text") && (
-          <Text style={[s.caption, { fontSize: 8 }]}>{dd.data.shapes.flatMap((sh) => (sh.t === "text" && sh.text ? [sh.text] : [])).join(" · ")}</Text>
+          <Text style={[s.caption, { fontSize: 8.5 }]}>{dd.data.shapes.flatMap((sh) => (sh.t === "text" && sh.text ? [sh.text] : [])).join(" · ")}</Text>
         )}
         <Text style={s.caption}>{d.visuals.illustration} : {v.caption}</Text>
       </View>
@@ -453,7 +454,7 @@ function VisualPdf({ v, numbers, d, images }: { v: VisualSpec; numbers: Map<stri
         {/* eslint-disable-next-line jsx-a11y/alt-text -- Image de @react-pdf (PDF), sans attribut alt ; légende juste en dessous */}
         <Image src={{ data: img.data, format: img.format }} style={{ width, height: Math.round((width * img.height) / img.width) }} />
         <Text style={s.caption}>{d.visuals.illustration} : {v.caption}</Text>
-        <Text style={[s.caption, { fontSize: 7.5 }]}>{img.credit}</Text>
+        <Text style={[s.caption, { fontSize: 8 }]}>{img.credit}</Text>
       </View>
     );
   }
@@ -666,7 +667,7 @@ function ReportDocument(input: PdfReportInput) {
             <Text style={[s.p, s.muted]}>{groups.length ? d.pdf.exercisesIntro : d.pdf.noExercises}</Text>
             {groups.map((g) => (
               <View key={g.title}>
-                <Text style={[s.h2, { fontSize: 12 }]} minPresenceAhead={110}>{g.title}</Text>
+                <Text style={[s.h2, { fontSize: 12.5 }]} minPresenceAhead={110}>{g.title}</Text>
                 {g.items.map((ex) => <ExerciseQuestion key={ex.id} ex={ex} n={++qn} d={d} />)}
               </View>
             ))}
@@ -675,6 +676,23 @@ function ReportDocument(input: PdfReportInput) {
 
         {/* Composé pour le papier (Atlas § 05) : ni annexes ni glossaire développé ; limites et sources essentielles restent. */}
         <View break>
+          {ordered.some(({ sec }) => sec.notions?.length) && (
+            <View>
+              <Text style={s.h2} minPresenceAhead={110}>{d.pdf.notionsTitle}</Text>
+              {ordered.map(({ sec }, i) =>
+                sec.notions?.length ? (
+                  <View key={`n-${sec.id}`} wrap={false} style={{ marginBottom: 8 }}>
+                    <Text style={s.label}>{i + 1}. {sec.question}</Text>
+                    {sec.notions.map((n) => (
+                      <Text key={n.term} style={s.source}>
+                        <Text style={{ fontWeight: 700 }}>{n.term}</Text> — {plain(n.definition)}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null,
+              )}
+            </View>
+          )}
           {explanation.limitations.length > 0 && (
             <View>
               <Text style={s.h2} minPresenceAhead={110}>{d.lim.limits}</Text>

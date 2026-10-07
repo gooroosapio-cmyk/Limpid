@@ -668,6 +668,7 @@ export const fr = {
     provider_auth: "La clé du service d'IA est refusée (invalide ou révoquée). L'administrateur doit la vérifier.",
     provider_forbidden: "Le service d'IA refuse la demande : limite de dépense de la clé atteinte ou modèle non autorisé.",
     provider_bad_request: "Le modèle d'IA a refusé la demande. L'équipe Limpid est prévenue.",
+    plan_ocr: "Ce document contient des pages scannées : leur lecture est réservée à l'offre Pro. Aucun crédit n'a été débité.",
     provider_rate_limited: "Le service d'IA limite les demandes. Réessayez dans quelques minutes.",
     provider_quota_exhausted: "Le quota quotidien de l'IA est atteint. Réessayez demain.",
     provider_timeout: "Le service d'IA n'a pas répondu à temps.",
@@ -950,6 +951,7 @@ export const fr = {
     footer: (page: number, total: number) => `Limpid · explication générée par IA, vérifiez les sources citées · page ${page} / ${total}`,
     watermark: "Créé avec Limpid · version gratuite",
     cycle: "↺ puis le cycle recommence",
+    notionsTitle: "Notions importantes, par chapitre",
     exercises: "Exercices",
     exercisesIntro: "Répondez sans regarder le corrigé, fourni séparément.",
     answerKey: "Corrigé des exercices",
@@ -1512,6 +1514,7 @@ export const fr = {
         `Votre offre conserve ${limit} Limpid générés au plus. Supprimez un Limpid ou choisissez une offre plus grande : une recharge ne change pas cette limite.`,
       planSources: (limit: number) =>
         limit === 1 ? "L'offre gratuite crée un Limpid par document. Choisissez « Un Limpid par document » ou une offre payante." : `Votre offre accepte ${limit} documents par Limpid au plus.`,
+      planOcr: "Ce document contient des pages scannées (images de texte) : leur lecture est réservée à l'offre Pro. Passez à Pro, ou remplacez-le par une version numérique (texte sélectionnable). Aucun crédit n'a été utilisé.",
     },
     seeOffers: "Voir les offres",
     topup: "Recharger mes crédits",

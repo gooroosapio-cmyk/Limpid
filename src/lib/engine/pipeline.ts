@@ -4,6 +4,7 @@
  * offsets calculés par le serveur, identifiants vérifiés, jusqu'à deux réparations.
  * La mise en page est déterministe ; le modèle ne dessine rien.
  */
+import type { AiTier } from "@/lib/billing/tier";
 import { z } from "zod";
 import {
   blockClaimIds,
@@ -265,6 +266,10 @@ export interface GenerationInput {
    * léger ; un document jugé complexe est rédigé par le modèle Pro. Sans effet si absent.
    */
   plan?: boolean;
+  /** Parcours IA du forfait (images, Sol) ; absent : parcours Plus pour les anciennes tâches. */
+  tier?: AiTier;
+  /** Interventions de Sol restantes pour cette génération (Pro : 2 ; partagé entre chapitres). */
+  expert?: { left: number };
 }
 
 export interface GenerationOutput {
@@ -473,7 +478,8 @@ export async function verifyClaims(
     schema: VerificationDraft,
     instructions: VERIFY_INSTRUCTIONS,
     data: [{ label: "affirmations et extraits", text: verificationPayload({ ...ko, claims: ko.claims.filter((c) => risky.has(c.id)) }, evidence, segments) }],
-    budget: { ...input.budgets.comprehension, role: "controller", reasoning: "low" },
+    // Contrôle courant : Luna ; source complexe d'un compte Pro : audit par Sol (texte).
+    budget: { ...input.budgets.comprehension, role: input.tier === "pro" && input.budgets.comprehension.role === "structure_complex" ? "expert" : "controller", reasoning: "low" },
   });
   const verdicts = new Map(draft.verdicts.map((x) => [x.claim_id, x]));
   const claims = ko.claims.map((c) => {

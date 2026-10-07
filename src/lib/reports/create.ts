@@ -11,6 +11,7 @@ import { planPages } from "@/lib/engine/pipeline";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { ACTION_PRICES, CHARS_PER_PAGE, MAX_SOURCE_PAGES, reportAction, sourcePages } from "@/lib/billing/catalog";
 import { accountUsage, attachReservation, CreditError, getEntitlements, quotaBlock, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
+import { ocrAllowed } from "@/lib/billing/tier";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient } from "@/lib/supabase/admin";
@@ -61,6 +62,7 @@ export class CreateError extends Error {
       | "quota"
       | "plan_reports"
       | "plan_sources"
+      | "plan_ocr"
       | "too_long",
     message: string,
     /** Pages à lire par OCR (demande d'accord). */
@@ -131,6 +133,12 @@ export async function createReport(
     }
     if (pendingOcr) ocrSources.push(id);
   }
+  // Pages scannées (document entier ou pages isolées) : lecture réservée au Pro, refusée avant
+  // tout appel payant et toute réservation de crédits (prompt V2, § II).
+  const scanned = ocrSources.length > 0 || sourceIds.some((id) => ((byId.get(id)?.coverage as { pending_ocr_pages?: number[] } | null)?.pending_ocr_pages?.length ?? 0) > 0);
+  if (scanned && !ocrAllowed(ent.wallet.aiTier)) {
+    throw new CreateError("plan_ocr", "Lecture des pages scannées réservée à l'offre Pro.");
+  }
   // Un document, un Limpid : supprimer le Limpid supprime aussi ses documents.
   const [{ data: usedSet }, { data: usedLegacy }] = await Promise.all([
     db.from("report_sources").select("report_id, reports!inner(deleted_at)").in("source_id", sourceIds).is("reports.deleted_at", null).limit(1).maybeSingle(),
@@ -199,6 +207,7 @@ export async function createReport(
       visual_mode: visualMode,
       ...(sourceIds.length > 1 ? { source_ids: sourceIds } : {}),
       ...(ocrSources.length ? { ocr: true, ocr_sources: ocrSources } : {}),
+      ai_tier: ent.wallet.aiTier,
       credits: { action, amount: ACTION_PRICES[action] },
     },
   }).select("id").single();
