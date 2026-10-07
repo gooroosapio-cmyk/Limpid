@@ -71,7 +71,7 @@
 
 .chip, .badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px;
-  font-size: 11px; line-height: 1.2; letter-spacing: 0.5px; font-weight: 700; text-transform: uppercase; white-space: nowrap; background: transparent; color: var(--ink);
+  font-size: 12px; line-height: 1.2; letter-spacing: 0.5px; font-weight: 700; text-transform: uppercase; white-space: nowrap; background: transparent; color: var(--ink);
 }
 .chip-yellow, .badge { background: var(--pale); border-color: transparent; }
 .chip-green { background: var(--green-pale); border-color: transparent; color: var(--green); }
@@ -114,7 +114,8 @@ input[type="text"], input[type="url"], input[type="email"], input[type="number"]
   background: var(--surface); color: var(--ink); font-size: 16px; line-height: 1.5;
   transition: border-color var(--t-press) ease, box-shadow var(--t-press) ease;
 }
-input:focus, textarea:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); outline: none; }
+/* Anneau plein (contraste ≥ 3:1 en clair et en sombre), pas un halo pâle */
+input:focus, textarea:focus, select:focus { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); outline: none; }
 textarea { min-height: 180px; resize: vertical; }
 select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 40px; margin-bottom: var(--s3); }
 .searchbox { position: relative; margin: var(--s4) 0; }

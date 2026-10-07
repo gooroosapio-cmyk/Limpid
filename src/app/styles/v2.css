@@ -33,7 +33,7 @@
 .notice-warn { background: var(--pale); }
 .notice-error, .note-danger { background: var(--danger-pale); color: var(--ink); }
 .notice-ok, .note-green { background: var(--green-pale); }
-.chip, .badge { border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; line-height: 16px; letter-spacing: 1px; font-weight: 600; border-color: var(--line); }
+.chip, .badge { border-radius: var(--r-pill); padding: 4px 10px; font-size: 12px; line-height: 16px; letter-spacing: 1px; font-weight: 600; border-color: var(--line); }
 .chip-yellow, .badge { background: var(--pale); color: var(--yellow); }
 :root[data-mode="light"] .chip-yellow, :root[data-mode="light"] .badge { color: var(--ink); }
 
@@ -159,7 +159,7 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 .bottomnav-item {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   min-width: 44px; border: 0; background: none; color: var(--muted); text-decoration: none; cursor: pointer;
-  font-size: 11px; line-height: 16px; font-weight: 500; border-radius: var(--r-nav);
+  font-size: 12px; line-height: 16px; font-weight: 500; border-radius: var(--r-nav);
   transition: color var(--t-press) ease, transform var(--t-release) var(--ease-out);
 }
 .bottomnav-item:active { transform: scale(0.985); }
@@ -350,7 +350,7 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 .lesson-points li + li { margin-top: 8px; }
 .lesson-idea { display: flex; gap: 16px; align-items: flex-start; margin: var(--s5) 0; padding: var(--s5); border-radius: var(--r-card); background: var(--green-pale); }
 .lesson-idea > .icon { flex: none; color: var(--sage); }
-.lesson-idea-eyebrow { margin: 0 0 4px; font-size: 11px; line-height: 16px; letter-spacing: 1.6px; font-weight: 600; text-transform: uppercase; color: var(--sage); }
+.lesson-idea-eyebrow { margin: 0 0 4px; font-size: 12px; line-height: 16px; letter-spacing: 1.6px; font-weight: 600; text-transform: uppercase; color: var(--sage); }
 .lesson-idea-text { margin: 0; font-size: 17px; line-height: 24px; font-weight: 500; }
 .lesson-further { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 12px; }
 .further-card {
@@ -425,7 +425,7 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 .period-switch { display: inline-flex; width: auto; min-width: min(320px, 100%); }
 .period-switch button { flex: 1; min-height: 44px; border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; }
 .period-switch button.on { background: var(--yellow); color: var(--on-yellow); font-weight: 600; }
-.period-switch .badge-soft { white-space: nowrap; font-size: 11px; line-height: 16px; padding: 2px 8px; border-radius: 999px; background: var(--pale); color: var(--yellow); }
+.period-switch .badge-soft { white-space: nowrap; font-size: 12px; line-height: 16px; padding: 2px 8px; border-radius: 999px; background: var(--pale); color: var(--yellow); }
 .period-switch button.on .badge-soft { background: rgb(21 24 15 / 14%); color: var(--on-yellow); }
 .offers { gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
 .offer { position: relative; display: flex; flex-direction: column; gap: 6px; padding: var(--s5); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
@@ -440,7 +440,7 @@ dialog.sheet[open] { border-radius: var(--r-sheet) var(--r-sheet) 0 0; animation
 .offer-features li::before { content: ""; flex: none; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; background: var(--sage); }
 .offer-features li::after { content: ""; position: absolute; left: 6px; top: 6px; width: 8px; height: 5px; border-left: 2px solid var(--on-yellow); border-bottom: 2px solid var(--on-yellow); transform: rotate(-45deg); }
 .offer .btn { margin-top: auto; }
-.offer-badge { position: absolute; top: var(--s4); right: var(--s4); padding: 4px 10px; border-radius: 999px; background: var(--yellow); color: var(--on-yellow); font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.offer-badge { position: absolute; top: var(--s4); right: var(--s4); padding: 4px 10px; border-radius: 999px; background: var(--yellow); color: var(--on-yellow); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
 .topups { gap: 12px; }
 .topup { background: var(--surface); }
 

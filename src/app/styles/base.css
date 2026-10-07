@@ -71,10 +71,10 @@ code, kbd, .mono { font-family: var(--font-mono); font-size: 0.92em; overflow-wr
 .lead, .lede { font-size: 16px; line-height: 24px; color: var(--muted); margin: 0 0 var(--s6); }
 .muted { color: var(--muted); }
 .small { font-size: 13px; line-height: 18px; }
-.micro { font-size: 11px; line-height: 16px; }
+.micro { font-size: 12px; line-height: 16px; }
 .center { text-align: center; }
 .eyebrow, .sectionlabel {
-  display: block; font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase;
+  display: block; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase;
   color: var(--muted); margin: var(--s6) 0 var(--s3);
 }
 .eyebrow:first-child, .sectionlabel:first-child { margin-top: var(--s2); }
