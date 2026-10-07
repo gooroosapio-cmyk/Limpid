@@ -12,6 +12,7 @@ import { parseRich, splitParagraph } from "@/lib/reader/rich";
 import { sourceEntries, type SourceEntry } from "@/lib/render/sources";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { NotionTerm, type Notion } from "../Notions";
+import type { ProjectionStats } from "@/lib/reader/projection";
 import { SourceRef } from "../Sources";
 import { VisualFigure, type AssetView } from "../Visuals";
 import { ChapterCheck } from "./ChapterCheck";
@@ -34,6 +35,8 @@ interface Terms {
   matcher: RegExp | null;
   list: string[];
   used: Set<string>;
+  /** Terme (minuscules) → clé du sens ouvert ; absent : le terme lui-même. */
+  senses?: Map<string, string>;
 }
 
 interface Ctx {
@@ -55,7 +58,11 @@ function Rich({ text, ctx, linkTerms = true }: { text: string; ctx: Ctx; linkTer
       {parseRich(text).map((run, i) => {
         const parts = linkTerms ? splitTerms(run.text, ctx.terms.matcher, ctx.terms.list, ctx.terms.used) : [run.text];
         const inner = parts.map((p, k) =>
-          typeof p === "string" ? <Fragment key={k}>{p}</Fragment> : <NotionTerm key={k} term={p.term}>{p.text}</NotionTerm>,
+          typeof p === "string" ? (
+            <Fragment key={k}>{p}</Fragment>
+          ) : (
+            <NotionTerm key={k} term={p.term} sense={ctx.terms.senses?.get(p.term.toLowerCase())}>{p.text}</NotionTerm>
+          ),
         );
         if (run.bold) return <strong key={i}>{inner}</strong>;
         if (run.italic) return <em key={i}>{inner}</em>;
@@ -73,7 +80,8 @@ function Refs({ ids, ctx }: { ids: string[]; ctx: Ctx }) {
   return refs.length ? <span className="refs">{refs}</span> : null;
 }
 
-type PieceAttrs = { keep?: boolean; breakBefore?: boolean; breakAfter?: boolean; section?: string };
+/** `plain` : paragraphe courant, replié derrière « Lire l'explication » en projection visuelle. */
+type PieceAttrs = { keep?: boolean; breakBefore?: boolean; breakAfter?: boolean; section?: string; plain?: boolean };
 function attrs(a: PieceAttrs) {
   return {
     "data-piece": "",
@@ -81,6 +89,7 @@ function attrs(a: PieceAttrs) {
     ...(a.breakBefore ? { "data-break-before": "1" } : {}),
     ...(a.breakAfter ? { "data-break-after": "1" } : {}),
     ...(a.section ? { "data-section": a.section } : {}),
+    ...(a.plain ? { "data-plain": "1" } : {}),
   };
 }
 
@@ -108,7 +117,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
       if (float) return [piece("block", <p><Rich text={b.text} ctx={ctx} /> {refs}</p>)];
       // Long paragraphe : paragraphes successifs (fins de phrase), références après la dernière.
       return splitParagraph(b.text).map((part, k, all) => (
-        <div key={`${b.id}-${k}`} id={k === 0 ? b.id : `${b.id}-${k}`} className="piece block" {...attrs({ section })}>
+        <div key={`${b.id}-${k}`} id={k === 0 ? b.id : `${b.id}-${k}`} className="piece block" {...attrs({ section, plain: true })}>
           <p><Rich text={part} ctx={ctx} />{k === all.length - 1 && <> {refs}</>}</p>
         </div>
       ));
@@ -287,44 +296,67 @@ function visualPiece(v: VisualSpec, section: string, ctx: Ctx, assets: Record<st
   );
 }
 
-/** Notions : définitions du texte (avec leurs extraits) puis glossaire, une entrée par terme. */
+/**
+ * Notions : définitions du texte (avec leurs extraits), notions de chapitre puis glossaire.
+ * Un même mot défini autrement dans un autre chapitre devient une notion distincte (sens
+ * propre, clé `mot~2`) : il n'ouvre jamais la définition d'un homonyme (lecteur V3).
+ */
 export function buildNotions(explanation: ExplanationObject, numbers: Map<string, number>): Notion[] {
+  return notionIndex(explanation, numbers).notions;
+}
+
+/** Notions et, par chapitre, les termes à rendre interactifs avec la clé de leur sens. */
+export function notionIndex(explanation: ExplanationObject, numbers: Map<string, number>) {
   const byKey = new Map<string, Notion>();
+  const scopes = new Map<string, Map<string, string>>(); // chapitre → terme (minuscules) → clé
+  const scoped = explanation.sections.some((s) => (s.notions?.length ?? 0) > 0);
+  const scopeOf = (id: string) => scopes.get(id) ?? scopes.set(id, new Map()).get(id)!;
+  const add = (n: Notion, section: string | null) => {
+    const lower = n.term.toLowerCase();
+    let key = lower;
+    for (let i = 2; byKey.has(key); i++) {
+      const prev = byKey.get(key)!;
+      // Même définition : même sens, une seule entrée.
+      if (prev.definition.trim().toLowerCase() === n.definition.trim().toLowerCase()) break;
+      if (!section) break;
+      key = `${lower}~${i}`;
+    }
+    if (!byKey.has(key)) byKey.set(key, key === lower ? n : { ...n, key });
+    if (section && !scopeOf(section).has(lower)) scopeOf(section).set(lower, key);
+  };
   for (const s of explanation.sections) {
     for (const b of s.blocks) {
       if (b.type !== "definition") continue;
-      const key = b.term.trim().toLowerCase();
-      if (byKey.has(key)) continue;
       const refs = b.evidence_ids.flatMap((id) => {
         const n = numbers.get(id);
         return n ? [{ n, evidenceId: id }] : [];
       });
-      byKey.set(key, { term: b.term.trim(), definition: b.text, refs });
+      add({ term: b.term.trim(), definition: b.text, refs }, scoped ? s.id : null);
     }
   }
   // V5 : notions du chapitre (définition simple et exemple préproduits).
   for (const s of explanation.sections) {
     for (const n of s.notions ?? []) {
-      const key = n.term.trim().toLowerCase();
-      if (byKey.has(key)) continue;
       const claims = new Set(n.claim_ids);
       const ev = s.blocks.filter((b) => b.claim_ids.some((c) => claims.has(c))).flatMap((b) => b.evidence_ids);
       const refs = [...new Set(ev)].slice(0, 3).flatMap((id) => {
         const num = numbers.get(id);
         return num ? [{ n: num, evidenceId: id }] : [];
       });
-      byKey.set(key, { term: n.term.trim(), definition: n.definition, example: n.example, refs });
+      add({ term: n.term.trim(), definition: n.definition, example: n.example, refs }, s.id);
     }
   }
   for (const g of explanation.glossary) {
     const key = g.term.trim().toLowerCase();
     if (!byKey.has(key)) byKey.set(key, { term: g.term.trim(), definition: g.definition, refs: [] });
   }
-  return [...byKey.values()];
+  return { notions: [...byKey.values()], scopes: scoped ? scopes : null };
 }
 
 export interface LimpidDoc {
   chapters: { id: string; title: string }[];
+  /** Comptes pour le choix automatique de projection (lecteur V3). */
+  stats: ProjectionStats;
   notions: Notion[];
   entries: SourceEntry[];
   pieces: React.ReactNode;
@@ -360,9 +392,18 @@ export function composeLimpid({
   documents?: Record<string, string>;
 }): LimpidDoc {
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments, documents);
-  const notions = buildNotions(explanation, numbers);
-  const termList = notions.map((n) => n.term);
-  const ctx: Ctx = { t, numbers, terms: { matcher: termMatcher(termList), list: termList, used: new Set() } };
+  const { notions, scopes } = notionIndex(explanation, numbers);
+  const termList = [...new Set(notions.map((n) => n.term))];
+  const globalTerms: Terms = { matcher: termMatcher(termList), list: termList, used: new Set() };
+  const ctx: Ctx = { t, numbers, terms: globalTerms };
+  // Lecteur V3 : une notion n'est interactive que dans le chapitre qui la définit, dans le sens
+  // qu'il lui donne (première occurrence par chapitre). Anciens rapports : glossaire global.
+  const chapterTerms = (id: string): Terms => {
+    const senses = scopes?.get(id);
+    if (!scopes) return globalTerms;
+    const list = senses ? [...senses.keys()] : [];
+    return { matcher: termMatcher(list), list, used: new Set(), senses };
+  };
   const sections = new Map(explanation.sections.map((s) => [s.id, s]));
   const visuals = new Map(blueprint.visual_specs.map((v) => [v.id, v]));
   const checkpoints = new Map((exercises?.checkpoints ?? []).map((c) => [c.section_id, c.exercises]));
@@ -394,6 +435,7 @@ export function composeLimpid({
   );
 
   ordered.forEach(({ s, bs }, si) => {
+    ctx.terms = chapterTerms(s.id);
     const placed = bs.visual_ids.flatMap((id) => (visuals.get(id) ? [visuals.get(id)!] : []));
     out.push(
       <div key={`h-${s.id}`} id={s.id} className="piece section-head" {...attrs({ keep: true, section: s.id })}>
@@ -449,5 +491,21 @@ export function composeLimpid({
 
   // Annexes (glossaire, sources, limites) : page continue à part, hors du carrousel (§ 14).
 
-  return { chapters, notions, entries, pieces: out };
+  const blocks = ordered.flatMap(({ s }) => s.blocks);
+  const count = (types: string[]) => blocks.filter((b) => types.includes(b.type)).length;
+  const stats: ProjectionStats = {
+    chapters: chapters.length,
+    steps: count(["steps", "calculation", "timeline"]),
+    visuals:
+      count(["comparison", "proportion", "chart", "formula"]) +
+      ordered.flatMap(({ bs }) => bs.visual_ids).filter((id) => {
+        const v = visuals.get(id);
+        if (!v || v.kind === "drawing") return false;
+        const assetId = v.kind === "illustration" ? (v.data as { asset_id?: unknown }).asset_id : null;
+        return v.kind !== "illustration" || (typeof assetId === "string" && !!assets[assetId]);
+      }).length,
+    paragraphs: count(["fact"]),
+  };
+
+  return { chapters, stats, notions, entries, pieces: out };
 }

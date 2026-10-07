@@ -10,6 +10,7 @@ import { Screen } from "@/components/shell/Screen";
 import { requireUser } from "@/lib/auth";
 import { readDisplayPrefs } from "@/lib/display/prefs";
 import { getT } from "@/lib/i18n/server";
+import { readerV3Enabled } from "@/lib/reader/flags";
 import { offlineKey } from "@/lib/offline-key";
 import { loadReport } from "@/lib/reports/load";
 
@@ -92,6 +93,7 @@ export default async function ReportPage({
   return (
     <LimpidScreen
       doc={doc}
+      readerV3={await readerV3Enabled()}
       quizzes={chapterQuizzes(report.explanation.sections)}
       reportId={report.isCurrent ? id : null}
       versionId={report.versionId}

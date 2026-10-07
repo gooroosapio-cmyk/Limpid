@@ -2,7 +2,7 @@ import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
-import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMonthlyCap } from "@/app/admin/actions";
+import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMonthlyCap, setReaderV3 } from "@/app/admin/actions";
 import { IMAGE_MODELS, IMAGE_STYLES } from "@/lib/visuals/image-models";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 import { nowMs } from "@/lib/time";
@@ -168,6 +168,22 @@ export async function AdminView({
           <p className="muted small">{t.admin.images.note}</p>
           <button type="submit" className="btn">{t.admin.save}</button>
         </form>
+      </section>
+
+      <section className="admin-section" aria-labelledby="adm-reader">
+        <h2 id="adm-reader">{t.admin.reader.title}</h2>
+        <p className="muted small">{t.admin.reader.intro}</p>
+        {o.readerV3 === null ? (
+          <p className="notice" role="note">{t.admin.reader.missing}</p>
+        ) : (
+          <form action={setReaderV3} className="admin-form">
+            <label className="consent">
+              <input type="checkbox" name="reader_v3" defaultChecked={o.readerV3} />
+              <span>{t.admin.reader.enabled}</span>
+            </label>
+            <button type="submit" className="btn">{t.admin.save}</button>
+          </form>
+        )}
       </section>
 
       <section className="admin-section" aria-labelledby="adm-reset">

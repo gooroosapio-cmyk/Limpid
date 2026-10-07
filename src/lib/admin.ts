@@ -78,7 +78,9 @@ export async function adminOverview() {
   const day = new Date(now.getTime() - 24 * 3600_000).toISOString();
   const quotaStart = pacificMidnight(now);
 
-  const [settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
+  const [readerV3, settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
+    // Colonne absente tant que la migration du lecteur V3 n'est pas appliquée : null.
+    db.from("app_settings").select("reader_v3_enabled").single().then((r) => (r.error ? null : (r.data as { reader_v3_enabled?: boolean }).reader_v3_enabled === true)),
     db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
@@ -96,6 +98,7 @@ export async function adminOverview() {
 
   return {
     generationEnabled: settings.data?.generation_enabled ?? false,
+    readerV3,
     images: imageSettingsFrom(settings.data as Record<string, unknown> | null),
     // Recraft, Seedream et Nano Banana passent tous par OpenRouter : une seule clé.
     imageProviders: { nanobanana: !!process.env.OPENROUTER_API_KEY?.trim(), gptimage: !!process.env.OPENROUTER_API_KEY?.trim() },

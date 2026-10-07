@@ -40,6 +40,16 @@ export async function setMonthlyCap(form: FormData) {
   done(`Plafond mensuel fixé à ${(cents / 100).toLocaleString("fr-FR")} €.`);
 }
 
+/** Lecteur V3 (projections Livre / Guidé / Visuel / Auto) : interrupteur global. */
+export async function setReaderV3(form: FormData) {
+  const user = await requireAdmin();
+  const enabled = form.get("reader_v3") === "on";
+  const { error } = await adminClient().from("app_settings").update({ reader_v3_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", true);
+  if (error) done("La modification n'a pas été enregistrée (migration du lecteur V3 appliquée ?).");
+  await audit(user.id, "reader.v3", null, { enabled });
+  done(enabled ? "Lecteur V3 activé." : "Lecteur V3 désactivé.");
+}
+
 /** Fournisseur et modèle par type de visuel : valeur « fournisseur|modèle » du catalogue fermé. */
 export async function setImageSettings(form: FormData) {
   const user = await requireAdmin();

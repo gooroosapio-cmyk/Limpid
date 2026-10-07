@@ -13,6 +13,8 @@ import { ChapterQuiz } from "./ChapterCheck";
 import { ReaderCtx, type ReaderApi } from "./context";
 import { OptionsPanel, type OptionsData } from "./OptionsPanel";
 import { ReformulatePanel } from "./ReformulatePanel";
+import { ProjectionPicker, useProjection } from "./projection";
+import type { ProjectionStats } from "@/lib/reader/projection";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 
 export interface Chapter {
@@ -59,8 +61,11 @@ export function LimpidReader({
   insufficient,
   options,
   quizzes = {},
+  projection: projectionStats = null,
   children,
 }: {
+  /** Lecteur V3 (interrupteur admin) : comptes du cours ; null = lecture actuelle seulement. */
+  projection?: ProjectionStats | null;
   reportId: string | null;
   versionId: string | null;
   chapters: Chapter[];
@@ -163,6 +168,20 @@ export function LimpidReader({
   useEffect(() => {
     apply(index);
   }, [apply, index, children]);
+  const proj = useProjection({
+    enabled: !!projectionStats,
+    stats: projectionStats,
+    mode: options.mode,
+    reportId,
+    colRef,
+    deckRef,
+    host,
+    index,
+    units,
+    content: children,
+  });
+  const reveal = proj.reveal;
+
   // Ouverture directe depuis l'aperçu : « Demander à Limpid », le bilan ou les options (?ouvrir=…).
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -188,8 +207,9 @@ export function LimpidReader({
   /** Défile jusqu'à un élément (compensation de l'en-tête par scroll-margin en CSS). */
   const scrollToId = useCallback((id: string, smooth = false) => {
     const target = document.getElementById(id);
+    if (target) reveal(target);
     target?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
-  }, []);
+  }, [reveal]);
 
   /** Ouvre le chapitre `i` : masque les autres, remonte en tête, focus sur le titre. */
   const openChapter = useCallback(
@@ -375,6 +395,7 @@ export function LimpidReader({
 
       <div ref={deckRef} className="deck continuous" tabIndex={0} role="region" aria-label={t.lim.deckLabel}>
         <div ref={colRef} className="deck-col chapters" data-motion={motion || undefined}>{children}</div>
+        {proj.bar}
       </div>
 
       {host && chapter &&
@@ -465,6 +486,7 @@ export function LimpidReader({
         {head("opt-h", t.lim.options, optionsDialog)}
         <OptionsPanel
           data={options}
+          reading={proj.on ? <ProjectionPicker choice={proj.choice} projection={proj.projection} reason={proj.reason} onChange={proj.setChoice} /> : null}
           onNavigate={() => optionsDialog.current?.close()}
           annexHref={(hash) => annex?.href(hash, anchorRef.current) ?? `#${hash}`}
           onAnnex={(hash) => annex?.open(hash, anchorRef.current)}

@@ -43,7 +43,7 @@ export function AnnexesView({
   const { numbers, entries } = sourceEntries(blueprint, evidence, segments, titles);
   const notions = buildNotions(explanation, numbers);
   const glossary = notions.map((n) => ({
-    id: termAnchor(n.term),
+    id: termAnchor(n.key ?? n.term),
     term: n.term,
     definition: n.definition,
     refs: n.refs.map((r) => ({ n: r.n, href: `#${sourceAnchor(r.n)}` })),
