@@ -55,6 +55,7 @@ import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
 import { BUCKET, purgeDate, purgeOriginal } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
 import { profileOf, structureRoute } from "@/lib/engine/routing";
+import { expertCalls, imageFallbackCap, ocrAllowed, type AiTier } from "@/lib/billing/tier";
 import type { JobStage } from "./state";
 
 export const WORKER_LEASE_SECONDS = 300;
@@ -83,6 +84,8 @@ interface JobRow {
     ocr_sources?: string[];
     /** Organisation imposée par le lecteur. */
     template?: z.infer<typeof TemplateId>;
+    /** Parcours IA du forfait à la création (OCR, Sol, images) ; absent : ancienne tâche. */
+    ai_tier?: AiTier;
     /** Nouvelle version d'un rapport existant. */
     variation?: Variation;
     base_version_id?: string;
@@ -285,6 +288,8 @@ async function checkBudget(ownerId: string) {
  * scannées) sont lues, puis rejoignent leur place dans l'ordre des pages. Déjà lu : rien.
  */
 async function runOcr(job: JobRow, sourceId: string, controller: AbortController) {
+  // Seconde garde : la lecture des pages scannées est réservée au Pro (refusée dès la création).
+  if (job.params.ai_tier && !ocrAllowed(job.params.ai_tier)) throw new JobFailure("plan_ocr");
   const db = adminClient();
   const { data: src } = await db.from("sources").select("kind, storage_path, page_count, coverage").eq("id", sourceId).single();
   const coverage = (src?.coverage ?? {}) as Record<string, unknown> & { pending_ocr?: boolean; pending_ocr_pages?: number[] };
@@ -483,6 +488,8 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     verifyClaims: process.env.LIMPID_VERIFY_CLAIMS !== "off",
     template: job.params.template ?? null,
     visualMode: job.params.visual_mode ?? "auto",
+    tier: job.params.ai_tier ?? "plus",
+    expert: { left: expertCalls(job.params.ai_tier ?? "free") },
   };
 
   // Moteur V5 : lecture (par fragments si besoin), plan, chapitres en parallèle. Chaque étape
@@ -651,6 +658,8 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
   const deps: IllustrateDeps = {
     settings: await imageSettings(),
     available: imageProviders(),
+    // Secours GPT Image 2 : 1, 2 ou 3 par cours selon le forfait (en plus d'un par image).
+    fallbacks: { left: imageFallbackCap(job.params.ai_tier ?? "plus") },
     render: async (route, style, item) => {
       // Plafonds vérifiés avant chaque image ; un refus laisse le cours sans image.
       await checkBudget(job.owner_id);

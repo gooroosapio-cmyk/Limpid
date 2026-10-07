@@ -3,6 +3,7 @@
  * pour qu'une génération réelle aboutisse — configuration, base, stockage privé, et, sur
  * demande, un appel Gemini minimal (une requête du quota). Aucun secret n'est renvoyé.
  */
+import { internalProEmails } from "@/lib/billing/tier";
 import "server-only";
 import { openRouterConfigFromEnv } from "@/lib/engine/openrouter";
 import { siteUrl } from "@/lib/site";
@@ -44,6 +45,7 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   const or = present("OPENROUTER_API_KEY");
   add("Images (Nano Banana 2.1, secours GPT Image 2)", or, or ? "clé OpenRouter présente : toutes les illustrations par Nano Banana 2.1, GPT Image 2 seulement en secours" : "OPENROUTER_API_KEY absente : aucune image générée");
   add("Couvertures (Pixabay, sinon Nano Banana)", present("PIXABAY_API_KEY"), present("PIXABAY_API_KEY") ? "illustration Pixabay selon le thème du document, sinon Nano Banana 2.1" : "PIXABAY_API_KEY absente : Nano Banana 2.1 à chaque couverture (payante)");
+  add("Droit Pro interne", true, `${internalProEmails().join(", ")} : parcours Pro (OCR, Sol, 10 images), plafonds 50 par jour et 300 par semaine ; offre réelle inchangée`);
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
   add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
   add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || `absente : ${siteUrl()} par défaut`);

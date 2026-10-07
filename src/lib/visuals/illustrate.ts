@@ -14,7 +14,7 @@ import type { Candidate, StoredImage } from "./sources";
 import type { SvgLibrary } from "./svg-library";
 
 /** Images générées par cours : 3 images + 2 SVG au plus (le plan applique le plafond par taille). */
-export const MAX_ILLUSTRATIONS = 5;
+export const MAX_ILLUSTRATIONS = 10;
 
 /** Image vectorielle assainie, prête à stocker. */
 export interface StoredVector {
@@ -48,6 +48,8 @@ export interface IllustrateDeps {
   settings: ImageSettings;
   /** Fournisseurs configurés (clé présente). */
   available: Record<ImageProviderId, boolean>;
+  /** Secours restants pour le cours (absent : sans limite propre au cours). */
+  fallbacks?: { left: number };
   /** Génère une image pour une route ; SVG déjà assaini, image matricielle déjà contrôlée. */
   render(route: ImageRoute, style: ImageStyle, item: { subject: string; purpose: string; altText: string; content: string }): Promise<{ image: StoredImage | StoredVector; usage: UsageReport }>;
   onUsage?(route: ImageRoute, attempt: number, usage: UsageReport): Promise<void> | void;
@@ -136,6 +138,8 @@ export async function illustrate(
       const routes = imageAttempts(style, deps.settings, deps.available);
       for (const [k, route] of routes.entries()) {
         const attempt = n * 10 + k + 1;
+        // Secours : réservé avant l'appel (images en parallèle), jamais au-delà du plafond du cours.
+        if (k > 0 && deps.fallbacks && deps.fallbacks.left-- <= 0) break;
         try {
           const out = await deps.render(route, style, { subject: data.subject, purpose: spec.purpose, altText: spec.alt_text, content: data.content ?? "" });
           await deps.onUsage?.(route, attempt, out.usage);
