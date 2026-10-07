@@ -4,7 +4,9 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { InstallPrompt } from "@/components/shell/InstallPrompt";
+import { PageTransition } from "@/components/shell/PageTransition";
 import { Pwa } from "@/components/shell/Pwa";
+import { ScrollReveal } from "@/components/shell/ScrollReveal";
 import { Toaster } from "@/components/shell/Toasts";
 import { currentUser } from "@/lib/auth";
 import { htmlAttributes, readDisplayPrefs } from "@/lib/display/prefs";
@@ -23,6 +25,7 @@ import "./styles/v2.css";
 import "./styles/v4.css";
 import "./styles/reader-carousel.css";
 import "./styles/roles.css";
+import "./styles/motion.css";
 import "./styles/tailwind.css";
 
 export const metadata: Metadata = {
@@ -72,8 +75,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <AppShell email={user.email ?? ""} />
             </Suspense>
           )}
-          <main id="contenu" className="app-content">{children}</main>
+          <main id="contenu" className="app-content">
+            <PageTransition>{children}</PageTransition>
+          </main>
         </div>
+        <ScrollReveal />
         <Pwa account={user ? offlineKey(user.id) : null} />
         <InstallPrompt />
         <Toaster closeLabel={t.reader.close} />

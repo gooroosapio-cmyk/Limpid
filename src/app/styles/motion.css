@@ -1,0 +1,47 @@
+/*
+ * Mouvement éditorial discret : révélations au défilement, transitions de page natives,
+ * parallaxe légère des couvertures. Jamais dans le lecteur. Mouvement réduit : rien ne bouge.
+ */
+:root {
+  --t-reveal: 420ms;
+  --t-page-out: 140ms;
+  --t-page-in: 260ms;
+  --reveal-shift: 12px;
+}
+
+/* ---------- Révélation au défilement (classe posée par ScrollReveal) ---------- */
+.reveal-on .reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-shift));
+  transition:
+    opacity var(--t-reveal) var(--ease-out) var(--reveal-delay, 0ms),
+    transform var(--t-reveal) var(--ease-out) var(--reveal-delay, 0ms);
+}
+.reveal-on .reveal.is-revealed { opacity: 1; transform: none; }
+/* Fin de la révélation : ScrollReveal retire les classes, l'élément retrouve ses propres styles. */
+
+/* ---------- Parallaxe des couvertures (ParallaxImg) ---------- */
+.parallax-frame { position: absolute; inset: 0; display: block; overflow: hidden; }
+.parallax-img { display: block; width: 100%; height: 100%; object-fit: cover; scale: 1.12; }
+.illus .parallax-img { object-position: right center; }
+
+/* ---------- Transitions de page (React <ViewTransition>, navigateurs compatibles) ---------- */
+::view-transition-old(.page-out) { animation: var(--t-page-out) ease-in both page-out; }
+::view-transition-new(.page-in) { animation: var(--t-page-in) var(--ease-out) var(--t-page-out) both page-in; }
+@keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
+/* L'entrée CSS de l'écran ferait doublon avec la transition native */
+@supports (view-transition-name: none) { .page-enter { animation: none; } }
+
+/* ---------- Mouvement réduit ---------- */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .reveal-on .reveal { opacity: 1; transform: none; transition: none; }
+}
+:root[data-motion="reduit"]::view-transition-group(*),
+:root[data-motion="reduit"]::view-transition-old(*),
+:root[data-motion="reduit"]::view-transition-new(*) { animation: none !important; }
+:root[data-motion="reduit"] .reveal { opacity: 1; transform: none; transition: none; }
+
+/* Impression : tout est visible */
+@media print { .reveal-on .reveal { opacity: 1 !important; transform: none !important; } }

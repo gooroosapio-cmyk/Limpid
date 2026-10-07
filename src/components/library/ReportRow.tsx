@@ -209,7 +209,7 @@ export function ReportRow({
   // ligne, statut). L'image ne passe jamais devant le texte.
   const body = (
     <>
-      <Cover cover={cover} className={variant === "grid" ? "limpid-card-cover" : "lesson-thumb"} />
+      <Cover cover={cover} className={variant === "grid" ? "limpid-card-cover" : "lesson-thumb"} parallax={variant === "grid"} />
       <span className="lesson-text">
         <b className="lesson-title" title={title}>
           {title}
