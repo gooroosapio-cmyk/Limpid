@@ -8,7 +8,7 @@
 .toc a:hover { color: var(--green); }
 
 .block { margin: 0 0 var(--s5); overflow-wrap: break-word; }
-.block-label { display: block; font-size: 11px; font-weight: 720; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.block-label { display: block; font-size: 12px; font-weight: 720; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 .block-definition dfn { font-style: normal; font-weight: 700; }
 .block-analogy, .block-example {
   padding: 16px 18px; border-radius: var(--r-control); background: var(--pale); border-left: 3px solid var(--yellow);
@@ -219,7 +219,7 @@ figure.illustration.diagram img { width: 100%; max-width: 560px; height: auto; m
 /* Indices discrets (V5, § 14) : un petit exposant, sans pastille ; zone tactile de 44 px. */
 .lim .ref, .annex-glossary .ref {
   position: relative; min-width: 0; min-height: 0; margin-left: 1px; padding: 0 2px; border: 0; border-radius: 3px; background: none;
-  color: var(--green); font-family: var(--font); font-size: 0.68em; font-weight: 700; line-height: 1; vertical-align: super; text-decoration: none;
+  color: var(--green); font-family: var(--font); font-size: 0.75em; font-weight: 700; line-height: 1; vertical-align: super; text-decoration: none;
 }
 .lim .ref + .ref, .annex-glossary .ref + .ref { margin-left: 0; padding-left: 0; }
 .lim .ref + .ref::before, .annex-glossary .ref + .ref::before { content: ","; position: static; margin-right: 2px; color: var(--muted); }
@@ -419,7 +419,7 @@ figure.visual-drawing { max-width: 320px; margin-inline: auto; background: trans
 .wrap-left { float: left; margin-right: 14px; }
 .wrap-fig img { display: block; width: 100%; height: auto; }
 .wrap-fig figcaption { margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--muted); }
-.wrap-fig .credit { font-size: 11px; }
+.wrap-fig .credit { font-size: 12px; }
 @media (min-width: 600px) { .wrap-fig { width: 34%; } .wrap-fig.wrap-compact { width: 42%; } }
 .annex-doc-head .btn-link { display: inline-flex; align-items: center; min-height: var(--cible); }
 /* Schéma dans le lecteur : jamais plus haut que l'écran de lecture (il garde ses proportions). */
