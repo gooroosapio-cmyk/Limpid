@@ -5,6 +5,7 @@ import { NotionsProvider, type Notion } from "../Notions";
 import { SourcesProvider } from "../Sources";
 import type { ChapterQuestion, Exercise, Section } from "@/lib/contracts/schemas";
 import { LimpidReader } from "./LimpidReader";
+import type { ProjectionStats } from "@/lib/reader/projection";
 import type { OptionsData } from "./OptionsPanel";
 
 /** QCM de fin de chapitre (V6) par chapitre : seuls les chapitres qui en ont un. */
@@ -24,8 +25,11 @@ export function LimpidScreen({
   annexBase,
   originalHref,
   quizzes,
+  readerV3 = false,
 }: {
-  doc: { chapters: { id: string; title: string }[]; notions: Notion[]; entries: SourceEntry[]; pieces: React.ReactNode };
+  doc: { chapters: { id: string; title: string }[]; stats?: ProjectionStats; notions: Notion[]; entries: SourceEntry[]; pieces: React.ReactNode };
+  /** Interrupteur administrateur du lecteur V3 (projections). */
+  readerV3?: boolean;
   reportId: string | null;
   versionId: string | null;
   initialAnchor: string | null;
@@ -52,6 +56,7 @@ export function LimpidScreen({
             insufficient={insufficient}
             options={options}
             quizzes={quizzes}
+            projection={readerV3 ? (doc.stats ?? null) : null}
           >
             <article className="lim" aria-label={options.title}>{doc.pieces}</article>
           </LimpidReader>

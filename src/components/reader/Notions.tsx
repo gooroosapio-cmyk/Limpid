@@ -8,6 +8,8 @@ import { pieceOf, useAnnex } from "./annex-link";
 import { SourceRef } from "./Sources";
 
 export interface Notion {
+  /** Sens précis (V3) : deux chapitres peuvent employer le même mot dans deux sens. */
+  key?: string;
   term: string;
   definition: string;
   /** V5 : exemple préproduit avec le cours (aucun appel IA au toucher). */
@@ -31,7 +33,7 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
-  const notion = notions.find((n) => n.term.toLowerCase() === current?.toLowerCase());
+  const notion = notions.find((n) => (n.key ?? n.term.toLowerCase()) === current?.toLowerCase());
 
   const open = useCallback((term: string, opener: HTMLElement) => {
     openerRef.current = opener;
@@ -75,11 +77,11 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
             {annex && (
               <a
                 className="btn-link notion-glossary"
-                href={annex.href(termAnchor(notion.term))}
+                href={annex.href(termAnchor(notion.key ?? notion.term))}
                 onClick={(e) => {
                   if (e.metaKey || e.ctrlKey || e.shiftKey) return;
                   e.preventDefault();
-                  annex.open(termAnchor(notion.term), pieceOf(openerRef.current));
+                  annex.open(termAnchor(notion.key ?? notion.term), pieceOf(openerRef.current));
                 }}
               >
                 <Icon name="book" size={16} /> {t.reader.inGlossary}
@@ -106,7 +108,8 @@ export function NotionsProvider({ notions, checkHref, children }: { notions: Not
 }
 
 /** Mot souligné ouvrant l'explication locale. */
-export function NotionTerm({ term, children }: { term: string; children: React.ReactNode }) {
+export function NotionTerm({ term, sense, children }: { term: string; sense?: string; children: React.ReactNode }) {
+  const id = sense ?? term.toLowerCase();
   const t = useT();
   const { open, current } = useContext(Ctx);
   return (
@@ -114,9 +117,9 @@ export function NotionTerm({ term, children }: { term: string; children: React.R
       type="button"
       className="term"
       aria-haspopup="dialog"
-      aria-expanded={current?.toLowerCase() === term.toLowerCase()}
+      aria-expanded={current?.toLowerCase() === id}
       aria-label={t.reader.openNotion(term)}
-      onClick={(e) => open(term, e.currentTarget)}
+      onClick={(e) => open(id, e.currentTarget)}
     >
       {children}
     </button>

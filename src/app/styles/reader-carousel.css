@@ -90,3 +90,29 @@
   font-size: 14px; line-height: 1.45;
 }
 .import-note { margin: var(--s3) 0 0; padding: 10px 12px; border-radius: var(--r-control); background: var(--danger-pale); color: var(--danger); font-size: 14px; line-height: 1.45; }
+
+/* Lecteur V3 : projections locales (mêmes pièces, seule la visibilité change). */
+.deck-col.chapters .lim > [data-step-off],
+.deck-col.chapters [data-chapter-end][data-step-off] { display: none !important; }
+.deck-col.chapters[data-projection="visual"][data-collapsed] .lim > [data-plain] { display: none !important; }
+.deck-col.chapters[data-projection="visual"] .lim > .piece-visual { margin-block: var(--s3); }
+.proj-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  max-width: var(--read-max, 42rem);
+  margin: var(--s3) auto 0;
+  padding: var(--s2) var(--s3) calc(var(--s2) + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.proj-bar .proj-count { font-size: 0.875rem; color: var(--muted); min-width: 6.5em; text-align: center; }
+.proj-bar .proj-spacer { min-width: 6em; }
+.proj-bar .proj-all { flex-basis: 100%; text-align: center; font-size: 0.875rem; }
+.setting-projection { display: grid; gap: var(--s1); margin-bottom: var(--s3); }
+.setting-projection .seg button { flex: 1; }

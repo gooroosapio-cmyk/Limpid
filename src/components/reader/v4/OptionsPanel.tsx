@@ -101,8 +101,11 @@ export function OptionsPanel({
   onNavigate,
   annexHref,
   onAnnex,
+  reading = null,
 }: {
   data: OptionsData;
+  /** Lecteur V3 : choix local de l'approche (« Ma lecture »), en tête du menu. */
+  reading?: React.ReactNode;
   onNavigate: () => void;
   /** Page Annexes du rapport, à une ancre (Annexes, Sources, Glossaire). */
   annexHref: (hash: string) => string;
@@ -229,6 +232,7 @@ export function OptionsPanel({
 
   return (
     <div>
+      {reading}
       <ul className="rows">
         <Row icon="download" title={t.lim.optExport} sub={t.lim.optExportSub} onClick={() => setView("export")} />
         <Row icon="eye" title={t.lim.optDisplay} sub={t.lim.optDisplaySub} onClick={() => setView("display")} />
