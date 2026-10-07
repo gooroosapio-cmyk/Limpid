@@ -67,7 +67,9 @@
 .cquiz-choice.is-right { border: 2px solid var(--green); background: var(--positive-bg, var(--green-pale)); }
 .cquiz-choice.is-wrong { border: 2px dashed var(--danger); background: var(--danger-pale); }
 .cquiz-choice.is-answer { border-color: var(--green); }
-.cquiz-validate { min-height: var(--cible); margin-top: var(--s3); }
+.cquiz-validate, .cquiz-next { min-height: var(--cible); margin-top: var(--s3); }
+.cquiz-progress { margin: 0 0 var(--s2); font-size: 13px; color: var(--muted); }
+.cquiz-prompt:focus { outline: none; }
 .cquiz-feedback { margin-top: var(--s3); padding: var(--s3); border-left: 3px solid var(--green); border-radius: 0 var(--r-control) var(--r-control) 0; background: var(--soft); }
 .cquiz-feedback.is-wrong { border-left-color: var(--danger); }
 .cquiz-feedback p { margin: 0; font-size: 15px; line-height: 1.5; }

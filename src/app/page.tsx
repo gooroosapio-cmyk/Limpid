@@ -6,7 +6,7 @@ import { ImportForm } from "@/components/ImportForm";
 import { Screen } from "@/components/shell/Screen";
 import { Mode } from "@/lib/contracts/schemas";
 import { requireUser } from "@/lib/auth";
-import { isDemoMode, isUrlImportEnabled, limits } from "@/lib/config";
+import { isDemoMode, limits } from "@/lib/config";
 import { getT } from "@/lib/i18n/server";
 import { onboardingRedirect, onboardingState } from "@/lib/onboarding";
 import { isAdminConfigured } from "@/lib/supabase/admin";
@@ -17,7 +17,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.v4.homeTitle };
 }
 
-const TABS = { fichier: "file", lien: "link", texte: "text" } as const;
 const LIBRARY_PARAMS = ["vue", "q", "filtre", "dossier"];
 
 /**
@@ -43,17 +42,13 @@ export default async function HomeImportPage({ searchParams }: { searchParams: P
   const next = error ? null : onboardingRedirect(onboardingState(profile));
   if (next) redirect(next);
   const enabled = !isDemoMode() && isAdminConfigured();
-  const tab = TABS[sp.mode as keyof typeof TABS] ?? "file";
   return (
     <Screen className="add-page">
       <h1>{t.v4.homeTitle}</h1>
       <DemoBanner />
       {!enabled && <p className="notice notice-warn">{t.create.notConfigured}</p>}
       <ImportForm
-        key={tab}
-        initialTab={tab}
         enabled={enabled}
-        urlEnabled={isUrlImportEnabled()}
         maxFileMb={Math.round(limits.maxFileBytes / 1024 / 1024)}
         maxPages={limits.maxPages}
         defaultMode={Mode.safeParse(prefs?.default_mode).data ?? "auto"}

@@ -523,6 +523,7 @@ dialog.chat-sheet::backdrop { background: var(--backdrop); }
 .admin-select { display: grid; gap: 6px; font-weight: 600; }
 .admin-select select { min-height: 44px; max-width: 100%; }
 .install-sheet { display: grid; gap: 12px; }
+.install-sheet .install-hint { margin: 0; text-align: center; }
 .install-head { display: flex; align-items: center; gap: 14px; }
 .install-head h2 { margin: 0 0 2px; font-size: 20px; }
 .install-icon { border-radius: 14px; flex: none; }

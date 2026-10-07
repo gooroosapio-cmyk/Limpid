@@ -46,7 +46,11 @@
 .retain-title { display: inline-block; background: var(--mark); color: var(--ink); padding: 1px 6px; border-radius: 3px; }
 
 /* Réussite : vert ; erreur : jamais un rouge punitif (pointillé + « À revoir ») */
-.cquiz-choice.is-right { border-color: var(--role-success); background: var(--tint-success); }
+.cquiz-choice.is-right, .cquiz-choice.is-right:has(input:checked) { border: 2px solid var(--role-success); background: var(--tint-success); }
+.cquiz-choice.is-answer { border: 2px solid var(--role-success); }
+.cquiz-choice.is-wrong, .cquiz-choice.is-wrong:has(input:checked) { border: 2px dashed var(--role-alert); background: var(--tint-alert); }
+.cquiz-feedback.is-right { border-left-color: var(--role-success); }
+.cquiz-feedback.is-wrong { border-left-color: var(--role-alert); }
 
 /* Icône de rôle devant l'étiquette (même couleur que l'étiquette) */
 .block-label { display: flex; align-items: center; gap: 6px; }

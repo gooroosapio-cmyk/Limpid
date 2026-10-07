@@ -761,6 +761,7 @@ export const fr = {
   pwa: {
     installSub: "Ouvrez vos cours d'un geste depuis l'écran d'accueil, même hors connexion.",
     installBtn: "Installer l'application",
+    installLaterHint: "Vous pourrez aussi l'installer à tout moment depuis Paramètres.",
     later: "Plus tard",
     understood: "J'ai compris",
     iosStep1: "Touchez le bouton Partager du navigateur",
@@ -1325,6 +1326,10 @@ export const fr = {
     quizWrong: "À revoir.",
     quizGood: (g: number, n: number) => `${g} bonne${g > 1 ? "s" : ""} réponse${g > 1 ? "s" : ""} sur ${n}`,
     quizAgain: "Recommencer",
+    quizNext: "Suivant",
+    quizFinish: "Terminer",
+    quizLater: "Plus tard",
+    quizNewLot: "Autres questions",
     chapterLabel: (i: number) => `Chapitre ${i}`,
     retain: "À retenir",
     checkChapter: (n: number) => `Vérifier ce chapitre · ${n} question${n > 1 ? "s" : ""}`,
