@@ -15,7 +15,6 @@
 }
 .block-analogy p, .block-example p { margin: 0 0 var(--s2); }
 .block-analogy .limit { font-size: 15px; color: var(--muted); margin: var(--s2) 0 0; }
-:root[data-mode="dark"] .block-analogy .limit { color: #ded9b7; }
 .block-example { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--green); }
 .block-caution { padding: 4px 0 4px 18px; border-left: 3px solid var(--ink); }
 

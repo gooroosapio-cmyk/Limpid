@@ -1,0 +1,106 @@
+/*
+ * Limpid — jetons de couleur : source unique (palette du kit, harmonisée).
+ * Chaque valeur est écrite une fois : light-dark(clair, sombre). Le thème suit l'appareil ;
+ * data-mode="light" | "dark" force un thème ; .scheme-light / .scheme-dark forcent un thème sur un
+ * bloc (les jetons y sont redéclarés pour que light-dark() se résolve sur ce bloc).
+ * Contrastes vérifiés (WCAG 2.2, texte ≥ 4,5:1) sur le fond, les surfaces, les teintes de rôle et le marqueur : voir /admin/charte.
+ */
+:root, .scheme-light, .scheme-dark {
+  /* Surfaces */
+  --bg: light-dark(#f7f6ef, #101813);
+  --surface: light-dark(#ffffff, #1b2720);
+  --elevated: light-dark(#eceee8, #25342a);
+  --soft: light-dark(#eeefe8, #1d2a22);
+  --glass: light-dark(rgb(255 255 255 / 92%), rgb(27 39 32 / 90%));
+  --backdrop: light-dark(rgb(24 35 29 / 42%), rgb(0 0 0 / 62%));
+
+  /* Texte */
+  --ink: light-dark(#18231d, #f5f3e9);
+  --muted: light-dark(#506057, #b9c7bc);
+  --line: light-dark(#d4d9d2, rgb(245 243 233 / 13%));
+  --line-strong: light-dark(#abb4ad, #536459);
+
+  /* Accent (logo) : fond jaune + texte anthracite, jamais du petit texte jaune sur fond clair */
+  --yellow: #f2d94e;
+  --yellow-hover: #dcc23a;
+  --on-yellow: #172119;
+  --pale: light-dark(#faefb4, rgb(242 217 78 / 14%));
+  --focus: light-dark(#315f43, #f2d94e);
+
+  /* États d'interface */
+  --sage: light-dark(#23633e, #8fd1a6);
+  --green: var(--sage);
+  --green-pale: light-dark(#e3ede6, rgb(143 209 166 / 14%));
+  --positive-bg: light-dark(#e3ede6, #223a2c);
+  --danger: light-dark(#a3303a, #ffafb3);
+  --danger-pale: light-dark(#f7e4e3, #3a2426);
+
+  /*
+   * Rôles pédagogiques (texte, étiquettes, filets, icônes). La couleur n'est jamais seule :
+   * chaque rôle a son étiquette et son icône.
+   *   bleu   notion     définitions, formules, termes du glossaire
+   *   rouge  important  idée clé (icône étoile) · attention / piège (icône triangle)
+   *   vert   réussite   bonne réponse, chapitre validé, progrès
+   *   violet exemple    exemple, analogie, cas résolu
+   *   jaune  à retenir  marqueur (fond), jamais en couleur de texte
+   */
+  --role-notion: light-dark(#2b5b88, #9cc3ea);
+  --role-alert: light-dark(#a3303a, #ffafb3);
+  --role-success: light-dark(#23633e, #8fd1a6);
+  --role-example: light-dark(#5f4a86, #d3bdec);
+
+  /* Surlignage par rôle : teinte du rôle sur le fond (10 % clair, 16 % sombre), texte en encre */
+  --tint-notion: light-dark(color-mix(in srgb, #2b5b88 10%, #f7f6ef), color-mix(in srgb, #9cc3ea 16%, #101813));
+  --tint-alert: light-dark(color-mix(in srgb, #a3303a 10%, #f7f6ef), color-mix(in srgb, #ffafb3 16%, #101813));
+  --tint-success: light-dark(color-mix(in srgb, #23633e 10%, #f7f6ef), color-mix(in srgb, #8fd1a6 16%, #101813));
+  --tint-example: light-dark(color-mix(in srgb, #5f4a86 10%, #f7f6ef), color-mix(in srgb, #d3bdec 16%, #101813));
+
+  /* Marqueur « À retenir » : jaune du logo, 42 % en clair, 26 % en sombre ; texte en encre */
+  --mark: light-dark(rgb(242 217 78 / 42%), rgb(242 217 78 / 26%));
+
+  /* Ombres et halo */
+  --shadow: 0 12px 32px light-dark(rgb(24 35 29 / 10%), rgb(0 0 0 / 18%));
+  --shadow-lift: 0 16px 40px light-dark(rgb(24 35 29 / 16%), rgb(0 0 0 / 32%));
+  --halo: radial-gradient(60% 80% at 85% 0%, light-dark(rgb(242 217 78 / 18%), rgb(242 217 78 / 8%)), transparent 70%);
+}
+:root { color-scheme: light dark; }
+:root[data-mode="light"], .scheme-light { color-scheme: light; }
+:root[data-mode="dark"], .scheme-dark { color-scheme: dark; }
+
+/* Contraste renforcé (réglage d'affichage) */
+:root[data-contrast="fort"] {
+  --muted: light-dark(#3a463f, #d6dbd4);
+  --line: light-dark(rgb(24 35 29 / 40%), rgb(245 243 233 / 34%));
+}
+
+/* Rôles appliqués au texte : utiles partout (lecteur, bilan, charte) */
+.role-notion { --role: var(--role-notion); --tint: var(--tint-notion); }
+.role-alert { --role: var(--role-alert); --tint: var(--tint-alert); }
+.role-success { --role: var(--role-success); --tint: var(--tint-success); }
+.role-example { --role: var(--role-example); --tint: var(--tint-example); }
+.text-role { color: var(--role); }
+
+/* Marqueur jaune : <mark> dans tout le texte de lecture */
+mark, .hl-mark {
+  background: var(--mark);
+  color: inherit;
+  padding: 0 0.12em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/* Surlignage par rôle : fond teinté, texte en encre */
+.hl-role {
+  background: var(--tint);
+  color: var(--ink);
+  padding: 0 0.12em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/* Soulignement : plein pour les liens ; pointillé de la couleur du rôle pour les termes du glossaire */
+.u-term {
+  text-decoration: underline dotted var(--role, var(--role-notion));
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}

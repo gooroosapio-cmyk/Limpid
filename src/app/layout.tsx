@@ -12,6 +12,7 @@ import { I18nProvider } from "@/lib/i18n/client";
 import { getLang, getT } from "@/lib/i18n/server";
 import { offlineKey } from "@/lib/offline-key";
 import { siteUrl } from "@/lib/site";
+import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/shell.css";
 import "./styles/components.css";
@@ -21,6 +22,8 @@ import "./styles/pages.css";
 import "./styles/v2.css";
 import "./styles/v4.css";
 import "./styles/reader-carousel.css";
+import "./styles/roles.css";
+import "./styles/tailwind.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -46,8 +49,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F5F4EC" },
-    { media: "(prefers-color-scheme: dark)", color: "#0E110F" },
+    { media: "(prefers-color-scheme: light)", color: "#F7F6EF" },
+    { media: "(prefers-color-scheme: dark)", color: "#101813" },
   ],
 };
 

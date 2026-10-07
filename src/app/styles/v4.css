@@ -4,29 +4,13 @@
  * compacte (interface 14/20, titres 24/30), navigation à quatre destinations, rail sur ordinateur.
  */
 
-/* ---------- Jetons ---------- */
+/* ---------- Jetons (couleurs : tokens.css) ---------- */
 :root {
-  --bg: #0f1411; --surface: #18201b; --elevated: #242e27; --soft: #1d2620;
-  --ink: #f5f4ec; --muted: #b5beb4; --line: rgb(245 244 236 / 13%); --line-strong: #3e4b40;
-  --sage: #afcbbc; --green: var(--sage); --positive-bg: #223a2c; --danger: #f0aea3; --danger-pale: #382420;
-  --focus: #f1d94e;
   --pad: 20px; --r-control: 12px; --r-card: 16px; --r-panel: 20px; --btn-h: 44px;
   --header: 56px; --bottomnav: 64px; --rail-w: 88px;
 }
 @media (max-width: 389px) { :root { --pad: 16px; } }
 @media (min-width: 1024px) { :root { --pad: 32px; } }
-:root[data-mode="light"] {
-  --bg: #f5f4ec; --surface: #ffffff; --elevated: #eeefe7; --soft: #ebebe3;
-  --ink: #15180f; --muted: #596052; --line: #d4d7cd; --line-strong: #c3c7bb;
-  --sage: #35624c; --positive-bg: #e4eee7; --danger: #9a3f36; --danger-pale: #f7e8e4; --focus: #75620b;
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-mode="dark"]):not([data-mode="light"]) {
-    --bg: #f5f4ec; --surface: #ffffff; --elevated: #eeefe7; --soft: #ebebe3;
-    --ink: #15180f; --muted: #596052; --line: #d4d7cd; --line-strong: #c3c7bb;
-    --sage: #35624c; --positive-bg: #e4eee7; --danger: #9a3f36; --danger-pale: #f7e8e4; --focus: #75620b;
-  }
-}
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 
 /* ---------- Typographie de l'interface (le lecteur garde la sienne) ---------- */

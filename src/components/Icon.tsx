@@ -189,6 +189,7 @@ const PATHS = {
 } as const;
 
 export type IconName = keyof typeof PATHS;
+export const ICON_NAMES = Object.keys(PATHS) as IconName[];
 
 export function Icon({ name, size = 22, className }: { name: IconName; size?: number; className?: string }) {
   return (
