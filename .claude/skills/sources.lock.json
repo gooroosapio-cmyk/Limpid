@@ -1,0 +1,668 @@
+{
+  "format_version": 1,
+  "retrieved_at": "2026-10-09",
+  "target_repository": "gooroosapio-cmyk/Limpid",
+  "base_commit": "6bb87b705298dbed8ae0aff4a521e69336e462ec",
+  "installation": "Project-scoped Claude Code skill files; no hooks or engine binary installed or executed.",
+  "sources": [
+    {
+      "repository": "pbakaus/impeccable",
+      "commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "skill_version": "4.5.2",
+      "engine_version": "0.1.14",
+      "license": "Apache-2.0",
+      "runtime_verified": false
+    },
+    {
+      "repository": "vercel-labs/agent-skills",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "skill_version": "1.0.0",
+      "license_declaration": "MIT in root README; no full LICENSE file in pinned repository tree",
+      "remote_rules": "https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md",
+      "remote_rules_pinned": false
+    }
+  ],
+  "files": [
+    {
+      "path": ".claude/agents/impeccable-asset-producer.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/agents/impeccable-asset-producer.md",
+      "git_blob_sha1": "9fa186e7ad8a99f90401d7821ac1f60c4823a29f",
+      "sha256": "854a2da0f67cbe627908aa450115e83985b7d20cf2cc345adf173f228c6130b8",
+      "mode": "100644",
+      "bytes": 8250
+    },
+    {
+      "path": ".claude/agents/impeccable-documenter.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/agents/impeccable-documenter.md",
+      "git_blob_sha1": "eb12233534675517c97b6ba526c6f8d7182d9f1a",
+      "sha256": "6bc62a59f6fef0b749927c8d10e9849ab2411199d86d70772a86f8e83ac309f5",
+      "mode": "100644",
+      "bytes": 3144
+    },
+    {
+      "path": ".claude/agents/impeccable-finish-reviewer.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/agents/impeccable-finish-reviewer.md",
+      "git_blob_sha1": "74c372e23a1cc7e860ea0a3be6bc453b9da19b23",
+      "sha256": "08398fa2d8e2b06b849f1c0f032e1e93b832e9294aed35c1c7f62b938d62ee80",
+      "mode": "100644",
+      "bytes": 15248
+    },
+    {
+      "path": ".claude/agents/impeccable-manual-edit-applier.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/agents/impeccable-manual-edit-applier.md",
+      "git_blob_sha1": "a1e179cbed669cf4f25267d5684fa813553df6a7",
+      "sha256": "b2d71ff0df7ed49e06dfc4acfce3d3f7eb48afa68be04763ee8c08354df50a07",
+      "mode": "100644",
+      "bytes": 6983
+    },
+    {
+      "path": ".claude/skills/impeccable/LICENSE",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": "LICENSE",
+      "git_blob_sha1": "bb3f6d23b1f8025514a62a12b51b47d73e3c9aa9",
+      "sha256": "02bb8c3b4e70190e3986c0404ad2fd8d639b4f534252d82379cc1b502b6d1812",
+      "mode": "100644",
+      "bytes": 10766
+    },
+    {
+      "path": ".claude/skills/impeccable/NOTICE.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": "NOTICE.md",
+      "git_blob_sha1": "0468271c904ae334cfaf27da6f8df3d5f419a1f0",
+      "sha256": "c60a093c2845fd9fb82f9c6f742ece31f379f8190b535309d32d66c45ccffdcb",
+      "mode": "100644",
+      "bytes": 503
+    },
+    {
+      "path": ".claude/skills/impeccable/SKILL.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/SKILL.md",
+      "git_blob_sha1": "db84db9c79ddd0024d0dfb18b2f5715e7e5ba560",
+      "sha256": "35c883046117a416ca008ad7cbcda912c728a01f99b9a88130c2f0ab4c8d234c",
+      "mode": "100644",
+      "bytes": 12510
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/adapt.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/adapt.md",
+      "git_blob_sha1": "58d54aa3e6b1dfb34622d7b99e51c9c9c660b69a",
+      "sha256": "0648e4e06d01cabc91fa7dc19256ceedeeeea213b9265e9d36b0918370e16fb2",
+      "mode": "100644",
+      "bytes": 11301
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/adapt.native.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/adapt.native.md",
+      "git_blob_sha1": "f1ccd65d9788ffdfb5761824e6c51b8866f4cba5",
+      "sha256": "17c583cf8ad41266ea1e787b666b9d91fe13469d3d0f6af57c08e0146f9b17ac",
+      "mode": "100644",
+      "bytes": 3910
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/android.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/android.md",
+      "git_blob_sha1": "1f67a6bb574960cccb1692f460cc5432baebad65",
+      "sha256": "058f81f256134841875fd3183e06b37a023de0c877fd2b9eecd97011640791fe",
+      "mode": "100644",
+      "bytes": 4093
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/animate.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/animate.md",
+      "git_blob_sha1": "4ae4cc5fcd7ae4341f4f130ab67a7d9b03c00562",
+      "sha256": "94b4ce6299fea93d9f256b2d25705961a76bc5ea940c56db4145686ebc99df1b",
+      "mode": "100644",
+      "bytes": 5236
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/audit.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/audit.md",
+      "git_blob_sha1": "b3e1d7c98646501fcf150fb722f56f5d0eb38c2a",
+      "sha256": "b7c98bde47e00889c235e3d808b596224aad5a0869f25e439f135ce86551a075",
+      "mode": "100644",
+      "bytes": 8528
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/audit.native.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/audit.native.md",
+      "git_blob_sha1": "fbccb56f6e6fe64fc6b24d82977f392a6285848e",
+      "sha256": "fe91fcf28638f95577af481a50edaf339d6c9a3ad3b9fa477bc81c116b8bc392",
+      "mode": "100644",
+      "bytes": 8364
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/bolder.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/bolder.md",
+      "git_blob_sha1": "1cad2f1d1bbec240aaf39f2332e83c25dcc20cd0",
+      "sha256": "4879f38b23d0a251a63cbb0327e660296194cd2e71eb4da3236c6ebfe5807746",
+      "mode": "100644",
+      "bytes": 3471
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/clarify.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/clarify.md",
+      "git_blob_sha1": "3047a9d82b9cfa31b392e35c643d82bcdb50250a",
+      "sha256": "6c382f8283756e8a693d832b750f7e4cbff1ca5bdcc3825b2b4ef4da9f21876a",
+      "mode": "100644",
+      "bytes": 4590
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/colorize.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/colorize.md",
+      "git_blob_sha1": "dc45f88c5f81c61355a915c6ea1391b1a36c9ba8",
+      "sha256": "d1fbd55074abb2251bdaa03749d34acc42c38e46e47549f18f5848df57d43c42",
+      "mode": "100644",
+      "bytes": 4537
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/component-review.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/component-review.md",
+      "git_blob_sha1": "0e96a9d2ceba25197ab8cb6b08dd62eb4b107d2a",
+      "sha256": "6996198844d6459392b816e7bfb7d256f07b6884614e88069ffab5544b4886df",
+      "mode": "100644",
+      "bytes": 8017
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/craft-floor.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/craft-floor.md",
+      "git_blob_sha1": "9653b980895fa343127982ba575085c31726eecc",
+      "sha256": "96e2e6bd4fcf9a2c6da65fb029f96d9176308fae2efd9d8653d3b8d838960e07",
+      "mode": "100644",
+      "bytes": 4484
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/craft.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/craft.md",
+      "git_blob_sha1": "dbbc9402c07cdab21f2b6eb69279b8435fecfd7f",
+      "sha256": "9205e222bc6565b37fb504ceec93233c2d2a456802b69d16e6b1c44723907c4c",
+      "mode": "100644",
+      "bytes": 555
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/critique.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/critique.md",
+      "git_blob_sha1": "f4a2f3f6eb99d551ce2501274a83c32a73494076",
+      "sha256": "c9284892cb1f21aaeaf93fdf2e9e7a679d05e0baa8ddf309a79a9790d262ad38",
+      "mode": "100644",
+      "bytes": 42717
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/degraded/asset-producer.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/degraded/asset-producer.md",
+      "git_blob_sha1": "ffdf8747e7ad410b4cddba9efb3d5c8b8ce77f0e",
+      "sha256": "a83cfd24bf58bc8997540577651a485f1eca38fd324106d8bedeab2394fb169e",
+      "mode": "100644",
+      "bytes": 8429
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/degraded/documenter.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/degraded/documenter.md",
+      "git_blob_sha1": "e9dfb799bcece32233386bf9702bc3141d56d196",
+      "sha256": "bcc05ea92faebb5c74037a9d4263a5ce9a56f5ab07c8ab3c59ee704d8cade745",
+      "mode": "100644",
+      "bytes": 3325
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/degraded/finish-reviewer.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/degraded/finish-reviewer.md",
+      "git_blob_sha1": "af7c451dfcbf2f753603a00089f35ac87aa575f9",
+      "sha256": "275dd1b6e63bbd30d2713227c4f79b880a8bc4e01cc48d392068bb86939d3afa",
+      "mode": "100644",
+      "bytes": 15415
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/degraded/manual-edit-applier.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/degraded/manual-edit-applier.md",
+      "git_blob_sha1": "ef5095b924623ce04e02188a6790ebd98a273bcd",
+      "sha256": "5fae7f8a2fc3ddd49ad0a413446dc44daedef5b6b7de5eb935bd2fbfad646d58",
+      "mode": "100644",
+      "bytes": 7196
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/delight.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/delight.md",
+      "git_blob_sha1": "798c43a5b735a5b75b67484c516821f1355dfbd6",
+      "sha256": "56500b1f9d2fcec8324d7f448d813048b5831a46d3feeb1055bd3eb17ec3660f",
+      "mode": "100644",
+      "bytes": 3716
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/distill.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/distill.md",
+      "git_blob_sha1": "7b93f0fb72bb296ad2cacd20428c6a0b6b4fb909",
+      "sha256": "b2f60e0154bf0e687badc46d8c8420e2118a9a6e21162050722be779dc02cb6d",
+      "mode": "100644",
+      "bytes": 5624
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/doctor.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/doctor.md",
+      "git_blob_sha1": "e73daa7d152ec6fdc86327140b9924f28ee00b7b",
+      "sha256": "712a9a1cec93cc4d1bb4a4e9e47dd7c048973eebfa6f428f943386a7bc192f39",
+      "mode": "100644",
+      "bytes": 5563
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/document.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/document.md",
+      "git_blob_sha1": "033ff9b3e6754ea85e2a0316bf732b051138a7a5",
+      "sha256": "87b3db688c7963898bda8096f7868fed05ec5a0a80d14298e8b906b70cdf9c42",
+      "mode": "100644",
+      "bytes": 27428
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/extract.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/extract.md",
+      "git_blob_sha1": "fb1cd199e3d8d298e2fcc46defb5fcd1f873d27e",
+      "sha256": "bfc51972fbf387566dc9e29c8b1af479a66ab401fdbce659fae9e6a5a9d85316",
+      "mode": "100644",
+      "bytes": 3340
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/generate.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/generate.md",
+      "git_blob_sha1": "f359ee9dcec360efeee5ea303f644b14d8d0c8ed",
+      "sha256": "fc149b5bc7a8d0cc9b9bf86e5013793f3857c1c302212e9aaf101cb95427386b",
+      "mode": "100644",
+      "bytes": 13126
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/harden.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/harden.md",
+      "git_blob_sha1": "cbe2941e5e9959dc5b475da24d33aecbff090e5a",
+      "sha256": "3898bd9b56a042e860a0db4fb4dd81ac81126fa218b604702e2ac0c2287ae09b",
+      "mode": "100644",
+      "bytes": 9450
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/hooks.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/hooks.md",
+      "git_blob_sha1": "8156b2cd64ca45f780e2d880cb0c2c8e9ec11986",
+      "sha256": "3186f2c7fdf24c1fc9cc089850b62228fad79fde2908d3b6c900d9eda44b5185",
+      "mode": "100644",
+      "bytes": 13911
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/init.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/init.md",
+      "git_blob_sha1": "c208d6e3464d96eae5677a2a54f6397f6dca9e2b",
+      "sha256": "dc340befdfb87d1de3b70e860fab0be7e951a60d3ddc529072c39eb136cfcfcd",
+      "mode": "100644",
+      "bytes": 11671
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/ios.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/ios.md",
+      "git_blob_sha1": "c6244dfe32176e5718d86211b7d1eb5601eb0860",
+      "sha256": "40c87038b5f75147a5952a96237acf312a327bf70c1bcd8e0a5f064625ae9668",
+      "mode": "100644",
+      "bytes": 3812
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/layout.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/layout.md",
+      "git_blob_sha1": "7f3b30d80964a21776ec9dd7bb2a9d5db0075003",
+      "sha256": "64802d14087fc96b38ef3881fef8098b36068d07f3b942031637b18eef3dd2af",
+      "mode": "100644",
+      "bytes": 5161
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/live-setup.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/live-setup.md",
+      "git_blob_sha1": "670ecc737035debe4783a7c15394ea14ac26c915",
+      "sha256": "6e7e3b7c4cf331cdb43f4546c164acd6c45a267ce3289dcfa87e13202d98c747",
+      "mode": "100644",
+      "bytes": 8186
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/live.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/live.md",
+      "git_blob_sha1": "4307a2121c3cabd4363a1aed385af84070f5a6a0",
+      "sha256": "b4def5b57733b6ba233570bd5691a536901f8b15479fc0111a2cde56224d0e1a",
+      "mode": "100644",
+      "bytes": 36245
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/mode-operate.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/mode-operate.md",
+      "git_blob_sha1": "833775ba85f03bf65a4c1b23e39192f7653414e6",
+      "sha256": "7a52dd7a94ee75f6ae89542c86a1b6e1d306812b16e0d9dbf12d4acad44d148b",
+      "mode": "100644",
+      "bytes": 4716
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/mode-persuade.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/mode-persuade.md",
+      "git_blob_sha1": "9c152d67064fb8453a7eaa89de20c35fc115b085",
+      "sha256": "21e78c8a77badb3f83290cd4577ed3b24bd4dd3b57136d7da75733d4f3ee9ac0",
+      "mode": "100644",
+      "bytes": 3638
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/mode-read.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/mode-read.md",
+      "git_blob_sha1": "b30c4c9139e3094bd35c60738decb6109326153f",
+      "sha256": "a569989e6a3d6453b4c45e9474e162a15cc54e11732ac6baa7990a6e7cccc0b5",
+      "mode": "100644",
+      "bytes": 4396
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/new-work.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/new-work.md",
+      "git_blob_sha1": "3a07a75785c330337c11dc0829673bcd2d607bb3",
+      "sha256": "6c070f803553dfacbbb1a5e136d8a05776eee399bdd501d596dd513a6e7e7dbe",
+      "mode": "100644",
+      "bytes": 61199
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/onboard.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/onboard.md",
+      "git_blob_sha1": "d6a6de372d527d232c60f8317a077b5c5405b927",
+      "sha256": "9a2c08ee2516d2ee87129e7ebe6a0895f9990c9852d1f6fa7e70be9a6a88a659",
+      "mode": "100644",
+      "bytes": 7740
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/operate.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/operate.md",
+      "git_blob_sha1": "524f2c3ae9fa497284e9699f3ca5320cce5d05cf",
+      "sha256": "a9d2203acd45ca33a13d5c68b02b23ed512425ac15f0e8438318ed124b43729d",
+      "mode": "100644",
+      "bytes": 4145
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/optimize.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/optimize.md",
+      "git_blob_sha1": "cc6ce4925266bf3c4a7d40b5a435fe315cbf6f1a",
+      "sha256": "6d368b679a0ed1815812815de65863b5840d419589dfbda06224c01149240287",
+      "mode": "100644",
+      "bytes": 7614
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/overdrive.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/overdrive.md",
+      "git_blob_sha1": "764740e4e910a64d5b570c71b9347bb326a05bc8",
+      "sha256": "a9856cb40da6519b1334bcfc75a4fbe83bef39ca86ee6f3effcb2a96794c627c",
+      "mode": "100644",
+      "bytes": 9085
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/polish.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/polish.md",
+      "git_blob_sha1": "d981459468a485dc3b3e8add112ea0f5e6b9e576",
+      "sha256": "b8d49a3cab3428d9f351502e9c2c5802cef187e0d2af626ef3e1cd1837fd06bf",
+      "mode": "100644",
+      "bytes": 6646
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/quieter.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/quieter.md",
+      "git_blob_sha1": "5c1331c252b47bf2262b9a11248e54c56bf9c164",
+      "sha256": "ee6d6d127c1c2ab3526d529a8e3698be2185b5e346ac617f37501de2c0698b97",
+      "mode": "100644",
+      "bytes": 4859
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/region-map.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/region-map.md",
+      "git_blob_sha1": "1d33c7b4a61f6590484c42847499a10beb4b93ca",
+      "sha256": "4ea8e05d0f88d24f182ad554da84317f90b9730e29fad262143ddf423a1f8645",
+      "mode": "100644",
+      "bytes": 3361
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/routing.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/routing.md",
+      "git_blob_sha1": "e41a143fdab06e4545640896a3f9b7516e6d1b2f",
+      "sha256": "56285b28b0ffe471761c2ad062d3f933ed2346ca1b617f1323a30fed99a1a852",
+      "mode": "100644",
+      "bytes": 3336
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/shape.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/shape.md",
+      "git_blob_sha1": "90a74ae813331cbce8fff6beb498ced77970fadf",
+      "sha256": "a55f016c046cb6a27c55bd7f346375aeb506a755c4fbca19a5f92dbd42309c23",
+      "mode": "100644",
+      "bytes": 3547
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/typeset.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/typeset.md",
+      "git_blob_sha1": "9fcdc5b637614e333878ea9ad2175f70dfea543b",
+      "sha256": "696c15f96d49a03091b71a408151a3297521f7a8231b98ca9b1103667a0b5f89",
+      "mode": "100644",
+      "bytes": 5256
+    },
+    {
+      "path": ".claude/skills/impeccable/reference/visualize.md",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/reference/visualize.md",
+      "git_blob_sha1": "54ee3bd592c4409b52932895ce6bbbeb401ed893",
+      "sha256": "d685c04013b4559504db064a2c5a3e5868f24f7136b2b4f76f9d5f68086e779d",
+      "mode": "100644",
+      "bytes": 13912
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/VERSION",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/VERSION",
+      "git_blob_sha1": "71d6a66eda4c751cd57798e19de8b770703abdd6",
+      "sha256": "9940d4b5219de8404015bc18af844c88d7e9e9105682a5d47b1d369d027dbd25",
+      "mode": "100644",
+      "bytes": 7
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/command-metadata.json",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/command-metadata.json",
+      "git_blob_sha1": "89891ea4df179d5a07cf3aef42e84dafb1d05689",
+      "sha256": "e8720f3aa41135211cc58cc299a39eeda86c75651f4279cc1ede8db10dcc0584",
+      "mode": "100644",
+      "bytes": 8392
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/data/font-index-failures.json",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/data/font-index-failures.json",
+      "git_blob_sha1": "1aca67220413ef163570c75405b444d7a27a32be",
+      "sha256": "835f19a0a3812f3652dd6979a2ce5597f654fd01f26e1b420b92d5f42b997ce4",
+      "mode": "100644",
+      "bytes": 2437
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/data/font-index.json",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/data/font-index.json",
+      "git_blob_sha1": "9d2029971df232a72ff6584d264c104490521742",
+      "sha256": "47edbdfaf27073c47033d1ac7dfee881be49e2dcbda7671d1157300481dde6da",
+      "mode": "100644",
+      "bytes": 1100013
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/impeccable",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/impeccable",
+      "git_blob_sha1": "eb60f8667dd6924bc6271e9e1a0761ea5f945751",
+      "sha256": "39d9600489073e227e4f4d55c451ce4252a6632ed7ae37923efbbcbc91f16d07",
+      "mode": "100755",
+      "bytes": 8514
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/impeccable.cmd",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/impeccable.cmd",
+      "git_blob_sha1": "dc0fd33e5ac02ec325cb21af7cef39b201959a35",
+      "sha256": "69cad1ae7355825ef320ac9638a1c9675ba9fda01c9a0fa12244cc4a1973e550",
+      "mode": "100644",
+      "bytes": 8498
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/live-browser-dom.js",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/live-browser-dom.js",
+      "git_blob_sha1": "8646944982fcb5e36c111d134c5bf1e027bb27c6",
+      "sha256": "24f09f2597b9b55a1e2c4acd2ae5c95db5c8615cfc20aa07d1a3950538ad5c4a",
+      "mode": "100644",
+      "bytes": 10623
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/live-browser-ignores.js",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/live-browser-ignores.js",
+      "git_blob_sha1": "1c8514c7bcd8b8d889a1763965326fb6adec24a1",
+      "sha256": "c1cb6877ca99a0c1b38ba0c7d59f32702d3022f6821d8045f7133f7c40b6362f",
+      "mode": "100644",
+      "bytes": 10346
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/live-browser-session.js",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/live-browser-session.js",
+      "git_blob_sha1": "ad9cdf008fdbeebd3da6a93d4ef408b5abff7420",
+      "sha256": "42831c3cd874346d8e7f120808d91e6ed3cda5c3eca6eefd76b126659536bc87",
+      "mode": "100644",
+      "bytes": 4346
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/live-browser.js",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/live-browser.js",
+      "git_blob_sha1": "c7eed77fb06fa81ef9841f61b5ac28d3bfe5a4f1",
+      "sha256": "d7f1ee3fdfc423e90268e9c666dce61b2180b62431dbb6ecfc48bca65398a1f8",
+      "mode": "100644",
+      "bytes": 548448
+    },
+    {
+      "path": ".claude/skills/impeccable/scripts/modern-screenshot.umd.js",
+      "source_repository": "pbakaus/impeccable",
+      "source_commit": "d631a8827f99414d2b6daba4ef08b7f8701751d7",
+      "source_path": ".claude/skills/impeccable/scripts/modern-screenshot.umd.js",
+      "git_blob_sha1": "a9c5208f6b141d3bafdb8eb843d6fcbdcf23e370",
+      "sha256": "bb36665889124a0b6e15f16045265737449c3bdcf2712cdb08af3cfa01563e2b",
+      "mode": "100644",
+      "bytes": 29290
+    },
+    {
+      "path": ".claude/skills/web-design-guidelines/SKILL.md",
+      "source_repository": "vercel-labs/agent-skills",
+      "source_commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "source_path": "skills/web-design-guidelines/SKILL.md",
+      "git_blob_sha1": "ceae92ab319216a68274168fba9b63b998b65997",
+      "sha256": "f4647ca866a3accf763777f83e7682954f0187cd6bea7eea0399796652414e8f",
+      "mode": "100644",
+      "bytes": 1231
+    }
+  ],
+  "target_branch": "chore/install-claude-design-skills"
+}
