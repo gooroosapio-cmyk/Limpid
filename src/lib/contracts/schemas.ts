@@ -206,7 +206,7 @@ export const Block = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("formula"),
     expression: shortText,
-    symbols: z.array(z.strictObject({ symbol: z.string().trim().min(1).max(40), meaning: shortText })).max(12),
+    symbols: z.array(z.strictObject({ symbol: z.string().trim().min(1).max(40), meaning: shortText })).max(30),
     ...blockBase,
   }),
   // Complément absent de la source : signalé « Complément », jamais référencé comme sourcé.
