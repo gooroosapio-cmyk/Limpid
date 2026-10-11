@@ -38,7 +38,8 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (report.current_version_id || !last || last.kind !== "generate_report" || ["queued", "running", "succeeded"].includes(last.status)) {
+  // Une première génération en échec peut avoir publié une version partielle : elle se relance aussi.
+  if (!last || last.kind !== "generate_report" || ["queued", "running", "succeeded", "incomplete_check"].includes(last.status)) {
     throw new RetryError("not_failed", "Ce Limpid n'est pas en échec.");
   }
   const { data: settings } = await db.from("app_settings").select("generation_enabled").single();
