@@ -77,7 +77,13 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
             </p>
             <section className="preview-card" aria-labelledby="essential-h">
               <h2 id="essential-h">{l.essential}</h2>
-              <p>{essential.join(" ")}</p>
+              {essential.length > 1 ? (
+                <ul className="preview-points">
+                  {essential.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              ) : (
+                <p>{essential[0]}</p>
+              )}
             </section>
             {idea && (
               <aside className="preview-idea" aria-labelledby="idea-h">
@@ -91,11 +97,14 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
             {notions.length >= 3 && (
               <section aria-labelledby="notions-h">
                 <h2 id="notions-h" className="preview-h2">{p.keyNotions}</h2>
-                <ul className="notions">
+                <ul className="notions notion-chips">
                   {notions.map((g) => (
                     <li key={g.term}>
-                      <b>{g.term}</b>
-                      <span>{g.definition}</span>
+                      <span className="notion-chip-icon" aria-hidden="true"><Icon name="definition" size={16} /></span>
+                      <span className="notion-chip-text">
+                        <b>{g.term}</b>
+                        <span>{g.definition}</span>
+                      </span>
                     </li>
                   ))}
                 </ul>

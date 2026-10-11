@@ -97,18 +97,24 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
 
   return (
     <div className="ask-panel">
-      {/* Kit V5 : une seule pastille de contexte, modifiable d'un toucher. */}
-      <button
-        type="button"
-        className="ask-pill"
-        aria-label={v.scope}
-        aria-pressed={!!scope}
-        disabled={!section}
-        onClick={() => setScoped((x) => !x)}
-      >
-        {scope ? v.about(scope.title) : v.wholeCourse}
-        {section && <Icon name="refresh" size={14} />}
-      </button>
+      {/* Kit V4 : contexte explicite (ce Limpid ou ce chapitre) et sa portée. */}
+      <label className="ask-context">
+        <span className="ask-context-label">{v.context}</span>
+        <span className="ask-context-field">
+          <Icon name="target" size={18} />
+          <select
+            aria-label={v.scope}
+            value={scope ? "section" : "all"}
+            disabled={!section}
+            onChange={(e) => setScoped(e.target.value === "section")}
+          >
+            <option value="all">{v.thisLimpid}</option>
+            {section && <option value="section">{v.thisSection} : {section.title}</option>}
+          </select>
+          {section && <Icon name="chevron" size={16} className="ask-context-caret" />}
+        </span>
+      </label>
+      <p className="ask-context-note">{scope ? v.sectionNote(scope.title) : v.limpidNote}</p>
 
       <div className="ask-thread" aria-live="polite" ref={threadRef} onScroll={onScroll}>
         {turns.length === 0 && (
@@ -140,9 +146,10 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
                 {!t.a.inDocument && <p className="chip">{L.ask.notInDoc}</p>}
                 <p>{t.a.answer}</p>
                 {t.a.citations.map((c, k) => (
-                  <blockquote key={k} className="quote ask-quote">
-                    « {c.quote} »<cite className="citation"><Icon name="file" /> {c.location}</cite>
-                  </blockquote>
+                  <details key={k} className="ask-source">
+                    <summary><Icon name="file" size={16} /> {c.location} <Icon name="chevron" size={14} /></summary>
+                    <blockquote className="quote ask-quote">« {c.quote} »</blockquote>
+                  </details>
                 ))}
                 {t.a.beyond && (
                   <div className="note">
@@ -151,10 +158,13 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
                   </div>
                 )}
                 {i === turns.length - 1 && t.a.followups.length > 0 && (
-                  <div className="ask-follow" role="group" aria-label={L.ask.followups}>
-                    {t.a.followups.map((f) => (
-                      <button key={f} type="button" className="filterchip" onClick={() => ask(f)} disabled={pending}>{f}</button>
-                    ))}
+                  <div className="ask-follow" role="group" aria-label={v.suggestion}>
+                    <p className="ask-follow-label">{v.suggestion}</p>
+                    <button type="button" className="ask-suggestion" onClick={() => ask(t.a!.followups[0]!)} disabled={pending}>
+                      <Icon name="spark" size={18} />
+                      <span>{t.a.followups[0]}</span>
+                      <Icon name="chevron" size={18} />
+                    </button>
                   </div>
                 )}
               </div>
@@ -201,7 +211,7 @@ export function AskPanel({ reportId, section, initialQuestion = "" }: { reportId
           </button>
         )}
       </form>
-      <p className="muted small ask-private">{v.verify}</p>
+      <p className="ask-private"><span className="ask-cost"><Icon name="coins" size={14} /> {v.cost}</span> · {v.mistakes}</p>
     </div>
   );
 }
