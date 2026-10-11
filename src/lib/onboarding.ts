@@ -7,6 +7,8 @@ import { z } from "zod";
 
 export const ONBOARDING_VERSION = 1;
 export const STEPS = 5;
+/** Kit V4 : au premier lancement, seul l'objectif est demandé (les autres réponses restent modifiables dans le Profil). */
+export const FIRST_RUN_STEPS = 1;
 
 export const GOAL_CHOICES = ["comprendre", "resumer", "reviser", "appliquer", "decider"] as const;
 export const MODE_CHOICES = ["tres_simple", "claire", "resume", "revision"] as const;

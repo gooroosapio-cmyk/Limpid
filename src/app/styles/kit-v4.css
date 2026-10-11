@@ -180,3 +180,17 @@
 .lesson-status .status-ready { background: var(--positive-bg); color: var(--sage); }
 .lesson-status .status-failed { background: var(--danger-pale); color: var(--danger); }
 .lesson-status .status .icon { width: 12px; height: 12px; color: inherit; }
+
+/* ---------- Premier lancement : présentation (kit V4) ---------- */
+.intro-v4 .intro-title { font-size: 2.25rem; line-height: 1.08; letter-spacing: -0.03em; font-weight: 700; margin: var(--s5) 0 var(--s3); }
+.intro-v4 .intro-title span { color: var(--accent-text); }
+.intro-v4 .intro-lede { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.45; max-width: 34ch; }
+.intro-v4 .intro-art { width: 100%; max-width: 360px; aspect-ratio: 480 / 360; margin: var(--s3) auto 0; background: none; }
+.intro-v4 .intro-art img { object-fit: contain; }
+.intro-v4 .intro-steps { list-style: none; margin: var(--s4) 0 var(--s5); padding: 0; display: grid; gap: 14px; }
+.intro-v4 .intro-steps li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; align-items: start; }
+.intro-v4 .intro-steps li + li::before { content: ""; position: absolute; left: 15px; top: -12px; height: 10px; border-left: 1px dashed var(--line-strong); }
+.intro-v4 .intro-num { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--mint); color: var(--mint-text); font-weight: 700; font-size: 0.875rem; }
+.intro-v4 .intro-steps b { display: block; font-size: 1rem; line-height: 1.3; }
+.intro-v4 .intro-steps small { display: block; margin-top: 3px; color: var(--muted); font-size: 0.8125rem; line-height: 1.4; }
+.intro-v4 .intro-later { background: var(--surface); border: 1px solid var(--ink); }

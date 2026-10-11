@@ -6,6 +6,7 @@ import { coverView, type CoverId } from "@/lib/library/covers";
 export const ILLUSTRATIONS = [
   "connexion",
   "accueil",
+  "bienvenue",
   "bibliotheque-vide",
   "import",
   "offres",
@@ -16,7 +17,7 @@ export const ILLUSTRATIONS = [
   "lecon-quiz",
 ] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
-const READY: ReadonlySet<IllustrationName> = new Set<IllustrationName>(["connexion", "accueil", "bibliotheque-vide", "import", "offres", "profil-offre"]);
+const READY: ReadonlySet<IllustrationName> = new Set<IllustrationName>(["connexion", "accueil", "bienvenue", "bibliotheque-vide", "import", "offres", "profil-offre"]);
 
 /** Image livrée, sinon le dégradé d'une couverture de la banque (aucune requête vers un fichier absent). */
 export function Illustration({ name, fallback, className, eager = false }: { name: IllustrationName; fallback: CoverId; className?: string; eager?: boolean }) {

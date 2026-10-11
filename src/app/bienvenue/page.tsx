@@ -29,7 +29,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   return (
     <div className="page onboarding-page">
       <Questionnaire
-        initialStep={review ? 1 : state.step}
+        initialStep={1}
         review={review}
         initial={{
           goal: prefs?.goal ?? null,

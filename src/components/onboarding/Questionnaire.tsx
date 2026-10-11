@@ -6,7 +6,7 @@ import { finishOnboarding, saveOnboardingStep, skipOnboardingStep } from "@/app/
 import { Icon, type IconName } from "@/components/Icon";
 import { Wordmark } from "@/components/Logo";
 import { useT } from "@/lib/i18n/client";
-import { ACQUISITION_CHOICES, DOC_CHOICES, FAMILIARITY_CHOICES, GOAL_CHOICES, MODE_CHOICES, STEPS } from "@/lib/onboarding";
+import { ACQUISITION_CHOICES, DOC_CHOICES, FAMILIARITY_CHOICES, GOAL_CHOICES, MODE_CHOICES, STEPS, FIRST_RUN_STEPS } from "@/lib/onboarding";
 
 const GOAL_ICONS: Record<string, IconName> = { comprendre: "book", resumer: "file", reviser: "learning", appliquer: "settings", decider: "bars" };
 const MODE_ICONS: Record<string, IconName> = { tres_simple: "bulb", claire: "book", resume: "file", revision: "quiz-v4" };
@@ -42,6 +42,10 @@ export function Questionnaire({ initialStep, initial, review }: { initialStep: n
     title.current?.focus();
   }, [step]);
 
+  // Kit V4 : premier lancement en deux écrans (objectif, puis présentation) ; la révision depuis
+  // le Profil garde les cinq questions.
+  const last = review ? STEPS : FIRST_RUN_STEPS;
+  const shownTotal = review ? STEPS : FIRST_RUN_STEPS + 1;
   const q = [o.q1, o.q2, o.q3, o.q4, o.q5][step - 1]!;
   const value: string | string[] | null =
     step === 1 ? answers.goal : step === 2 ? answers.mode : step === 3 ? answers.familiarity : step === 4 ? answers.docs : answers.acquisition;
@@ -61,7 +65,7 @@ export function Questionnaire({ initialStep, initial, review }: { initialStep: n
     start(async () => {
       const r = save ? await saveOnboardingStep({ step, value }) : await skipOnboardingStep(step);
       if (!r.ok) return setError(true);
-      if (step < STEPS) setStep(step + 1);
+      if (step < last) setStep(step + 1);
       else done();
     });
   }
@@ -74,9 +78,9 @@ export function Questionnaire({ initialStep, initial, review }: { initialStep: n
         <Wordmark height={26} />
         <div className="onboarding-progress">
           <ol className="onboarding-dots" aria-hidden="true">
-            {Array.from({ length: STEPS }, (_, i) => <li key={i} className={i + 1 === step ? "on" : i + 1 < step ? "past" : ""} />)}
+            {Array.from({ length: shownTotal }, (_, i) => <li key={i} className={i + 1 === step ? "on" : i + 1 < step ? "past" : ""} />)}
           </ol>
-          <p className="meta" aria-live="polite">{o.stepOf(step, STEPS)}</p>
+          <p className="meta" aria-live="polite">{o.stepOf(step, shownTotal)}</p>
         </div>
       </header>
 
