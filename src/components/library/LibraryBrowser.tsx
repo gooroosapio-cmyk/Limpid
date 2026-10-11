@@ -77,6 +77,7 @@ export function LibraryBrowser({
   filtered = false,
   resume,
   preparations,
+  summary = null,
   headerExtra,
   footer,
   emptyText,
@@ -100,6 +101,8 @@ export function LibraryBrowser({
   resume: ResumeItem | null;
   /** Indicateur « À vérifier (n) », s'il y a des préparations interrompues. */
   preparations: React.ReactNode;
+  /** Kit V4 : carte « contenus / votre progression », au-dessus des collections. */
+  summary?: React.ReactNode;
   headerExtra?: React.ReactNode;
   footer?: React.ReactNode;
   emptyText: string;
@@ -210,6 +213,8 @@ export function LibraryBrowser({
         </button>
       </div>
       {headerExtra}
+      {/* Kit V4 : filtres Tous / Prêts / En cours / Favoris toujours visibles ; la loupe ouvre recherche et tri. */}
+      {!open && rail}
 
       {open && (
       <div
@@ -322,6 +327,7 @@ export function LibraryBrowser({
         </div>
       )}
 
+      {!searching && filter === "tous" && root && summary}
       {!searching && resume && filter === "tous" && root && (
         <section className="lib-section" aria-labelledby="resume-h">
           <h2 id="resume-h">{v.resume}</h2>

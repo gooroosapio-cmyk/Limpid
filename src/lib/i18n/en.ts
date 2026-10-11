@@ -99,6 +99,12 @@ export const en: Dict = {
     },
     add: { title: "Create a Limpid" },
     library: {
+      summaryLabel: "Your content and progress",
+      contents: (n: number) => `${n} item${n > 1 ? "s" : ""}`,
+      readyRunning: (r: number, c: number) => `${r} ready · ${c} in progress`,
+      progress: "Your progress",
+      readOf: (r: number, n: number) => `${r} of ${n} opened`,
+      progressAria: (p: number) => `${p}% of ready courses opened`,
       search: "Search a Limpid or a folder",
       searchLabel: "Search the library",
       filtersLabel: "Filter",

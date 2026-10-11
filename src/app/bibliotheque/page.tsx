@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { LibrarySummary } from "@/components/library/LibrarySummary";
 import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";
 import { FolderActions, NewFolder } from "@/components/library/FolderDialogs";
@@ -219,6 +220,7 @@ export default async function LibraryPage({
         }
         sortControl={<SortSelect value={sort} hrefs={sortHrefs} />}
         preparations={null}
+        summary={<LibrarySummary items={items} />}
         filtered={filter !== "tous" || sort !== "recents"}
         footer={
           !folder ? (
