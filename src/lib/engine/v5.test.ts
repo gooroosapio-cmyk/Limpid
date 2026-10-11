@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import { riskyClaim, type GenerationInput } from "./pipeline";
-import type { AIProvider, StructuredRequest } from "./provider";
+import { ProviderError, type AIProvider, type StructuredRequest } from "./provider";
 import { capChapters, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
@@ -79,6 +79,7 @@ class StageProvider implements AIProvider {
     const queue = this.answers[req.stage];
     const next = queue && queue.length > 1 ? queue.shift() : queue?.[0];
     if (next === undefined) throw new Error(`aucune réponse pour ${req.stage}`);
+    if (next instanceof Error) throw next;
     return { value: req.schema.parse(next) as z.infer<T>, usage: { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null } };
   }
 }
@@ -158,6 +159,19 @@ describe("moteur V5 : un chapitre par appel", () => {
     expect(calls).toHaveLength(2);
     expect(calls[1]!.data).toContain("a corriger");
     if (res.status === "done") expect(res.output.explanation.sections[0]!.blocks.some((b) => b.claim_ids.includes("clm_2"))).toBe(true);
+  });
+
+  it("réparation en échec (réponse vide) : le premier brouillon est gardé", async () => {
+    const thin = { ...chapter1, blocks: [chapter1.blocks[1]] };
+    const both = { ...plan, chapters: [{ ...plan.chapters[0]!, claim_ids: ["clm_1", "clm_2"] }] };
+    const empty = new ProviderError("empty", "Réponse vide.");
+    const p = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin, empty] });
+    const res = await generateV5(p, input(), far());
+    expect(res.status).toBe("done");
+    expect(p.calls.filter((c) => c.stage === "chapitre_1")).toHaveLength(2);
+    // Une erreur de compte n'est jamais masquée.
+    const denied = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin, new ProviderError("auth", "Clé refusée.")] });
+    await expect(generateV5(denied, input(), far())).rejects.toMatchObject({ code: "auth" });
   });
 
   it("reprise : une invocation interrompue repart des étapes enregistrées", async () => {
