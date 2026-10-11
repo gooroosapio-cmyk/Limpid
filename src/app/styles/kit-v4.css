@@ -141,3 +141,42 @@
 .ask-cost { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-weight: 600; }
 .ask-cost svg { color: var(--gold); }
 .ask-context-caret { transform: rotate(90deg); pointer-events: none; }
+
+/* ---------- Bibliothèque (kit V4) ---------- */
+/* Filtres en pastilles : l'actif en jaune */
+.lib-filters > a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 500; white-space: nowrap; }
+.lib-filters > a[aria-current="true"] { background: var(--yellow); border-color: var(--yellow); color: var(--on-yellow); font-weight: 600; }
+.lib-filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.lib-filters::-webkit-scrollbar { display: none; }
+
+/* Résumé : contenus et progression */
+.lib-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-top: var(--s4); padding: 14px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.lib-summary-part { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lib-summary-part + .lib-summary-part { padding-left: var(--s3); border-left: 1px solid var(--line); }
+.lib-summary-part b { display: block; font-size: 0.875rem; }
+.lib-summary-part small { display: block; font-size: 0.75rem; color: var(--muted); }
+.lib-summary-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); color: var(--ink); }
+.lib-ring { position: relative; flex: none; display: grid; place-items: center; width: 52px; height: 52px; font-size: 0.75rem; font-weight: 700; }
+.lib-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.lib-ring circle { fill: none; stroke-width: 3.5; }
+.lib-ring .track { stroke: var(--line); }
+.lib-ring .value { stroke: var(--sage); stroke-linecap: round; }
+@media (max-width: 359px) { .lib-summary { gap: 6px; padding: 12px 10px; } .lib-summary-icon { width: 32px; height: 32px; } .lib-ring { width: 44px; height: 44px; } }
+
+/* Collections : cartes horizontales, icône dossier colorée */
+.folder-tiles { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.folder-tile { flex: 0 0 auto; }
+.folder-tile a { display: flex; align-items: center; gap: 8px; min-width: 136px; max-width: 220px; min-height: 56px; padding: 12px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: none; }
+.folder-tile-cover, .folder-tile-chevron { display: none; }
+.folder-tile-icon .icon { width: 26px; height: 26px; fill: currentColor; stroke: none; }
+.folder-tile:nth-child(3n + 1) .folder-tile-icon { color: #85b08c; }
+.folder-tile:nth-child(3n + 2) .folder-tile-icon { color: var(--gold); }
+.folder-tile:nth-child(3n) .folder-tile-icon { color: #5b8fc7; }
+.folder-tile-text b { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-tile-text small { font-size: 0.75rem; color: var(--muted); }
+
+/* Badges d'état en pastille (Prêt, En préparation, Interrompu) */
+.lesson-status .status { padding: 2px 9px; border-radius: var(--r-pill); font-size: 0.75rem; font-weight: 600; background: var(--elevated); color: var(--muted); }
+.lesson-status .status-ready { background: var(--positive-bg); color: var(--sage); }
+.lesson-status .status-failed { background: var(--danger-pale); color: var(--danger); }
+.lesson-status .status .icon { width: 12px; height: 12px; color: inherit; }

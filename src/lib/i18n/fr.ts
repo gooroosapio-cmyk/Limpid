@@ -95,6 +95,12 @@ export const fr = {
     },
     add: { title: "Créer un Limpid" },
     library: {
+      summaryLabel: "Vos contenus et votre progression",
+      contents: (n: number) => `${n} contenu${n > 1 ? "s" : ""}`,
+      readyRunning: (r: number, c: number) => `${r} prêt${r > 1 ? "s" : ""} · ${c} en cours`,
+      progress: "Votre progression",
+      readOf: (r: number, n: number) => `${r} sur ${n} ouvert${n > 1 ? "s" : ""}`,
+      progressAria: (p: number) => `${p} % des cours prêts ont été ouverts`,
       search: "Rechercher un Limpid ou un dossier",
       searchLabel: "Rechercher dans la bibliothèque",
       filtersLabel: "Filtrer",

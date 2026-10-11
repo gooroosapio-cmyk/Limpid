@@ -16,3 +16,16 @@ describe("accueil : Reprendre et Récents", () => {
     expect(recentItems(items, resumeItem(items)).map((i) => i.id)).toEqual(["a", "b", "e"]);
   });
 });
+
+describe("bibliothèque : résumé", () => {
+  it("compte contenus, prêts, en cours et lus", async () => {
+    const { librarySummary } = await import("./home");
+    const rows = [
+      { id: "1", state: "ready", unread: false },
+      { id: "2", state: "ready", unread: true },
+      { id: "3", state: "running", unread: false },
+      { id: "4", state: "failed", unread: false },
+    ] as LibraryItem[];
+    expect(librarySummary(rows)).toEqual({ total: 3, ready: 2, running: 1, read: 1 });
+  });
+});
