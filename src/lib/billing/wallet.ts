@@ -180,16 +180,17 @@ export async function getWallet(userId: string): Promise<Wallet> {
   }
   // Plafonds de l'offre (le mode Recharge suit ceux d'Essentiel). Administrateurs : sans
   // plafond de rythme, mais les crédits restent dus (jamais d'accès illimité).
-  const limits = PLANS[mode === "free" ? "free" : plan].limits;
-  // Droit Pro interne : plafonds élevés mais bornés (jamais illimités).
+  // Droit Pro interne : limites de l'offre Pro (conservation, documents, tâches simultanées)
+  // et plafonds de rythme élevés mais bornés (jamais illimités). Les crédits restent dus.
   const internalPro = isInternalPro(user?.user?.email);
+  const limits = PLANS[internalPro ? "pro" : mode === "free" ? "free" : plan].limits;
   const rhythm = internalPro ? INTERNAL_PRO_QUOTAS : { day: limits.dailyReports, week: limits.weeklyReports };
   const quotas = profile?.role === "admin" ? null : quotaState((unitRows ?? []).map((r) => r.created_at as string), rhythm, now);
   return {
     available: valid.reduce((n, l) => n + l.available, 0),
     reserved: lotRows.reduce((n, l) => n + l.reserved, 0),
     nextExpiry,
-    plan,
+    plan: internalPro ? "pro" : plan,
     mode,
     accessEndsAt,
     nextGrant,
@@ -202,7 +203,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
 /** Droits de l'offre active (limites d'accès, filigrane). */
 export async function getEntitlements(userId: string) {
   const w = await getWallet(userId);
-  return { wallet: w, ...PLANS[w.mode === "free" ? "free" : w.plan] };
+  return { wallet: w, ...PLANS[w.internalPro ? "pro" : w.mode === "free" ? "free" : w.plan] };
 }
 
 /**
