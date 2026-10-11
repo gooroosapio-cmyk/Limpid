@@ -81,8 +81,21 @@ export function repairDraftBlocks(value: unknown): unknown {
         ? sec.blocks.map((b) => {
             if (!b || typeof b !== "object") return b;
             let out = { ...b };
+            // Références oubliées : listes vides (un bloc sourcé sans référence est ensuite rétrogradé).
+            if (!Array.isArray(out.claim_ids)) out.claim_ids = [];
+            if (!Array.isArray(out.evidence_ids)) out.evidence_ids = [];
             if (Array.isArray(out.variants)) {
               out.variants = (out.variants as Record<string, unknown>[]).map((x) => (x && typeof x === "object" && !("limit" in x) ? { ...x, limit: null } : x));
+            }
+            // Formule : l'unité demandée par la consigne rejoint la signification (le contrat n'a
+            // pas de champ « unit ») ; au-delà de 30 symboles, les suivants sont omis.
+            if (out.type === "formula" && Array.isArray(out.symbols)) {
+              out.symbols = (out.symbols as Record<string, unknown>[]).slice(0, 30).map((x) => {
+                if (!x || typeof x !== "object" || !("unit" in x)) return x;
+                const { unit, ...rest } = x;
+                const u = typeof unit === "string" ? unit.trim() : "";
+                return u && typeof rest.meaning === "string" ? { ...rest, meaning: `${rest.meaning} (${u})` } : rest;
+              });
             }
             if (out.type === "analogy" && (typeof out.limit !== "string" || !out.limit.trim())) {
               const { limit: _l, ...rest } = out;

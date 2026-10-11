@@ -522,6 +522,18 @@ describe("réparations sûres du brouillon (V4)", () => {
     expect(fixed.sections[0]!.blocks[1]).toMatchObject({ type: "analogy", limit: "Un filtre retient, le sol laisse passer." });
     expect(ExplanationDraft).toBeDefined();
   });
+
+  it("formule : l'unité rejoint la signification, 30 symboles au plus", async () => {
+    const { repairDraftBlocks } = await import("./pipeline");
+    const symbols = Array.from({ length: 34 }, (_, i) => ({ symbol: `S${i}`, meaning: `Compte ${i}`, unit: i === 0 ? "€" : "" }));
+    const fixed = repairDraftBlocks({ sections: [{ blocks: [{ type: "formula", id: "blk_1", expression: "Actif = Passif", symbols, text: "Lecture.", claim_ids: [], evidence_ids: [] }] }] }) as {
+      sections: { blocks: { symbols: Record<string, unknown>[] }[] }[];
+    };
+    const out = fixed.sections[0]!.blocks[0]!.symbols;
+    expect(out).toHaveLength(30);
+    expect(out[0]).toEqual({ symbol: "S0", meaning: "Compte 0 (€)" });
+    expect(out[1]).toEqual({ symbol: "S1", meaning: "Compte 1" });
+  });
 });
 
 describe("plan et Pro ciblé (Atlas)", () => {
