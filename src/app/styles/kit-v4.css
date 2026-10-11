@@ -49,3 +49,49 @@
 .home-recent-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .home-recent-text b { font-weight: 600; font-size: 0.9375rem; overflow-wrap: anywhere; }
 .home-recent-text small { color: var(--muted); font-size: 0.8125rem; }
+
+/* ---------- Création : fichiers, approches, devis (kit V4) ---------- */
+.import .filelist { margin-top: var(--s3); }
+.import .fileline { gap: 10px; min-height: 56px; padding: 10px 8px 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.import .fileline-icon { width: 30px; height: 34px; border-radius: 4px; background: var(--elevated); color: var(--ink); }
+.import .fileline-icon.fmt-pdf { background: #d9534c; color: #fff; }
+.import .fileline-icon.fmt-docx { background: #2b5b88; color: #fff; }
+.import .fileline.is-error .fileline-icon { background: transparent; color: var(--danger); }
+.import .fileline-text b { font-size: 0.875rem; font-weight: 600; }
+.import .fileline-text small { font-size: 0.75rem; }
+.import .fileline-ok { flex: none; display: grid; place-items: center; color: var(--sage); }
+.import .fileline-actions .ib { width: 44px; height: 44px; background: transparent; border-radius: 50%; }
+
+.import .modes { margin: var(--s6) 0 var(--s4); }
+.import .modes legend { font-size: 1.125rem; font-weight: 700; margin: 0 0 2px; }
+.import .modes-sub { margin: 0 0 var(--s3); color: var(--muted); font-size: 0.8125rem; }
+.import .mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.import .mode-card {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) 20px; align-items: start; column-gap: 10px; min-height: 0;
+  padding: 14px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: none;
+}
+.import .mode-card:hover { transform: none; box-shadow: none; border-color: var(--line-strong); }
+.import .mode-card .mode-ic { color: var(--accent-text); padding-top: 1px; }
+.import .mode-card .mode-ic svg { width: 22px; height: 22px; }
+.import .mode-txt { display: grid; gap: 4px; }
+.import .mode-card strong { font-size: 0.9375rem; line-height: 1.3; }
+.import .mode-desc { font-size: 0.8125rem; line-height: 1.4; }
+.import .mode-radio { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: var(--surface); }
+.import .mode-card.is-selected { background: var(--pale); border-color: var(--gold); }
+.import .mode-card.is-selected .mode-radio { border: 6px solid var(--on-yellow); background: var(--yellow); box-shadow: 0 0 0 1px var(--gold); }
+.import .mode-card:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 359px) { .import .mode-grid { grid-template-columns: 1fr; } }
+
+.import .estimate { display: flex; align-items: center; gap: 10px; margin-top: var(--s4); padding: 10px 10px 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.import .estimate-icon { flex: none; color: var(--gold); }
+.import .estimate-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.import .estimate-text b { font-size: 0.875rem; font-weight: 700; }
+.import .estimate-text small { font-size: 0.75rem; color: var(--muted); }
+.import .estimate .btn { flex: none; min-height: 48px; padding: 10px 16px; margin: 0; width: auto; }
+@media (max-width: 389px) { .import .estimate { flex-wrap: wrap; } .import .estimate .btn { width: 100%; } }
+.import .retention { display: flex; align-items: center; gap: 6px; margin: var(--s2) 0 0; color: var(--muted); font-size: 0.75rem; }
+.import .retention svg { flex: none; }
+/* Carte « Ajouter des documents » : illustration détourée du kit, sans fondu */
+.import .upload:not(.upload-hero) .upload-art { inset: 8px 8px 8px auto; width: 34%; -webkit-mask-image: none; mask-image: none; background: none; }
+.import .upload:not(.upload-hero) .upload-art img { object-fit: contain; object-position: right center; }
+.import .upload:not(.upload-hero) .upload-icon { background: var(--yellow); color: var(--on-yellow); border-radius: 50%; }
