@@ -58,4 +58,4 @@
 .block-label .icon, .retain-title .icon { flex: none; }
 
 /* Images détourées (fond transparent) : toujours sur un support ivoire, jamais inversées */
-figure.illustration.cutout img { background: #f7f6ef; }
+figure.illustration.cutout img { background: #f8f7f2; }

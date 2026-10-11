@@ -153,8 +153,11 @@ export function ImportForm({
   maxPages = 100,
   maxFiles = 5,
   defaultMode = "auto",
+  hero = false,
 }: {
   enabled: boolean;
+  /** Accueil (kit V4) : la zone de dépôt est la grande carte jaune « Créer un Limpid ». */
+  hero?: boolean;
   maxFileMb?: number;
   maxPages?: number;
   maxFiles?: number;
@@ -391,7 +394,7 @@ export function ImportForm({
             {items.length < maxFiles && (
               <label
                 htmlFor={`${base}-file`}
-                className={dragging ? "upload dragging" : "upload"}
+                className={`upload${hero && !items.length ? " upload-hero" : ""}${dragging ? " dragging" : ""}`}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragging(true);
@@ -403,10 +406,25 @@ export function ImportForm({
                   add(e.dataTransfer.files);
                 }}
               >
-                <Illustration name="import" fallback="papier" className="upload-art" eager />
-                <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={30} /></span>
-                <span className="upload-title">{items.length ? t.add.addMore : t.add.v2.addDocuments}</span>
-                <span className="upload-sub">{t.add.v2.formats}</span>
+                {hero && !items.length ? (
+                  <>
+                    <span className="hero-plus" aria-hidden="true"><Icon name="plus" size={24} /></span>
+                    <span className="hero-text">
+                      <span className="hero-title">{t.home.createTitle}</span>
+                      <span className="hero-sub">{t.home.createSub}</span>
+                      <span className="hero-formats">{t.add.v2.formats}</span>
+                    </span>
+                    <Illustration name="accueil" fallback="papier" className="hero-art" eager />
+                    <span className="hero-arrow" aria-hidden="true"><Icon name="arrow" size={22} /></span>
+                  </>
+                ) : (
+                  <>
+                    <Illustration name="import" fallback="papier" className="upload-art" eager />
+                    <span className="upload-icon" aria-hidden="true"><Icon name="plus" size={30} /></span>
+                    <span className="upload-title">{items.length ? t.add.addMore : t.add.v2.addDocuments}</span>
+                    <span className="upload-sub">{t.add.v2.formats}</span>
+                  </>
+                )}
               </label>
             )}
             {items.length > 0 && (
@@ -486,6 +504,8 @@ export function ImportForm({
         </fieldset>
       )}
 
+      {(!hero || items.length > 0) && (
+      <>
       <fieldset className="modes" disabled={busy}>
         <legend>{t.add.v2.approach}</legend>
         <div className="mode-grid">
@@ -526,6 +546,8 @@ export function ImportForm({
       </button>
       {missing && <p id={`${base}-missing`} className="muted small center">{missing}</p>}
       {count === 1 && <p className="muted small center">{quote ? t.add.v2.cost(quote) : t.billing.createCostFrom(ACTION_PRICES.report_short)}</p>}
+      </>
+      )}
     </form>
   );
 }
