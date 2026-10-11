@@ -47,13 +47,13 @@ function model(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
 /**
  * Registre par défaut (prompt V2, catalogue OpenRouter vérifié le 7 octobre 2026). Structure :
  * GLM-5.3 Flash, ou DeepSeek V4.1 Flash pour une source complexe. Rédaction pédagogique :
- * MiMo-V2.6-Pro. Chat, reformulations et contrôle courant (texte et images) : GPT-6 Luna.
+ * GPT-6 Luna Pro (MiMo-V2.6-Pro, essayé en production, dépassait le délai d'un chapitre). Chat, reformulations et contrôle courant (texte et images) : GPT-6 Luna.
  * Expertise et audit Pro : GPT-6.1 Sol, jamais sans rôle « expert » explicite.
  */
 export const DEFAULT_MODELS: Record<ModelRole, string> = {
   structure: "z-ai/glm-5.3-flash",
   structure_complex: "deepseek/deepseek-v4.1-flash",
-  writer: "xiaomi/mimo-v2.6-pro",
+  writer: "openai/gpt-6-luna-pro",
   chat: "openai/gpt-6-luna",
   controller: "openai/gpt-6-luna",
   expert: "openai/gpt-6.1-sol",
@@ -62,7 +62,7 @@ export const DEFAULT_MODELS: Record<ModelRole, string> = {
 export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
   structure: "deepseek/deepseek-v4.1-flash",
   structure_complex: "z-ai/glm-5.3-flash",
-  writer: "openai/gpt-6-luna",
+  writer: "z-ai/glm-5.3-flash",
   chat: "z-ai/glm-5.3-flash",
   controller: "z-ai/glm-5.3-flash",
   expert: "openai/gpt-6-luna",

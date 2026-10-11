@@ -321,6 +321,9 @@ export async function callWithRetry<T extends z.ZodType>(
   let waits = 0;
   let fixes = 0;
   let schemaFeedback: string[] = [];
+  // Réponse coupée à la limite de sortie : un seul nouvel essai, limite doublée.
+  let budget = req.budget;
+  let widened = false;
   for (let i = 0; ; i++) {
     try {
       const res = await provider.generateStructured({
@@ -330,7 +333,7 @@ export async function callWithRetry<T extends z.ZodType>(
           ? `${req.instructions}\nTa réponse précédente ne respectait pas le schéma JSON demandé. Écarts :\n- ${schemaFeedback.join("\n- ")}\nRenvoie un objet complet et conforme : identifiants au format demandé, champs obligatoires présents, aucun champ en plus.`
           : req.instructions,
         untrustedData: req.data,
-        budget: req.budget,
+        budget,
         signal: input.signal,
         preferFallback: fixes === MAX_SCHEMA_FIXES,
       });
@@ -341,6 +344,11 @@ export async function callWithRetry<T extends z.ZodType>(
       if (e instanceof ProviderError && e.code === "schema_mismatch" && fixes < MAX_SCHEMA_FIXES) {
         fixes++;
         schemaFeedback = e.issues.length ? e.issues : ["structure générale invalide"];
+        continue;
+      }
+      if (e instanceof ProviderError && e.code === "truncated" && !widened) {
+        widened = true;
+        budget = { ...budget, maxOutputTokens: Math.min(budget.maxOutputTokens * 2, 64_000) };
         continue;
       }
       const transient = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited");
