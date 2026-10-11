@@ -7,33 +7,40 @@
  */
 :root, .scheme-light, .scheme-dark {
   /* Surfaces */
-  --bg: light-dark(#f7f6ef, #101813);
-  --surface: light-dark(#ffffff, #1b2720);
-  --elevated: light-dark(#eceee8, #25342a);
-  --soft: light-dark(#eeefe8, #1d2a22);
-  --glass: light-dark(rgb(255 255 255 / 92%), rgb(27 39 32 / 90%));
+  --bg: light-dark(#f8f7f2, #101713);
+  --surface: light-dark(#fffefa, #1a231e);
+  --elevated: light-dark(#f0f0e8, #243028);
+  --soft: light-dark(#f0f0e8, #1d2722);
+  --glass: light-dark(rgb(255 254 250 / 92%), rgb(26 35 30 / 90%));
   --backdrop: light-dark(rgb(24 35 29 / 42%), rgb(0 0 0 / 62%));
 
   /* Texte */
-  --ink: light-dark(#18231d, #f5f3e9);
-  --muted: light-dark(#506057, #b9c7bc);
-  --line: light-dark(#d4d9d2, rgb(245 243 233 / 13%));
-  --line-strong: light-dark(#abb4ad, #536459);
+  --ink: light-dark(#142018, #f7f7ef);
+  --muted: light-dark(#58645c, #afbbb2);
+  --line: light-dark(#dedcd3, #39463d);
+  --line-strong: light-dark(#b9bdb3, #536459);
 
   /* Accent (logo) : fond jaune + texte anthracite, jamais du petit texte jaune sur fond clair */
-  --yellow: #f2d94e;
-  --yellow-hover: #dcc23a;
-  --on-yellow: #172119;
-  --pale: light-dark(#faefb4, rgb(242 217 78 / 14%));
-  --focus: light-dark(#315f43, #f2d94e);
+  --yellow: #f8d94b;
+  --yellow-hover: #ebcb35;
+  --on-yellow: #142018;
+  --pale: light-dark(#fbf0b8, rgb(248 217 75 / 14%));
+  --focus: light-dark(#335c42, #f8d94b);
+
+  /* Kit V4 : menthe (cartes « idée à retenir », pastilles d'icône), or (crédits), jaune lisible en petit texte */
+  --mint: light-dark(#dceae0, #2a4134);
+  --mint-text: light-dark(#234834, #cae5d0);
+  --gold: #d0ad3d;
+  --accent-text: light-dark(#8a6b11, #f8d94b);
+  --hero: linear-gradient(115deg, #f8d94b, #fce570);
 
   /* États d'interface */
-  --sage: light-dark(#23633e, #8fd1a6);
+  --sage: light-dark(#2f6846, #b7dec3);
   --green: var(--sage);
-  --green-pale: light-dark(#e3ede6, rgb(143 209 166 / 14%));
-  --positive-bg: light-dark(#e3ede6, #223a2c);
-  --danger: light-dark(#a3303a, #ffafb3);
-  --danger-pale: light-dark(#f7e4e3, #3a2426);
+  --green-pale: light-dark(#e0efe3, #284333);
+  --positive-bg: light-dark(#e0efe3, #284333);
+  --danger: light-dark(#a63728, #f6b8a5);
+  --danger-pale: light-dark(#f9e9e3, #472b24);
 
   /*
    * Rôles pédagogiques (texte, étiquettes, filets, icônes). La couleur n'est jamais seule :
@@ -50,18 +57,18 @@
   --role-example: light-dark(#5f4a86, #d3bdec);
 
   /* Surlignage par rôle : teinte du rôle sur le fond (10 % clair, 16 % sombre), texte en encre */
-  --tint-notion: light-dark(color-mix(in srgb, #2b5b88 10%, #f7f6ef), color-mix(in srgb, #9cc3ea 16%, #101813));
-  --tint-alert: light-dark(color-mix(in srgb, #a3303a 10%, #f7f6ef), color-mix(in srgb, #ffafb3 16%, #101813));
-  --tint-success: light-dark(color-mix(in srgb, #23633e 10%, #f7f6ef), color-mix(in srgb, #8fd1a6 16%, #101813));
-  --tint-example: light-dark(color-mix(in srgb, #5f4a86 10%, #f7f6ef), color-mix(in srgb, #d3bdec 16%, #101813));
+  --tint-notion: light-dark(color-mix(in srgb, #2b5b88 10%, #f8f7f2), color-mix(in srgb, #9cc3ea 16%, #101713));
+  --tint-alert: light-dark(color-mix(in srgb, #a3303a 10%, #f8f7f2), color-mix(in srgb, #ffafb3 16%, #101713));
+  --tint-success: light-dark(color-mix(in srgb, #23633e 10%, #f8f7f2), color-mix(in srgb, #8fd1a6 16%, #101713));
+  --tint-example: light-dark(color-mix(in srgb, #5f4a86 10%, #f8f7f2), color-mix(in srgb, #d3bdec 16%, #101713));
 
   /* Marqueur « À retenir » : jaune du logo, 42 % en clair, 26 % en sombre ; texte en encre */
-  --mark: light-dark(rgb(242 217 78 / 42%), rgb(242 217 78 / 26%));
+  --mark: light-dark(rgb(248 217 75 / 42%), rgb(248 217 75 / 26%));
 
   /* Ombres et halo */
   --shadow: 0 12px 32px light-dark(rgb(24 35 29 / 10%), rgb(0 0 0 / 18%));
   --shadow-lift: 0 16px 40px light-dark(rgb(24 35 29 / 16%), rgb(0 0 0 / 32%));
-  --halo: radial-gradient(60% 80% at 85% 0%, light-dark(rgb(242 217 78 / 18%), rgb(242 217 78 / 8%)), transparent 70%);
+  --halo: radial-gradient(60% 80% at 85% 0%, light-dark(rgb(248 217 75 / 18%), rgb(248 217 75 / 8%)), transparent 70%);
 }
 :root { color-scheme: light dark; }
 :root[data-mode="light"], .scheme-light { color-scheme: light; }

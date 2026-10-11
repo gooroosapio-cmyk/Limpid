@@ -26,6 +26,7 @@ import "./styles/v4.css";
 import "./styles/reader-carousel.css";
 import "./styles/roles.css";
 import "./styles/motion.css";
+import "./styles/kit-v4.css";
 import "./styles/tailwind.css";
 
 export const metadata: Metadata = {
@@ -52,8 +53,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F6EF" },
-    { media: "(prefers-color-scheme: dark)", color: "#101813" },
+    { media: "(prefers-color-scheme: light)", color: "#F8F7F2" },
+    { media: "(prefers-color-scheme: dark)", color: "#101713" },
   ],
 };
 

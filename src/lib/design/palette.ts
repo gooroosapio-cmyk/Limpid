@@ -3,14 +3,14 @@
 export type Pair = { light: string; dark: string };
 
 export const SURFACES = {
-  bg: { light: "#f7f6ef", dark: "#101813" },
-  surface: { light: "#ffffff", dark: "#1b2720" },
-  elevated: { light: "#eceee8", dark: "#25342a" },
+  bg: { light: "#f8f7f2", dark: "#101713" },
+  surface: { light: "#fffefa", dark: "#1a231e" },
+  elevated: { light: "#f0f0e8", dark: "#243028" },
 } satisfies Record<string, Pair>;
 
 export const TEXT = {
-  ink: { light: "#18231d", dark: "#f5f3e9" },
-  muted: { light: "#506057", dark: "#b9c7bc" },
+  ink: { light: "#142018", dark: "#f7f7ef" },
+  muted: { light: "#58645c", dark: "#afbbb2" },
 } satisfies Record<string, Pair>;
 
 export type RoleId = "notion" | "alert" | "success" | "example";
@@ -24,7 +24,7 @@ export const ROLES: Record<RoleId, Pair> = {
 
 /** Opacité des teintes de rôle et du marqueur jaune, par thème. */
 export const TINT = { light: 0.1, dark: 0.16 };
-export const MARK = { color: "#f2d94e", light: 0.42, dark: 0.26 };
+export const MARK = { color: "#f8d94b", light: 0.42, dark: 0.26 };
 
 type Rgb = [number, number, number];
 const rgb = (hex: string): Rgb => {
