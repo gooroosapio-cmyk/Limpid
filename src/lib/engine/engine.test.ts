@@ -265,6 +265,24 @@ describe("réponse hors schéma", () => {
     expect(seen[0]).not.toContain("ne respectait pas le schéma");
   });
 
+  it("réponse coupée : un seul nouvel essai, limite de sortie doublée", async () => {
+    const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
+    const cut = () => new ProviderError("truncated", "Réponse tronquée.", usage);
+    const fake = new FakeProvider([cut(), goodComp, goodExpl]);
+    const limits: number[] = [];
+    const spy: AIProvider = {
+      name: "fake",
+      isDemo: false,
+      generateStructured: (req) => {
+        limits.push(req.budget.maxOutputTokens);
+        return fake.generateStructured(req);
+      },
+    };
+    expect((await generateReport(spy, input())).status).toBe("validated");
+    expect(limits[1]).toBe(limits[0]! * 2);
+    await expect(generateReport(new FakeProvider([cut(), cut(), goodComp]), input())).rejects.toMatchObject({ code: "truncated" });
+  });
+
   it("abandonne après deux corrections infructueuses", async () => {
     const usage = { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null };
     const bad = () => new ProviderError("schema_mismatch", "hors schéma", usage, ["x : invalide"]);

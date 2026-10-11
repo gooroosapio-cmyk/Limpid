@@ -19,7 +19,7 @@ describe("OpenRouter : configuration et routage", () => {
     expect(c.models).toEqual({
       structure: "z-ai/glm-5.3-flash",
       structure_complex: "deepseek/deepseek-v4.1-flash",
-      writer: "xiaomi/mimo-v2.6-pro",
+      writer: "openai/gpt-6-luna-pro",
       chat: "openai/gpt-6-luna",
       controller: "openai/gpt-6-luna",
       expert: "openai/gpt-6.1-sol",
@@ -89,7 +89,7 @@ describe("OpenRouter : appels", () => {
     await p.generateStructured(req("complex"));
     expect(bodies.map((b) => [b.model, (b.reasoning as { effort?: string } | undefined)?.effort])).toEqual([
       ["openai/gpt-6-luna", "high"],
-      ["xiaomi/mimo-v2.6-pro", "high"],
+      ["openai/gpt-6-luna-pro", "high"],
     ]);
   });
 
