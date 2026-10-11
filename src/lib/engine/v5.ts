@@ -46,7 +46,7 @@ import {
   type GenerationInput,
   type GenerationOutput,
 } from "./pipeline";
-import type { AIProvider, StageBudget, UsageReport } from "./provider";
+import { ProviderError, type AIProvider, type StageBudget, type UsageReport } from "./provider";
 
 const draftId = z.string().regex(/^[a-z]{1,6}_[A-Za-z0-9_-]{1,64}$/);
 const txt = (max: number) => z.string().trim().min(1).max(max);
@@ -622,6 +622,9 @@ function demoteComponents(section: Section, statements: Map<string, string>): Se
  * conforme est réparé avec une réflexion haute (niveau « complexe »). Exemples, notions, QCM et
  * « À retenir » sont produits dans le même appel.
  */
+/** Erreurs qu'une réparation ne doit pas masquer (compte, clé, quota, annulation). */
+const REPAIR_FATAL = new Set<ProviderError["code"]>(["auth", "forbidden", "quota_exhausted", "cancelled", "not_configured"]);
+
 async function writeChapter(provider: AIProvider, input: GenerationInput, c: ChapterInputs): Promise<Section> {
   const difficult = c.chapter.difficulty === "difficile";
   const evidenceIds = new Set(c.evidence.map((e) => e.id));
@@ -632,13 +635,17 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
   const statements = new Map(c.ko.claims.map((x) => [x.id, x.statement]));
   // Réparation d'un chapitre difficile : Sol pour un compte Pro (deux fois au plus par génération).
   const expertRepair = difficult && input.tier === "pro" && (input.expert?.left ?? 0) > 0;
-  const budgetFor = (repair: number): StageBudget => ({
-    ...input.budgets.explanation,
-    role: repair > 0 && expertRepair && input.expert!.left-- > 0 ? "expert" : "writer",
-    tier: repair > 0 && difficult ? "complex" : "fast",
-    reasoning: repair > 0 && difficult ? "high" : difficult ? "medium" : "low",
-    maxOutputTokens: Math.max(input.budgets.explanation.maxOutputTokens, 16_000),
-  });
+  const budgetFor = (repair: number): StageBudget => {
+    const expert = repair > 0 && expertRepair && input.expert!.left-- > 0;
+    return {
+      ...input.budgets.explanation,
+      role: expert ? "expert" : "writer",
+      tier: repair > 0 && difficult ? "complex" : "fast",
+      // Sol en réflexion haute dépassait le délai d'un chapitre (production, 11 oct.) : moyenne.
+      reasoning: expert ? "medium" : repair > 0 && difficult ? "high" : difficult ? "medium" : "low",
+      maxOutputTokens: Math.max(input.budgets.explanation.maxOutputTokens, 16_000),
+    };
+  };
   let draft: ChapterDraft | null = null;
   let feedback: string[] = [];
   let section: Section | null = null;
@@ -648,12 +655,19 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
       data.push({ label: "brouillon precedent", text: JSON.stringify(draft) });
       data.push({ label: "a corriger", text: feedback.join("\n") });
     }
-    draft = await callWithRetry(provider, input, stage, repair * 10, {
-      schema: ChapterDraft,
-      instructions: draft ? `${base}\nCorrige les points listés et renvoie le chapitre complet.` : base,
-      data,
-      budget: budgetFor(repair),
-    });
+    try {
+      draft = await callWithRetry(provider, input, stage, repair * 10, {
+        schema: ChapterDraft,
+        instructions: draft ? `${base}\nCorrige les points listés et renvoie le chapitre complet.` : base,
+        data,
+        budget: budgetFor(repair),
+      });
+    } catch (e) {
+      // Réparation qui échoue (délai, réponse vide ou coupée) : le premier brouillon, déjà
+      // conforme au schéma, est gardé ; les écarts restants sont signalés par la vérification.
+      if (repair === 0 || !section || input.signal.aborted || !(e instanceof ProviderError) || REPAIR_FATAL.has(e.code)) throw e;
+      break;
+    }
     section = toSection(draft, difficult, approach, claimIds);
     const issues = chapterIssues(section, c, evidenceIds);
     if (issues.blocking.length === 0 && issues.coverage.length === 0) break;
