@@ -155,6 +155,8 @@ const ICONS = {
   analogy: ArrowLeftRight,
   retain: Highlighter,
   success: CircleCheck,
+  "check-circle": CircleCheck,
+  coins: Coins,
   source: Quote,
 } satisfies Record<string, LucideIcon>;
 

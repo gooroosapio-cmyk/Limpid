@@ -296,6 +296,7 @@ export function ImportForm({
   const pendingItems = items.filter((x) => x.status !== "ready" && x.status !== "error");
   const failedItems = items.filter((x) => x.status === "error");
   const many = items.length > 1;
+  const pages = readyItems.reduce((n, x) => n + (x.prepared?.pageCount ?? 0), 0);
   const ready =
     enabled &&
     !busy &&
@@ -434,7 +435,7 @@ export function ImportForm({
                     const name = it.prepared?.title ?? it.file.name;
                     return (
                       <li key={it.key} className={`fileline${it.status === "error" ? " is-error" : ""}`}>
-                        <span className="fileline-icon" aria-hidden="true">
+                        <span className={`fileline-icon fmt-${(it.file.name.split(".").pop() ?? "").toLowerCase().slice(0, 5)}`} aria-hidden="true">
                           <Icon name={it.status === "error" ? "alert" : it.status === "ready" ? "file" : "hourglass"} />
                         </span>
                         <span className="fileline-text">
@@ -453,6 +454,7 @@ export function ImportForm({
                           {it.status === "upload" && <progress value={it.percent} max={100} aria-hidden="true" />}
                           {it.error && <span className="fileline-error" role="alert">{it.error}</span>}
                         </span>
+                        {it.status === "ready" && <span className="fileline-ok" aria-hidden="true"><Icon name="check-circle" size={22} /></span>}
                         <span className="fileline-actions">
                           {it.status === "error" && !it.rejected && (
                             <button type="button" className="ib" aria-label={t.add.retryFile(name)} onClick={() => retry(it.key)} disabled={busy}>
@@ -508,6 +510,7 @@ export function ImportForm({
       <>
       <fieldset className="modes" disabled={busy}>
         <legend>{t.add.v2.approach}</legend>
+        <p className="modes-sub">{t.add.v2.approachSub}</p>
         <div className="mode-grid">
           {V6_MODES.map((m) => (
             <label key={m} className={`mode-card${mode === m ? " is-selected" : ""}`}>
@@ -517,7 +520,7 @@ export function ImportForm({
                 <strong>{t.add.modes[m]?.title}</strong>
                 <span id={`${base}-mode-${m}`} className="mode-desc">{t.add.v2.modeShort[m]}</span>
               </span>
-              <span className="mode-check" aria-hidden="true"><Icon name="check" size={16} /></span>
+              <span className="mode-radio" aria-hidden="true" />
             </label>
           ))}
         </div>
@@ -535,17 +538,23 @@ export function ImportForm({
           )}
         </div>
       )}
-      <button
-        type="submit"
-        className={`btn btn-primary btn-block${phase.step !== "idle" ? " busy" : ""}`}
-        disabled={!ready}
-        aria-describedby={missing ? `${base}-missing` : undefined}
-      >
-        {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : t.add.v2.continue}{" "}
-        {phase.step !== "creating" && <Icon name="arrow" />}
-      </button>
+      <div className="estimate">
+        <span className="estimate-icon" aria-hidden="true"><Icon name="coins" size={26} /></span>
+        <span className="estimate-text">
+          <b>{count === 1 ? (quote ? t.add.v2.estimate(quote) : t.billing.createCostFrom(ACTION_PRICES.report_short)) : t.add.v2.estimateMany(count)}</b>
+          {pages > 0 && <small>{t.add.v2.estimatePages(pages)}</small>}
+        </span>
+        <button
+          type="submit"
+          className={`btn btn-primary${phase.step !== "idle" ? " busy" : ""}`}
+          disabled={!ready}
+          aria-describedby={missing ? `${base}-missing` : undefined}
+        >
+          {phase.step === "creating" ? t.add.creating : count > 1 ? t.add.createMany(count) : t.add.v2.create}
+        </button>
+      </div>
       {missing && <p id={`${base}-missing`} className="muted small center">{missing}</p>}
-      {count === 1 && <p className="muted small center">{quote ? t.add.v2.cost(quote) : t.billing.createCostFrom(ACTION_PRICES.report_short)}</p>}
+      <p className="retention"><Icon name="shield" size={14} /> {t.add.v2.retention}</p>
       </>
       )}
     </form>
