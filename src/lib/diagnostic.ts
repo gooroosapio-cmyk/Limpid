@@ -47,7 +47,7 @@ export async function runDiagnostic(opts: { gemini: boolean }): Promise<Diagnost
   add("Couvertures (Pixabay, sinon Nano Banana)", present("PIXABAY_API_KEY"), present("PIXABAY_API_KEY") ? "illustration Pixabay selon le thème du document, sinon Nano Banana 2.1" : "PIXABAY_API_KEY absente : Nano Banana 2.1 à chaque couverture (payante)");
   add("Droit Pro interne", true, `${internalProEmails().join(", ")} : parcours Pro (OCR, Sol, 10 images), plafonds 50 par jour et 300 par semaine ; offre réelle inchangée`);
   add("Clé serveur Supabase", isAdminConfigured(), isAdminConfigured() ? "présente" : "SUPABASE_SERVICE_ROLE_KEY absente");
-  add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise quotidienne est refusée");
+  add("Secret du cron", present("CRON_SECRET"), present("CRON_SECRET") ? "présent" : "CRON_SECRET absent : la reprise automatique est refusée");
   add("Adresse du site", present("LIMPID_SITE_URL"), process.env.LIMPID_SITE_URL || `absente : ${siteUrl()} par défaut`);
   add("Import par lien", true, isUrlImportEnabled() ? "activé" : "désactivé");
   add(

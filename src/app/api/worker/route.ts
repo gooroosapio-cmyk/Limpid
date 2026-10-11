@@ -8,7 +8,7 @@ import { reconcilePending } from "@/lib/billing/purchase";
 export const maxDuration = 300;
 
 /**
- * Filet de sécurité (cron Vercel) : efface les envois abandonnés ou jamais utilisés, reprend les
+ * Filet de sécurité (cron Vercel, quotidien) : efface les envois abandonnés ou jamais utilisés, reprend les
  * tâches restées en file. Aucun Limpid ni document utilisé n'est purgé (conservation V4).
  */
 function authorized(request: NextRequest): boolean {
@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "interdit" }, { status: 401 });
   if (!isAdminConfigured()) return NextResponse.json({ error: "non_configure" }, { status: 503 });
+  // Passage fréquent (toutes les 5 min) : reprise de la file seule ; l'entretien reste quotidien.
+  if (request.nextUrl.searchParams.get("scope") === "queue") {
+    return NextResponse.json({ processed: await drainQueue("cron-queue", Date.now() + 270_000) });
+  }
   // Envois interrompus et sources jamais utilisées (24 h) : seuls contenus encore temporaires.
   const purged = await purgeDueOriginals().catch(() => -1);
   const unused = await purgeUnusedSources().catch(() => -1);
