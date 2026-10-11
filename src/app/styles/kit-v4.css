@@ -95,3 +95,49 @@
 .import .upload:not(.upload-hero) .upload-art { inset: 8px 8px 8px auto; width: 34%; -webkit-mask-image: none; mask-image: none; background: none; }
 .import .upload:not(.upload-hero) .upload-art img { object-fit: contain; object-position: right center; }
 .import .upload:not(.upload-hero) .upload-icon { background: var(--yellow); color: var(--on-yellow); border-radius: 50%; }
+
+/* ---------- Aperçu d'un Limpid (kit V4) ---------- */
+.preview-tabs > [aria-current="page"]::after { background: var(--gold); }
+.preview-card { border-radius: 16px; }
+.preview-card h2 { font-size: 1.25rem; }
+.preview-points { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 0.9375rem; line-height: 1.5; }
+.preview-points li::marker { color: var(--ink); }
+.preview-idea { background: var(--mint); color: var(--mint-text); border-radius: 16px; }
+.preview-idea h2 { color: var(--ink); font-size: 1rem; }
+.preview-idea p { color: var(--ink); }
+.preview-idea-icon { background: color-mix(in srgb, var(--surface) 55%, var(--mint)); color: var(--mint-text); }
+/* Notions clés : pastilles horizontales (icône menthe, terme, définition sur une ligne) */
+.notions.notion-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.notion-chips li { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; width: min(60vw, 200px); padding: 8px 10px; border-radius: 12px; scroll-snap-align: start; }
+.notion-chip-icon { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--mint); color: var(--mint-text); }
+.notion-chip-text { display: grid; min-width: 0; gap: 1px; }
+.notion-chip-text b { font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notion-chip-text span { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.action-dock .btn:not(.btn-primary) { background: var(--surface); border: 1px solid var(--ink); }
+
+/* ---------- Demander à Limpid (kit V4) ---------- */
+.ask-context { display: grid; gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ask-context-label { font-size: 0.75rem; color: var(--muted); }
+.ask-context-field { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.ask-context-field svg { flex: none; color: var(--muted); }
+.ask-context select { flex: 1; min-width: 0; min-height: 36px; border: 0; padding: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-overflow: ellipsis; }
+.ask-context select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.ask-context-note { margin: 6px 0 0; font-size: 0.75rem; color: var(--muted); }
+.ask-q { background: var(--elevated); color: var(--ink); }
+.ask-source { margin-top: 10px; }
+.ask-source summary { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--r-pill); font-size: 0.8125rem; color: var(--muted); cursor: pointer; list-style: none; }
+.ask-source summary::-webkit-details-marker { display: none; }
+.ask-source[open] summary svg:last-child { transform: rotate(90deg); }
+.ask-source .ask-quote { margin: 8px 0 0; }
+.ask-follow { display: grid; gap: 6px; margin-top: var(--s3); }
+.ask-follow-label { margin: 0; font-size: 0.75rem; color: var(--muted); }
+.ask-suggestion { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.ask-suggestion > svg:first-child { flex: none; color: var(--gold); }
+.ask-suggestion > span { flex: 1; min-width: 0; }
+.ask-suggestion > svg:last-child { flex: none; color: var(--muted); }
+.ask-suggestion:hover { border-color: var(--line-strong); }
+.ask-send { background: var(--yellow); color: var(--on-yellow); }
+.ask-private { font-size: 0.75rem; color: var(--muted); text-align: center; }
+.ask-cost { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-weight: 600; }
+.ask-cost svg { color: var(--gold); }
+.ask-context-caret { transform: rotate(90deg); pointer-events: none; }

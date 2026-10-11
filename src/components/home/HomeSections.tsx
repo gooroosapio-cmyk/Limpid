@@ -42,7 +42,7 @@ export async function HomeSections({ items }: { items: LibraryItem[] }) {
           <ul className="home-recent">
             {recent.map((i) => (
               <li key={i.id}>
-                <Link href={`/rapports/${i.id}`} className="home-recent-row">
+                <Link href={i.state === "ready" ? `/rapports/${i.id}/apercu` : `/rapports/${i.id}`} className="home-recent-row">
                   <Cover cover={i.cover} className="home-thumb" />
                   <span className="home-recent-text">
                     <b>{i.title}</b>

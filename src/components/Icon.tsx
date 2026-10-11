@@ -17,6 +17,7 @@ import {
   Clock,
   Cloud,
   Coins,
+  Crosshair,
   Copy,
   Download,
   Ellipsis,
@@ -157,6 +158,7 @@ const ICONS = {
   success: CircleCheck,
   "check-circle": CircleCheck,
   coins: Coins,
+  target: Crosshair,
   source: Quote,
 } satisfies Record<string, LucideIcon>;
 
