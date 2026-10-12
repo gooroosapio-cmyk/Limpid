@@ -8,11 +8,15 @@ import { LoaderBook } from "@/components/LoaderBook";
 import type { Dict } from "@/lib/i18n";
 import { useT } from "@/lib/i18n/client";
 import { isActiveJob } from "@/lib/jobs/state";
+import { RecoveryState } from "@/components/jobs/RecoveryState";
 
 interface JobView {
+  id?: string;
   status: string;
   stage: string | null;
   error_code: string | null;
+  recoverable?: boolean | null;
+  attempts?: number;
   /** Publication progressive : une version lisible existe déjà (chapitre 1 au moins). */
   readable?: boolean;
 }
@@ -65,6 +69,9 @@ export function JobProgress({ reportId, initial, compact = false, partial = fals
 
   const step = job.status === "queued" ? 0 : (STEP_OF_STAGE[job.stage ?? ""] ?? 0);
 
+  // Relance automatique programmée : les étapes validées restent affichées comme terminées.
+  if (job.status === "retrying") return <RecoveryState reportId={reportId} job={job} compact={compact} readable={!!job.readable} />;
+
   if (active && compact) {
     return (
       <div className="card prep-compact" role="status" aria-live="polite">
@@ -107,18 +114,4 @@ export function JobProgress({ reportId, initial, compact = false, partial = fals
     );
   }
 
-  const message = `${t.reports.status[job.status] ?? job.status}${job.error_code ? ` : ${t.jobErrors[job.error_code] ?? t.jobErrors.unknown}` : ""}`;
-  if (compact) return <p className="notice notice-error" role="alert">{message}</p>;
-  return (
-    <div className="prep prep-error">
-      <span className="icon-badge" aria-hidden="true"><Icon name="alert" size={30} /></span>
-      <h1>{t.prep.errorTitle}</h1>
-      <p className="notice notice-error" role="alert">{message}</p>
-      <p className="muted">{t.prep.kept}</p>
-      <div className="actions-row">
-        <Link href="/bibliotheque" className="btn">{t.prep.library}</Link>
-        <Link href="/" className="btn btn-primary">{t.prep.addAgain}</Link>
-      </div>
-    </div>
-  );
-}
+  return <RecoveryState reportId={reportId} job={job} compact={compact} readable={!!job.readable} />;}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { walletChanged } from "@/components/billing/wallet-store";
@@ -22,18 +22,24 @@ function FailedCard({ item }: { item: FailedItem }) {
   const v = t.library.v2;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const key = useRef<string | null>(null);
   async function retry() {
+    if (busy) return;
     setBusy(true);
+    key.current ??= crypto.randomUUID();
     // Une clé par geste : un double appui ne relance pas deux préparations.
     const res = await fetch(`/api/reports/${item.id}/retry`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idempotency_key: `retry-${item.id}-${Math.floor(Date.now() / 60_000)}` }),
+      body: JSON.stringify({ idempotency_key: key.current }),
     }).catch(() => null);
     const body = await res?.json().catch(() => ({}));
     walletChanged();
     setBusy(false);
-    if (!res?.ok) return toast(apiMessage(t, body, t.library.actionFailed), "error");
+    if (!res?.ok) {
+      key.current = null;
+      return toast(apiMessage(t, body, t.library.actionFailed), "error");
+    }
     toast(t.library.retried);
     router.refresh();
   }

@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const supabase = await createUserClient();
   const { data } = await supabase
     .from("jobs")
-    .select("status, stage, error_code, lease_expires_at, next_run_at, attempts, progress, recoverable")
+    .select("id, status, stage, error_code, lease_expires_at, next_run_at, attempts, progress, recoverable")
     .eq("report_id", id)
     .order("created_at", { ascending: false })
     .limit(1)

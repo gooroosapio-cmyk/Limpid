@@ -17,9 +17,12 @@ import { createUserClient } from "@/lib/supabase/server";
 const CoverageNotes = z.object({ notes: z.array(z.string().max(300)).max(10), partial: z.boolean().optional() });
 
 export interface JobView {
+  id?: string;
   status: string;
   stage: string | null;
   error_code: string | null;
+  recoverable?: boolean | null;
+  attempts?: number;
 }
 
 export interface VersionInfo {
@@ -95,7 +98,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   if (!report.current_version_id) {
     const { data: job } = await supabase
       .from("jobs")
-      .select("status, stage, error_code")
+      .select("id, status, stage, error_code, recoverable, attempts")
       .eq("report_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -107,7 +110,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
     supabase.from("report_versions").select("id, version_number, change_reason, level, mode, created_at").eq("report_id", id).order("version_number"),
     supabase
       .from("jobs")
-      .select("status, stage, error_code")
+      .select("id, status, stage, error_code, recoverable, attempts")
       .eq("report_id", id)
       .order("created_at", { ascending: false })
       .limit(1)

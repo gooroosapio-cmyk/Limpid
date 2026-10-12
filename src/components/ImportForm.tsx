@@ -12,6 +12,7 @@ import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { ACTION_PRICES } from "@/lib/billing/catalog";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
+import { InsufficientCreditsState } from "@/components/jobs/InsufficientCreditsState";
 
 type Phase = { step: "idle" } | { step: "reading" } | { step: "creating" };
 type Output = "common" | "each";
@@ -48,13 +49,39 @@ const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
 /** Formats acceptés, pour le message de non-conformité (TYPE). */
 const FORMATS = "PDF, DOCX, TXT, JPG, PNG, WEBP";
 
+interface Billing { code: string; topup: string | null; needed?: number; available?: number }
+
+/** Création bloquée par le solde : sources et approche gardées sur l'appareil pour reprendre après recharge. */
+const PENDING_KEY = "limpid-pending-import";
+interface PendingImport { sourceIds: string[]; mode: string; at: number }
+/** Une source jamais utilisée est purgée après 24 h : au-delà, la reprise n'est plus proposée. */
+const PENDING_MAX_MS = 20 * 3600_000;
+
+function readPending(): PendingImport | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null") as PendingImport | null;
+    if (!p || !Array.isArray(p.sourceIds) || !p.sourceIds.length || Date.now() - p.at > PENDING_MAX_MS) return null;
+    return p;
+  } catch {
+    return null;
+  }
+}
+function writePending(p: Omit<PendingImport, "at"> | null) {
+  try {
+    if (p) localStorage.setItem(PENDING_KEY, JSON.stringify({ ...p, at: Date.now() }));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* stockage indisponible : la reprise ne sera simplement pas proposée */
+  }
+}
+
 class FormError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
     public readonly reportId?: string,
     /** Blocage de l'offre : liens vers les offres et, si elle aide, la recharge. */
-    public readonly billing?: { code: string; topup: string | null },
+    public readonly billing?: Billing,
     /** Détail de l'erreur (code d'extraction, nombre de pages) quand le serveur le donne. */
     public readonly detail?: { reason?: string; pages?: number },
   ) {
@@ -77,7 +104,7 @@ async function postJson(url: string, body: unknown, fallback: string, t: Dict): 
       apiMessage(t, data, fallback),
       typeof data.error === "string" ? data.error : undefined,
       typeof data.reportId === "string" ? data.reportId : undefined,
-      (data.billing as { code: string; topup: string | null } | undefined) ?? undefined,
+      (data.billing as Billing | undefined) ?? undefined,
       { reason: typeof data.reason === "string" ? data.reason : undefined, pages: typeof data.pages === "number" ? data.pages : undefined },
     );
   }
@@ -174,7 +201,9 @@ export function ImportForm({
   const [error, setError] = useState<string | null>(null);
   /** Message sous la console (sélection trop nombreuse) ; les fichiers déjà là restent. */
   const [consoleNote, setConsoleNote] = useState<string | null>(null);
-  const [billing, setBilling] = useState<{ code: string; topup: string | null } | null>(null);
+  const [billing, setBilling] = useState<Billing | null>(null);
+  const [pending, setPending] = useState<PendingImport | null>(null);
+  const [resuming, setResuming] = useState(false);
   // Devis reçu pour un jeu de documents donné (clé) : affiché seulement s'il correspond encore.
   const [quoted, setQuoted] = useState<{ key: string; credits: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -189,7 +218,36 @@ export function ImportForm({
 
   useEffect(() => {
     key.current = crypto.randomUUID();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique du stockage de l'appareil
+    setPending(readPending());
   }, []);
+
+  /** « Reprendre mon Limpid » après recharge : mêmes documents, même approche, sans réimport. */
+  async function resumePending() {
+    if (!pending || resuming) return;
+    setResuming(true);
+    setError(null);
+    try {
+      const data = await postJson("/api/reports", { source_ids: pending.sourceIds, mode: pending.mode, idempotency_key: key.current }, t.add.failed, t);
+      writePending(null);
+      router.push(`/rapports/${String(data.reportId)}`);
+    } catch (err) {
+      if (err instanceof FormError && err.reportId) {
+        writePending(null);
+        router.push(`/rapports/${err.reportId}`);
+        return;
+      }
+      // Document expiré ou supprimé : la reprise n'est plus possible, on le dit.
+      if (err instanceof FormError && (err.code === "source_missing" || err.code === "upload_missing")) {
+        writePending(null);
+        setPending(null);
+      }
+      setError(err instanceof FormError ? err.message : t.create.networkError);
+      setBilling(err instanceof FormError ? (err.billing ?? null) : null);
+      key.current = crypto.randomUUID();
+      setResuming(false);
+    }
+  }
 
   const patch = (k: string, p: Partial<Item>) => setItems((list) => list.map((it) => (it.key === k ? { ...it, ...p } : it)));
 
@@ -336,6 +394,7 @@ export function ImportForm({
       const sourceIds = readyItems.map((x) => x.prepared!.sourceId);
       setPhase({ step: "creating" });
       const data = await postJson("/api/reports", { source_ids: sourceIds, mode, idempotency_key: key.current }, t.add.failed, t);
+      writePending(null);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
       if (err instanceof FormError && err.reportId) {
@@ -344,6 +403,9 @@ export function ImportForm({
       }
       setError(err instanceof FormError ? err.message : t.create.networkError);
       setBilling(err instanceof FormError ? (err.billing ?? null) : null);
+      if (err instanceof FormError && err.billing?.code === "credits" && !(many && output === "each")) {
+        writePending({ sourceIds: readyItems.map((x) => x.prepared!.sourceId), mode });
+      }
       setPhase({ step: "idle" });
       key.current = crypto.randomUUID();
     }
@@ -367,6 +429,20 @@ export function ImportForm({
 
   return (
     <form onSubmit={submit} aria-busy={busy} className="import">
+      {pending && !items.length && (
+        <section className="fl-card fl-pending" aria-labelledby={`${base}-pending`}>
+          <h2 id={`${base}-pending`}>{t.fluid.credits.resumeTitle}</h2>
+          <p className="muted">{t.fluid.credits.resumeLede}</p>
+          <div className="fl-actions fl-actions-row">
+            <button type="button" className={`btn btn-primary${resuming ? " busy" : ""}`} disabled={resuming} aria-busy={resuming} onClick={resumePending}>
+              {t.fluid.credits.resumeCta}
+            </button>
+            <button type="button" className="btn-link" onClick={() => { writePending(null); setPending(null); }}>
+              {t.fluid.credits.resumeDismiss}
+            </button>
+          </div>
+        </section>
+      )}
       <div className="import-panel">
         <>
             <input
@@ -527,7 +603,9 @@ export function ImportForm({
       </fieldset>
 
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
-      {error && (
+      {error && billing?.code === "credits" && typeof billing.needed === "number" ? (
+        <InsufficientCreditsState needed={billing.needed} available={billing.available ?? 0} topup={billing.topup} />
+      ) : error && (
         <div className="notice notice-error" role="alert">
           <p>{error}</p>
           {billing && (
