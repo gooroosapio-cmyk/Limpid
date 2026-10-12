@@ -342,3 +342,12 @@ dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px 
 .proj-bar { row-gap: 2px; padding-top: 6px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
 .proj-bar .btn { min-height: 40px; padding: 8px 16px; }
 .proj-bar .proj-all { min-height: 32px; font-size: 0.8125rem; }
+
+/* Vue guidée : console fixée au-dessus de la barre basse du lecteur (plus suspendue dans le flux
+   ni flottante au milieu du texte). Le texte garde une réserve pour ne jamais passer dessous. */
+.deck .proj-bar {
+  position: fixed; left: 0; right: 0; bottom: calc(var(--rbar) + env(safe-area-inset-bottom));
+  z-index: 2; max-width: none; margin: 0; padding: 6px var(--gutter) 2px; border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.deck:has(> .proj-bar) { padding-bottom: calc(var(--deck-bottom) + 96px); }

@@ -49,6 +49,9 @@ export default async function ReportPage({
 
   const job = report.latestJob;
   const preparing = !!job && isActiveJob(job.status);
+  // Notes utiles à la lecture : pages non lues (limite de pages). Pas de liste de pages sans
+  // texte (souvent blanches ou décoratives) ni d'avertissement générique.
+  const readerNotes = report.notes.filter((n) => n.startsWith("Seules les ") || n.startsWith("Le document est trop long"));
   const lastFailed = !!job && (job.status === "failed" || job.status === "uncertain") && report.versions.length >= 1;
   const pdfHref = `/api/reports/${id}/pdf${report.isCurrent ? "" : `?version=${report.shownVersion}`}`;
   const modeLabel = report.mode ? (t.add.modes[report.mode]?.title ?? null) : null;
@@ -67,13 +70,12 @@ export default async function ReportPage({
           <JobProgress reportId={id} initial={job} compact />
         </div>
       )}
-      {report.checkStatus !== "validated" && (
-        <p className="notice notice-warn" role="status">{t.reader.incompleteCheck}</p>
-      )}
-      {report.notes.length > 0 && (
+      {/* Retour lecteur : ni avertissement « vérification incomplète » ni liste des pages sans
+          texte en tête du cours ; seules les notes qui changent la lecture restent (pages non lues). */}
+      {readerNotes.length > 0 && (
         <div className="notice notice-warn" role="status">
-          <strong>{report.partial ? t.reader.partialCoverage : t.reader.aboutSource}</strong>
-          <ul>{report.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+          <strong>{t.reader.aboutSource}</strong>
+          <ul>{readerNotes.map((n) => <li key={n}>{n}</li>)}</ul>
         </div>
       )}
     </>

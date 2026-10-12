@@ -372,7 +372,7 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
         maxPages: limits.maxOcrPages,
         pages: pages ?? undefined,
         signal: controller.signal,
-        budget: { tier: "fast", role: "chat", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+        budget: { tier: "fast", role: "vision", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
         onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
       });
     } catch (e) {

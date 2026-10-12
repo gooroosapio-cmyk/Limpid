@@ -47,7 +47,8 @@ function model(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
  * Registre par défaut (prompt V2, catalogue OpenRouter vérifié le 7 octobre 2026). Structure :
  * GLM-5.3 Flash, ou DeepSeek V4.1 Flash pour une source complexe. Rédaction pédagogique :
  * GPT-6 Luna Pro (MiMo-V2.6-Pro, essayé en production, dépassait le délai d'un chapitre). Chat, reformulations et contrôle courant (texte et images) : GPT-6 Luna.
- * Expertise et audit Pro : GPT-6.1 Sol, jamais sans rôle « expert » explicite.
+ * Expertise et audit Pro : GPT-6.1 Sol, jamais sans rôle « expert » explicite (chapitres
+ * difficiles d'un compte Pro). Lecture des pages scannées, formules et figures : Gemini 3.8 Flash.
  */
 export const DEFAULT_MODELS: Record<ModelRole, string> = {
   structure: "z-ai/glm-5.3-flash",
@@ -56,6 +57,7 @@ export const DEFAULT_MODELS: Record<ModelRole, string> = {
   chat: "openai/gpt-6-luna",
   controller: "openai/gpt-6-luna",
   expert: "openai/gpt-6.1-sol",
+  vision: "google/gemini-3.8-flash",
 };
 /** Replis : un autre fournisseur de même gamme ; Sol n'est jamais un repli. */
 export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
@@ -65,6 +67,7 @@ export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
   chat: "z-ai/glm-5.3-flash",
   controller: "z-ai/glm-5.3-flash",
   expert: "openai/gpt-6-luna",
+  vision: "openai/gpt-6-luna",
 };
 /** Variables d'environnement du registre (prompt V2). */
 const ROLE_ENV: Record<ModelRole, string> = {
@@ -74,6 +77,7 @@ const ROLE_ENV: Record<ModelRole, string> = {
   chat: "MODEL_CHAT",
   controller: "MODEL_CONTROLLER_DEFAULT",
   expert: "MODEL_EXPERT_PRO",
+  vision: "MODEL_VISION",
 };
 const ROLES = Object.keys(DEFAULT_MODELS) as ModelRole[];
 
