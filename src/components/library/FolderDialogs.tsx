@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { ActionMenu } from "@/components/shell/ActionMenu";
 import { toast } from "@/components/shell/Toasts";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 import { apiMessage } from "@/lib/i18n/api";
@@ -104,34 +105,40 @@ export function NewFolder({ iconOnly = false }: { iconOnly?: boolean }) {
   );
 }
 
-/** Actions d'un dossier ouvert : renommer, supprimer (ses Limpid gardés par défaut). */
-export function FolderActions({ id, name, count }: { id: string; name: string; count: number }) {
+/**
+ * Menu « … » du dossier sélectionné : renommer, supprimer. Supprimer retire seulement le
+ * classement : les cours du dossier restent dans la bibliothèque générale (dit dans la confirmation).
+ */
+export function FolderActions({ id, name, count, clearHref }: { id: string; name: string; count: number; clearHref: string }) {
   const t = useT();
+  const f = t.fluid.folders;
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
   const del = useRef<HTMLDialogElement>(null);
   useDialogHistory(del);
   const [busy, setBusy] = useState(false);
 
-  async function remove(withReports: boolean) {
-    if (withReports && !window.confirm(t.library.deleteAllConfirm(count))) return;
+  async function remove() {
+    if (busy) return;
     setBusy(true);
-    const res = await fetch(`/api/folders/${id}${withReports ? "?avec_limpid=1" : ""}`, { method: "DELETE" }).catch(() => null);
+    const res = await fetch(`/api/folders/${id}`, { method: "DELETE" }).catch(() => null);
     setBusy(false);
     if (!res?.ok) return toast(t.library.actionFailed, "error");
     del.current?.close();
-    router.push("/bibliotheque");
+    toast(f.deleted(name));
+    router.push(clearHref, { scroll: false });
     router.refresh();
   }
 
   return (
-    <div className="folder-actions">
-      <button type="button" className="btn-link" aria-haspopup="dialog" onClick={() => ref.current?.showModal()}>
-        {t.library.rename}
-      </button>
-      <button type="button" className="btn-link danger" aria-haspopup="dialog" onClick={() => del.current?.showModal()}>
-        {t.library.deleteFolder}
-      </button>
+    <>
+      <ActionMenu
+        label={f.actions(name)}
+        items={[
+          { label: t.library.rename, icon: "pencil", onSelect: () => ref.current?.showModal() },
+          { label: t.library.deleteFolder, icon: "trash", danger: true, onSelect: () => del.current?.showModal() },
+        ]}
+      />
       <NameDialog
         dialogRef={ref}
         title={t.library.renameFolder}
@@ -147,31 +154,19 @@ export function FolderActions({ id, name, count }: { id: string; name: string; c
           return true;
         }}
       />
-      <dialog ref={del} className="sheet side" aria-labelledby="folder-del-h">
-        <div className="sheet-grip" aria-hidden="true" />
+      <dialog ref={del} className="sheet center" aria-labelledby="folder-del-h" aria-describedby="folder-del-d">
         <div className="sheet-head">
-          <h2 id="folder-del-h">{t.library.deleteFolderTitle}</h2>
+          <h2 id="folder-del-h">{f.deleteTitle(name)}</h2>
           <button type="button" className="ib" aria-label={t.reader.close} onClick={() => del.current?.close()}>
             <Icon name="close" />
           </button>
         </div>
-        <ul className="rows">
-          <li>
-            <button type="button" className="row" disabled={busy} onClick={() => remove(false)}>
-              <span className="row-icon"><Icon name="folder" /></span>
-              <span className="row-text"><b>{t.library.deleteFolderKeep}</b><small>{t.library.deleteFolderKeepSub}</small></span>
-            </button>
-          </li>
-          {count > 0 && (
-            <li>
-              <button type="button" className="row row-danger" disabled={busy} onClick={() => remove(true)}>
-                <span className="row-icon"><Icon name="trash" /></span>
-                <span className="row-text"><b>{t.library.deleteFolderAll(count)}</b><small>{t.library.deleteFolderAllSub}</small></span>
-              </button>
-            </li>
-          )}
-        </ul>
+        <p id="folder-del-d">{f.deleteKeeps(count)}</p>
+        <div className="actions-row">
+          <button type="button" className="btn" onClick={() => del.current?.close()}>{t.library.cancel}</button>
+          <button type="button" className={`btn btn-danger${busy ? " busy" : ""}`} disabled={busy} onClick={remove}>{f.deleteCta}</button>
+        </div>
       </dialog>
-    </div>
+    </>
   );
 }

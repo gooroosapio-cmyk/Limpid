@@ -1,18 +1,12 @@
 /**
- * Double authentification de l'administration (cadrage Q8, écart levé) : l'accès à /admin
- * exige une session de niveau aal2 (mot de passe ou lien, puis code TOTP).
- * `LIMPID_ADMIN_MFA=off` coupe l'exigence (secours si l'application d'authentification est perdue).
+ * Code supplémentaire de l'administration (prompt « Fluidité », § 9) : retiré par défaut. Un
+ * administrateur déjà connecté accède directement à l'administration ; son rôle reste vérifié en
+ * base à chaque requête. `LIMPID_ADMIN_MFA=on` rétablit l'exigence d'une session aal2 (code TOTP).
  */
 export type MfaStep = "ok" | "verify" | "enroll";
 
-let warned = false;
 export function adminMfaRequired(env: Record<string, string | undefined> = process.env): boolean {
-  const on = env.LIMPID_ADMIN_MFA !== "off";
-  if (!on && !warned) {
-    warned = true;
-    console.warn("SÉCURITÉ : LIMPID_ADMIN_MFA=off, l'administration n'exige pas la double authentification.");
-  }
-  return on;
+  return env.LIMPID_ADMIN_MFA === "on";
 }
 
 /** Étape à franchir selon le niveau de la session et l'existence d'un facteur vérifié. */

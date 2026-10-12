@@ -84,7 +84,13 @@ export function LibraryBrowser({
   recent: initialRecent,
   initialQuery,
   newFolder,
+  folderBar = null,
+  emptyNode = null,
 }: {
+  /** Bande de dossiers (filtres sur le même écran). */
+  folderBar?: React.ReactNode;
+  /** État vide propre (dossier vide, aucun résultat pour ces filtres) à la place du texte. */
+  emptyNode?: React.ReactNode;
   title: string;
   folder: { id: string; name: string } | null;
   folders: FolderItem[];
@@ -212,6 +218,7 @@ export function LibraryBrowser({
           {!open && (searching || filtered) && <span className="bell-dot" aria-hidden="true" />}
         </button>
       </div>
+      {folderBar}
       {headerExtra}
       {/* Kit V4 : filtres Tous / Prêts / En cours / Favoris toujours visibles ; la loupe ouvre recherche et tri. */}
       {!open && rail}
@@ -368,7 +375,7 @@ export function LibraryBrowser({
       {showLessons && (
         <section className="lib-section" aria-labelledby="limpids-h">
           <div className="lib-section-head">
-            <h2 id="limpids-h">{l.yourLimpids}</h2>
+            <h2 id="limpids-h">{t.fluid.folders.yourLimpids(visible.length)}</h2>
             <div className="lib-view-tools">
             <div className="view-toggle" role="group" aria-label={l.viewLabel}>
               <button type="button" className="icon-button" aria-pressed={view === "grid"} aria-label={l.cards} onClick={() => chooseView("grid")}>
@@ -381,7 +388,7 @@ export function LibraryBrowser({
             </div>
           </div>
           {visible.length === 0 ? (
-            <p className="meta lib-empty-line">{searching ? t.library.noResult : emptyText}</p>
+            !searching && emptyNode ? emptyNode : <p className="meta lib-empty-line">{searching ? t.library.noResult : emptyText}</p>
           ) : (
             <ul className={view === "grid" ? "limpid-grid" : "limpid-list"}>
               {visible.map((r) => (

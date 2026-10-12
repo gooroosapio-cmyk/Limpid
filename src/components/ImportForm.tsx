@@ -181,7 +181,10 @@ export function ImportForm({
   maxFiles = 5,
   defaultMode = "auto",
   hero = false,
+  folderId = null,
 }: {
+  /** Dossier sélectionné dans la bibliothèque : le nouveau Limpid y est rangé. */
+  folderId?: string | null;
   enabled: boolean;
   /** Accueil (kit V4) : la zone de dépôt est la grande carte jaune « Créer un Limpid ». */
   hero?: boolean;
@@ -382,7 +385,7 @@ export function ImportForm({
         setPhase({ step: "creating" });
         const data = await postJson(
           "/api/reports/batch",
-          { source_ids: readyItems.map((x) => x.prepared!.sourceId), mode, idempotency_key: key.current },
+          { source_ids: readyItems.map((x) => x.prepared!.sourceId), mode, idempotency_key: key.current, folder_id: folderId },
           t.add.failed,
           t,
         );
@@ -393,7 +396,7 @@ export function ImportForm({
       }
       const sourceIds = readyItems.map((x) => x.prepared!.sourceId);
       setPhase({ step: "creating" });
-      const data = await postJson("/api/reports", { source_ids: sourceIds, mode, idempotency_key: key.current }, t.add.failed, t);
+      const data = await postJson("/api/reports", { source_ids: sourceIds, mode, idempotency_key: key.current, folder_id: folderId }, t.add.failed, t);
       writePending(null);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
@@ -603,6 +606,8 @@ export function ImportForm({
       </fieldset>
 
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
+      {/* Le fichier n'est reçu qu'après l'envoi : jamais de faux « Document reçu » avant. */}
+      {items.some((it) => it.status === "upload") && <p className="fl-info"><Icon name="info" size={18} /> <span>{t.fluid.tracker.uploading}</span></p>}
       {error && billing?.code === "credits" && typeof billing.needed === "number" ? (
         <InsufficientCreditsState needed={billing.needed} available={billing.available ?? 0} topup={billing.topup} />
       ) : error && (

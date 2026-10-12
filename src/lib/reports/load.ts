@@ -23,6 +23,7 @@ export interface JobView {
   error_code: string | null;
   recoverable?: boolean | null;
   attempts?: number;
+  progress?: { chapters_done?: number; chapters_total?: number } | null;
 }
 
 export interface VersionInfo {
@@ -35,7 +36,7 @@ export interface VersionInfo {
 }
 
 export type LoadedReport =
-  | { state: "pending"; id: string; title: string; job: JobView }
+  | { state: "pending"; id: string; title: string; job: JobView; doc: { kind: string | null; pages: number | null } }
   | {
       state: "ready";
       id: string;
@@ -90,7 +91,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   const supabase = await createUserClient();
   const { data: report } = await supabase
     .from("reports")
-    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources!reports_source_id_fkey(title, kind, coverage, original_url, storage_path)")
+    .select("id, title, source_id, current_version_id, theme_id, visual_mode, created_at, sources!reports_source_id_fkey(title, kind, coverage, original_url, storage_path, page_count)")
     .eq("id", id)
     .maybeSingle();
   if (!report) return null;
@@ -98,19 +99,20 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
   if (!report.current_version_id) {
     const { data: job } = await supabase
       .from("jobs")
-      .select("id, status, stage, error_code, recoverable, attempts")
+      .select("id, status, stage, error_code, recoverable, attempts, progress")
       .eq("report_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    return { state: "pending", id, title: report.title, job: job ?? { status: "queued", stage: null, error_code: null } };
+    const src = report.sources as unknown as { kind?: string; page_count?: number | null } | null;
+    return { state: "pending", id, title: report.title, job: job ?? { status: "queued", stage: null, error_code: null }, doc: { kind: src?.kind ?? null, pages: src?.page_count ?? null } };
   }
 
   const [{ data: list }, { data: latestJob }] = await Promise.all([
     supabase.from("report_versions").select("id, version_number, change_reason, level, mode, created_at").eq("report_id", id).order("version_number"),
     supabase
       .from("jobs")
-      .select("id, status, stage, error_code, recoverable, attempts")
+      .select("id, status, stage, error_code, recoverable, attempts, progress")
       .eq("report_id", id)
       .order("created_at", { ascending: false })
       .limit(1)

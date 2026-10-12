@@ -63,3 +63,23 @@ exception when insufficient_privilege then null;
 end $$;
 reset role;
 select 'JOBS OK';
+
+-- Conversations : lecture par le propriétaire seulement, écriture par le serveur seul.
+reset role;
+insert into public.reports (id, owner_id, title) values ('00000000-0000-0000-0000-0000000000f8', '00000000-0000-0000-0000-0000000000f7', 'Chat');
+insert into public.chat_messages (owner_id, report_id, role, client_id, content) values ('00000000-0000-0000-0000-0000000000f7', '00000000-0000-0000-0000-0000000000f8', 'user', 'client-0001', 'Question ?');
+do $$
+begin
+  insert into public.chat_messages (owner_id, report_id, role, client_id, content) values ('00000000-0000-0000-0000-0000000000f7', '00000000-0000-0000-0000-0000000000f8', 'user', 'client-0001', 'Doublon');
+  raise exception 'ECHEC : message renvoyé créé deux fois';
+exception when unique_violation then null;
+end $$;
+set role authenticated;
+do $$
+begin
+  insert into public.chat_messages (owner_id, report_id, role, content) values ('00000000-0000-0000-0000-0000000000f7', '00000000-0000-0000-0000-0000000000f8', 'user', 'x');
+  raise exception 'ECHEC : message écrit par un client';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+select 'CHAT OK';

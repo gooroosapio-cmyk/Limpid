@@ -41,7 +41,7 @@ export default async function ReportPage({
     const active = isActiveJob(report.job.status);
     return (
       <Screen>
-        <JobProgress reportId={id} initial={report.job} />
+        <JobProgress reportId={id} initial={report.job} doc={{ title: report.title, kind: report.doc.kind, pages: report.doc.pages }} />
         {!active && <DeleteReport reportId={id} />}
       </Screen>
     );

@@ -30,6 +30,8 @@ const Settings = {
   theme: ThemeId.optional(),
   visual_mode: VisualMode.optional(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/),
+  /** Dossier sélectionné dans la bibliothèque : le nouveau Limpid y est rangé. */
+  folder_id: z.string().uuid().nullable().optional(),
 };
 
 export const CreateRequest = z.union([
@@ -172,9 +174,13 @@ export async function createReport(
   } catch (e) {
     throw creditFailure(e);
   }
+  // Dossier : seulement un dossier de ce compte (sinon le Limpid reste dans la bibliothèque).
+  const folderId = input.folder_id
+    ? ((await db.from("folders").select("id").eq("id", input.folder_id).eq("owner_id", userId).maybeSingle()).data?.id ?? null)
+    : null;
   const report = await db
     .from("reports")
-    .insert({ owner_id: userId, source_id: sourceId, title, theme_id: theme, visual_mode: visualMode, mode })
+    .insert({ owner_id: userId, source_id: sourceId, title, theme_id: theme, visual_mode: visualMode, mode, folder_id: folderId })
     .select("id")
     .single();
   if (report.error || !report.data) {
@@ -242,6 +248,7 @@ export const BatchRequest = z.strictObject({
   target_pages: TargetPages.optional(),
   visual_mode: VisualMode.optional(),
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,90}$/),
+  folder_id: z.string().uuid().nullable().optional(),
 });
 
 /**
@@ -269,7 +276,7 @@ export async function createBatch(userId: string, input: z.infer<typeof BatchReq
     }
     const { reportId } = await createReport(
       userId,
-      { source_id: sourceId, mode: input.mode, level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key },
+      { source_id: sourceId, mode: input.mode, level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key, folder_id: input.folder_id ?? null },
       { limitsChecked: true },
     );
     reportIds.push(reportId);

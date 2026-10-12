@@ -48,10 +48,12 @@ begin
   -- Une session ne change pas de propriétaire.
   if public.touch_session(s3, a, 'Chrome', true) <> 'revoked' then raise exception 'ECHEC : session réutilisée par un autre compte'; end if;
 
-  -- Administrateur : 30 minutes d'inactivité, 12 heures au plus.
+  -- Administrateur : plus de fermeture après 30 minutes (règle commune de 7 jours).
   perform public.touch_session(sa, a, 'Edge', true);
-  update public.user_sessions set last_activity_at = now() - interval '31 minutes' where session_id = sa;
-  if public.touch_session(sa, a, 'Edge', true) <> 'inactive_admin' then raise exception 'ECHEC : session admin inactive acceptée'; end if;
+  update public.user_sessions set last_activity_at = now() - interval '3 hours', created_at = now() - interval '13 hours' where session_id = sa;
+  if public.touch_session(sa, a, 'Edge', true) <> 'ok' then raise exception 'ECHEC : session admin fermée après 30 minutes'; end if;
+  update public.user_sessions set last_activity_at = now() - interval '8 days' where session_id = sa;
+  if public.touch_session(sa, a, 'Edge', true) <> 'inactive' then raise exception 'ECHEC : règle commune non appliquée à l''admin'; end if;
 end $$;
 
 do $$ begin

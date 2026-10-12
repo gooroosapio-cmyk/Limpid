@@ -30,6 +30,8 @@ export interface LibraryItem {
   openedAt: string | null;
   /** Étape serveur de la préparation en cours (validation, extraction…), ou null. */
   stage: string | null;
+  /** Avancement réel de la préparation en cours (chapitres rédigés / prévus), ou null. */
+  progress: { done: number; total: number } | null;
 }
 
 export interface LibraryFolder {
@@ -43,7 +45,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
   let query = supabase
     .from("reports")
     .select(
-      "id, title, created_at, mode, folder_id, favorite, cover_id, cover_path, cover_url, cover_credit, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(kind, status, stage, error_code, created_at), report_progress(read_at, updated_at), report_sources(source_id)",
+      "id, title, created_at, mode, folder_id, favorite, cover_id, cover_path, cover_url, cover_credit, current_version_id, report_versions!reports_current_version_fk(check_status), jobs(kind, status, stage, error_code, created_at, progress), report_progress(read_at, updated_at), report_sources(source_id)",
     )
     .eq("is_demo", false)
     .order("created_at", { ascending: false })
@@ -54,7 +56,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
     supabase.from("folders").select("id, name, created_at").order("created_at", { ascending: true }).limit(100),
   ]);
   const items: LibraryItem[] = (data ?? []).map((r) => {
-    const jobs = (r.jobs as { kind: string; status: string; stage: string | null; error_code: string | null; created_at: string }[] | null) ?? [];
+    const jobs = (r.jobs as { kind: string; status: string; stage: string | null; error_code: string | null; created_at: string; progress?: { chapters_done?: number; chapters_total?: number } | null }[] | null) ?? [];
     const job = [...jobs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     const running = !!job && isActiveJob(job.status);
     // Publication progressive : une première génération interrompue laisse une version
@@ -82,6 +84,10 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
       cover: lessonCover(r.id, r.cover_id as string | null, r.cover_path as string | null, { url: r.cover_url as string | null, credit: r.cover_credit }),
       openedAt: p?.updated_at ?? null,
       stage: running ? (job?.stage ?? null) : null,
+      progress:
+        running && typeof job?.progress?.chapters_done === "number" && typeof job.progress.chapters_total === "number" && job.progress.chapters_total > 0
+          ? { done: job.progress.chapters_done, total: job.progress.chapters_total }
+          : null,
     };
   });
   const counts = new Map<string, number>();

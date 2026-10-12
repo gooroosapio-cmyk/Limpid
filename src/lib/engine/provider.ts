@@ -101,6 +101,11 @@ export interface StructuredRequest<T extends z.ZodType> {
    * (un autre modèle ne refait pas la même erreur), puis le modèle principal.
    */
   preferFallback?: boolean;
+  /**
+   * Réponse progressive : appelé avec le texte brut reçu jusque-là (JSON partiel). Le résultat
+   * final reste validé par le schéma ; un fournisseur sans flux l'appelle une fois à la fin.
+   */
+  onText?: (raw: string) => void;
 }
 
 export interface StructuredResponse<T> {

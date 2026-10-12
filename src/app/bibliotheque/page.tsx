@@ -5,16 +5,17 @@ import { LibrarySummary } from "@/components/library/LibrarySummary";
 import { Screen } from "@/components/shell/Screen";
 import { ReportLink } from "@/components/ReportLink";
 import { FolderActions, NewFolder } from "@/components/library/FolderDialogs";
+import { EmptyFolderState, FolderContext, FolderFilterBar, NoMatchState } from "@/components/library/FolderFilters";
 import { LibraryMemory } from "@/components/library/LibraryMemory";
 import { LibraryBrowser, type ResumeItem } from "@/components/library/LibraryBrowser";
 import { Preparations } from "@/components/library/Preparations";
 import { SortSelect } from "@/components/library/SortSelect";
 import { canRetryNow } from "@/lib/library/retry";
+import { PHASE_OF_STAGE } from "@/lib/jobs/phases";
 import { type RowData } from "@/components/library/ReportRow";
 import { requireUser } from "@/lib/auth";
 import { demoBlueprint } from "@/lib/demo/cycle-eau";
 import { getLang, getT } from "@/lib/i18n/server";
-import { coverFor, coverView } from "@/lib/library/covers";
 import { loadLibrary, whenLabel, type LibraryItem } from "@/lib/library/load";
 import { createUserClient } from "@/lib/supabase/server";
 import { Illustration } from "@/components/Illustration";
@@ -55,7 +56,8 @@ export default async function LibraryPage({
   const view = sp.vue === "sources" ? "sources" : sp.vue === "preparations" ? "preparations" : "rapports";
   const q = (sp.q ?? "").trim().slice(0, 80);
   // « recents » (V2) devient le tri par défaut ; « dossiers » reste l'accès à toutes les collections.
-  const filter: Filter = sp.filtre === "dossiers" ? "dossiers" : (FILTERS as readonly string[]).includes(sp.filtre ?? "") ? (sp.filtre as Filter) : "tous";
+  // « dossiers » (ancienne vue des collections) : la bande de dossiers les montre déjà tous.
+  const filter: Filter = (FILTERS as readonly string[]).includes(sp.filtre ?? "") ? (sp.filtre as Filter) : "tous";
   const sort: Sort = (SORTS as readonly string[]).includes(sp.tri ?? "") ? (sp.tri as Sort) : "recents";
   const supabase = await createUserClient();
 
@@ -148,6 +150,8 @@ export default async function LibraryPage({
     favorite: i.favorite,
     cover: i.cover,
     sourceCount: i.sourceCount,
+    phase: i.state === "running" ? `${t.fluid.phases[PHASE_OF_STAGE[i.stage ?? ""] ?? 0]}${i.progress ? ` · ${i.progress.done}/${i.progress.total}` : ""}` : null,
+    progress: i.progress,
   });
   const scoped = folder ? items.filter((i) => i.folderId === folder.id) : items;
   // Les préparations échouées restent dans la liste (« Échec » et motif), comme les autres.
@@ -187,30 +191,46 @@ export default async function LibraryPage({
 
   const l = t.v4.library;
   const keep = { dossier: folder?.id, tri: sort === "recents" ? undefined : sort };
+  const filtre = filter === "tous" ? undefined : filter;
+  const tri = sort === "recents" ? undefined : sort;
+  const counts = new Map<string, number>();
+  for (const i of items) if (i.folderId) counts.set(i.folderId, (counts.get(i.folderId) ?? 0) + 1);
+  const clearHref = href({ filtre, tri, q: q || undefined });
+  const others = folder ? items.filter((i) => i.folderId !== folder.id && i.state === "ready").map((i) => ({ id: i.id, title: i.title })) : [];
+  const emptyNode =
+    folder && scoped.length === 0 ? <EmptyFolderState folderId={folder.id} others={others} allHref={clearHref} />
+    : scoped.length > 0 && shown.length === 0 ? <NoMatchState resetHref={href({ dossier: folder?.id })} />
+    : null;
   const sortHrefs = Object.fromEntries(SORTS.map((k) => [k, href({ dossier: folder?.id, filtre: filter === "tous" ? undefined : filter, tri: k === "recents" ? undefined : k })]));
 
   return (
     <Screen>
       <LibraryMemory />
-      {folder && (
-        <nav className="crumbs" aria-label={t.library.folders}>
-          <Link href="/bibliotheque"><Icon name="back" size={18} /> {t.library.backToLibrary}</Link>
-        </nav>
-      )}
       <LibraryBrowser
-        title={folder ? folder.name : t.library.title}
+        title={t.library.title}
         folder={folder ? { id: folder.id, name: folder.name } : null}
-        folders={folder ? [] : folders.map((f) => ({ ...f, cover: coverView(coverFor(f.id, null)) }))}
+        folders={[]}
         allFolders={folders.map((f) => ({ id: f.id, name: f.name }))}
         rows={shown.map(toRow)}
         root={!folder}
+        folderBar={
+          folders.length > 0 ? (
+            <FolderFilterBar
+              folders={folders.map((f) => ({ id: f.id, name: f.name, count: counts.get(f.id) ?? 0 }))}
+              active={folder?.id ?? null}
+              allHref={clearHref}
+              hrefFor={Object.fromEntries(folders.map((f) => [f.id, href({ dossier: f.id, filtre, tri, q: q || undefined })]))}
+            />
+          ) : null
+        }
+        emptyNode={emptyNode}
         filter={filter}
         initialQuery={q}
         recent={recent}
         resume={resume}
         emptyText={emptyText}
         newFolder={<NewFolder iconOnly />}
-        headerExtra={folder ? <FolderActions id={folder.id} name={folder.name} count={scoped.length} /> : undefined}
+        headerExtra={folder ? <FolderContext name={folder.name} clearHref={clearHref} actions={<FolderActions id={folder.id} name={folder.name} count={scoped.length} clearHref={clearHref} />} /> : undefined}
         rail={
           <nav className="lib-filters lib-controls" aria-label={l.filtersLabel}>
             {FILTERS.map((f) => (
