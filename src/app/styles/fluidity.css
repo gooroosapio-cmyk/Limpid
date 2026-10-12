@@ -1,0 +1,76 @@
+/*
+ * Prompt « Fluidité » (planches 01–03) : cartes compactes de reprise, de crédits et de suivi.
+ * Une icône calme, une action principale ; le rouge est réservé aux incidents bloquants.
+ */
+.fl-card {
+  display: grid; gap: 16px; padding: 20px; margin: 0 0 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+}
+.fl-card h2 { margin: 0; font-size: 1.375rem; line-height: 1.25; letter-spacing: -0.01em; }
+.fl-card p { margin: 0; }
+.fl-card .muted { color: var(--muted); }
+
+/* Reprise */
+.fl-recovery-head { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+.fl-recovery-head h2 + p { margin-top: 6px; line-height: 1.45; }
+.fl-badge {
+  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%;
+  background: var(--danger-pale); color: var(--danger);
+}
+.fl-badge.is-calm { background: var(--pale); color: var(--ink); }
+.fl-recovery.is-compact { padding: 16px; gap: 12px; }
+.fl-recovery.is-compact h2 { font-size: 1.0625rem; }
+.fl-recovery.is-compact .fl-badge { width: 40px; height: 40px; }
+
+.fl-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.fl-step { position: relative; display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 0 0 14px; }
+.fl-step:not(:last-child)::after {
+  content: ""; position: absolute; left: 15px; top: 34px; bottom: 2px; width: 2px; background: var(--line);
+}
+.fl-step.is-done:not(:last-child)::after { background: var(--green); }
+.fl-step-mark {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--line); font-weight: 700; font-size: 0.875rem; color: var(--muted); background: var(--surface);
+}
+.fl-step.is-done .fl-step-mark { background: var(--green); border-color: var(--green); color: var(--surface); }
+.fl-step.is-resume .fl-step-mark { background: var(--yellow); border-color: var(--yellow); color: var(--on-yellow); }
+.fl-step strong { display: block; font-weight: 600; line-height: 1.3; }
+.fl-step.is-done strong { color: var(--green); }
+.fl-step small { display: block; color: var(--muted); font-size: 0.875rem; margin-top: 2px; }
+
+.fl-good {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px;
+  background: var(--green-pale); color: var(--ink);
+}
+.fl-good svg { color: var(--green); flex-shrink: 0; }
+.fl-actions { display: grid; gap: 10px; }
+.fl-actions-row { grid-auto-flow: column; justify-content: start; }
+.fl-details { border: 1px solid var(--line); border-radius: 14px; }
+.fl-details summary {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; cursor: pointer; list-style: none; font-weight: 500;
+}
+.fl-details summary::-webkit-details-marker { display: none; }
+.fl-details summary svg { transition: transform 160ms ease; }
+.fl-details[open] summary svg { transform: rotate(90deg); }
+.fl-details summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 14px; }
+.fl-details dl { margin: 0; padding: 0 14px 12px; display: grid; gap: 6px; font-size: 0.875rem; }
+.fl-details dl div { display: flex; gap: 8px; }
+.fl-details dt { color: var(--muted); min-width: 9em; }
+.fl-details dd { margin: 0; }
+
+/* Crédits insuffisants */
+.fl-credits { background: color-mix(in srgb, var(--pale) 45%, var(--surface)); border-color: color-mix(in srgb, var(--yellow) 45%, var(--line)); }
+.fl-credits-head { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+.fl-credits-head h2 + p { margin-top: 6px; }
+.fl-coin { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--yellow); color: var(--on-yellow); }
+.fl-credit-rows { margin: 0; display: grid; border-top: 1px solid var(--line); }
+.fl-credit-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.fl-credit-rows div:last-child { border-bottom: 0; }
+.fl-credit-rows dt { color: var(--ink); }
+.fl-credit-rows dd { margin: 0; font-weight: 600; }
+.fl-info { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--soft); color: var(--muted); font-size: 0.875rem; }
+.fl-info svg { flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-details summary svg { transition: none; }
+}

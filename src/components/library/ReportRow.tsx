@@ -90,6 +90,7 @@ export function ReportRow({
   const origin = useRef<{ x: number; y: number } | null>(null);
   const pressed = useRef(false);
   const [busy, setBusy] = useState(false);
+  const retryKey = useRef<string | null>(null);
   const [favorite, setFavorite] = useState(row.favorite);
   const [cover, setCover] = useState(row.cover);
   const [title, setTitle] = useState(row.title);
@@ -103,12 +104,16 @@ export function ReportRow({
   }
 
   async function retry() {
+    if (busy) return;
     setBusy(true);
+    // Même clé pour un double toucher : une seule reprise.
+    retryKey.current ??= crypto.randomUUID();
     const res = await fetch(`/api/reports/${row.id}/retry`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+      body: JSON.stringify({ idempotency_key: retryKey.current }),
     }).catch(() => null);
+    if (!res?.ok) retryKey.current = null;
     const body = await res?.json().catch(() => ({}));
     walletChanged();
     setBusy(false);

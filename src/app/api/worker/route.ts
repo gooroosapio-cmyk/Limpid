@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { after, NextResponse, type NextRequest } from "next/server";
 import { drainQueue } from "@/lib/jobs/worker";
 import { purgeDueOriginals, purgeUnusedSources } from "@/lib/sources/uploads";
-import { isAdminConfigured } from "@/lib/supabase/admin";
+import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
 import { reconcilePending } from "@/lib/billing/purchase";
 
 export const maxDuration = 300;
@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
   const unused = await purgeUnusedSources().catch(() => -1);
   // Commandes Chariow restées en attente (webhook perdu, onglet fermé) : relecture des ventes.
   const reconciled = await reconcilePending().catch(() => -1);
+  await adminClient().rpc("purge_perf_events").then(({ error }) => error && console.error("purge_perf_events", error.code));
   const processed = await drainQueue("cron", Date.now() + 270_000);
   return NextResponse.json({ processed, purged, unused, reconciled });
 }

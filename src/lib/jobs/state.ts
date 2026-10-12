@@ -18,6 +18,7 @@ export type JobStage = (typeof JOB_STAGES)[number];
 export const JOB_STATUSES = [
   "queued",
   "running",
+  "retrying", // incident transitoire : relance automatique programmée (next_run_at)
   "awaiting_confirmation", // extraction partielle : l'utilisateur doit confirmer
   "succeeded",
   "incomplete_check", // contrôle final incomplet : pas d'export présenté comme validé
@@ -31,7 +32,8 @@ export const TERMINAL: ReadonlySet<JobStatus> = new Set(["succeeded", "incomplet
 
 const TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   queued: ["running", "cancelled"],
-  running: ["running", "awaiting_confirmation", "succeeded", "incomplete_check", "failed", "cancelled", "uncertain", "queued"],
+  running: ["running", "awaiting_confirmation", "succeeded", "incomplete_check", "failed", "cancelled", "uncertain", "queued", "retrying"],
+  retrying: ["running", "queued", "failed", "cancelled"],
   awaiting_confirmation: ["queued", "cancelled"],
   uncertain: ["queued", "failed", "cancelled"],
   succeeded: [],
@@ -68,3 +70,9 @@ export const STAGE_LABELS_FR: Record<JobStage, string> = {
   plan: "Préparation du plan",
   mise_en_page: "Mise en page",
 };
+
+/** Tâche encore en cours côté serveur (y compris une relance programmée). */
+export const ACTIVE_STATUSES = ["queued", "running", "retrying"] as const;
+export function isActiveJob(status: string | null | undefined): boolean {
+  return (ACTIVE_STATUSES as readonly string[]).includes(status ?? "");
+}

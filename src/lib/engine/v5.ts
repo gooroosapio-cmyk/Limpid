@@ -722,6 +722,8 @@ export interface V5Options {
    * (préfixe contigu, jamais un trou), avant la fin du cours. Les appels sont sérialisés.
    */
   onPartial?: (output: GenerationOutput, ready: number, total: number) => Promise<void>;
+  /** Avancement réel : chapitres rédigés (validés et enregistrés) sur le nombre prévu par le plan. */
+  onProgress?: (done: number, total: number) => Promise<void>;
 }
 
 /** Exécute des tâches en parallèle (borné) tant que le temps restant le permet. */
@@ -806,10 +808,13 @@ export async function generateV5(provider: AIProvider, input: GenerationInput, o
     const output = assemble(input, ko, evidence, read!.validation, partialPlan, sections.slice(0, k) as Section[]);
     publishing = publishing.then(() => opts.onPartial!(output, k, sections.length)).catch(() => undefined);
   };
+  const progress = () => opts.onProgress?.(sections.filter(Boolean).length, sections.length).catch(() => undefined);
+  await progress();
   const complete = await pool(todo, limit, canStart, async ({ chapter, i }) => {
     const section = renameChapter(await writeChapter(provider, input, { index: i + 1, chapter, outline, ko, evidence }), i + 1);
     sections[i] = section;
     await opts.store.save(`chap_${i + 1}`, { section });
+    await progress();
     publish();
   });
   await publishing;
