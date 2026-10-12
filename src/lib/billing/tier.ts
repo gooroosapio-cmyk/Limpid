@@ -60,7 +60,7 @@ export function imageFallbackCap(tier: AiTier): number {
 
 /** Interventions ciblées de Sol par génération : Pro seulement, deux au plus. */
 export function expertCalls(tier: AiTier): number {
-  return tier === "pro" ? 2 : 0;
+  return tier === "pro" ? 6 : 0;
 }
 
 /** Lecture des pages scannées (OCR) : Pro seulement. */

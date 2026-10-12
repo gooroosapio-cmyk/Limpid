@@ -28,7 +28,7 @@ describe("parcours IA par forfait", () => {
 
   it("secours d'image, Sol et OCR selon le niveau", () => {
     expect([imageFallbackCap("free"), imageFallbackCap("plus"), imageFallbackCap("pro")]).toEqual([1, 2, 3]);
-    expect([expertCalls("free"), expertCalls("plus"), expertCalls("pro")]).toEqual([0, 0, 2]);
+    expect([expertCalls("free"), expertCalls("plus"), expertCalls("pro")]).toEqual([0, 0, 6]);
     expect([ocrAllowed("free"), ocrAllowed("plus"), ocrAllowed("pro")]).toEqual([false, false, true]);
   });
 });
