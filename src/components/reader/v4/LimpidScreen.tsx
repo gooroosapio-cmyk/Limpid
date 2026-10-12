@@ -1,3 +1,4 @@
+import type { PracticeState } from "@/lib/reader/progress";
 import type { SourceEntry } from "@/lib/render/sources";
 import { AnnexProvider } from "../annex-link";
 import { Immersive } from "../Immersive";
@@ -25,6 +26,7 @@ export function LimpidScreen({
   annexBase,
   originalHref,
   quizzes,
+  practice = {},
   readerV3 = false,
 }: {
   doc: { chapters: { id: string; title: string }[]; stats?: ProjectionStats; notions: Notion[]; entries: SourceEntry[]; pieces: React.ReactNode };
@@ -41,6 +43,8 @@ export function LimpidScreen({
   originalHref: string | null;
   /** QCM de fin de chapitre (V6), cf. `chapterQuizzes`. */
   quizzes?: Record<string, ChapterQuestion[]>;
+  /** Kit V5 : entraînement réussi / à revoir, par chapitre. */
+  practice?: Record<string, PracticeState>;
 }) {
   return (
     <Immersive>
@@ -56,6 +60,7 @@ export function LimpidScreen({
             insufficient={insufficient}
             options={options}
             quizzes={quizzes}
+            practice={practice}
             projection={readerV3 ? (doc.stats ?? null) : null}
           >
             <article className="lim" aria-label={options.title}>{doc.pieces}</article>

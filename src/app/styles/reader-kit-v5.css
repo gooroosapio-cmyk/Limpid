@@ -101,3 +101,16 @@
 .lim .symbols dt { flex: 0 0 auto; font-style: normal; font-weight: 600; min-width: 0; }
 .lim .symbols dd { flex: 1 1 12em; }
 .lim .v6-status:not(.is-sim) { padding: 0; background: none; }
+
+/* ---------- Progression dans le sommaire : trois états distincts, jamais par la couleur seule ---------- */
+.toc .toc-label { display: grid; gap: 4px; min-width: 0; }
+.toc .toc-status { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+.toc .toc-tag { display: inline-flex; align-items: center; gap: 4px; }
+.toc .toc-tag.is-success { color: var(--sage); }
+.toc .toc-tag.is-review { color: var(--danger); }
+
+/* ---------- Quiz de fin de chapitre : correction ciblée, puis variante proposée ---------- */
+.cquiz-correct-answer { margin: 8px 0 0; }
+.cquiz-after { display: flex; flex-wrap: wrap; gap: 0 16px; margin-top: 4px; }
+.cquiz-after .btn-link { min-height: 44px; }
+.cquiz-after .btn-link { padding-left: 0; padding-right: 0; }

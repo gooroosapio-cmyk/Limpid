@@ -15,6 +15,7 @@ import { OptionsPanel, type OptionsData } from "./OptionsPanel";
 import { ReformulatePanel } from "./ReformulatePanel";
 import { ProjectionPicker, useProjection } from "./projection";
 import type { ProjectionStats } from "@/lib/reader/projection";
+import { CONSULTED_MS, consultedKey, type PracticeState } from "@/lib/reader/progress";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
 import { KitIcon } from "../KitIcon";
 
@@ -64,6 +65,7 @@ export function LimpidReader({
   insufficient,
   options,
   quizzes = {},
+  practice = {},
   projection: projectionStats = null,
   children,
 }: {
@@ -75,6 +77,8 @@ export function LimpidReader({
   initialAnchor: string | null;
   /** QCM de fin de chapitre (V6), par identifiant de chapitre. */
   quizzes?: Record<string, ChapterQuestion[]>;
+  /** Kit V5 : entraînement réussi / à revoir, par chapitre (tentatives conservées). */
+  practice?: Record<string, PracticeState>;
   bilan: Exercise[] | null;
   insufficient: boolean;
   options: OptionsData;
@@ -366,6 +370,60 @@ export function LimpidReader({
     };
   }, [reportId]);
 
+  // Kit V5 (PRO-02) : un sous-chapitre (ou un chapitre sans sous-chapitre) affiché au moins 2 s,
+  // onglet visible, est « consulté ». Simple observation d'usage, jamais une preuve de maîtrise.
+  const [consulted, setConsulted] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    const key = consultedKey(reportId ?? "demo");
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture du stockage local après le montage
+      setConsulted(new Set(JSON.parse(localStorage.getItem(key) ?? "[]") as string[]));
+    } catch {}
+    const deck = deckRef.current;
+    if (!deck || typeof IntersectionObserver === "undefined") return;
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    const mark = (id: string) => {
+      setConsulted((prev) => {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev).add(id);
+        try {
+          localStorage.setItem(key, JSON.stringify([...next].slice(-2000)));
+        } catch {}
+        return next;
+      });
+    };
+    const unitId = (el: Element) => el.closest<HTMLElement>("details.lr-part")?.id ?? el.closest<HTMLElement>("[data-section]")?.dataset.section ?? null;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const id = unitId(e.target);
+          if (!id) continue;
+          const tid = `${id}|${(e.target as HTMLElement).id}`;
+          if (e.isIntersecting && document.visibilityState === "visible") {
+            if (!timers.has(tid)) timers.set(tid, setTimeout(() => mark(id), CONSULTED_MS));
+          } else {
+            clearTimeout(timers.get(tid));
+            timers.delete(tid);
+          }
+        }
+      },
+      { root: deck, threshold: 0.6 },
+    );
+    deck.querySelectorAll("[data-piece][data-section]:not(details), details.lr-part [data-piece]").forEach((el) => io.observe(el));
+    const hide = () => {
+      if (document.visibilityState !== "visible") {
+        timers.forEach((x) => clearTimeout(x));
+        timers.clear();
+      }
+    };
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      io.disconnect();
+      timers.forEach((x) => clearTimeout(x));
+      document.removeEventListener("visibilitychange", hide);
+    };
+  }, [reportId, children]);
+
   const closeAll = useCallback(() => [tocDialog, optionsDialog, askDialog, bilanDialog, reformDialog].forEach((d) => d.current?.close()), []);
 
   const api: ReaderApi = useMemo(
@@ -518,6 +576,8 @@ export function LimpidReader({
                 current={chapter?.id === c.id}
                 onGo={(id) => api.goTo(id)}
                 forced={tocAll}
+                consulted={consulted}
+                practice={practice[c.id]}
               />
             ))}
             <li className="toc-check">
@@ -586,22 +646,36 @@ function TocChapter({
   current,
   forced,
   onGo,
+  consulted,
+  practice,
 }: {
   chapter: Chapter;
   n: number;
   current: boolean;
   forced: boolean | null;
   onGo: (id: string) => void;
+  consulted: Set<string>;
+  practice?: PracticeState;
 }) {
   const t = useT();
   const [open, setOpen] = useState(forced ?? current);
   const parts = chapter.parts ?? [];
   const listId = `toc-parts-${chapter.id}`;
+  // Trois dimensions séparées (NAV-08, PRO-01) : jamais confondues avec l'état replié.
+  const seen = parts.length ? parts.filter((p) => consulted.has(p.id)).length : consulted.has(chapter.id) ? 1 : 0;
+  const total = parts.length || 1;
+  const status = (
+    <span className="toc-status">
+      {seen > 0 && <span className="toc-tag"><KitIcon name="read" size={14} />{t.lim.consulted(seen, total)}</span>}
+      {practice?.success && <span className="toc-tag is-success"><KitIcon name="success" size={14} />{t.lim.practiceSuccess}</span>}
+      {practice?.review && <span className="toc-tag is-review"><KitIcon name="review" size={14} />{t.lim.reviewTag}</span>}
+    </span>
+  );
   return (
     <li className="toc-chapter">
       <div className="toc-chapter-row">
         <a href={`#${chapter.id}`} aria-current={current ? "location" : undefined} onClick={(e) => { e.preventDefault(); onGo(chapter.id); }}>
-          <span className="toc-n">{n}.</span> {chapter.title}
+          <span className="toc-n">{n}.</span> <span className="toc-label">{chapter.title}{(seen > 0 || practice?.success || practice?.review) && status}</span>
         </a>
         {parts.length > 0 && (
           <button
@@ -621,7 +695,7 @@ function TocChapter({
           {parts.map((p, k) => (
             <li key={p.id}>
               <a href={`#${p.id}`} onClick={(e) => { e.preventDefault(); onGo(p.id); }}>
-                <span className="toc-n">{n}.{k + 1}</span> {p.title}
+                <span className="toc-n">{n}.{k + 1}</span> <span className="toc-label">{p.title}{consulted.has(p.id) && <span className="toc-status"><span className="toc-tag"><KitIcon name="read" size={14} />{t.lim.consultedOne}</span></span>}</span>
               </a>
             </li>
           ))}

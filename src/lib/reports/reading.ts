@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { z } from "zod";
+import { practiceBySection, type PracticeState, type SectionAttempt } from "@/lib/reader/progress";
 import { Exercise, ExerciseSet } from "@/lib/contracts/schemas";
 import { askGrade } from "@/lib/reports/checks";
 import { getProvider } from "@/lib/engine";
@@ -48,7 +49,16 @@ export const AttemptRequest = z.strictObject({
   score: z.number().int().min(0).max(25),
   total: z.number().int().min(1).max(25),
   answers: z
-    .array(z.strictObject({ id: PieceId, correct: z.boolean().nullable(), ratio: z.number().min(0).max(1).nullable() }))
+    .array(
+      z.strictObject({
+        id: PieceId,
+        correct: z.boolean().nullable(),
+        ratio: z.number().min(0).max(1).nullable(),
+        /** Kit V5 : variante proposée après une erreur sur cette question (réussite aidée). */
+        variant_of: PieceId.nullable().optional(),
+        aided: z.boolean().optional(),
+      }),
+    )
     .max(25),
 });
 
@@ -74,6 +84,19 @@ export async function saveAttempt(userId: string, reportId: string, input: z.inf
     answers: input.answers,
   });
   return !error;
+}
+
+/** Tentatives de fin de chapitre d'une version (progression : réussi / à revoir). */
+export async function chapterPractice(userId: string, versionId: string): Promise<Record<string, PracticeState>> {
+  const { data } = await adminClient()
+    .from("quiz_attempts")
+    .select("section_id, created_at, answers")
+    .eq("owner_id", userId)
+    .eq("report_version_id", versionId)
+    .eq("kind", "checkpoint")
+    .order("created_at", { ascending: true })
+    .limit(500);
+  return practiceBySection((data ?? []) as SectionAttempt[]);
 }
 
 export async function listAttempts(userId: string, reportId: string, versionId: string) {
