@@ -146,4 +146,25 @@ describe("export PDF · composants V6", () => {
       expect(text).toContain(want);
     }
   }, 30_000);
+
+  it("kit V5 : objectif, sous-chapitres numérotés et développés, formule longue découpée, étapes avant le résultat", async () => {
+    const explanation = structuredClone(demoExplanation);
+    const sec = explanation.sections[0]!;
+    const src = { claim_ids: [], evidence_ids: [] };
+    sec.blocks.push(
+      { type: "formula", id: "blk_fx", text: "La marge.", expression: "Marge brute = Chiffre d'affaires - Coût d'achat des marchandises vendues", symbols: [], ...src },
+      { type: "calculation", id: "blk_cx", text: "Une variation.", formula_id: "percent_change", variables: [{ label: "Avant", value: 200, unit: "€" }, { label: "Après", value: 250, unit: "€" }], steps: ["On soustrait la valeur de départ."], interactive: false, example: false, ...src },
+    );
+    const ids = sec.blocks.map((b) => b.id);
+    sec.objective = "Objectif du chapitre test";
+    sec.parts = [
+      { id: "part_t1", title: "Première partie test", objective: "Objectif de partie", block_ids: ids.slice(0, 1) },
+      { id: "part_t2", title: "Seconde partie test", objective: null, block_ids: ids.slice(1) },
+    ];
+    const buf = await renderReportPdf({ blueprint: demoBlueprint, explanation, evidence: demoEvidence, segments: demoSegments, sourceTitle: DEMO_SOURCE_TITLE });
+    const { blocks } = await extractPdf(new Uint8Array(buf), { maxPages: 50 });
+    const text = blocks.map((b) => b.text).join(" ").replace(/\s+/g, " ");
+    for (const want of ["Objectif du chapitre test", "1.1 Première partie test", "Objectif de partie", "1.2 Seconde partie test", "= Chiffre d'affaires"]) expect(text).toContain(want);
+    expect(text.indexOf("On soustrait la valeur de départ")).toBeLessThan(text.indexOf("(250 - 200)"));
+  }, 30_000);
 });

@@ -11,6 +11,7 @@ import path from "node:path";
 import { Circle, Document, Ellipse, Font, Image, Line, Link, Page, Path, Polygon, Rect, renderToBuffer, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { Evidence, Exercise, ExerciseSet, ExplanationObject, ReportBlueprint, SourceSegment, VisualSpec } from "@/lib/contracts/schemas";
+import { partsCoverBlocks } from "@/lib/contracts/validate";
 import { shuffled } from "@/lib/exercises/grade";
 import { dictFor, type Dict, type Lang } from "@/lib/i18n";
 import { stripRich } from "@/lib/reader/rich";
@@ -52,7 +53,9 @@ const s = StyleSheet.create({
   li: { flexDirection: "row", marginBottom: 3 },
   bullet: { width: 12 },
   number: { width: 18 },
-  formula: { fontFamily: "Courier", fontSize: 11.5, padding: 8, borderWidth: 1, borderColor: C.bordure, borderRadius: 6, marginBottom: 6 },
+  // Kit V5 : formules dans la police et à la taille du texte, alignées à gauche (filet discret).
+  formula: { fontFamily: "Inter", fontSize: 11, paddingLeft: 10, paddingVertical: 2, borderLeftWidth: 2, borderLeftColor: C.bordure, marginBottom: 6 },
+  h3: { fontSize: 12.5, fontWeight: 700, lineHeight: 1.3, color: C.vert, marginTop: 10, marginBottom: 2 },
   exercise: { borderWidth: 1, borderColor: C.bordure, borderRadius: 8, padding: 10, marginBottom: 8 },
   lines: { borderBottomWidth: 0.5, borderBottomColor: C.bordure, height: 18 },
   watermark: { position: "absolute", top: 20, left: 52, right: 52, fontSize: 8, color: C.gris, textAlign: "right" },
@@ -189,7 +192,11 @@ function BlockPdf({ block, numbers, d }: { block: Block; numbers: Map<string, nu
     case "formula":
       return (
         <View style={s.block} wrap={false}>
-          <Text style={s.formula}>{block.expression}</Text>
+          <View style={s.formula}>
+            {(block.expression.length > 32 ? block.expression.split(/\s+=\s+/) : [block.expression]).map((line, i) => (
+              <Text key={i} style={i > 0 ? { paddingLeft: 10 } : undefined}>{i > 0 ? `= ${line}` : line}</Text>
+            ))}
+          </View>
           {block.symbols.length > 0 && (
             <View style={{ marginBottom: 4 }}>
               <Text style={s.muted}>{d.lim.symbols}</Text>
@@ -270,14 +277,14 @@ function BlockPdf({ block, numbers, d }: { block: Block; numbers: Map<string, nu
           {block.variables.map((v, i) => (
             <Text key={i}>{v.label} : {v.unit ? `${f(v.value)} ${v.unit}` : f(v.value)}</Text>
           ))}
-          <Text style={[s.formula, { marginTop: 4 }]}>{pdfSafe(formulaText(block.formula_id, va.value, vb.value, d.blocks6.locale))} = {shown}</Text>
-          {unit.kind !== "plain" && <Text style={s.muted}>{unit.kind === "points" ? d.blocks6.points : d.blocks6.percentChange}</Text>}
           {block.steps.length > 0 && (
             <View style={{ marginTop: 4 }}>
               <Text style={s.muted}>{d.blocks6.steps}</Text>
               <Bullets ordered items={block.steps} />
             </View>
           )}
+          <Text style={[s.formula, { marginTop: 4 }]}>{d.blocks6.result} : {pdfSafe(formulaText(block.formula_id, va.value, vb.value, d.blocks6.locale))} = <Text style={{ fontWeight: 700 }}>{shown}</Text></Text>
+          {unit.kind !== "plain" && <Text style={s.muted}>{unit.kind === "points" ? d.blocks6.points : d.blocks6.percentChange}</Text>}
         </View>
       );
     }
@@ -570,6 +577,20 @@ function Chrome({ d, watermark }: { d: Dict; watermark: boolean }) {
   );
 }
 
+/** Sous-chapitres valides d'un chapitre (aucun pour un cours plus ancien). */
+function partsOf(sec: ExplanationObject["sections"][number]) {
+  return sec.parts && partsCoverBlocks(sec) ? sec.parts : [];
+}
+
+function PartHead({ n, title, objective }: { n: string; title: string; objective: string | null }) {
+  return (
+    <View minPresenceAhead={60}>
+      <Text style={s.h3}>{n} {title}</Text>
+      {objective && <Text style={[s.muted, { marginBottom: 4 }]}>{objective}</Text>}
+    </View>
+  );
+}
+
 function ReportDocument(input: PdfReportInput) {
   const { blueprint, explanation } = input;
   const lang = input.lang ?? "fr";
@@ -637,7 +658,12 @@ function ReportDocument(input: PdfReportInput) {
 
         <View style={s.toc}>
           <Text style={s.boxTitle}>{d.lim.toc}</Text>
-          {ordered.map(({ sec }, i) => <Text key={sec.id}>{i + 1}. {sec.question}</Text>)}
+          {ordered.map(({ sec }, i) => (
+            <View key={sec.id}>
+              <Text>{i + 1}. {sec.question}</Text>
+              {partsOf(sec).map((p, k) => <Text key={p.id} style={{ paddingLeft: 14, color: C.gris }}>{i + 1}.{k + 1} {p.title}</Text>)}
+            </View>
+          ))}
         </View>
 
         {ordered.map(({ bs, sec }, i) => (
@@ -645,15 +671,33 @@ function ReportDocument(input: PdfReportInput) {
             {/* Le titre reste avec son premier bloc : jamais seul en bas de page. */}
             <View wrap={false}>
               <Text style={s.h2}>{i + 1}. {sec.question}</Text>
+              {sec.objective && <Text style={[s.p, s.muted]}>{sec.objective}</Text>}
               {sec.essential && sec.essential.length > 0 && (
                 <View style={T.takeaway}>
                   <Text style={s.boxTitle}>{d.blocks6.essential}</Text>
                   <Bullets items={sec.essential.map(plain)} />
                 </View>
               )}
+              {partsOf(sec)[0] && <PartHead n={`${i + 1}.1`} title={partsOf(sec)[0]!.title} objective={partsOf(sec)[0]!.objective} />}
               {sec.blocks[0] && <BlockPdf block={sec.blocks[0]} numbers={numbers} d={d} />}
             </View>
-            {sec.blocks.slice(1).map((b) => <BlockPdf key={b.id} block={b} numbers={numbers} d={d} />)}
+            {/* Kit V5 (IMP-06) : sous-chapitres toujours développés à l'export. */}
+            {sec.blocks.slice(1).map((b) => {
+              const k = partsOf(sec).findIndex((p) => p.block_ids[0] === b.id);
+              const part = k > 0 ? partsOf(sec)[k]! : null;
+              return (
+                <View key={b.id}>
+                  {part ? (
+                    <View wrap={false}>
+                      <PartHead n={`${i + 1}.${k + 1}`} title={part.title} objective={part.objective} />
+                      <BlockPdf block={b} numbers={numbers} d={d} />
+                    </View>
+                  ) : (
+                    <BlockPdf block={b} numbers={numbers} d={d} />
+                  )}
+                </View>
+              );
+            })}
             {bs.visual_ids.map((vid) => {
               const v = visuals.get(vid);
               return v ? <VisualPdf key={v.id} v={v} numbers={numbers} d={d} images={input.images ?? {}} /> : null;
