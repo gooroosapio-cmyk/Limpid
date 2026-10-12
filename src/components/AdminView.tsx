@@ -108,6 +108,28 @@ export async function AdminView({
             {t.admin.perfReports(perf.reports.count, seconds(perf.reports.p50), seconds(perf.reports.p95))}
             {perf.reports.successRate !== null && ` ${t.admin.perfSuccess(Math.round(perf.reports.successRate * 100))}`}
           </p>
+          {perf.experience.length > 0 && (
+            <div className="table-scroll" tabIndex={0} role="region" aria-label={t.admin.perfExperience}>
+              <table className="admin-table">
+                <caption className="tw:text-left">{t.admin.perfExperience}</caption>
+                <thead><tr><th scope="col">{t.admin.perfMetric}</th><th scope="col">{t.admin.perfDevice}</th><th scope="col">n</th><th scope="col">p50</th><th scope="col">p95</th><th scope="col">{t.admin.perfBudget}</th><th scope="col">{t.admin.perfFailures}</th></tr></thead>
+                <tbody>
+                  {perf.experience.map((x) => (
+                    <tr key={`${x.name}-${x.source}-${x.device}`}>
+                      <td><code>{x.name}</code></td>
+                      <td>{x.device}</td>
+                      <td>{x.n}</td>
+                      <td>{x.p50 ?? "—"}</td>
+                      <td>{x.p95 ?? "—"}</td>
+                      <td>{x.budget === null ? "—" : `${x.budget} · ${x.p95 !== null && x.p95 > x.budget ? t.admin.perfOver : t.admin.perfWithin}`}</td>
+                      <td>{x.failRate === null ? "—" : `${Math.round(x.failRate * 100)} %`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="muted tw:text-sm">{t.admin.perfUnits}</p>
+            </div>
+          )}
           {perf.stages.length > 0 && (
             <div className="table-scroll" tabIndex={0} role="region" aria-label={t.admin.perfTable}>
               <table className="admin-table">

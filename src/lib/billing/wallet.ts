@@ -137,7 +137,7 @@ export async function sweepReservations(userId: string) {
     }
     const status = job?.status ?? null;
     // Une tâche en file dont l'annulation est demandée (rapport supprimé) ne démarrera jamais.
-    if (status === "running" || (status === "queued" && !job?.cancel_requested)) continue;
+    if (status === "running" || status === "retrying" || (status === "queued" && !job?.cancel_requested)) continue;
     if (status === "succeeded" || status === "incomplete_check") await settleReservation(r.id as string);
     else await releaseReservation(r.id as string);
   }
@@ -307,7 +307,7 @@ export async function accountUsage(userId: string) {
   const db = adminClient();
   const [{ count: kept }, { count: active }] = await Promise.all([
     db.from("reports").select("id", { count: "exact", head: true }).eq("owner_id", userId).is("deleted_at", null).eq("is_demo", false),
-    db.from("jobs").select("id", { count: "exact", head: true }).eq("owner_id", userId).in("status", ["queued", "running"]),
+    db.from("jobs").select("id", { count: "exact", head: true }).eq("owner_id", userId).in("status", ["queued", "running", "retrying"]),
   ]);
   return { kept: kept ?? 0, active: active ?? 0 };
 }

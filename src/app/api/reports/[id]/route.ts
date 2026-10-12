@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const supabase = await createUserClient();
   const { data } = await supabase
     .from("jobs")
-    .select("status, stage, error_code, lease_expires_at")
+    .select("status, stage, error_code, lease_expires_at, next_run_at, attempts, progress, recoverable")
     .eq("report_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -33,6 +33,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!data) return NextResponse.json({ error: "introuvable" }, { status: 404 });
   const stalled =
     data.status === "queued" ||
+    (data.status === "retrying" && (!data.next_run_at || new Date(data.next_run_at).getTime() <= Date.now())) ||
     (data.status === "running" && !!data.lease_expires_at && new Date(data.lease_expires_at).getTime() < Date.now());
   if (stalled && isAdminConfigured()) {
     const started = Date.now();

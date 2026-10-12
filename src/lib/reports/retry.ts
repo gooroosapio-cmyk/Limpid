@@ -1,6 +1,8 @@
 /**
- * « Réessayer » un Limpid dont la préparation a échoué (V4, § 13) : nouvelle tâche avec les
- * mêmes réglages et le même document, soumise aux limites du compte. Idempotent par clé.
+ * « Reprendre la génération » d'un Limpid interrompu (V4, § 13 ; prompt « Fluidité », § 6) :
+ * la même tâche repart (mêmes réglages, même document, étapes déjà validées conservées) ; seules
+ * les unités manquantes sont refaites. L'échec a rendu les crédits : la reprise réserve à nouveau
+ * le même prix fixe, donc un seul débit au total, sans surcoût. Idempotent par clé.
  */
 import "server-only";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
@@ -33,13 +35,16 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
   if (!report) throw new RetryError("not_found", "Limpid introuvable.");
   const { data: last } = await db
     .from("jobs")
-    .select("status, kind, params, source_id")
+    .select("id, status, kind, params, source_id, recoverable")
     .eq("report_id", reportId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   // Une première génération en échec peut avoir publié une version partielle : elle se relance aussi.
-  if (!last || last.kind !== "generate_report" || ["queued", "running", "succeeded", "incomplete_check"].includes(last.status)) {
+  if (!last || last.kind !== "generate_report" || ["queued", "running", "retrying", "succeeded", "incomplete_check"].includes(last.status)) {
+    // Même clé déjà acceptée (double toucher, accusé perdu) : la reprise est en cours.
+    const { data: same } = await db.from("credit_reservations").select("id").eq("owner_id", userId).eq("idempotency_key", `report:${idempotencyKey}`).maybeSingle();
+    if (same) return;
     throw new RetryError("not_failed", "Ce Limpid n'est pas en échec.");
   }
   const { data: settings } = await db.from("app_settings").select("generation_enabled").single();
@@ -60,6 +65,23 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
       throw new RetryError(e.code === "insufficient" ? "credits" : "quota", e.message, e.detail);
     }
     throw e;
+  }
+  // Même tâche logique : ses étapes enregistrées (lecture, plan, chapitres) sont réutilisées.
+  if (last.status === "failed" || last.status === "uncertain") {
+    const { data: resumed } = await db
+      .from("jobs")
+      .update({ status: "queued", error_code: null, recoverable: null, attempts: 0, next_run_at: null, finished_at: null, cancel_requested: false })
+      .eq("id", last.id)
+      .in("status", ["failed", "uncertain"])
+      .select("id");
+    if (!resumed?.length) {
+      // Double toucher : la reprise a déjà été lancée par une autre requête.
+      await releaseReservation(reservationId);
+      return;
+    }
+    await attachReservation(reservationId, { jobId: last.id as string });
+    await recordLimitEvent(userId, REPORT_CREATED, reportId);
+    return;
   }
   const { data: job, error } = await db.from("jobs").insert({
     owner_id: userId,

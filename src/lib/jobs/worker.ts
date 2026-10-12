@@ -44,6 +44,8 @@ import { diagramPrompt, imageSettingsFrom, transparentStyle, type ImageProviderI
 import { cutout, KEY_BACKGROUND_PROMPT } from "@/lib/visuals/cutout";
 import { jobStore } from "./checkpoints";
 import { generateV5, PlanCheckpoint } from "@/lib/engine/v5";
+import { afterFailure } from "@/lib/jobs/retry-policy";
+import { recordPerf } from "@/lib/perf/server";
 import { checkImage } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
 import { finishJobReservation } from "@/lib/billing/wallet";
@@ -63,6 +65,10 @@ export const WORKER_LEASE_SECONDS = 300;
 interface JobRow {
   id: string;
   owner_id: string;
+  /** Jeton de bail (fencing) : seul le détenteur du bail courant écrit l'état de la tâche. */
+  lease_version: number;
+  attempts: number;
+  created_at: string;
   report_id: string | null;
   source_id: string | null;
   kind: string;
@@ -165,7 +171,7 @@ async function jobModels(jobId: string): Promise<{ reading: string | null; writi
 class JobFailure extends Error {
   constructor(
     public readonly code: string,
-    public readonly status: "failed" | "uncertain" | "cancelled" = "failed",
+    public readonly status: "failed" | "uncertain" | "cancelled" | "lost" = "failed",
   ) {
     super(code);
   }
@@ -221,26 +227,54 @@ async function jobSourceIds(job: JobRow): Promise<string[]> {
   return [job.source_id];
 }
 
-async function setStage(jobId: string, stage: JobStage) {
-  const db = adminClient();
-  const { data } = await db
-    .from("jobs")
-    .update({
-      stage,
-      heartbeat_at: new Date().toISOString(),
-      lease_expires_at: new Date(Date.now() + WORKER_LEASE_SECONDS * 1000).toISOString(),
-    })
-    .eq("id", jobId)
-    .select("cancel_requested")
-    .single();
-  if (data?.cancel_requested) throw new JobFailure("cancelled", "cancelled");
+/** Bail détenu par cette exécution, par tâche (jeton incrémenté à chaque réservation). */
+const leases = new Map<string, number>();
+/** Étape en cours et son début, pour mesurer la durée de chaque étape. */
+const stageClock = new Map<string, { stage: string; at: number }>();
+
+function fenced<T extends { eq: (col: string, v: unknown) => T }>(q: T, jobId: string): T {
+  const v = leases.get(jobId);
+  return v === undefined ? q : q.eq("lease_version", v);
 }
 
-async function finish(jobId: string, status: string, errorCode: string | null) {
-  await adminClient()
-    .from("jobs")
-    .update({ status, error_code: errorCode, finished_at: new Date().toISOString(), lease_owner: null, lease_expires_at: null })
-    .eq("id", jobId);
+async function setStage(jobId: string, stage: JobStage) {
+  const db = adminClient();
+  const { data } = await fenced(
+    db
+      .from("jobs")
+      .update({
+        stage,
+        heartbeat_at: new Date().toISOString(),
+        lease_expires_at: new Date(Date.now() + WORKER_LEASE_SECONDS * 1000).toISOString(),
+      })
+      .eq("id", jobId),
+    jobId,
+  )
+    .select("cancel_requested")
+    .maybeSingle();
+  // Bail perdu (expiré puis repris par un autre worker) : cette exécution s'arrête sans rien écrire.
+  if (!data) throw new JobFailure("lease_lost", "lost");
+  if (data.cancel_requested) throw new JobFailure("cancelled", "cancelled");
+  const prev = stageClock.get(jobId);
+  if (prev && prev.stage !== stage) await recordPerf(`stage.${prev.stage}`, Date.now() - prev.at, { jobId });
+  if (!prev || prev.stage !== stage) stageClock.set(jobId, { stage, at: Date.now() });
+}
+
+/** Avancement réel (chapitres rédigés / prévus), sans estimation. */
+async function setProgress(jobId: string, progress: Record<string, number>) {
+  await fenced(adminClient().from("jobs").update({ progress }).eq("id", jobId), jobId);
+}
+
+/** Écrit l'état final ; false si le bail a été perdu (rien n'est écrit, rien n'est soldé). */
+async function finish(jobId: string, status: string, errorCode: string | null, recoverable: boolean | null = null): Promise<boolean> {
+  const { data, error } = await fenced(
+    adminClient()
+      .from("jobs")
+      .update({ status, error_code: errorCode, recoverable, finished_at: new Date().toISOString(), lease_owner: null, lease_expires_at: null })
+      .eq("id", jobId),
+    jobId,
+  ).select("id");
+  return !!error || !!data?.length;
 }
 
 /** Journal de consommation : une ligne par appel, sans double débit (clé tâche/étape/tentative). */
@@ -415,11 +449,26 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
 
 /** Rend la tâche à la file : une nouvelle invocation reprendra après l'étape déjà faite. */
 async function requeue(jobId: string) {
-  await adminClient()
-    .from("jobs")
-    .update({ status: "queued", lease_owner: null, lease_expires_at: null })
-    .eq("id", jobId)
-    .eq("status", "running");
+  await fenced(adminClient().from("jobs").update({ status: "queued", lease_owner: null, lease_expires_at: null }).eq("id", jobId).eq("status", "running"), jobId);
+}
+
+/** Incident transitoire : relance programmée ; la réservation de crédits reste en place. */
+async function scheduleRetry(job: JobRow, code: string, delayMs: number) {
+  await fenced(
+    adminClient()
+      .from("jobs")
+      .update({
+        status: "retrying",
+        error_code: code,
+        attempts: job.attempts + 1,
+        next_run_at: new Date(Date.now() + delayMs).toISOString(),
+        lease_owner: null,
+        lease_expires_at: null,
+      })
+      .eq("id", job.id)
+      .eq("status", "running"),
+    job.id,
+  );
 }
 
 /**
@@ -502,6 +551,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
   const result = await generateV5(provider, input, {
     store,
     deadline: claimedAt + GENERATION_WINDOW_MS,
+    onProgress: (done, total) => setProgress(job.id, { chapters_done: done, chapters_total: total }),
     onPartial: async (out) => {
       await publishAs(out, false);
     },
@@ -893,7 +943,30 @@ export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENE
   const job = (data as JobRow[] | null)?.[0];
   if (!job) return null;
 
+  leases.set(job.id, job.lease_version);
+  // Première réservation : attente dans la file depuis la création.
+  if (job.lease_version === 1) await recordPerf("job.queue_wait", Date.now() - Date.parse(job.created_at), { jobId: job.id });
   const controller = new AbortController();
+  let lost = false;
+  // Battement régulier pendant une étape longue : le bail reste à cette exécution ; s'il a été
+  // perdu (exécution gelée puis reprise ailleurs), le travail en cours s'interrompt.
+  const beat = setInterval(() => {
+    void fenced(
+      adminClient()
+        .from("jobs")
+        .update({ heartbeat_at: new Date().toISOString(), lease_expires_at: new Date(Date.now() + WORKER_LEASE_SECONDS * 1000).toISOString() })
+        .eq("id", job.id)
+        .eq("status", "running"),
+      job.id,
+    )
+      .select("id")
+      .then(({ data, error }) => {
+        if (!error && !data?.length) {
+          lost = true;
+          controller.abort();
+        }
+      });
+  }, 60_000);
   // Deuxième tâche d'une même invocation : sa fenêtre se termine avec celle de l'invocation.
   const claimedAt = Math.min(Date.now(), deadlineMs - GENERATION_WINDOW_MS);
   try {
@@ -905,23 +978,37 @@ export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENE
       if (!(await relayWorker())) console.error("worker.relay", job.id);
       return { id: job.id, requeued: true };
     }
-    await finish(job.id, status, null);
+    if (!(await finish(job.id, status, null))) return { id: job.id, requeued: true };
+    await recordPerf("job.total", Date.now() - Date.parse(job.created_at), { jobId: job.id });
     // Module livré : le prix réservé devient une consommation (une seule fois).
     await finishJobReservation(job.id, status === "succeeded" || status === "incomplete_check");
     if (job.report_id && (status === "succeeded" || status === "incomplete_check")) await afterDelivery(job, claimedAt);
   } catch (e) {
     const f = failureOf(e);
+    // Bail perdu : un autre worker a repris la tâche ; rien n'est écrit ici.
+    if (lost || f.status === "lost") return { id: job.id, requeued: true };
     // Message technique seulement (ex. « OpenRouter : erreur HTTP 403. »), jamais le contenu du document.
     console.error("job", job.id, f.code, e instanceof Error ? e.message.slice(0, 160) : "");
-    await finish(job.id, f.status, f.code);
+    if (e instanceof ProviderError && e.issues.length) await recordSchemaIssues(job, e);
+    const next = f.status === "cancelled" ? null : afterFailure(f.code, job.attempts);
+    if (next?.retry) {
+      // Incident transitoire : relance bornée, étapes validées conservées, crédits toujours réservés.
+      await scheduleRetry(job, f.code, next.delayMs);
+      await recordPerf("job.retry", next.delayMs, { jobId: job.id, ok: false });
+      return { id: job.id, requeued: true };
+    }
+    if (!(await finish(job.id, f.status === "uncertain" ? "failed" : f.status, f.code, next ? next.recoverable : null))) return { id: job.id, requeued: true };
     // Échec ou annulation : les crédits réservés sont rendus à leurs lots d'origine.
     await finishJobReservation(job.id, false);
-    if (e instanceof ProviderError && e.issues.length) await recordSchemaIssues(job, e);
     // Échec technique ou annulation d'un nouveau rapport : le crédit du jour est rendu.
     if (job.kind === "generate_report" && job.report_id) await recordLimitEvent(job.owner_id, CREDIT_RETURNED, job.report_id);
     if (job.report_id && f.status !== "cancelled") {
       await notify(job.owner_id, "report_failed", `job:${job.id}:failed`, { reportId: job.report_id, data: { code: f.code } }).catch(() => undefined);
     }
+  } finally {
+    clearInterval(beat);
+    leases.delete(job.id);
+    stageClock.delete(job.id);
   }
   return { id: job.id, requeued: false };
 }

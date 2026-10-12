@@ -6,6 +6,7 @@ import "server-only";
 import { Mode } from "@/lib/contracts/schemas";
 import { lessonCover, type CoverView } from "@/lib/library/covers";
 import { createUserClient } from "@/lib/supabase/server";
+import { isActiveJob } from "@/lib/jobs/state";
 
 export type LibraryState = "ready" | "running" | "failed";
 
@@ -55,7 +56,7 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
   const items: LibraryItem[] = (data ?? []).map((r) => {
     const jobs = (r.jobs as { kind: string; status: string; stage: string | null; error_code: string | null; created_at: string }[] | null) ?? [];
     const job = [...jobs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-    const running = !!job && (job.status === "queued" || job.status === "running");
+    const running = !!job && isActiveJob(job.status);
     // Publication progressive : une première génération interrompue laisse une version
     // partielle ; le cours reste en échec (jamais « Prêt ») tant qu'une génération n'a pas abouti.
     const unfinished = !!job && job.kind === "generate_report" && !running && job.status !== "succeeded" && job.status !== "incomplete_check";

@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { isDemoMode } from "@/lib/config";
 import { READER_AI_STATUS, ReaderAIError } from "@/lib/reports/ai-call";
@@ -6,6 +6,7 @@ import { askDocument, AskRequest } from "@/lib/reports/ask";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { billingResponse } from "@/lib/billing/errors";
 import { getLang, getT } from "@/lib/i18n/server";
+import { recordPerf } from "@/lib/perf/server";
 
 export const maxDuration = 75;
 
@@ -22,8 +23,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   if (!parsed.success) return NextResponse.json({ error: "requete_invalide", message: "Question vide ou trop longue." }, { status: 400 });
 
   const { id } = await ctx.params;
+  const t0 = Date.now();
+  const traceId = request.headers.get("x-trace-id");
   try {
     const result = await askDocument(user.id, id, parsed.data);
+    after(() => recordPerf("chat.server_total", Date.now() - t0, { traceId, route: "/api/reports/:id/ask" }));
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     if (e instanceof ReaderAIError && e.code === "credits") return billingResponse(await getT(), await getLang(), "credits", e.detail);

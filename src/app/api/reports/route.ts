@@ -7,6 +7,7 @@ import { loadLibrary } from "@/lib/library/load";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { billingResponse, isBillingBlock } from "@/lib/billing/errors";
 import { getLang, getT } from "@/lib/i18n/server";
+import { recordPerf } from "@/lib/perf/server";
 
 // La génération s'exécute après la réponse, dans la même fonction (durée Vercel max.).
 export const maxDuration = 300;
@@ -35,8 +36,12 @@ export async function POST(request: NextRequest) {
   const parsed = CreateRequest.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "requete_invalide" }, { status: 400 });
 
+  const t0 = Date.now();
+  const traceId = request.headers.get("x-trace-id");
   try {
     const { reportId } = await createReport(user.id, parsed.data);
+    // Création durable (réservation + tâche) après réception du fichier, hors transfert.
+    after(() => recordPerf("job.create", Date.now() - t0, { traceId, route: "/api/reports" }));
     const started = Date.now();
     after(() => drainQueue(`web-${crypto.randomUUID().slice(0, 8)}`, started + 270_000));
     return NextResponse.json({ reportId }, { status: 201 });

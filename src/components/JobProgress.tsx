@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { LoaderBook } from "@/components/LoaderBook";
 import type { Dict } from "@/lib/i18n";
 import { useT } from "@/lib/i18n/client";
+import { isActiveJob } from "@/lib/jobs/state";
 
 interface JobView {
   status: string;
@@ -44,7 +45,7 @@ export function JobProgress({ reportId, initial, compact = false, partial = fals
   const t = useT();
   const [job, setJob] = useState(initial);
   const router = useRouter();
-  const active = job.status === "queued" || job.status === "running";
+  const active = isActiveJob(job.status);
 
   useEffect(() => {
     if (!active) return;

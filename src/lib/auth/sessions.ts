@@ -36,7 +36,8 @@ export function sessionExempt(pathname: string): boolean {
  */
 export function isInteractive(method: string, headers: { get(name: string): string | null }, pathname: string): boolean {
   if (headers.get("next-router-prefetch") || headers.get("purpose") === "prefetch") return false;
-  if (method !== "GET" && method !== "HEAD") return !pathname.startsWith("/api/wallet");
+  // Mesures envoyées en arrière-plan : jamais une activité de l'utilisateur.
+  if (method !== "GET" && method !== "HEAD") return !pathname.startsWith("/api/wallet") && pathname !== "/api/metrics";
   if (pathname.startsWith("/api/")) return false;
   return headers.get("sec-fetch-dest") === "document" || headers.get("rsc") === "1";
 }

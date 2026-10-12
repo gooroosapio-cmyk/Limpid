@@ -109,13 +109,28 @@ export function percentile(values: number[], p: number): number | null {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))]!;
 }
 
+/**
+ * Budgets de travail (prompt « Fluidité », § 1) : p95 visé, en ms (CLS × 1000). Objectifs à
+ * confronter aux mesures, pas une garantie.
+ */
+export function perfBudget(name: string): number | null {
+  if (name === "vital.inp" || name === "nav.internal") return 200;
+  if (name === "vital.lcp") return 2_500;
+  if (name === "vital.cls") return 100;
+  if (name === "job.create") return 1_000;
+  if (name === "chat.first_text") return 3_000;
+  if (name === "chat.local_echo" || name.startsWith("ui.")) return 100;
+  return null;
+}
+
 /** Durées et coûts observés sur 30 jours : par étape (appels) et par rapport (tâches). */
 export async function performance() {
   const db = adminClient();
   const since = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
-  const [{ data: calls }, { data: jobs }] = await Promise.all([
+  const [{ data: calls }, { data: jobs }, { data: experience }] = await Promise.all([
     db.from("usage_ledger").select("stage, duration_ms, actual_cents, reserved_cents").gte("created_at", since).limit(5_000),
     db.from("jobs").select("kind, status, started_at, finished_at").gte("created_at", since).limit(2_000),
+    db.rpc("perf_summary", { p_days: 7 }),
   ]);
   const byStage = new Map<string, { ms: number[]; cents: number }>();
   for (const c of calls ?? []) {
@@ -128,6 +143,14 @@ export async function performance() {
   const durations = done.map((j) => new Date(j.finished_at!).getTime() - new Date(j.started_at!).getTime());
   const finished = (jobs ?? []).filter((j) => j.kind === "generate_report" && ["succeeded", "incomplete_check", "failed"].includes(j.status));
   return {
+    experience: ((experience ?? []) as { name: string; source: string; device: string; n: number; p50: number | null; p95: number | null; fail_rate: number | null }[]).map((r) => ({
+      ...r,
+      n: Number(r.n),
+      p50: r.p50 === null ? null : Number(r.p50),
+      p95: r.p95 === null ? null : Number(r.p95),
+      failRate: r.fail_rate === null ? null : Number(r.fail_rate),
+      budget: perfBudget(r.name),
+    })),
     stages: [...byStage.entries()].map(([stage, s]) => ({
       stage,
       calls: s.ms.length,

@@ -28,7 +28,7 @@ export interface AdminJob {
   aiMs: number;
 }
 
-const ACTIVE = ["queued", "running", "awaiting_confirmation", "uncertain"];
+const ACTIVE = ["queued", "running", "retrying", "awaiting_confirmation", "uncertain"];
 export const RETRYABLE = ["failed", "uncertain"];
 export const CANCELLABLE = ACTIVE;
 
@@ -154,7 +154,7 @@ export async function cancelJob(jobId: string): Promise<"cancelled" | "requested
     .from("jobs")
     .update({ status: "cancelled", cancel_requested: true, finished_at: new Date().toISOString() })
     .eq("id", jobId)
-    .in("status", ["queued", "awaiting_confirmation", "uncertain"])
+    .in("status", ["queued", "retrying", "awaiting_confirmation", "uncertain"])
     .select("id")
     .maybeSingle();
   if (now) return "cancelled";

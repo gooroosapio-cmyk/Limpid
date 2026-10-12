@@ -15,6 +15,7 @@ import { offlineKey } from "@/lib/offline-key";
 import { loadReport } from "@/lib/reports/load";
 import { chapterPractice } from "@/lib/reports/reading";
 import { isAdminConfigured } from "@/lib/supabase/admin";
+import { isActiveJob } from "@/lib/jobs/state";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -37,7 +38,7 @@ export default async function ReportPage({
   if (!report) notFound();
 
   if (report.state === "pending") {
-    const active = report.job.status === "queued" || report.job.status === "running";
+    const active = isActiveJob(report.job.status);
     return (
       <Screen>
         <JobProgress reportId={id} initial={report.job} />
@@ -47,7 +48,7 @@ export default async function ReportPage({
   }
 
   const job = report.latestJob;
-  const preparing = !!job && (job.status === "queued" || job.status === "running");
+  const preparing = !!job && isActiveJob(job.status);
   const lastFailed = !!job && (job.status === "failed" || job.status === "uncertain") && report.versions.length >= 1;
   const pdfHref = `/api/reports/${id}/pdf${report.isCurrent ? "" : `?version=${report.shownVersion}`}`;
   const modeLabel = report.mode ? (t.add.modes[report.mode]?.title ?? null) : null;

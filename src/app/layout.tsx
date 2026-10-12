@@ -29,6 +29,7 @@ import "./styles/motion.css";
 import "./styles/kit-v4.css";
 import "./styles/reader-kit-v5.css";
 import "./styles/tailwind.css";
+import { WebVitals } from "@/components/perf/WebVitals";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -69,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={lang} {...htmlAttributes(prefs)}>
       <body>
+        <WebVitals />
         <I18nProvider lang={lang}>
         <a className="skip-link" href="#contenu">{t.nav.skip}</a>
         <div className="app">
