@@ -1,0 +1,152 @@
+{
+  "version": "5.0.0",
+  "scope": "reader",
+  "brand": {
+    "yellow": "#F8D94B",
+    "yellowPressed": "#EBCB35",
+    "gold": "#D0AD3D",
+    "ink": "#142018"
+  },
+  "font": {
+    "reading": "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif"
+  },
+  "light": {
+    "bg": "#F8F7F2",
+    "surface": "#FFFEFA",
+    "raised": "#F0F0E8",
+    "text": "#142018",
+    "muted": "#58645C",
+    "border": "#DEDCD3",
+    "mint": "#DCEAE0",
+    "mintText": "#234834",
+    "success": "#2F6846",
+    "successBg": "#E0EFE3",
+    "danger": "#A63728",
+    "dangerBg": "#F9E9E3",
+    "focus": "#335C42",
+    "accentText": "#8A6B11"
+  },
+  "dark": {
+    "bg": "#101713",
+    "surface": "#1A231E",
+    "raised": "#243028",
+    "text": "#F7F7EF",
+    "muted": "#AFBBB2",
+    "border": "#39463D",
+    "mint": "#2A4134",
+    "mintText": "#CAE5D0",
+    "success": "#B7DEC3",
+    "successBg": "#284333",
+    "danger": "#F6B8A5",
+    "dangerBg": "#472B24",
+    "focus": "#F8D94B",
+    "accentText": "#F8D94B"
+  },
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32,
+    40,
+    48
+  ],
+  "radii": {
+    "sm": 8,
+    "control": 12,
+    "card": 16,
+    "sheet": 24,
+    "pill": 999
+  },
+  "type": {
+    "body": 16,
+    "caption": 13,
+    "block": 16,
+    "section": 21,
+    "chapter": 26
+  },
+  "lineHeight": 1.55,
+  "motion": {
+    "durationMs": 150,
+    "reduceMotion": true
+  },
+  "layout": {
+    "contentMax": 680,
+    "touchMin": 44,
+    "mobileMin": 320
+  },
+  "roles": {
+    "essential": {
+      "light": [
+        "#FFF5CB",
+        "#142018"
+      ],
+      "dark": [
+        "#342F1C",
+        "#F8D94B"
+      ]
+    },
+    "definition": {
+      "light": [
+        "#DCEAE0",
+        "#234834"
+      ],
+      "dark": [
+        "#2A4134",
+        "#CAE5D0"
+      ]
+    },
+    "example": {
+      "light": [
+        "#EAF2FA",
+        "#244E70"
+      ],
+      "dark": [
+        "#1F3341",
+        "#CAE3F7"
+      ]
+    },
+    "analogy": {
+      "light": [
+        "#F1EBFA",
+        "#5A4378"
+      ],
+      "dark": [
+        "#322A40",
+        "#E5D7F8"
+      ]
+    },
+    "caution": {
+      "light": [
+        "#FFF1D4",
+        "#775310"
+      ],
+      "dark": [
+        "#3C331F",
+        "#F7DEA7"
+      ]
+    },
+    "success": {
+      "light": [
+        "#E0EFE3",
+        "#2F6846"
+      ],
+      "dark": [
+        "#284333",
+        "#B7DEC3"
+      ]
+    },
+    "review": {
+      "light": [
+        "#F9E9E3",
+        "#A63728"
+      ],
+      "dark": [
+        "#472B24",
+        "#F6B8A5"
+      ]
+    }
+  }
+}

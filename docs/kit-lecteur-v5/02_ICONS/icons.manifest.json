@@ -1,0 +1,162 @@
+{
+  "version": "5.0.0",
+  "style": "filled_rounded",
+  "icons": [
+    {
+      "id": "essential",
+      "path": "essential.svg",
+      "symbol": "lr-essential",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "definition",
+      "path": "definition.svg",
+      "symbol": "lr-definition",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "example",
+      "path": "example.svg",
+      "symbol": "lr-example",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "analogy",
+      "path": "analogy.svg",
+      "symbol": "lr-analogy",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "caution",
+      "path": "caution.svg",
+      "symbol": "lr-caution",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "important",
+      "path": "important.svg",
+      "symbol": "lr-important",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "calculation",
+      "path": "calculation.svg",
+      "symbol": "lr-calculation",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "formula",
+      "path": "formula.svg",
+      "symbol": "lr-formula",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "table",
+      "path": "table.svg",
+      "symbol": "lr-table",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "chart",
+      "path": "chart.svg",
+      "symbol": "lr-chart",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "timeline",
+      "path": "timeline.svg",
+      "symbol": "lr-timeline",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "steps",
+      "path": "steps.svg",
+      "symbol": "lr-steps",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "quiz",
+      "path": "quiz.svg",
+      "symbol": "lr-quiz",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "source",
+      "path": "source.svg",
+      "symbol": "lr-source",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "question",
+      "path": "question.svg",
+      "symbol": "lr-question",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "toc",
+      "path": "toc.svg",
+      "symbol": "lr-toc",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "options",
+      "path": "options.svg",
+      "symbol": "lr-options",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "expand",
+      "path": "expand.svg",
+      "symbol": "lr-expand",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "collapse",
+      "path": "collapse.svg",
+      "symbol": "lr-collapse",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "read",
+      "path": "read.svg",
+      "symbol": "lr-read",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "success",
+      "path": "success.svg",
+      "symbol": "lr-success",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "review",
+      "path": "review.svg",
+      "symbol": "lr-review",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "details",
+      "path": "details.svg",
+      "symbol": "lr-details",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "close",
+      "path": "close.svg",
+      "symbol": "lr-close",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "next",
+      "path": "next.svg",
+      "symbol": "lr-next",
+      "viewBox": "0 0 24 24"
+    },
+    {
+      "id": "back",
+      "path": "back.svg",
+      "symbol": "lr-back",
+      "viewBox": "0 0 24 24"
+    }
+  ]
+}

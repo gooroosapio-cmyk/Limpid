@@ -1,0 +1,28 @@
+Tu es Opus 5.5 chargé d’intégrer le référentiel pédagogique et le lecteur V5 dans l’application Limpid existante.
+
+MISSION
+Permettre à l’utilisateur d’étudier seul avec un cours fidèle, bien segmenté, lisible sur mobile, même lorsqu’il perd facilement le fil. Le dépôt existant reste la base de travail.
+
+ORDRE DE LECTURE
+1. 00_DOCUMENTATION/LIMPID_Referentiel_Final_Opus_5_5.md (même contenu que le PDF).
+2. 01_DESIGN/reader.rules.json et reader.tokens.json.
+3. 03_COMPONENTS/course.schema.json, reader.contracts.ts et reader.css.
+4. 04_EXAMPLES/lecteur.autonome.html et course.demo.json.
+5. 05_QA/RECETTE_APPLICATION.md.
+
+DÉCISIONS PRIORITAIRES
+Chapitre complet en lecture continue, tous les sous-chapitres ouverts. Petit contrôle de repli en face du titre. Sommaire : chapitre courant ouvert, autres repliés ; accès direct qui déplie la destination. Reprise au début du chapitre avec objectif et essentiel, historique conservé. Explication et exemple utiles visibles ; détails secondaires repliables. Pictogrammes pleins arrondis avec libellés. Quiz uniquement en fin de chapitre ; correction ciblée puis variante proposée. Calculs : toutes les étapes numérotées visibles. Progression : consultation, réussite et à revoir séparés. Ces choix priment sur l’ancien rendu « une étape par bloc ».
+
+RESSOURCES DRIVE
+Dossier Limpid : https://drive.google.com/drive/folders/1irmnE9BAt2dL5cetwxh_OeBgaS3JsyjC
+Nouveau kit : https://drive.google.com/drive/folders/15-ZoO0V1h0FiDhc84TMcLC8byPkceCJn
+Kit UI V4 existant : https://drive.google.com/drive/folders/1y2FbrMX5U9V5R3k7zMDi1FEMtXcOk31v
+Télécharger le ZIP complet ou les fichiers utiles, puis les copier dans le projet. Une URL de page Drive ne remplace pas un asset local. Si Drive n’est pas accessible depuis ton environnement, utiliser l’archive fournie : elle contient tous les fichiers de ce nouveau kit.
+
+EXÉCUTION
+Auditer les points d’entrée du dépôt et établir la correspondance avec les chemins du PDF source. Implémenter par phases selon IMP-01 à IMP-08, avec un adaptateur pour les cours existants. Ne pas appliquer globalement le CSS du lecteur. Préserver les références source et versionner les contrats. Les exemples demo=true restent des fixtures de démonstration.
+La structure générée porte les objectifs et sous-chapitres. Le code dessine les données, applique les replis, calcule les résultats et choisit le rendu responsive. Ne pas convertir l’interface en images. Valider les contenus après réparation ; ne pas publier un brouillon ayant une erreur bloquante.
+Pour les nouveaux cas d’exercice : nouvelles valeurs fictives possibles, méthode déjà enseignée, correction recalculée. Après un signalement d’erreur, réexaminer les passages originaux et les dépendances.
+
+LIVRAISON ATTENDUE
+Décrire le comportement final, les changements de code, les adaptations de données, les contrôles réellement exécutés et les limites. Fournir la recette 320/360/390/430 px, thème clair/sombre, texte agrandi, clavier, reprise, source, calcul long, tableau large, fin de chapitre et export. Ne pas déclarer la maîtrise de l’utilisateur à partir d’un défilement ou d’un seul QCM. Activer le nouveau lecteur après validation et garder une possibilité de retour au rendu précédent.

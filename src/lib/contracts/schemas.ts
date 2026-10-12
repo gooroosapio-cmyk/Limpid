@@ -288,11 +288,28 @@ export const ChapterQuestion = z
   .refine((q) => q.correct_index < q.choices.length && q.explanations.length === q.choices.length, "choix, bonne réponse et explications incohérents");
 export type ChapterQuestion = z.infer<typeof ChapterQuestion>;
 
+/**
+ * Sous-chapitre (référentiel V5, STR-02/STR-05) : une question, un mécanisme ou une application
+ * identifiable. Titre et objectif sont des champs structurés ; les blocs restent dans
+ * `Section.blocks` (références, contrôles et ancres inchangés), la partie les désigne dans l'ordre.
+ */
+export const SectionPart = z.strictObject({
+  id,
+  title: z.string().trim().min(1).max(160),
+  objective: shortText.nullable(),
+  block_ids: ids(40).min(1),
+});
+export type SectionPart = z.infer<typeof SectionPart>;
+
 export const Section = z.strictObject({
   id,
   question: shortText,
   takeaway: mediumText,
+  /** V5 : objectif du chapitre (capacité observable), repris du plan. */
+  objective: shortText.optional(),
   blocks: z.array(Block).min(1).max(40),
+  /** V5 : sous-chapitres, dans l'ordre des blocs. Absent pour un cours plus ancien (une seule partie implicite). */
+  parts: z.array(SectionPart).min(1).max(8).optional(),
   /** V5 : 2 à 4 idées « À retenir » en fin de chapitre. */
   retain: z.array(shortText).max(5).optional(),
   /** V5 : notions soulignées dans le chapitre (premières occurrences utiles). */

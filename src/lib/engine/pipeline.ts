@@ -44,7 +44,7 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 import { blocksMissingNumbers, caveatGaps, droppedCaveatClaims, droppedNumberClaims, numberGaps } from "./coverage";
 import { locateQuote } from "./quotes";
 
-export const PROMPT_VERSION = "2026-10-08.2";
+export const PROMPT_VERSION = "2026-10-12.1";
 /** Une seule réparation automatique par étape (kit V6) : chaque aller-retour coûte 30 à 80 s. */
 export const MAX_REPAIRS = 1;
 

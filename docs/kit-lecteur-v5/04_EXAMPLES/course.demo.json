@@ -1,0 +1,262 @@
+{
+  "schema_version": "5.0.0",
+  "content_version": "demo-1",
+  "demo": true,
+  "language": "fr",
+  "title": "Comprendre deux prélèvements successifs",
+  "sources": [
+    {
+      "id": "doc_demo",
+      "title": "Source synthétique de démonstration",
+      "kind": "synthetic_demo",
+      "text": "Cas pédagogique fictif. Le montant initial est de 8 € par action. Un premier prélèvement de 25 % donne 2 € ; il reste 6 €. Tout ce reste est distribué. Un second prélèvement de 30 % sur les 6 € donne 1,80 €. Le montant final est de 4,20 € par action. Les prélèvements totalisent 3,80 €, soit 47,5 % des 8 € de départ. Aucun taux fiscal réel n’est décrit."
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev_demo_1",
+      "source_id": "doc_demo",
+      "quote": "Cas pédagogique fictif. Le montant initial est de 8 € par action. Un premier prélèvement de 25 % donne 2 € ; il reste 6 €. Tout ce reste est distribué. Un second prélèvement de 30 % sur les 6 € donne 1,80 €. Le montant final est de 4,20 € par action. Les prélèvements totalisent 3,80 €, soit 47,5 % des 8 € de départ. Aucun taux fiscal réel n’est décrit."
+    }
+  ],
+  "claims": [
+    {
+      "id": "clm_demo_1",
+      "text": "Cas pédagogique fictif. Le montant initial est de 8 € par action. Un premier prélèvement de 25 % donne 2 € ; il reste 6 €. Tout ce reste est distribué. Un second prélèvement de 30 % sur les 6 € donne 1,80 €. Le montant final est de 4,20 € par action. Les prélèvements totalisent 3,80 €, soit 47,5 % des 8 € de départ. Aucun taux fiscal réel n’est décrit.",
+      "status": "supported",
+      "evidence_ids": [
+        "ev_demo_1"
+      ]
+    }
+  ],
+  "limitations": [
+    "Cas fictif ; aucune donnée de fiscalité réelle."
+  ],
+  "publication_status": "ready",
+  "validation": {
+    "blocking_errors": [],
+    "warnings": [
+      "Source synthétique de démonstration."
+    ],
+    "source_coverage": "complete"
+  },
+  "chapters": [
+    {
+      "id": "ch_calculation",
+      "title": "Comment suivre les deux prélèvements ?",
+      "objective": "Identifier les bases et expliquer le montant final.",
+      "essential": [
+        "Les taux portent sur deux bases différentes.",
+        "Chaque étape produit la base de la suivante.",
+        "Le résultat dépend des hypothèses de l’exemple."
+      ],
+      "sections": [
+        {
+          "id": "sec_data",
+          "title": "Identifier les données de départ",
+          "objective": "Repérer le montant initial et les deux bases.",
+          "blocks": [
+            {
+              "id": "blk_context",
+              "kind": "fictional_example",
+              "payload": {
+                "text": "Le calcul ci-dessous décrit uniquement un cas fictif. Les deux prélèvements ont des bases différentes.",
+                "label": "Exemple pédagogique fictif"
+              },
+              "claim_ids": [
+                "clm_demo_1"
+              ],
+              "evidence_ids": [
+                "ev_demo_1"
+              ]
+            },
+            {
+              "id": "blk_condition",
+              "kind": "caution",
+              "payload": {
+                "text": "On suppose que tout le montant restant après le premier prélèvement est distribué.",
+                "critical": true
+              },
+              "claim_ids": [
+                "clm_demo_1"
+              ],
+              "evidence_ids": [
+                "ev_demo_1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sec_calculation",
+          "title": "Suivre les deux prélèvements",
+          "objective": "Expliquer chaque étape du calcul.",
+          "blocks": [
+            {
+              "id": "blk_calculation",
+              "kind": "calculation",
+              "payload": {
+                "inputs": [
+                  {
+                    "label": "Montant initial par action",
+                    "value": 8,
+                    "unit": "€"
+                  },
+                  {
+                    "label": "Premier taux",
+                    "value": 25,
+                    "unit": "%"
+                  },
+                  {
+                    "label": "Second taux",
+                    "value": 30,
+                    "unit": "%"
+                  }
+                ],
+                "steps": [
+                  {
+                    "title": "Premier prélèvement",
+                    "expression": "8 × 0,25 = 2 €",
+                    "explanation": "Il reste 8 − 2 = 6 €."
+                  },
+                  {
+                    "title": "Second prélèvement",
+                    "expression": "6 × 0,30 = 1,80 €",
+                    "explanation": "Le taux porte sur le montant restant."
+                  },
+                  {
+                    "title": "Montant final",
+                    "expression": "6 − 1,80 = 4,20 €",
+                    "explanation": "Résultat du cas fictif."
+                  }
+                ],
+                "result": {
+                  "value": 4.2,
+                  "unit": "€ par action",
+                  "label": "Montant final"
+                },
+                "example": true
+              },
+              "claim_ids": [
+                "clm_demo_1"
+              ],
+              "evidence_ids": [
+                "ev_demo_1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sec_result",
+          "title": "Interpréter le montant final",
+          "objective": "Distinguer les bases des deux pourcentages.",
+          "blocks": [
+            {
+              "id": "blk_compare",
+              "kind": "comparison",
+              "payload": {
+                "columns": [
+                  "Étape",
+                  "Montant par action"
+                ],
+                "rows": [
+                  [
+                    "Départ",
+                    8
+                  ],
+                  [
+                    "Après le premier prélèvement",
+                    6
+                  ],
+                  [
+                    "Après le second prélèvement",
+                    4.2
+                  ]
+                ],
+                "unit": "€"
+              },
+              "claim_ids": [
+                "clm_demo_1"
+              ],
+              "evidence_ids": [
+                "ev_demo_1"
+              ]
+            },
+            {
+              "id": "blk_detail",
+              "kind": "details",
+              "payload": {
+                "summary": "Voir le calcul du taux global",
+                "text": "(2 + 1,80) ÷ 8 × 100 = 47,5 %. Les taux de 25 % et 30 % ne s’additionnent pas directement, car les bases sont différentes.",
+                "critical": false
+              },
+              "claim_ids": [
+                "clm_demo_1"
+              ],
+              "evidence_ids": [
+                "ev_demo_1"
+              ]
+            }
+          ]
+        }
+      ],
+      "retain": [
+        "Identifier la base avant d’appliquer un pourcentage.",
+        "Conserver les hypothèses du calcul."
+      ],
+      "quiz": [
+        {
+          "id": "q_base",
+          "type": "single",
+          "objective_id": "obj_base",
+          "prompt": "Sur quelle base s’applique le second taux de 30 % ?",
+          "choices": [
+            "8 €",
+            "6 €",
+            "2 €"
+          ],
+          "correct_index": 1,
+          "explanations": [
+            "Le premier prélèvement a déjà réduit les 8 €.",
+            "Correct : le second taux porte sur les 6 € restants.",
+            "Les 2 € correspondent au premier prélèvement."
+          ],
+          "revisit_section_id": "sec_calculation",
+          "variant_of": null,
+          "claim_ids": [
+            "clm_demo_1"
+          ],
+          "evidence_ids": [
+            "ev_demo_1"
+          ],
+          "example": true
+        },
+        {
+          "id": "q_base_variant",
+          "type": "single",
+          "objective_id": "obj_base",
+          "prompt": "Dans un autre cas fictif, un montant de 10 € subit un premier prélèvement de 20 %. Quelle base reste pour le second prélèvement ?",
+          "choices": [
+            "10 €",
+            "2 €",
+            "8 €"
+          ],
+          "correct_index": 2,
+          "explanations": [
+            "Le premier prélèvement doit être retiré.",
+            "2 € est le montant prélevé.",
+            "Correct : 10 − 2 = 8 €."
+          ],
+          "revisit_section_id": "sec_calculation",
+          "variant_of": "q_base",
+          "claim_ids": [
+            "clm_demo_1"
+          ],
+          "evidence_ids": [
+            "ev_demo_1"
+          ],
+          "example": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2495 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Limpid course exchange 5.0.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "5.0.0"
+    },
+    "content_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "demo": {
+      "type": "boolean"
+    },
+    "language": {
+      "enum": [
+        "fr",
+        "en"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "document",
+              "synthetic_demo"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "source_id",
+          "quote"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "supported",
+              "partial",
+              "ambiguous",
+              "unsupported",
+              "contradicted"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "status",
+          "evidence_ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 1
+          },
+          "essential": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 7,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "sections": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "objective": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "blocks": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "fact"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "definition"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "term": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "concept_id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "term",
+                              "text",
+                              "concept_id"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "list"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "style": {
+                                "enum": [
+                                  "bullets",
+                                  "numbers"
+                                ]
+                              },
+                              "items": {
+                                "type": "array",
+                                "minItems": 2,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            "required": [
+                              "style",
+                              "items"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "formula"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "expression": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "symbols": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "symbol": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "meaning": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "unit": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "symbol",
+                                    "meaning",
+                                    "unit"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "reading": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "expression",
+                              "symbols",
+                              "reading"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "analogy"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "mapping": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "limit": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "mapping",
+                              "limit"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "fictional_example"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "label": {
+                                "const": "Exemple pédagogique fictif"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "complement"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "provenance": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "checked": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "checked"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "inference"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "derivation": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "derivation"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "caution"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "critical": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "critical"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "steps"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "items": {
+                                "type": "array",
+                                "minItems": 2,
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "title": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "title",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "items"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "timeline"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "order": {
+                                "enum": [
+                                  "chronological",
+                                  "narrative"
+                                ]
+                              },
+                              "events": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "date": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "title": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "date",
+                                    "title",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "order",
+                              "events"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "comparison"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "columns": {
+                                "type": "array",
+                                "minItems": 2,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "rows": {
+                                "type": "array",
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "null"
+                                    ]
+                                  }
+                                }
+                              },
+                              "unit": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "columns",
+                              "rows",
+                              "unit"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "proportion"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "base": {
+                                "type": "number",
+                                "exclusiveMinimum": 0
+                              },
+                              "percent": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              },
+                              "unit": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "example": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "base",
+                              "percent",
+                              "unit",
+                              "label",
+                              "example"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "chart"
+                          },
+                          "payload": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "x_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "y_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "chart_type": {
+                                    "const": "bar"
+                                  },
+                                  "points": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "value": {
+                                          "type": [
+                                            "number",
+                                            "null"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "value"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "x_label",
+                                  "y_label",
+                                  "unit",
+                                  "description",
+                                  "chart_type",
+                                  "points"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "x_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "y_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "chart_type": {
+                                    "const": "line"
+                                  },
+                                  "series": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "points": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": [
+                                                  "number",
+                                                  "string"
+                                                ]
+                                              },
+                                              "value": {
+                                                "type": [
+                                                  "number",
+                                                  "null"
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "value"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "points"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "x_label",
+                                  "y_label",
+                                  "unit",
+                                  "description",
+                                  "chart_type",
+                                  "series"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "x_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "y_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "chart_type": {
+                                    "const": "stacked"
+                                  },
+                                  "categories": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "series": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "values": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": [
+                                              "number",
+                                              "null"
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "values"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "x_label",
+                                  "y_label",
+                                  "unit",
+                                  "description",
+                                  "chart_type",
+                                  "categories",
+                                  "series"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "x_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "y_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "chart_type": {
+                                    "const": "scatter"
+                                  },
+                                  "points": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "x_label",
+                                  "y_label",
+                                  "unit",
+                                  "description",
+                                  "chart_type",
+                                  "points"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "x_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "y_label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "chart_type": {
+                                    "const": "histogram"
+                                  },
+                                  "bins": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "start": {
+                                          "type": "number"
+                                        },
+                                        "end": {
+                                          "type": "number"
+                                        },
+                                        "count": {
+                                          "type": "number",
+                                          "minimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "start",
+                                        "end",
+                                        "count"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "x_label",
+                                  "y_label",
+                                  "unit",
+                                  "description",
+                                  "chart_type",
+                                  "bins"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "calculation"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "inputs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "value": {
+                                      "type": "number"
+                                    },
+                                    "unit": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "label",
+                                    "value",
+                                    "unit"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "steps": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "title": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "expression": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "explanation": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "title",
+                                    "expression",
+                                    "explanation"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "result": {
+                                "type": "object",
+                                "properties": {
+                                  "value": {
+                                    "type": "number"
+                                  },
+                                  "unit": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "value",
+                                  "unit",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "example": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "inputs",
+                              "steps",
+                              "result",
+                              "example"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "details"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "summary": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "critical": {
+                                "const": false
+                              }
+                            },
+                            "required": [
+                              "summary",
+                              "text",
+                              "critical"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "scene"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "asset": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "caption": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "alt": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "asset",
+                              "caption",
+                              "alt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "important"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "diagram"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "nodes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "from": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "to": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "from",
+                                    "to",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "nodes",
+                              "edges",
+                              "description"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "quote"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "source_id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "source_id"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "const": "code"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "properties": {
+                              "language": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "language",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "claim_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "evidence_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "payload",
+                          "claim_ids",
+                          "evidence_ids"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "objective",
+                "blocks"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "retain": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "quiz": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "single"
+                    },
+                    "choices": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "correct_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "explanations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "choices",
+                    "correct_index",
+                    "explanations"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "multiple"
+                    },
+                    "choices": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 6,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "correct_indices": {
+                      "type": "array",
+                      "minItems": 2,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "explanations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "choices",
+                    "correct_indices",
+                    "explanations"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "truefalse"
+                    },
+                    "truth": {
+                      "type": "boolean"
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "truth",
+                    "explanation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "order"
+                    },
+                    "items": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 6,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "items",
+                    "explanation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "match"
+                    },
+                    "pairs": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "left": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "right": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "left",
+                          "right"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "pairs",
+                    "explanation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "cloze"
+                    },
+                    "accepted_answers": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "accepted_answers",
+                    "explanation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "objective_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "revisit_section_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant_of": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "example": {
+                      "type": "boolean"
+                    },
+                    "type": {
+                      "const": "short"
+                    },
+                    "expected": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rubric": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objective_id",
+                    "prompt",
+                    "revisit_section_id",
+                    "variant_of",
+                    "claim_ids",
+                    "evidence_ids",
+                    "example",
+                    "type",
+                    "expected",
+                    "rubric",
+                    "explanation"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "objective",
+          "essential",
+          "sections",
+          "retain",
+          "quiz"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "publication_status": {
+      "enum": [
+        "building",
+        "partial",
+        "ready",
+        "blocked"
+      ]
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "blocking_errors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "source_coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "blocking_errors",
+        "warnings",
+        "source_coverage"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "content_version",
+    "demo",
+    "language",
+    "title",
+    "sources",
+    "evidence",
+    "claims",
+    "limitations",
+    "chapters",
+    "publication_status",
+    "validation"
+  ],
+  "additionalProperties": false
+}
