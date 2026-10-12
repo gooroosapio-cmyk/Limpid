@@ -126,6 +126,11 @@ export const demoExplanation: ExplanationObject = {
         { type: "fictional_example", id: "blk_4", text: "Exemple imaginé : du linge mouillé sèche au soleil. L'eau du linge part dans l'air sous forme de vapeur.", claim_ids: ["clm_3"], evidence_ids: [] },
         { type: "fact", id: "blk_5", text: "Les plantes aussi rejettent de la vapeur par leurs feuilles. On appelle cela la transpiration.", claim_ids: ["clm_4"], evidence_ids: ["ev_4"] },
       ],
+      objective: "Expliquer comment l'eau passe du sol au ciel.",
+      parts: [
+        { id: "part_s2_1", title: "Ce qui se passe quand l'eau chauffe", objective: "Reconnaître l'évaporation.", block_ids: ["blk_3", "blk_4"] },
+        { id: "part_s2_2", title: "Les plantes y participent aussi", objective: null, block_ids: ["blk_5"] },
+      ],
     },
     {
       id: "sec_3",
@@ -142,6 +147,11 @@ export const demoExplanation: ExplanationObject = {
           evidence_ids: [],
         },
         { type: "fact", id: "blk_8", text: "Quand les gouttes deviennent lourdes, elles tombent : pluie, neige ou grêle.", claim_ids: ["clm_6"], evidence_ids: ["ev_6"] },
+      ],
+      objective: "Décrire le passage de la vapeur aux précipitations.",
+      parts: [
+        { id: "part_s3_1", title: "La formation des nuages", objective: "Relier refroidissement et gouttelettes.", block_ids: ["blk_6", "blk_7"] },
+        { id: "part_s3_2", title: "Pourquoi il pleut", objective: null, block_ids: ["blk_8"] },
       ],
     },
     {

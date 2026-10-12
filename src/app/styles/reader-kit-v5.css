@@ -1,0 +1,103 @@
+/*
+ * Kit lecteur V5 (docs/kit-lecteur-v5) : sous-chapitres repliables, sommaire hiérarchique,
+ * formules et chiffres à la taille du texte. Limité au lecteur (.lim, sommaire, options).
+ */
+
+/* ---------- Objectif du chapitre ---------- */
+.lim .chapter-objective { margin: 6px 0 0; color: var(--muted); }
+
+/* ---------- Sous-chapitres ---------- */
+.lim .lr-part { margin: 28px 0 0; padding-top: 4px; border-top: 1px solid var(--line); }
+.lim .lr-part-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  list-style: none; cursor: pointer; min-height: 44px; padding: 10px 0 2px;
+}
+.lim .lr-part-head::-webkit-details-marker { display: none; }
+.lim .lr-part-head:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.lim .lr-part-titles { display: grid; gap: 2px; min-width: 0; }
+/* Sous-titres : couleur sobre distincte du texte (vert de la marque), sans fond ni encadré. */
+.lim .lr-part-title { margin: 0; font-size: 1.25em; line-height: 1.3; font-weight: 600; color: var(--sage); letter-spacing: -0.01em; }
+.lim .lr-part-n { font-variant-numeric: tabular-nums; font-weight: 600; opacity: 0.75; margin-right: 0.15em; }
+.lim .lr-part-objective { color: var(--muted); font-size: 0.875em; line-height: 1.45; }
+.lim .lr-part-body { padding-top: 8px; }
+.lim .lr-part-body > .piece:first-child { margin-top: 0; }
+
+/* Chevron discret : pas de fond ni de bordure ; zone tactile de 44 px (NAV-02). */
+.lim .lr-part-toggle, .lr-toggle {
+  flex: 0 0 44px; width: 44px; height: 44px; margin: -10px -12px 0 0;
+  display: grid; place-items: center; color: var(--muted); opacity: 0.8;
+}
+.lr-toggle { margin: 0; padding: 0; border: 0; background: none; border-radius: 8px; cursor: pointer; }
+.lr-toggle:hover, .lim .lr-part-head:hover .lr-part-toggle { opacity: 1; color: var(--ink); }
+.lr-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: -4px; }
+.lim .lr-part-toggle svg, .lr-toggle svg { transition: transform 160ms ease; }
+.lim .lr-part[open] > .lr-part-head .lr-part-toggle svg, .lr-toggle svg.is-open { transform: rotate(180deg); }
+
+/* Commandes groupées « Tout déplier / Tout replier » : texte simple, discret. */
+.lr-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin: 4px 0 8px; }
+.lr-bulk-label { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 0.8125rem; }
+.lr-bulk-btn {
+  min-height: 44px; padding: 0 8px; border: 0; background: none; color: var(--muted);
+  font: inherit; font-size: 0.875rem; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px;
+}
+.lr-bulk-btn:first-of-type { padding-left: 0; }
+.lr-bulk-btn:hover { color: var(--ink); }
+.lr-bulk-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+
+/* ---------- Sommaire hiérarchique ---------- */
+.toc .toc-chapter { list-style: none; }
+.toc .toc-chapter-row { display: flex; align-items: center; gap: 4px; }
+.toc .toc-chapter-row > a { flex: 1; min-width: 0; }
+.toc .toc-n { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 0.2em; }
+.toc .toc-parts { margin: 0 0 6px; padding: 0 0 0 1.4em; list-style: none; }
+.toc .toc-parts a { font-size: 0.9375em; color: var(--ink); }
+
+/* ---------- Formules et calculs : même police, même taille que le texte ---------- */
+.lim .block-formula .formula {
+  font-family: inherit; font-size: 1em; font-variant-numeric: tabular-nums lining-nums;
+  background: none; border: 0; border-left: 3px solid var(--line); border-radius: 0;
+  padding: 2px 0 2px 14px; margin: 0 0 var(--s3); white-space: normal; overflow-x: auto; text-align: left;
+}
+.lim .formula-line { display: block; }
+.lim .formula-line + .formula-line { padding-left: 1em; }
+.lim .formula-eq { color: var(--muted); }
+.lim .symbols { font-size: 1em; }
+.lim .symbols dt { font-family: inherit; font-style: italic; min-width: 2.5em; }
+.lim .v6-mono { font-family: inherit; font-size: 1em; color: inherit; font-variant-numeric: tabular-nums; }
+.lim .v6-calc-line, .lim .v6-calc-line strong { font-size: 1em; }
+.lim .v6-table, .lim table.compare { font-size: 1em; }
+.lim .v6-vars dd, .lim .v6-vars dt { font-size: 1em; }
+
+/* Étapes de calcul : numérotées, une opération par ligne, toutes visibles (CAL-02). */
+.lim .v6-calc-steps { margin: 4px 0 var(--s3); }
+.lim .v6-calc-steps ol { list-style: none; counter-reset: calc-step; margin: 4px 0 0; padding: 0; font-size: 1em; }
+.lim .v6-calc-steps li {
+  counter-increment: calc-step; display: grid; grid-template-columns: 1.75em 1fr; gap: 6px;
+  margin: 0; padding: 8px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
+}
+.lim .v6-calc-steps li:last-child { border-bottom: 0; }
+.lim .v6-calc-steps li::before { content: counter(calc-step) "."; font-weight: 600; color: var(--sage); text-align: right; }
+
+/* ---------- Pictogrammes du kit ---------- */
+.kit-icon { flex-shrink: 0; vertical-align: middle; }
+.lim .block-label .kit-icon { margin-right: 6px; }
+.lim .retain-title .kit-icon { margin-right: 6px; }
+
+@media print {
+  .lim .lr-part-toggle, .lr-bulk { display: none !important; }
+  .lim .lr-part > .lr-part-body { display: block !important; }
+}
+.lim .lr-part-objective { font-weight: 400; }
+/* Sommaire hiérarchique : numérotation du cours (1., 1.1) à la place du compteur générique. */
+.toc .toc-chapter a::before, .toc .toc-parts a::before { content: none; }
+.toc .toc-parts li { border-bottom: 0; }
+.toc .toc-parts a { min-height: 44px; padding: 10px 0; font-weight: 450; }
+.toc .toc-n { min-width: 2.2em; display: inline-block; }
+.toc li:not(.toc-check) > a::before, .toc .toc-chapter-row > a::before { content: none; }
+/* Formule longue : « = » en tête de ligne, suite de ligne alignée après le signe (retrait suspendu). */
+.lim .formula-line + .formula-line { padding-left: 2em; text-indent: -1em; }
+/* Symboles : libellé et sens sur une ligne si la largeur suffit, sinon empilés (CAL-04). */
+.lim .symbols div { display: flex; flex-wrap: wrap; gap: 0 var(--s3); }
+.lim .symbols dt { flex: 0 0 auto; font-style: normal; font-weight: 600; min-width: 0; }
+.lim .symbols dd { flex: 1 1 12em; }
+.lim .v6-status:not(.is-sim) { padding: 0; background: none; }
