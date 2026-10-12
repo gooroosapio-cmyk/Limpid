@@ -7,7 +7,7 @@ import "server-only";
 import { siteUrl } from "@/lib/site";
 import { selectAll } from "@/lib/supabase/paginate";
 import { z } from "zod";
-import { activeProvider, limits } from "@/lib/config";
+import { activeProvider, budget as budgetCaps, limits } from "@/lib/config";
 import {
   Evidence,
   ExplanationObject,
@@ -312,9 +312,20 @@ async function recordUsage(job: JobRow, stage: string, attempt: number, u: Usage
  * le texte obtenu devient les segments de la source, puis l'original est effacé.
  * Sans effet si les segments existent déjà (reprise après remise en file).
  */
-async function checkBudget(ownerId: string) {
+/** Marge minimale réservée avant une étape (un appel encore possible). */
+const MIN_STEP_RESERVE_CENTS = 20;
+
+async function remainingReserve(jobId: string): Promise<number> {
+  const { data } = await adminClient().from("usage_ledger").select("actual_cents, reserved_cents").eq("job_id", jobId);
+  const spent = (data ?? []).reduce((sum, r) => sum + (r.actual_cents ?? r.reserved_cents ?? 0), 0);
+  return Math.max(MIN_STEP_RESERVE_CENTS, budgetCaps.perReportCapCents - spent);
+}
+
+async function checkBudget(ownerId: string, jobId?: string) {
   try {
-    await assertBudget(ownerId);
+    // Réserve restante de cette tâche seulement : ce qu'elle a déjà dépensé est déjà compté
+    // dans la journée (sinon un cours presque fini était bloqué par un double comptage).
+    await assertBudget(ownerId, jobId ? await remainingReserve(jobId) : undefined);
   } catch (e) {
     if (e instanceof BudgetError) throw new JobFailure(e.code);
     throw e;
@@ -339,7 +350,7 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
   } else if (pages.length === 0) return;
 
   await setStage(job.id, "extraction");
-  await checkBudget(job.owner_id);
+  await checkBudget(job.owner_id, job.id);
   if (!src?.storage_path || !(src.kind in OCR_MIME)) {
     // Document mixte dont l'original a disparu : on garde le texte natif, pages signalées.
     if (pages) return;
@@ -513,7 +524,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     }
   }
   await setStage(job.id, "validation");
-  await checkBudget(job.owner_id);
+  await checkBudget(job.owner_id, job.id);
   const segments = await loadSourceSet(sourceIds);
   const preferences = await preferencesOf(job.owner_id);
   const provider = getProvider();
@@ -717,7 +728,7 @@ async function runIllustrations(job: JobRow, blueprint: ReportBlueprint, control
     fallbacks: { left: imageFallbackCap(job.params.ai_tier ?? "plus") },
     render: async (route, style, item) => {
       // Plafonds vérifiés avant chaque image ; un refus laisse le cours sans image.
-      await checkBudget(job.owner_id);
+      await checkBudget(job.owner_id, job.id);
       const cut = transparentStyle(style);
       const base =
         style === "diagram"
@@ -803,7 +814,7 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
   if (!job.report_id || !variation || !baseId) throw new JobFailure("job_invalid");
   const db = adminClient();
   await setStage(job.id, "validation");
-  await checkBudget(job.owner_id);
+  await checkBudget(job.owner_id, job.id);
 
   const { data: base } = await db
     .from("report_versions")
