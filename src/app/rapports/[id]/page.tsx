@@ -13,6 +13,8 @@ import { getT } from "@/lib/i18n/server";
 import { readerV3Enabled } from "@/lib/reader/flags";
 import { offlineKey } from "@/lib/offline-key";
 import { loadReport } from "@/lib/reports/load";
+import { chapterPractice } from "@/lib/reports/reading";
+import { isAdminConfigured } from "@/lib/supabase/admin";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -95,6 +97,7 @@ export default async function ReportPage({
       doc={doc}
       readerV3={await readerV3Enabled()}
       quizzes={chapterQuizzes(report.explanation.sections)}
+      practice={report.isCurrent && isAdminConfigured() ? await chapterPractice(user.id, report.versionId).catch(() => ({})) : {}}
       reportId={report.isCurrent ? id : null}
       versionId={report.versionId}
       initialAnchor={report.progressAnchor}

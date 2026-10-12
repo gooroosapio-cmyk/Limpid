@@ -131,6 +131,13 @@ export const demoExplanation: ExplanationObject = {
         { id: "part_s2_1", title: "Ce qui se passe quand l'eau chauffe", objective: "Reconnaître l'évaporation.", block_ids: ["blk_3", "blk_4"] },
         { id: "part_s2_2", title: "Les plantes y participent aussi", objective: null, block_ids: ["blk_5"] },
       ],
+      quiz: [
+        { id: "q_1", prompt: "Qu'est-ce que l'évaporation ?", choices: ["L'eau liquide qui devient de la vapeur", "La vapeur qui retombe en pluie", "L'eau qui gèle"], correct_index: 0, explanations: ["Oui : chauffée, l'eau liquide devient de la vapeur.", "Ce passage-là, c'est la pluie : la vapeur est déjà dans le ciel.", "Geler, c'est l'inverse : l'eau refroidit et devient de la glace."], revisit_block_id: "blk_3", claim_ids: ["clm_3"] },
+        { id: "q_2", prompt: "Pourquoi le linge mouillé sèche-t-il au soleil ?", choices: ["L'eau du linge s'évapore", "Le tissu absorbe l'eau pour toujours", "Le soleil fait disparaître l'eau sans qu'elle aille nulle part"], correct_index: 0, explanations: ["Oui : l'eau part dans l'air sous forme de vapeur.", "Le tissu ne garde pas l'eau : elle s'en va.", "L'eau ne disparaît pas : elle devient de la vapeur."], revisit_block_id: "blk_3", claim_ids: ["clm_3"] },
+        { id: "q_3", prompt: "Que rejettent les plantes par leurs feuilles ?", choices: ["De la vapeur d'eau", "De la pluie", "Du sel"], correct_index: 0, explanations: ["Oui : c'est la transpiration des plantes.", "La pluie vient des nuages, pas des feuilles.", "Le cours ne parle pas de sel rejeté par les feuilles."], revisit_block_id: "blk_5", claim_ids: ["clm_4"] },
+        { id: "q_4", prompt: "Comment s'appelle le passage de l'eau liquide à la vapeur ?", choices: ["L'évaporation", "La transpiration", "La pluie"], correct_index: 0, explanations: ["Oui : c'est la définition de l'évaporation.", "La transpiration concerne les plantes.", "La pluie, c'est l'eau qui retombe."], revisit_block_id: "blk_3", claim_ids: ["clm_3"] },
+      ],
+
     },
     {
       id: "sec_3",
