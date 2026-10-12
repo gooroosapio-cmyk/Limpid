@@ -8,14 +8,14 @@ import { Fragment } from "react";
 import { Icon, type IconName } from "@/components/Icon";
 import type { Block, Evidence, ExerciseSet, ExplanationObject, ReportBlueprint, SourceSegment, VisualSpec } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
-import { parseRich, splitParagraph } from "@/lib/reader/rich";
+import { parseRich, sourceAnchor, splitParagraph } from "@/lib/reader/rich";
 import { sourceEntries, type SourceEntry } from "@/lib/render/sources";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { NotionTerm, type Notion } from "../Notions";
 import type { ProjectionStats } from "@/lib/reader/projection";
 import { partsCoverBlocks } from "@/lib/contracts/validate";
 import { KitIcon, type KitIconName } from "../KitIcon";
-import { SourceRef } from "../Sources";
+import { SourceChip, SourceMark } from "../Sources";
 import { VisualFigure, type AssetView } from "../Visuals";
 import { ChapterCheck } from "./ChapterCheck";
 import { AnnexLinks, EndActions } from "./EndActions";
@@ -54,7 +54,26 @@ function chunks<T>(list: T[], size: number): T[][] {
 }
 
 /** Texte du modèle : gras/italique légers, notions soulignées à leur première occurrence. */
-function Rich({ text, ctx, linkTerms = true }: { text: string; ctx: Ctx; linkTerms?: boolean }) {
+function Rich({ text, ctx, linkTerms = true, refs }: { text: string; ctx: Ctx; linkTerms?: boolean; refs?: string[] }) {
+  const known = refs ? knownRefs(refs, ctx) : [];
+  if (known.length) {
+    // Renvoi aux sources : un mot du passage surligné ouvre l'extrait (plus de numéros).
+    const anchor = sourceAnchor(text);
+    if (anchor) {
+      return (
+        <>
+          <Rich text={anchor.head} ctx={ctx} linkTerms={linkTerms} />
+          <SourceMark ids={known}>{anchor.word}</SourceMark>
+          {anchor.tail}
+        </>
+      );
+    }
+    return (
+      <>
+        <Rich text={text} ctx={ctx} linkTerms={linkTerms} /> <SourceChip ids={known} />
+      </>
+    );
+  }
   return (
     <>
       {parseRich(text).map((run, i) => {
@@ -74,12 +93,15 @@ function Rich({ text, ctx, linkTerms = true }: { text: string; ctx: Ctx; linkTer
   );
 }
 
+/** Sources connues d'un passage (celles qui ont une entrée dans le document). */
+function knownRefs(ids: string[], ctx: Ctx): string[] {
+  return [...new Set(ids)].filter((id) => ctx.numbers.has(id));
+}
+
+/** Renvoi détaché (tableau, frise, visuel) : petite pastille discrète, sans numéro. */
 function Refs({ ids, ctx }: { ids: string[]; ctx: Ctx }) {
-  const refs = [...new Set(ids)].flatMap((id) => {
-    const n = ctx.numbers.get(id);
-    return n ? [<SourceRef key={id} n={n} evidenceId={id} />] : [];
-  });
-  return refs.length ? <span className="refs">{refs}</span> : null;
+  const known = knownRefs(ids, ctx);
+  return known.length ? <span className="refs"><SourceChip ids={known} /></span> : null;
 }
 
 /** `plain` : paragraphe courant, replié derrière « Lire l'explication » en projection visuelle. */
@@ -125,7 +147,6 @@ function Label({ icon, children }: { icon?: IconName; children: React.ReactNode 
  */
 function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNode): React.ReactNode[] {
   const { t } = ctx;
-  const refs = <Refs ids={b.evidence_ids} ctx={ctx} />;
   const piece = (cls: string, body: React.ReactNode, a: PieceAttrs = {}) => (
     <div key={b.id} id={b.id} className={`piece ${cls}${float ? " wrap-host" : ""}`} {...attrs({ section, ...a })}>
       {float}
@@ -134,25 +155,25 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
   );
   switch (b.type) {
     case "fact":
-      if (b.emphasis === "key") return [piece("block block-key", <><Label icon="key-idea">{t.lim.keyIdea}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
-      if (float) return [piece("block", <p><Rich text={b.text} ctx={ctx} /> {refs}</p>)];
+      if (b.emphasis === "key") return [piece("block block-key", <><Label icon="key-idea">{t.lim.keyIdea}</Label><p><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p></>)];
+      if (float) return [piece("block", <p><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p>)];
       // Long paragraphe : paragraphes successifs (fins de phrase), références après la dernière.
       return splitParagraph(b.text).map((part, k, all) => (
         <div key={`${b.id}-${k}`} id={k === 0 ? b.id : `${b.id}-${k}`} className="piece block" {...attrs({ section, plain: true })}>
-          <p><Rich text={part} ctx={ctx} />{k === all.length - 1 && <> {refs}</>}</p>
+          <p><Rich text={part} ctx={ctx} refs={k === all.length - 1 ? b.evidence_ids : undefined} /></p>
         </div>
       ));
     case "definition":
       return [
         piece(
           "block block-definition",
-          <><Label icon="definition">{t.lim.definition}</Label><p><dfn>{b.term}</dfn> — <Rich text={b.text} ctx={ctx} linkTerms={false} /> {refs}</p></>,
+          <><Label icon="definition">{t.lim.definition}</Label><p><dfn>{b.term}</dfn> — <Rich text={b.text} ctx={ctx} linkTerms={false} refs={b.evidence_ids} /></p></>,
         ),
       ];
     case "inference":
-      return [piece("block block-inference", <><Label>{t.lim.inference}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
+      return [piece("block block-inference", <><Label>{t.lim.inference}</Label><p><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p></>)];
     case "caution":
-      return [piece("block block-caution", <><Label icon="caution">{t.lim.caution}</Label><p><Rich text={b.text} ctx={ctx} /> {refs}</p></>)];
+      return [piece("block block-caution", <><Label icon="caution">{t.lim.caution}</Label><p><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p></>)];
     case "complement":
       return [piece("block block-complement", <><Label>{t.lim.complement}</Label><p><Rich text={b.text} ctx={ctx} linkTerms={false} /></p></>)];
     case "analogy":
@@ -180,7 +201,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
                 ))}
               </dl>
             )}
-            <p><Rich text={b.text} ctx={ctx} /> {refs}</p>
+            <p><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p>
           </>,
         ),
       ];
@@ -188,7 +209,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
       const ordered = b.style !== "bullets";
       const groups = chunks(b.items, CHUNK);
       const intro = (
-        <p className="list-intro"><Rich text={b.text} ctx={ctx} /> {refs}</p>
+        <p className="list-intro"><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p>
       );
       return groups.map((items, g) => {
         const Tag = ordered ? "ol" : "ul";
@@ -204,7 +225,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
             {g === 0 && intro}
             <Tag {...(ordered ? { start } : {})}>
               {items.map((it, k) => (
-                <li key={k}><Rich text={it.text} ctx={ctx} /> <Refs ids={it.evidence_ids} ctx={ctx} /></li>
+                <li key={k}><Rich text={it.text} ctx={ctx} refs={it.evidence_ids} /></li>
               ))}
             </Tag>
           </div>
@@ -218,9 +239,9 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
           "block block-v6 block-steps",
           <Steps
             label={t.blocks6.stepsLabel}
-            intro={<Rich text={b.text} ctx={ctx} />}
-            refs={refs}
-            items={b.items.map((it) => ({ title: it.title, body: <Rich text={it.text} ctx={ctx} />, refs: <Refs ids={it.evidence_ids} ctx={ctx} /> }))}
+            intro={<Rich text={b.text} ctx={ctx} refs={b.evidence_ids} />}
+            refs={null}
+            items={b.items.map((it) => ({ title: it.title, body: <Rich text={it.text} ctx={ctx} refs={it.evidence_ids} />, refs: null }))}
           />,
         ),
       ];
@@ -231,9 +252,9 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
           <Timeline
             label={t.blocks6.timeline}
             orderLabel={t.blocks6.order[b.order]}
-            intro={<Rich text={b.text} ctx={ctx} />}
-            refs={refs}
-            events={b.events.map((ev) => ({ date: ev.date, title: ev.title, body: <Rich text={ev.text} ctx={ctx} />, refs: <Refs ids={ev.evidence_ids} ctx={ctx} /> }))}
+            intro={<Rich text={b.text} ctx={ctx} refs={b.evidence_ids} />}
+            refs={null}
+            events={b.events.map((ev) => ({ date: ev.date, title: ev.title, body: <Rich text={ev.text} ctx={ctx} refs={ev.evidence_ids} />, refs: null }))}
           />,
         ),
       ];
@@ -245,8 +266,8 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
             label={t.blocks6.comparison}
             scrollLabel={t.blocks6.tableScroll}
             missing={t.blocks6.missing}
-            intro={<Rich text={b.text} ctx={ctx} />}
-            refs={refs}
+            intro={<Rich text={b.text} ctx={ctx} refs={b.evidence_ids} />}
+            refs={null}
             columns={b.columns}
             rows={b.rows.map((r) => ({ cells: r.cells, refs: <Refs ids={r.evidence_ids} ctx={ctx} /> }))}
           />,
@@ -264,8 +285,8 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
             restLabel={b.rest_label}
             interactive={b.interactive}
             example={b.example}
-            intro={<Rich text={b.text} ctx={ctx} />}
-            refs={refs}
+            intro={<Rich text={b.text} ctx={ctx} refs={b.evidence_ids} />}
+            refs={null}
           />,
         ),
       ];
@@ -279,19 +300,19 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
             steps={b.steps}
             interactive={b.interactive}
             example={b.example}
-            intro={<Rich text={b.text} ctx={ctx} />}
-            refs={refs}
+            intro={<Rich text={b.text} ctx={ctx} refs={b.evidence_ids} />}
+            refs={null}
           />,
         ),
       ];
     case "chart":
-      return [piece("block block-v6 block-chart", <Chart chartType={b.chart_type} unit={b.unit} points={b.points} intro={<Rich text={b.text} ctx={ctx} />} refs={refs} />)];
+      return [piece("block block-v6 block-chart", <Chart chartType={b.chart_type} unit={b.unit} points={b.points} intro={<Rich text={b.text} ctx={ctx} refs={b.evidence_ids} />} refs={null} />)];
     case "details":
       return [
         piece(
           "block block-v6 block-details",
           <Details summary={b.summary}>
-            <p><Rich text={b.text} ctx={ctx} /> {refs}</p>
+            <p><Rich text={b.text} ctx={ctx} refs={b.evidence_ids} /></p>
           </Details>,
         ),
       ];
@@ -299,7 +320,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
       return [
         piece(
           "block block-v6 block-scene",
-          <Scene asset={b.asset} alt={t.blocks6.scenes[b.asset]} note={t.blocks6.sceneNote} caption={<><Rich text={b.text} ctx={ctx} linkTerms={false} /> {refs}</>} />,
+          <Scene asset={b.asset} alt={t.blocks6.scenes[b.asset]} note={t.blocks6.sceneNote} caption={<><Rich text={b.text} ctx={ctx} linkTerms={false} refs={b.evidence_ids} /></>} />,
         ),
       ];
   }
@@ -454,6 +475,22 @@ export function composeLimpid({
     </header>,
     <section key="keypoints" id="lim_keypoints" className="piece keypoints" aria-labelledby="kp-h" {...attrs({})}>
       <h2 id="kp-h" className="keypoints-title">{t.lim.keyPoints}</h2>
+      {chapters.length > 1 && (
+        // « Objectifs du cours » : but du cours puis parcours, tiré des chapitres réels.
+        <div className="course-goals">
+          <h3 className="course-goals-title">{t.lim.courseGoals}</h3>
+          <p className="course-goals-intro">{explanation.course_goal ?? t.lim.courseGoalsFallback(chapters.length)}</p>
+          <ol className="course-path">
+            {ordered.map(({ s }, i) => (
+              <li key={s.id}>
+                <span className="course-path-n" aria-hidden="true">{i + 1}</span>
+                <span className="course-path-text"><strong>{s.question}</strong>{s.objective && <span className="course-path-obj">{s.objective}</span>}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      <h3 className="keypoints-sub">{t.lim.keyPointsSub}</h3>
       <ul>{keyPoints.map((k, i) => <li key={i}><Rich text={k} ctx={ctx} linkTerms={false} /></li>)}</ul>
       {explanation.short_result && <p className="notice short-result" role="note">{t.lim.shortResult}</p>}
     </section>,

@@ -98,6 +98,15 @@ export function LimpidReader({
   const nextRef = useRef<HTMLButtonElement>(null);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const chapter: Chapter | null = chapters[index] ?? null;
+  // Fin de chapitre : « J'ai terminé la lecture » ouvre le QCM ; « Chapitre suivant » vient après.
+  const [end, setEnd] = useState<{ id: string; quizDone: boolean } | null>(null);
+  const endFor = end?.id ?? null;
+  const endQuizDone = !!end && end.id === chapter?.id && end.quizDone;
+  const hasQuiz = !!chapter && !!quizzes[chapter.id]?.length;
+  const quizFinished = useCallback(() => {
+    setEnd((e) => (e ? { ...e, quizDone: true } : e));
+    requestAnimationFrame(() => nextRef.current?.focus());
+  }, []);
   const [askOpened, setAskOpened] = useState(false);
   // Sommaire : à chaque ouverture, seul le chapitre courant est déplié (NAV-01).
   const [tocAll, setTocAll] = useState<boolean | null>(null);
@@ -488,8 +497,9 @@ export function LimpidReader({
       </header>
 
       <div ref={deckRef} className="deck continuous" tabIndex={0} role="region" aria-label={t.lim.deckLabel}>
-        <div ref={colRef} className="deck-col chapters" data-motion={motion || undefined}>{children}</div>
+        {/* Vue guidée : la console de navigation est au-dessus du texte (retour lecteur). */}
         {proj.bar}
+        <div ref={colRef} className="deck-col chapters" data-motion={motion || undefined}>{children}</div>
       </div>
 
       {host && chapter &&
@@ -518,26 +528,40 @@ export function LimpidReader({
               <p className="chapter-end-title">{t.lim.chapterEnd}</p>
               <p className="chapter-end-sub">{index < chapters.length - 1 ? t.lim.chapterEndNext : t.lim.chapterEndLast}</p>
             </div>
-            {/* Seul le chapitre ouvert : y revenir plus tard remonte le QCM = nouvelle visite, nouveau lot. */}
-            {chapters[index] && quizzes[chapters[index].id]?.length ? (
-              <div key={chapters[index].id} className="chapter-end-quiz">
-                <ChapterQuiz sectionId={chapters[index].id} quiz={quizzes[chapters[index].id]!} onSkip={() => nextRef.current?.focus()} />
+            {/* Fin de chapitre (retour lecteur) : « J'ai terminé la lecture », puis le QCM du
+                chapitre, puis « Chapitre suivant ». Revenir plus tard = nouvelle visite, nouveau lot. */}
+            {endFor !== chapter.id ? (
+              <div className="chapter-end-read">
+                {hasQuiz && <p className="muted small">{t.lim.readDoneHint}</p>}
+                <button type="button" className="btn btn-primary btn-block chapter-read" onClick={() => setEnd({ id: chapter.id, quizDone: !hasQuiz })}>
+                  <Icon name="check" size={18} /> {t.lim.readDone}
+                </button>
               </div>
-            ) : null}
-            <nav className="chapter-nav" aria-label={t.lim.chapterNav}>
-              <button type="button" className="btn chapter-prev" disabled={index === 0} onClick={() => openChapter(index - 1)}>
-                <Icon name="back" size={18} /> {t.lim.prevChapter}
-              </button>
-              {index < chapters.length - 1 ? (
-                <button ref={nextRef} type="button" className="btn btn-primary chapter-next" onClick={() => openChapter(index + 1)}>
-                  {t.lim.nextChapter} <Icon name="arrow" size={18} />
-                </button>
-              ) : (
-                <button ref={nextRef} type="button" className="btn chapter-next" aria-haspopup="dialog" onClick={openToc}>
-                  <Icon name="list" size={18} /> {t.lim.toc}
-                </button>
-              )}
-            </nav>
+            ) : (
+              <>
+                {hasQuiz && (
+                  <div key={chapter.id} className="chapter-end-quiz">
+                    <ChapterQuiz sectionId={chapter.id} quiz={quizzes[chapter.id]!} onDone={quizFinished} />
+                  </div>
+                )}
+                {endQuizDone && (
+                  <nav className="chapter-nav" aria-label={t.lim.chapterNav}>
+                    <button type="button" className="btn chapter-prev" disabled={index === 0} onClick={() => openChapter(index - 1)}>
+                      <Icon name="back" size={18} /> {t.lim.prevChapter}
+                    </button>
+                    {index < chapters.length - 1 ? (
+                      <button ref={nextRef} type="button" className="btn btn-primary chapter-next" onClick={() => openChapter(index + 1)}>
+                        {t.lim.nextChapter} <Icon name="arrow" size={18} />
+                      </button>
+                    ) : (
+                      <button ref={nextRef} type="button" className="btn chapter-next" aria-haspopup="dialog" onClick={openToc}>
+                        <Icon name="list" size={18} /> {t.lim.toc}
+                      </button>
+                    )}
+                  </nav>
+                )}
+              </>
+            )}
           </section>,
           host,
         )}
@@ -559,8 +583,8 @@ export function LimpidReader({
         {chapterIndex >= 0 && <p className="muted small toc-where">{t.lim.chapterOf(chapterIndex + 1, chapters.length)}</p>}
         {chapters.some((c) => c.parts?.length) && (
           <div className="lr-bulk" role="group" aria-label={t.lim.toc}>
-            <button type="button" className="lr-bulk-btn" onClick={() => { setTocAll(true); setTocKey((k) => k + 1); }}>{t.lim.tocExpandAll}</button>
-            <button type="button" className="lr-bulk-btn" onClick={() => { setTocAll(false); setTocKey((k) => k + 1); }}>{t.lim.tocCollapseAll}</button>
+            <button type="button" className="lr-bulk-btn" onClick={() => { setTocAll(true); setTocKey((k) => k + 1); }}><KitIcon name="expand" size={14} />{t.lim.tocExpandAll}</button>
+            <button type="button" className="lr-bulk-btn" onClick={() => { setTocAll(false); setTocKey((k) => k + 1); }}><KitIcon name="collapse" size={14} />{t.lim.tocCollapseAll}</button>
           </div>
         )}
         <nav className="toc" aria-labelledby="toc-h">
@@ -596,8 +620,8 @@ export function LimpidReader({
               {chapter?.parts?.length ? (
                 <div className="lr-bulk" role="group" aria-label={t.lim.partsScope}>
                   <p className="lr-bulk-label">{t.lim.partsScope}</p>
-                  <button type="button" className="lr-bulk-btn" onClick={() => { setParts(chapter.id, true); optionsDialog.current?.close(); }}>{t.lim.expandParts}</button>
-                  <button type="button" className="lr-bulk-btn" onClick={() => { setParts(chapter.id, false); optionsDialog.current?.close(); }}>{t.lim.collapseParts}</button>
+                  <button type="button" className="lr-bulk-btn" onClick={() => { setParts(chapter.id, true); optionsDialog.current?.close(); }}><KitIcon name="expand" size={14} />{t.lim.expandParts}</button>
+                  <button type="button" className="lr-bulk-btn" onClick={() => { setParts(chapter.id, false); optionsDialog.current?.close(); }}><KitIcon name="collapse" size={14} />{t.lim.collapseParts}</button>
                 </div>
               ) : null}
               {proj.on ? <ProjectionPicker choice={proj.choice} projection={proj.projection} reason={proj.reason} onChange={proj.setChoice} /> : null}
@@ -666,7 +690,7 @@ function TocChapter({
   const total = parts.length || 1;
   const status = (
     <span className="toc-status">
-      {seen > 0 && <span className="toc-tag"><KitIcon name="read" size={14} />{t.lim.consulted(seen, total)}</span>}
+      {seen > 0 && <span className="toc-tag is-seen"><KitIcon name="read" size={12} />{t.lim.consulted(seen, total)}</span>}
       {practice?.success && <span className="toc-tag is-success"><KitIcon name="success" size={14} />{t.lim.practiceSuccess}</span>}
       {practice?.review && <span className="toc-tag is-review"><KitIcon name="review" size={14} />{t.lim.reviewTag}</span>}
     </span>

@@ -270,7 +270,7 @@ describe("moteur V5 : plan", () => {
   const ch = (claim_ids: string[], visual = visualNone) => ({ title: "T", objective: "O", claim_ids, difficulty: "standard" as const, approach: "livre" as const, notions: [], visual: visual as PlanV5["chapters"][number]["visual"] });
 
   it("chaque affirmation dans un seul chapitre, oubliées rattachées au plus proche", () => {
-    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters: [ch(["clm_1", "clm_9"]), ch(["clm_1", "clm_4"])], excluded: [], limitations: [] };
+    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], course_goal: "", chapters: [ch(["clm_1", "clm_9"]), ch(["clm_1", "clm_4"])], excluded: [], limitations: [] };
     const { plan: p, orphans } = normalizePlanV5(draft, ko, input());
     expect(orphans).toEqual(["clm_2", "clm_3"]);
     expect(p.chapters.map((c) => c.claim_ids)).toEqual([["clm_1", "clm_2", "clm_3"], ["clm_4"]]);
@@ -296,7 +296,7 @@ describe("moteur V5 : plan", () => {
   it("images selon le forfait et l'approche (une place gardée à la couverture), aucune en résumé fidèle ou en texte seul", () => {
     const v = { kind: "vector", subject: "s", query_en: "q", purpose: "p", content: "" };
     const chapters = Array.from({ length: 6 }, (_, i) => ch([`clm_${(i % 4) + 1}`], v));
-    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], chapters, excluded: [], limitations: [] };
+    const draft: PlanV5 = { title: "T", cover_query_en: "", key_points: ["a", "b"], course_goal: "", chapters, excluded: [], limitations: [] };
     const count = (o: Parameters<typeof input>[0]) => normalizePlanV5(draft, ko, input(o)).plan.chapters.filter((c) => c.visual.kind !== "none").length;
     // Gratuit et Essentiel : 2 au total, dont 1 gardée pour la couverture.
     expect(count({ tier: "free" })).toBe(1);
