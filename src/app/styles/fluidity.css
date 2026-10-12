@@ -261,3 +261,20 @@
 }
 .lesson-phase { display: grid; gap: 4px; margin-top: 4px; }
 .lesson-phase .gt-progress { margin-top: 0; max-width: 160px; }
+
+/* « Votre approche » : une ligne par option sur mobile (icône, titre + description, choix),
+   alignement régulier même avec un texte agrandi. Deux colonnes seulement si la place suffit. */
+.import .mode-grid { grid-template-columns: 1fr; gap: 8px; }
+.import .mode-card {
+  grid-template-columns: 24px minmax(0, 1fr) 22px; align-items: center; column-gap: 12px;
+  min-height: 56px; padding: 12px 14px;
+}
+.import .mode-card .mode-ic { align-self: start; padding-top: 1px; }
+.import .mode-txt { display: grid; gap: 2px; min-width: 0; }
+.import .mode-card strong, .import .mode-desc { overflow-wrap: normal; hyphens: none; }
+.import .mode-radio { align-self: center; }
+@media (min-width: 640px) {
+  .import .mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .import .mode-card { align-items: start; }
+  .import .mode-card .mode-ic, .import .mode-radio { align-self: start; }
+}
