@@ -77,10 +77,13 @@ export function Preparations({ running, failed, initialTab }: { running: Running
   const router = useRouter();
   const [tab, setTab] = useState<"running" | "failed">(initialTab);
 
-  // Tant qu'une préparation tourne, la liste est relue toutes les 8 s (état serveur réel).
+  // Tant qu'une préparation tourne et que la page est visible, la liste est relue toutes les
+  // 8 s (état serveur réel) ; page masquée : aucune requête, le travail continue sur le serveur.
   useEffect(() => {
     if (running.length === 0) return;
-    const id = setInterval(() => router.refresh(), 8_000);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 8_000);
     return () => clearInterval(id);
   }, [running.length, router]);
 

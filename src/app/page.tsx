@@ -62,6 +62,7 @@ export default async function HomeImportPage({ searchParams }: { searchParams: P
         maxFileMb={Math.round(limits.maxFileBytes / 1024 / 1024)}
         maxPages={limits.maxPages}
         defaultMode={Mode.safeParse(prefs?.default_mode).data ?? "auto"}
+        folderId={/^[0-9a-f-]{36}$/i.test(sp.ranger ?? "") ? sp.ranger : null}
         hero
       />
       <HomeSections items={library.items} />

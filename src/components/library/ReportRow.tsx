@@ -26,6 +26,9 @@ export interface RowData {
   favorite: boolean;
   cover: CoverView;
   sourceCount: number;
+  /** Préparation en cours : phase réelle (« Explications · 4/9 ») et avancement. */
+  phase?: string | null;
+  progress?: { done: number; total: number } | null;
 }
 
 const LONG_PRESS = 500;
@@ -41,7 +44,8 @@ async function patch(id: string, body: Record<string, unknown>): Promise<boolean
 export function StatusLabel({ state }: { state: RowData["state"] }) {
   const t = useT();
   const icon: IconName = state === "failed" ? "alert" : state === "running" ? "hourglass" : "check";
-  const label = state === "failed" ? t.v4.failure.label : state === "running" ? t.library.v2.preparing : t.library.v2.ready;
+  // Badges du prompt « Fluidité » : Prêt, En cours, À reprendre (jamais la couleur seule).
+  const label = state === "failed" ? t.fluid.nav.toResume : state === "running" ? t.fluid.nav.running : t.library.v2.ready;
   return (
     <span className={`status status-${state}`}>
       <Icon name={icon} size={14} />
@@ -226,6 +230,12 @@ export function ReportRow({
           {favorite && <span className="lesson-fav-mark" role="img" aria-label={t.v4.library.favorite}><Icon name="heart" size={14} className="is-on" /></span>}
         </span>
         {row.state === "failed" && row.reason && <small className="lesson-reason">{row.reason}</small>}
+        {row.state === "running" && row.phase && (
+          <span className="lesson-phase">
+            <small className="meta">{row.phase}</small>
+            {row.progress && <progress className="gt-progress" value={row.progress.done} max={row.progress.total} aria-hidden="true" />}
+          </span>
+        )}
         {row.folderName && <small className="meta lesson-folder">{t.library.inFolder(row.folderName)}</small>}
       </span>
     </>
