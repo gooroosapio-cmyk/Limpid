@@ -491,6 +491,8 @@ export function composeLimpid({
       let at = 0;
       const byBlock = new Map<string, React.ReactNode[]>();
       for (const node of body) {
+        // Pièce absente (illustration masquée…) : rien à ranger.
+        if (node == null || typeof node !== "object") continue;
         const id = (node as React.ReactElement<{ id?: string }>).props?.id;
         if (typeof id === "string" && s.blocks.some((b) => b.id === id)) at = s.blocks.findIndex((b) => b.id === id);
         const owner = s.blocks[at]!.id;
