@@ -27,6 +27,7 @@ import "./styles/reader-carousel.css";
 import "./styles/roles.css";
 import "./styles/motion.css";
 import "./styles/kit-v4.css";
+import "./styles/reader-kit-v5.css";
 import "./styles/tailwind.css";
 
 export const metadata: Metadata = {

@@ -1,8 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Icon } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
+import { KitIcon } from "../KitIcon";
 import { computeCalculation, formatNumber, formulaText, inDomain, resultUnit, variableDomain, type FormulaId } from "@/lib/render/calc";
 
 interface Variable {
@@ -65,7 +65,7 @@ export function Calculation({
   return (
     <div className="v6-card v6-calc">
       <div className="v6-card-head">
-        <span className="block-label"><Icon name="formula" size={14} />{t.formulas[formula]}</span>
+        <span className="block-label"><KitIcon name="calculation" size={16} />{t.formulas[formula]}</span>
         {example && <span className="v6-pill">{t.example}</span>}
       </div>
       <p className="v6-intro">{intro} {refs}</p>
@@ -115,6 +115,16 @@ export function Calculation({
           ))}
         </dl>
       )}
+      {steps.length > 0 && (
+        <div className="v6-calc-steps">
+          <p className="v6-result-label">{t.steps}</p>
+          <ol>
+            {steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      )}
       <div className="v6-calc-result" aria-live="polite">
         <span className="v6-result-label">{t.result}</span>
         {result !== null ? (
@@ -131,20 +141,13 @@ export function Calculation({
       </div>
       <div className={`v6-status${changed ? " is-sim" : ""}`} role="status">
         {changed && <p className="v6-status-title">{t.simulation}</p>}
-        <p className="v6-status-ref">
-          {t.formula} : <span className="v6-mono">{formulaText(formula, va.value, vb.value, t.locale)} = {refResult !== null ? withUnit(refResult) : t.unavailable}</span>
-        </p>
+        {/* Valeurs d'origine rappelées seulement pendant une simulation (sinon redite du résultat). */}
+        {changed && (
+          <p className="v6-status-ref">
+            {t.formula} : <span className="v6-mono">{formulaText(formula, va.value, vb.value, t.locale)} = {refResult !== null ? withUnit(refResult) : t.unavailable}</span>
+          </p>
+        )}
       </div>
-      {steps.length > 0 && (
-        <div className="v6-calc-steps">
-          <p className="v6-result-label">{t.steps}</p>
-          <ol>
-            {steps.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ol>
-        </div>
-      )}
     </div>
   );
 }

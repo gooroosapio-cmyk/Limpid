@@ -16,10 +16,13 @@ import { ReformulatePanel } from "./ReformulatePanel";
 import { ProjectionPicker, useProjection } from "./projection";
 import type { ProjectionStats } from "@/lib/reader/projection";
 import { useDialogHistory } from "@/components/shell/useDialogHistory";
+import { KitIcon } from "../KitIcon";
 
 export interface Chapter {
   id: string;
   title: string;
+  /** Kit V5 : sous-chapitres (vide pour un cours plus ancien). */
+  parts?: { id: string; title: string }[];
 }
 
 /** Pièce de premier niveau de l'article, rattachée à un chapitre. */
@@ -56,7 +59,7 @@ export function LimpidReader({
   reportId,
   versionId,
   chapters,
-  initialAnchor: _initialAnchor,
+  initialAnchor,
   bilan,
   insufficient,
   options,
@@ -92,6 +95,14 @@ export function LimpidReader({
   const touch = useRef<{ x: number; y: number } | null>(null);
   const chapter: Chapter | null = chapters[index] ?? null;
   const [askOpened, setAskOpened] = useState(false);
+  // Sommaire : à chaque ouverture, seul le chapitre courant est déplié (NAV-01).
+  const [tocAll, setTocAll] = useState<boolean | null>(null);
+  const [tocKey, setTocKey] = useState(0);
+  const openToc = () => {
+    setTocAll(null);
+    setTocKey((k) => k + 1);
+    tocDialog.current?.showModal();
+  };
   const [askQuestion, setAskQuestion] = useState("");
   const tocDialog = useRef<HTMLDialogElement>(null);
   const optionsDialog = useRef<HTMLDialogElement>(null);
@@ -207,19 +218,32 @@ export function LimpidReader({
   /** Défile jusqu'à un élément (compensation de l'en-tête par scroll-margin en CSS). */
   const scrollToId = useCallback((id: string, smooth = false) => {
     const target = document.getElementById(id);
+    // Kit V5 (NAV-05) : un accès direct déplie le sous-chapitre de destination.
+    for (let d = target?.closest("details"); d; d = d.parentElement?.closest("details") ?? null) d.open = true;
     if (target) reveal(target);
     target?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   }, [reveal]);
 
+  /** Déplie (ou replie) les sous-chapitres d'un chapitre : présentation seulement (NAV-04). */
+  const setParts = useCallback((chapterId: string, open: boolean) => {
+    document.querySelectorAll<HTMLDetailsElement>(`details.lr-part[data-section="${CSS.escape(chapterId)}"]`).forEach((d) => {
+      // Un sous-chapitre replié qui contient le focus le rend à son contrôle (NAV-06).
+      if (!open && d.contains(document.activeElement) && document.activeElement !== d.querySelector("summary")) d.querySelector("summary")?.focus();
+      d.open = open;
+    });
+  }, []);
+
   /** Ouvre le chapitre `i` : masque les autres, remonte en tête, focus sur le titre. */
   const openChapter = useCallback(
-    (i: number, opts: { animate?: boolean; focus?: boolean; then?: () => void } = {}) => {
+    (i: number, opts: { animate?: boolean; focus?: boolean; reopen?: boolean; then?: () => void } = {}) => {
       if (i < 0 || i >= chapters.length || busyRef.current) return;
       const from = indexRef.current;
       const finish = () => {
         indexRef.current = i;
         setIndex(i);
         apply(i);
+        // Kit V5 (LEC-01) : ouvrir un chapitre affiche tous ses sous-chapitres ouverts.
+        if (i !== from || opts.reopen) setParts(chapters[i]!.id, true);
         if (opts.then) opts.then();
         else {
           const deck = deckRef.current;
@@ -247,7 +271,7 @@ export function LimpidReader({
         }, IN_MS);
       }, OUT_MS);
     },
-    [chapters, apply],
+    [chapters, apply, setParts],
   );
 
   /** Va à un élément : ouvre d'abord son chapitre, puis y défile. */
@@ -258,7 +282,7 @@ export function LimpidReader({
       const target = chapterOf(el);
       const isTitle = chapters.some((c) => c.id === id);
       if (target === null || target === indexRef.current) {
-        if (isTitle && target !== null) openChapter(target, { animate: false });
+        if (isTitle && target !== null) openChapter(target, { animate: false, reopen: true });
         else scrollToId(id, smooth);
         return;
       }
@@ -273,7 +297,19 @@ export function LimpidReader({
     const back = url.searchParams.get("a");
     const hash = decodeURIComponent(url.hash.slice(1));
     const anchor = back && ANCHOR_RE.test(back) ? back : hash && ANCHOR_RE.test(hash) ? hash : null;
-    if (!anchor || !host) return;
+    if (!host) return;
+    if (!anchor) {
+      // Kit V5 (reprise) : retour au DÉBUT du chapitre où la lecture s'était arrêtée, avec son
+      // objectif et l'essentiel ; résultats et historique sont conservés à part.
+      let last = initialAnchor;
+      try {
+        last = localStorage.getItem(progressKey(reportId ?? "demo")) ?? last;
+      } catch {}
+      const el = last && ANCHOR_RE.test(last) ? document.getElementById(last) : null;
+      const target = el ? chapterOf(el) : null;
+      if (target !== null && target > 0) openChapter(target, { animate: false, focus: false });
+      return;
+    }
     void document.fonts.ready.then(() => {
       reach(anchor, false);
       if (back) {
@@ -439,7 +475,7 @@ export function LimpidReader({
                   {t.lim.nextChapter} <Icon name="arrow" size={18} />
                 </button>
               ) : (
-                <button ref={nextRef} type="button" className="btn chapter-next" aria-haspopup="dialog" onClick={() => tocDialog.current?.showModal()}>
+                <button ref={nextRef} type="button" className="btn chapter-next" aria-haspopup="dialog" onClick={openToc}>
                   <Icon name="list" size={18} /> {t.lim.toc}
                 </button>
               )}
@@ -449,7 +485,7 @@ export function LimpidReader({
         )}
 
       <nav className="rbar rbar-v5" aria-label={t.lim.readerBar}>
-        <button type="button" className="rb" aria-haspopup="dialog" onClick={() => tocDialog.current?.showModal()}>
+        <button type="button" className="rb" aria-haspopup="dialog" onClick={openToc}>
           <Icon name="list" /> <span>{t.lim.toc}</span>
         </button>
         <button type="button" className="rb" aria-haspopup="dialog" onClick={openAsk}>
@@ -463,17 +499,26 @@ export function LimpidReader({
       <dialog ref={tocDialog} className="sheet side" aria-labelledby="toc-h">
         {head("toc-h", t.reader.inThisReport, tocDialog)}
         {chapterIndex >= 0 && <p className="muted small toc-where">{t.lim.chapterOf(chapterIndex + 1, chapters.length)}</p>}
+        {chapters.some((c) => c.parts?.length) && (
+          <div className="lr-bulk" role="group" aria-label={t.lim.toc}>
+            <button type="button" className="lr-bulk-btn" onClick={() => { setTocAll(true); setTocKey((k) => k + 1); }}>{t.lim.tocExpandAll}</button>
+            <button type="button" className="lr-bulk-btn" onClick={() => { setTocAll(false); setTocKey((k) => k + 1); }}>{t.lim.tocCollapseAll}</button>
+          </div>
+        )}
         <nav className="toc" aria-labelledby="toc-h">
           <ol>
             <li>
               <a href="#lim_keypoints" onClick={(e) => { e.preventDefault(); api.goTo("lim_keypoints"); }}>{t.lim.keyPoints}</a>
             </li>
-            {chapters.map((c) => (
-              <li key={c.id}>
-                <a href={`#${c.id}`} aria-current={chapter?.id === c.id ? "location" : undefined} onClick={(e) => { e.preventDefault(); api.goTo(c.id); }}>
-                  {c.title}
-                </a>
-              </li>
+            {chapters.map((c, ci) => (
+              <TocChapter
+                key={`${c.id}-${tocKey}`}
+                chapter={c}
+                n={ci + 1}
+                current={chapter?.id === c.id}
+                onGo={(id) => api.goTo(id)}
+                forced={tocAll}
+              />
             ))}
             <li className="toc-check">
               <a href="#end_bilan" onClick={(e) => { e.preventDefault(); api.goTo("end_bilan"); }}>{t.lim.bilanCta}</a>
@@ -486,7 +531,18 @@ export function LimpidReader({
         {head("opt-h", t.lim.options, optionsDialog)}
         <OptionsPanel
           data={options}
-          reading={proj.on ? <ProjectionPicker choice={proj.choice} projection={proj.projection} reason={proj.reason} onChange={proj.setChoice} /> : null}
+          reading={
+            <>
+              {chapter?.parts?.length ? (
+                <div className="lr-bulk" role="group" aria-label={t.lim.partsScope}>
+                  <p className="lr-bulk-label">{t.lim.partsScope}</p>
+                  <button type="button" className="lr-bulk-btn" onClick={() => { setParts(chapter.id, true); optionsDialog.current?.close(); }}>{t.lim.expandParts}</button>
+                  <button type="button" className="lr-bulk-btn" onClick={() => { setParts(chapter.id, false); optionsDialog.current?.close(); }}>{t.lim.collapseParts}</button>
+                </div>
+              ) : null}
+              {proj.on ? <ProjectionPicker choice={proj.choice} projection={proj.projection} reason={proj.reason} onChange={proj.setChoice} /> : null}
+            </>
+          }
           onNavigate={() => optionsDialog.current?.close()}
           annexHref={(hash) => annex?.href(hash, anchorRef.current) ?? `#${hash}`}
           onAnnex={(hash) => annex?.open(hash, anchorRef.current)}
@@ -516,5 +572,61 @@ export function LimpidReader({
         <ReformulatePanel reportId={reportId} onDone={() => reformDialog.current?.close()} />
       </dialog>
     </ReaderCtx.Provider>
+  );
+}
+
+/**
+ * Entrée de chapitre du sommaire (kit V5, NAV-01 à NAV-05) : le lien va au chapitre, le chevron
+ * distinct affiche ou masque ses sous-chapitres. Seul le chapitre courant est déplié au départ ;
+ * en déplier un autre ne ferme pas le premier.
+ */
+function TocChapter({
+  chapter,
+  n,
+  current,
+  forced,
+  onGo,
+}: {
+  chapter: Chapter;
+  n: number;
+  current: boolean;
+  forced: boolean | null;
+  onGo: (id: string) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(forced ?? current);
+  const parts = chapter.parts ?? [];
+  const listId = `toc-parts-${chapter.id}`;
+  return (
+    <li className="toc-chapter">
+      <div className="toc-chapter-row">
+        <a href={`#${chapter.id}`} aria-current={current ? "location" : undefined} onClick={(e) => { e.preventDefault(); onGo(chapter.id); }}>
+          <span className="toc-n">{n}.</span> {chapter.title}
+        </a>
+        {parts.length > 0 && (
+          <button
+            type="button"
+            className="lr-toggle"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-label={open ? t.lim.tocCollapse(chapter.title) : t.lim.tocExpand(chapter.title)}
+            onClick={() => setOpen((o) => !o)}
+          >
+            <KitIcon name="expand" size={16} className={open ? "is-open" : undefined} />
+          </button>
+        )}
+      </div>
+      {parts.length > 0 && (
+        <ol id={listId} className="toc-parts" hidden={!open}>
+          {parts.map((p, k) => (
+            <li key={p.id}>
+              <a href={`#${p.id}`} onClick={(e) => { e.preventDefault(); onGo(p.id); }}>
+                <span className="toc-n">{n}.{k + 1}</span> {p.title}
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+    </li>
   );
 }

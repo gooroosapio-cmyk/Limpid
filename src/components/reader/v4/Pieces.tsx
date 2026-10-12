@@ -13,6 +13,8 @@ import { sourceEntries, type SourceEntry } from "@/lib/render/sources";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { NotionTerm, type Notion } from "../Notions";
 import type { ProjectionStats } from "@/lib/reader/projection";
+import { partsCoverBlocks } from "@/lib/contracts/validate";
+import { KitIcon, type KitIconName } from "../KitIcon";
 import { SourceRef } from "../Sources";
 import { VisualFigure, type AssetView } from "../Visuals";
 import { ChapterCheck } from "./ChapterCheck";
@@ -93,8 +95,27 @@ function attrs(a: PieceAttrs) {
   };
 }
 
+/**
+ * Formule écrite par le code (kit V5, CAL-01/CAL-06) : même police et même taille que le texte,
+ * alignée à gauche ; une formule longue passe à la ligne à chaque égalité (« = » en tête de ligne).
+ */
+function FormulaLines({ expression }: { expression: string }) {
+  const parts = expression.length > 32 ? expression.split(/\s+=\s+/) : [expression];
+  return (
+    <div className="formula" role="math" aria-label={expression}>
+      {parts.map((p, i) => (
+        <span key={i} className="formula-line">{i > 0 && <span className="formula-eq">= </span>}{p}</span>
+      ))}
+    </div>
+  );
+}
+
+/** Pictogrammes pleins du kit V5 pour les rubriques pédagogiques (toujours avec un intitulé). */
+const KIT_LABEL: Partial<Record<IconName, KitIconName>> = { "key-idea": "important", definition: "definition", caution: "caution" };
+
 function Label({ icon, children }: { icon?: IconName; children: React.ReactNode }) {
-  return <span className="block-label">{icon && <Icon name={icon} size={14} />}{children}</span>;
+  const kit = icon ? KIT_LABEL[icon] : undefined;
+  return <span className="block-label">{kit ? <KitIcon name={kit} size={16} /> : icon && <Icon name={icon} size={14} />}{children}</span>;
 }
 
 /** Une pièce par bloc ; une liste longue est découpée en groupes (numérotation conservée). */
@@ -150,7 +171,7 @@ function blockPieces(b: Block, section: string, ctx: Ctx, float?: React.ReactNod
         piece(
           "block block-formula",
           <>
-            <p className="formula" role="math" aria-label={b.expression}>{b.expression}</p>
+            <FormulaLines expression={b.expression} />
             {b.symbols.length > 0 && (
               <dl className="symbols">
                 <dt className="sr-only">{t.lim.symbols}</dt>
@@ -354,7 +375,7 @@ export function notionIndex(explanation: ExplanationObject, numbers: Map<string,
 }
 
 export interface LimpidDoc {
-  chapters: { id: string; title: string }[];
+  chapters: { id: string; title: string; parts: { id: string; title: string }[] }[];
   /** Comptes pour le choix automatique de projection (lecteur V3). */
   stats: ProjectionStats;
   notions: Notion[];
@@ -411,7 +432,11 @@ export function composeLimpid({
     const s = sections.get(bs.section_id);
     return s ? [{ s, bs }] : [];
   });
-  const chapters = ordered.map(({ s }) => ({ id: s.id, title: s.question }));
+  const chapters = ordered.map(({ s }) => ({
+    id: s.id,
+    title: s.question,
+    parts: s.parts && partsCoverBlocks(s) ? s.parts.map((p) => ({ id: p.id, title: p.title })) : [],
+  }));
   const keyPoints = explanation.key_points?.length ? explanation.key_points : explanation.sections.slice(0, 5).map((s) => s.takeaway);
   const showIllustrations = true;
 
@@ -441,6 +466,7 @@ export function composeLimpid({
       <div key={`h-${s.id}`} id={s.id} className="piece section-head" {...attrs({ keep: true, section: s.id })}>
         <p className="eyebrow section-n">{t.lim.chapterLabel(si + 1)}</p>
         <h2>{s.question}</h2>
+        {s.objective && <p className="chapter-objective"><span className="sr-only">{t.lim.objective} : </span>{s.objective}</p>}
       </div>,
     );
     // V6 : « L'essentiel » du chapitre, en tête du corps (une fois par chapitre).
@@ -455,15 +481,43 @@ export function composeLimpid({
     // de texte qui l'entoure sur mobile). Illustration après le premier bloc, données ensuite.
     const illustrations = placed.filter((v) => v.kind === "illustration");
     const others = placed.filter((v) => v.kind !== "illustration" && v.kind !== "drawing");
+    const body: React.ReactNode[] = [];
     s.blocks.forEach((b, bi) => {
-      out.push(...blockPieces(b, s.id, ctx));
-      if (bi === 0) for (const v of illustrations) out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
+      body.push(...blockPieces(b, s.id, ctx));
+      if (bi === 0) for (const v of illustrations) body.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
     });
+    if (s.parts && partsCoverBlocks(s)) {
+      // Kit V5 : sous-chapitres ouverts, repliables par un petit chevron (présentation seulement).
+      let at = 0;
+      const byBlock = new Map<string, React.ReactNode[]>();
+      for (const node of body) {
+        const id = (node as React.ReactElement<{ id?: string }>).props?.id;
+        if (typeof id === "string" && s.blocks.some((b) => b.id === id)) at = s.blocks.findIndex((b) => b.id === id);
+        const owner = s.blocks[at]!.id;
+        byBlock.set(owner, [...(byBlock.get(owner) ?? []), node]);
+      }
+      s.parts.forEach((part, k) => {
+        out.push(
+          <details key={part.id} id={part.id} className="piece lr-part" open data-part="" {...attrs({ section: s.id })}>
+            <summary className="lr-part-head">
+              <span className="lr-part-titles">
+                <h3 className="lr-part-title"><span className="lr-part-n">{si + 1}.{k + 1}</span> {part.title}</h3>
+                {part.objective && <span className="lr-part-objective">{part.objective}</span>}
+              </span>
+              <span className="lr-part-toggle" aria-hidden="true"><KitIcon name="expand" size={16} /></span>
+            </summary>
+            <div className="lr-part-body">{part.block_ids.flatMap((id) => byBlock.get(id) ?? [])}</div>
+          </details>,
+        );
+      });
+    } else {
+      out.push(...body);
+    }
     for (const v of others) out.push(visualPiece(v, s.id, ctx, assets, showIllustrations));
     if (s.retain?.length) {
       out.push(
         <aside key={`ret-${s.id}`} id={`ret_${s.id}`} className="piece retain" aria-label={t.lim.retain} {...attrs({ section: s.id })}>
-          <p className="retain-title"><Icon name="retain" size={14} />{t.lim.retain}</p>
+          <p className="retain-title"><KitIcon name="important" size={16} />{t.lim.retain}</p>
           <ul>{s.retain.map((r, i) => <li key={i}><Rich text={r} ctx={ctx} linkTerms={false} /></li>)}</ul>
         </aside>,
       );

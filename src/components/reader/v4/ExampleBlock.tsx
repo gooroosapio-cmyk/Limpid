@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Icon, type IconName } from "@/components/Icon";
 import { useT } from "@/lib/i18n/client";
+import { KitIcon } from "../KitIcon";
 
 /**
  * Exemple ou analogie avec ses variantes préchargées (V4, § 11) : « Autre exemple » change
@@ -16,7 +17,7 @@ export function ExampleBlock({ icon, label, variants }: { icon?: IconName; label
   return (
     <div className="example-block">
       <div className="example-head">
-        <span className="block-label">{icon && <Icon name={icon} size={14} />}{label}</span>
+        <span className="block-label">{icon === "analogy" || icon === "example" ? <KitIcon name={icon} size={16} /> : icon && <Icon name={icon} size={14} />}{label}</span>
         {n > 1 && (
           <button type="button" className="example-next" onClick={() => setI((x) => (x + 1) % n)} aria-label={`${t.lim.otherExample} (${t.lim.exampleOf(((i + 1) % n) + 1, n)})`}>
             <Icon name="refresh" size={16} /> {t.lim.otherExample}
