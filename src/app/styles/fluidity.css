@@ -278,3 +278,74 @@
   .import .mode-card { align-items: start; }
   .import .mode-card .mode-ic, .import .mode-radio { align-self: start; }
 }
+
+/* Feuilles du bas : poignée et en-tête glissables vers le bas pour fermer. */
+dialog.sheet .sheet-grip, dialog.sheet .sheet-head { touch-action: none; }
+dialog.sheet .sheet-grip { position: relative; }
+dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px -60px; }
+
+/* Renvois aux sources : un mot surligné, discret, au lieu d'un numéro. */
+.src-mark {
+  display: inline; padding: 0 1px; margin: 0; border: 0; font: inherit; color: inherit; cursor: pointer;
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--yellow) 55%, transparent) 58%);
+  border-radius: 2px; text-decoration: none; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.src-mark:hover { background: color-mix(in srgb, var(--yellow) 45%, transparent); }
+.src-mark:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.src-chip {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 2px; vertical-align: -5px;
+  border: 0; border-radius: 50%; background: var(--soft); color: var(--muted); cursor: pointer; position: relative;
+}
+.src-chip::after { content: ""; position: absolute; inset: -10px; }
+.src-chip:hover { color: var(--ink); }
+.src-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.source-sheet-body { display: grid; gap: 12px; }
+.source-sheet-title { margin: 0; font-weight: 600; }
+.source-item { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.source-item .quote { margin: 0; }
+.source-loc { margin: 0; font-size: 0.875rem; }
+
+/* Sommaire : « Consulté » plus petit et en retrait (simple observation, pas une réussite). */
+.toc .toc-tag.is-seen { font-size: 0.75rem; font-weight: 400; opacity: 0.6; gap: 3px; }
+
+/* « Tout déplier / Tout replier » : deux pastilles discrètes, icône + texte. */
+.lr-bulk { gap: 8px; }
+.lr-bulk-btn, .lr-bulk-btn:first-of-type {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink);
+  font-size: 0.8125rem; font-weight: 500; text-decoration: none; position: relative;
+}
+.lr-bulk-btn::after { content: ""; position: absolute; inset: -4px 0; }
+.lr-bulk-btn svg { color: var(--muted); }
+.lr-bulk-btn:hover { background: var(--soft); color: var(--ink); }
+.lr-bulk-btn:active { background: var(--pale); }
+
+/* Fin de chapitre : « J'ai terminé la lecture », puis QCM (Valider vert, Plus tard rouge clair). */
+.chapter-end-read { display: grid; gap: 8px; margin: 8px 0 16px; }
+.chapter-end-read p { margin: 0; text-align: center; }
+.cquiz-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.cquiz .cquiz-validate { background: var(--green); border-color: var(--green); color: var(--surface); font-weight: 600; }
+.cquiz .cquiz-validate:hover { filter: brightness(1.06); }
+.cquiz .cquiz-later { background: var(--danger-pale); border-color: color-mix(in srgb, var(--danger) 25%, transparent); color: var(--danger); font-weight: 600; }
+.cquiz .cquiz-later:hover { filter: brightness(0.98); }
+.cquiz-empty { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--danger-pale); color: var(--danger); font-size: 0.875rem; }
+.cquiz-done p { margin: 0 0 8px; font-weight: 600; }
+.cquiz-actions .btn { margin-top: 0; min-height: 44px; }
+
+/* Vue guidée : console de navigation au-dessus du texte, collée en haut pendant la lecture. */
+.proj-bar {
+  top: 0; bottom: auto; margin: 0 auto var(--s3);
+  padding: var(--s2) var(--s3); border-top: 0; border-bottom: 1px solid var(--line);
+}
+
+/* ---------- « Objectifs du cours » (L'essentiel) ---------- */
+.keypoints .course-goals { margin: var(--s3) 0 var(--s4); padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
+.keypoints .course-goals-title, .keypoints .keypoints-sub { margin: 0 0 var(--s2); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); }
+.keypoints .course-goals-intro { margin: 0 0 var(--s3); font-size: 1rem; line-height: 1.55; color: var(--ink); }
+.keypoints ol.course-path { display: grid; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+.keypoints ol.course-path li { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 0; }
+.keypoints ol.course-path li::before { content: none; }
+.course-path-n { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--soft); color: var(--green); font-size: 0.8125rem; font-weight: 700; }
+.course-path-text { min-width: 0; display: grid; gap: 2px; font-size: 0.9375rem; line-height: 1.45; overflow-wrap: anywhere; }
+.course-path-text strong { font-weight: 650; color: var(--ink); }
+.course-path-obj { color: var(--muted); font-size: 0.875rem; }

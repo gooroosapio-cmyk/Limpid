@@ -31,6 +31,7 @@ import "./styles/reader-kit-v5.css";
 import "./styles/fluidity.css";
 import "./styles/tailwind.css";
 import { WebVitals } from "@/components/perf/WebVitals";
+import { SheetSwipe } from "@/components/shell/SheetSwipe";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -72,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={lang} {...htmlAttributes(prefs)}>
       <body>
         <WebVitals />
+        <SheetSwipe />
         <I18nProvider lang={lang}>
         <a className="skip-link" href="#contenu">{t.nav.skip}</a>
         <div className="app">

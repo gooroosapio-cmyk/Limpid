@@ -206,6 +206,8 @@ export const PlanV5Draft = z.strictObject({
   /** 2 à 5 mots-clés EN ANGLAIS pour une photo de couverture (sujet concret, sans nom propre). */
   cover_query_en: z.string().trim().max(80).default(""),
   key_points: z.array(txt(300)).min(2).max(7),
+  /** « Objectifs du cours » : but du cours et parcours, fidèles aux chapitres réels. */
+  course_goal: z.string().trim().max(500).default(""),
   chapters: z
     .array(
       z.strictObject({
@@ -227,7 +229,7 @@ export const PlanV5Draft = z.strictObject({
 export type PlanV5 = z.infer<typeof PlanV5Draft>;
 
 const PLAN_INSTRUCTIONS = (input: GenerationInput) => `Tu établis le plan d'un cours Limpid à partir de TOUTES les affirmations validées d'une ou plusieurs sources. Ne rédige pas encore le cours.
-- title : titre informatif et court. cover_query_en : 2 à 5 mots-clés anglais décrivant une photo de couverture évocatrice et concrète (objet, lieu, matière), sans chiffre ni nom propre. key_points : 3 à 7 idées essentielles DISTINCTES, une phrase chacune (le résumé « L'essentiel »).
+- title : titre informatif et court. cover_query_en : 2 à 5 mots-clés anglais décrivant une photo de couverture évocatrice et concrète (objet, lieu, matière), sans chiffre ni nom propre. key_points : 3 à 7 idées essentielles DISTINCTES, une phrase chacune (le résumé « L'essentiel »). course_goal : 1 à 2 phrases (500 caractères au plus) qui disent ce que le cours permet de comprendre ou de faire et comment le parcours y mène (de quoi on part, où l'on arrive), strictement fidèles aux chapitres que tu établis et à la portée réelle de la source : aucune promesse au-delà.
 - chapters : dans l'ordre pédagogique (prérequis d'abord, puis le sommaire réel de la source quand il est logique). Un chapitre = une question à comprendre, 2 à 5 objectifs liés, environ 3 à 15 affirmations. AUCUN quota de pages ou d'écrans : une source courte donne 2 à 4 chapitres, une source riche davantage, mais ${MAX_CHAPTERS} chapitres AU PLUS : pour un long document, regroupe les notions voisines en chapitres plus riches (davantage d'objectifs par chapitre) plutôt que d'en multiplier le nombre.
 - title (chapitre) : une question ou un apprentissage précis, jamais « Partie 1 ». objective : ce que le lecteur saura faire ou comprendre.
 - claim_ids : les affirmations que ce chapitre explique. Chaque affirmation "supported" ou "partial" pertinente apparaît dans UN chapitre, ou dans excluded avec sa raison (doublon, détail sans intérêt pour comprendre). Aucune notion centrale, aucun chiffre qui change la conclusion, aucune réserve ou exception ne peut être exclue.
@@ -830,6 +832,7 @@ export function assemble(input: GenerationInput, ko: KnowledgeObject, evidence: 
   const draft: ExplanationDraft = {
     title: plan.title,
     key_points: plan.key_points,
+    course_goal: plan.course_goal || undefined,
     template_id: input.template ?? "comprendre_sujet",
     sections,
     glossary: [...glossary.values()].slice(0, 200),

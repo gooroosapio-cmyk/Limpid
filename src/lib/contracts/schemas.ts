@@ -359,6 +359,8 @@ export const ExplanationObject = z.strictObject({
   mode: Mode.optional(),
   /** 3 à 5 points clés affichés sous le titre. */
   key_points: z.array(shortText).max(7).optional(),
+  /** « Objectifs du cours » : ce que le cours permet de comprendre ou de faire (absent : anciens cours). */
+  course_goal: z.string().trim().min(1).max(500).optional(),
   /** Source trop pauvre pour un rapport complet : résultat court annoncé comme tel. */
   short_result: z.boolean().optional(),
   preferences_snapshot: PreferencesSnapshot,

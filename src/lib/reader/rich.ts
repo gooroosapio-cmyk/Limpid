@@ -59,3 +59,23 @@ export function splitParagraph(text: string, target = 220): string[] {
   });
   return balanced && out.length > 1 ? out : [text];
 }
+
+/**
+ * Mot d'ancrage d'un renvoi aux sources : le dernier mot porteur de sens (4 lettres au moins)
+ * parmi les derniers mots du passage. Le texte qui suit (ponctuation, petits mots) reste tel
+ * quel ; aucune marque de mise en forme ne doit être coupée. null : pas d'ancrage sûr.
+ */
+export function sourceAnchor(text: string): { head: string; word: string; tail: string } | null {
+  const words = [...text.matchAll(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)];
+  for (let i = words.length - 1; i >= Math.max(0, words.length - 4); i--) {
+    const m = words[i]!;
+    const letters = (m[0].match(/\p{L}/gu) ?? []).length;
+    if (letters < 4) continue;
+    const start = m.index!;
+    const end = start + m[0].length;
+    // Une marque (*) dans la fin du passage : on ne coupe pas.
+    if (text.slice(start).includes("*")) return null;
+    return { head: text.slice(0, start), word: m[0], tail: text.slice(end) };
+  }
+  return null;
+}

@@ -111,6 +111,7 @@ export function repairDraftBlocks(value: unknown): unknown {
 export const ExplanationDraft = z.preprocess(repairDraftBlocks, z.strictObject({
   title: z.string().trim().min(1).max(200),
   key_points: z.array(z.string().trim().min(1).max(300)).min(1).max(5),
+  course_goal: z.string().trim().max(500).optional(),
   template_id: TemplateId,
   sections: z.array(Section).min(1).max(20),
   glossary: z.array(GlossaryEntry).max(60),
@@ -582,6 +583,7 @@ export function buildExplanation(input: GenerationInput, ko: KnowledgeObject, dr
     goal: input.goal,
     mode,
     key_points: keyPoints,
+    ...(draft.course_goal && plain(draft.course_goal).trim() ? { course_goal: plain(draft.course_goal).trim().slice(0, 500) } : {}),
     // Résultat court annoncé seulement quand la source elle-même est pauvre (peu d'affirmations
     // soutenues), jamais pour masquer une rédaction trop mince.
     short_result: mode !== "revision" && ko.claims.filter((c) => c.support_status === "supported").length < 6 && words < 300,

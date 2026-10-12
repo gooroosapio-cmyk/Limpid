@@ -102,20 +102,18 @@ export function ChapterCheck({ id, sectionId, title, exercises }: { id: string; 
   );
 }
 
-/** Réponse validée à une question du QCM de chapitre. */
-interface QuizAnswer {
-  choice: number;
-  correct: boolean;
-}
+/** Réponse à une question du QCM de chapitre : choix validé, ou question passée (« Plus tard »). */
+type QuizAnswer = { choice: number; correct: boolean } | { skipped: true };
+const isSkip = (a: QuizAnswer | undefined): a is { skipped: true } => !!a && "skipped" in a;
 
 /**
- * Mini-QCM de chapitre : à chaque visite, un lot de 2 questions (3 si la banque est riche)
- * est tiré localement dans la banque du chapitre (2 à 8), en évitant le lot précédent ; aucun
- * appel IA. Une question à la fois : choisir → Valider → correction (verte ou rouge, avec
- * texte et icône) et explication → Suivant. « Plus tard » ne compte ni comme réussite ni
- * comme échec et ne bloque jamais la suite.
+ * QCM de fin de chapitre (retour lecteur) : il s'affiche après « J'ai terminé la lecture ».
+ * Une question à la fois, tirée localement dans la banque du chapitre (aucun appel IA) :
+ * « Valider » (sans choix : message, rien n'est compté) → correction et explication →
+ * « Suivant » ; « Plus tard » passe directement à la question suivante, sans compter ni
+ * réussite ni échec. À la fin, `onDone` affiche « Chapitre suivant ».
  */
-export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; quiz: ChapterQuestion[]; onSkip?: () => void }) {
+export function ChapterQuiz({ sectionId, quiz, onDone }: { sectionId: string; quiz: ChapterQuestion[]; onDone?: () => void }) {
   const t = useT();
   const reader = useReader();
   const base = useId();
@@ -125,10 +123,11 @@ export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; qu
   const [step, setStep] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
-  const [skipped, setSkipped] = useState(false);
+  const [empty, setEmpty] = useState(false);
   // Kit V5 (QUI-05/06) : variante proposée après une erreur ; id de la variante → question d'origine.
   const [variantOf, setVariantOf] = useState<Record<string, string>>({});
   const promptRef = useRef<HTMLLegendElement>(null);
+  const finished = useRef(false);
 
   const draw = useCallback(
     (avoid?: string[]) => {
@@ -144,8 +143,9 @@ export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; qu
       setStep(0);
       setPicked(null);
       setAnswers([]);
-      setSkipped(false);
+      setEmpty(false);
       setVariantOf({});
+      finished.current = false;
     },
     [quiz, memo],
   );
@@ -153,49 +153,45 @@ export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; qu
   useEffect(() => draw(), [draw]);
 
   if (!items?.length) return null;
-  const q = items[step]!;
-  const answer = answers[step];
   const done = items.every((_, k) => answers[k]);
+  const q = items[Math.min(step, items.length - 1)]!;
+  const answer = answers[step];
   // Seules les réponses autonomes comptent : une variante réussie après correction est une réussite aidée.
   const own = items.filter((x) => !variantOf[x.id]);
-  const good = items.filter((x, k) => !variantOf[x.id] && answers[k]?.correct).length;
+  const good = items.filter((x, k) => {
+    const a = answers[k];
+    return !variantOf[x.id] && a && !isSkip(a) && a.correct;
+  }).length;
+  const passed = items.filter((x, k) => !variantOf[x.id] && isSkip(answers[k])).length;
   const isVariant = !!variantOf[q.id];
+  const chosen = answer && !isSkip(answer) ? answer : null;
   /** Question similaire de la banque : même passage à revoir, sinon mêmes affirmations. */
   const similar = (() => {
-    if (!answer || answer.correct || isVariant) return null;
+    if (!chosen || chosen.correct || isVariant) return null;
     const used = new Set(items.map((x) => x.id));
     const rest = quiz.filter((x) => !used.has(x.id));
     const claims = new Set(q.claim_ids);
     return (
       rest.find((x) => q.revisit_block_id && x.revisit_block_id === q.revisit_block_id) ??
       rest.find((x) => x.claim_ids.some((c) => claims.has(c))) ??
-      // Dernier recours : une autre question du même chapitre (jamais la même).
       rest[0] ??
       null
     );
   })();
 
-  function tryVariant() {
-    if (!similar || !items) return;
-    const [v] = drawLot([similar], []);
-    if (!v) return;
-    setVariantOf((m) => ({ ...m, [v.id]: q.id }));
-    setItems([...items.slice(0, step + 1), v, ...items.slice(step + 1)]);
-    setAnswers((all) => [...all.slice(0, step + 1), undefined as unknown as QuizAnswer, ...all.slice(step + 1)]);
-    setStep(step + 1);
-    setPicked(null);
-    requestAnimationFrame(() => promptRef.current?.focus());
-  }
-
   async function record(all: QuizAnswer[]) {
     if (!reader.reportId || !reader.versionId || !items) return;
     // La tentative initiale n'est jamais écrasée : la variante est enregistrée à côté, reliée à elle.
-    const list = items.map((x, k) => ({
-      id: x.id,
-      correct: all[k]?.correct ?? null,
-      ratio: null,
-      ...(variantOf[x.id] ? { variant_of: variantOf[x.id], aided: true } : {}),
-    }));
+    // Question passée : enregistrée sans réponse (ni réussite, ni échec).
+    const list = items.map((x, k) => {
+      const a = all[k];
+      return {
+        id: x.id,
+        correct: a && !isSkip(a) ? a.correct : null,
+        ratio: null,
+        ...(variantOf[x.id] ? { variant_of: variantOf[x.id], aided: true } : {}),
+      };
+    });
     const autonomous = list.filter((a) => !a.aided);
     await fetch(`/api/reports/${reader.reportId}/attempts`, {
       method: "POST",
@@ -204,103 +200,132 @@ export function ChapterQuiz({ sectionId, quiz, onSkip }: { sectionId: string; qu
     }).catch(() => undefined);
   }
 
-  function validate() {
-    if (picked === null || answer || !items) return;
-    const all = [...answers];
-    all[step] = { choice: picked, correct: picked === q.correct_index };
+  function settle(all: QuizAnswer[]) {
     setAnswers(all);
-    if (all.filter(Boolean).length === items.length) void record(all);
+    if (items && all.filter(Boolean).length === items.length && !finished.current) {
+      finished.current = true;
+      void record(all);
+    }
   }
 
-  function next() {
+  function tryVariant() {
+    if (!similar || !items) return;
+    const [v] = drawLot([similar], []);
+    if (!v) return;
+    setVariantOf((m) => ({ ...m, [v.id]: q.id }));
+    setItems([...items.slice(0, step + 1), v, ...items.slice(step + 1)]);
+    setAnswers((all) => [...all.slice(0, step + 1), undefined as unknown as QuizAnswer, ...all.slice(step + 1)]);
+    goNext();
+  }
+
+  function validate() {
+    if (answer || !items) return;
+    if (picked === null) {
+      setEmpty(true);
+      return;
+    }
+    const all = [...answers];
+    all[step] = { choice: picked, correct: picked === q.correct_index };
+    settle(all);
+  }
+
+  function goNext() {
     setStep((s) => s + 1);
     setPicked(null);
+    setEmpty(false);
     requestAnimationFrame(() => promptRef.current?.focus());
   }
 
+  /** « Plus tard » : la question est passée, sans compter ; on avance aussitôt. */
+  function later() {
+    if (answer || !items) return;
+    const all = [...answers];
+    all[step] = { skipped: true };
+    settle(all);
+    goNext();
+  }
+
   const name = `${base}-${q.id}`;
+  const last = step >= items.length - 1;
   return (
     <section className="cquiz" aria-labelledby={`${base}-h`}>
-      <h3 id={`${base}-h`} className="cquiz-head">{t.lim.quizOptional(own.length)}</h3>
-      {skipped ? (
-        <p className="muted small" role="status">{t.lim.quizSkipped}</p>
-      ) : (
+      <h3 id={`${base}-h`} className="cquiz-head">{t.lim.quizTitle(own.length)}</h3>
+      {step < items.length && (
         <>
-        <p className="quiz-progress cquiz-progress">{isVariant ? t.lim.quizVariantLabel : t.lim.question(own.indexOf(q) + 1, own.length)}</p>
-        <fieldset key={q.id} className="cquiz-q" data-answered={answer ? "" : undefined}>
-          <legend ref={promptRef} tabIndex={-1} className="cquiz-prompt">{q.prompt}</legend>
-          <div className="cquiz-choices">
-            {q.choices.map((c, ci) => {
-              const state = !answer ? "" : ci === answer.choice ? (answer.correct ? " is-right" : " is-wrong") : ci === q.correct_index ? " is-answer" : "";
-              return (
-                <label key={ci} className={`cquiz-choice${state}`}>
-                  <input type="radio" name={name} value={ci} checked={picked === ci} disabled={!!answer} onChange={() => setPicked(ci)} />
-                  <span>{c}</span>
-                </label>
-              );
-            })}
-          </div>
-          {!answer && (
-            <button type="button" className="btn cquiz-validate" disabled={picked === null} onClick={validate}>
-              {t.lim.validate}
-            </button>
-          )}
-          <div aria-live="polite">
-            {answer && (
-              <div className={`cquiz-feedback ${answer.correct ? "is-right" : "is-wrong"}`}>
-                <p>
-                  <strong>
-                    <Icon name={answer.correct ? "check" : "alert"} size={16} /> {answer.correct ? t.lim.quizRight : t.lim.quizWrong}
-                  </strong>{" "}
-                  {q.explanations[answer.choice]}
-                </p>
-                {!answer.correct && <p className="cquiz-correct-answer"><strong>{t.lim.quizAnswerWas}</strong> {q.choices[q.correct_index]} — {q.explanations[q.correct_index]}</p>}
-                {isVariant && answer.correct && <p className="muted small">{t.lim.quizAided}</p>}
-                <div className="cquiz-after">
-                  {!answer.correct && q.revisit_block_id && (
-                    <button type="button" className="btn-link cquiz-revisit" onClick={() => reader.goTo(q.revisit_block_id!)}>
-                      {t.lim.quizRevisit}
-                    </button>
-                  )}
-                  {similar && (
-                    <button type="button" className="btn-link cquiz-variant" onClick={tryVariant}>
-                      {t.lim.quizVariant}
-                    </button>
-                  )}
-                </div>
+          <p className="quiz-progress cquiz-progress">{isVariant ? t.lim.quizVariantLabel : t.lim.question(own.indexOf(q) + 1, own.length)}</p>
+          <fieldset key={q.id} className="cquiz-q" data-answered={answer ? "" : undefined}>
+            <legend ref={promptRef} tabIndex={-1} className="cquiz-prompt">{q.prompt}</legend>
+            <div className="cquiz-choices">
+              {q.choices.map((c, ci) => {
+                const state = !chosen ? "" : ci === chosen.choice ? (chosen.correct ? " is-right" : " is-wrong") : ci === q.correct_index ? " is-answer" : "";
+                return (
+                  <label key={ci} className={`cquiz-choice${state}`}>
+                    <input type="radio" name={name} value={ci} checked={picked === ci} disabled={!!answer} onChange={() => { setPicked(ci); setEmpty(false); }} />
+                    <span>{c}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {empty && !answer && <p className="cquiz-empty" role="alert">{t.lim.quizNoChoice}</p>}
+            {!answer && (
+              <div className="cquiz-actions">
+                <button type="button" className="btn cquiz-validate" onClick={validate}>{t.lim.validate}</button>
+                <button type="button" className="btn cquiz-later" onClick={later}>{t.lim.quizLater}</button>
               </div>
             )}
-          </div>
-          {answer && step < items.length - 1 && (
-            <button type="button" className="btn btn-primary cquiz-next" onClick={next}>
-              {t.lim.quizNext}
-            </button>
-          )}
-        </fieldset>
+            <div aria-live="polite">
+              {chosen && (
+                <div className={`cquiz-feedback ${chosen.correct ? "is-right" : "is-wrong"}`}>
+                  <p>
+                    <strong>
+                      <Icon name={chosen.correct ? "check" : "alert"} size={16} /> {chosen.correct ? t.lim.quizRight : t.lim.quizWrong}
+                    </strong>{" "}
+                    {q.explanations[chosen.choice]}
+                  </p>
+                  {!chosen.correct && <p className="cquiz-correct-answer"><strong>{t.lim.quizAnswerWas}</strong> {q.choices[q.correct_index]} — {q.explanations[q.correct_index]}</p>}
+                  {isVariant && chosen.correct && <p className="muted small">{t.lim.quizAided}</p>}
+                  <div className="cquiz-after">
+                    {!chosen.correct && q.revisit_block_id && (
+                      <button type="button" className="btn-link cquiz-revisit" onClick={() => reader.goTo(q.revisit_block_id!)}>
+                        {t.lim.quizRevisit}
+                      </button>
+                    )}
+                    {similar && (
+                      <button type="button" className="btn-link cquiz-variant" onClick={tryVariant}>
+                        {t.lim.quizVariant}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {chosen && (
+              <button type="button" className="btn btn-primary cquiz-next" onClick={goNext}>
+                {last ? t.lim.quizFinish : t.lim.quizNext}
+              </button>
+            )}
+          </fieldset>
         </>
       )}
-      {done ? (
-        <div className="cquiz-done">
-          <p role="status">{t.lim.quizGood(good, own.length)}</p>
-          {quiz.length > items.length && (
-            <button type="button" className="btn-link" onClick={() => draw(items.map((x) => x.id))}>{t.lim.quizNewLot}</button>
-          )}
-        </div>
-      ) : (
-        !skipped && (
-          <button
-            type="button"
-            className="btn cquiz-skip"
-            onClick={() => {
-              setSkipped(true);
-              onSkip?.();
-            }}
-          >
-            {t.lim.quizLater}
-          </button>
-        )
+      {done && step >= items.length && (
+        <QuizSummary good={good} total={own.length} passed={passed} onDone={onDone} canRedraw={quiz.length > items.length} redraw={() => draw(items.map((x) => x.id))} />
       )}
-      <p className="muted small cquiz-note">{t.lim.quizNote}</p>
     </section>
+  );
+}
+
+function QuizSummary({ good, total, passed, onDone, canRedraw, redraw }: { good: number; total: number; passed: number; onDone?: () => void; canRedraw: boolean; redraw: () => void }) {
+  const t = useT();
+  const announced = useRef(false);
+  useEffect(() => {
+    if (announced.current) return;
+    announced.current = true;
+    onDone?.();
+  }, [onDone]);
+  return (
+    <div className="cquiz-done">
+      <p role="status">{t.lim.quizGood(good, total)}{passed > 0 ? ` · ${t.lim.quizPassedCount(passed)}` : ""}</p>
+      {canRedraw && <button type="button" className="btn-link" onClick={redraw}>{t.lim.quizNewLot}</button>}
+    </div>
   );
 }

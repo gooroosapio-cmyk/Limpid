@@ -20,7 +20,10 @@ export interface SectionAttempt {
 }
 
 export interface PracticeState {
-  /** Au moins une réponse juste sans aide. */
+  /**
+   * Entraînement réussi : une tentative où toutes les questions ont reçu une réponse sans aide,
+   * toutes justes. Une question passée (« Plus tard ») ne présume jamais d'une réussite.
+   */
   success: boolean;
   /** Une question dont la dernière réponse autonome est fausse : notion à revoir. */
   review: boolean;
@@ -35,11 +38,12 @@ export function practiceBySection(attempts: SectionAttempt[]): Record<string, Pr
     if (!a.section_id) continue;
     const per = latest.get(a.section_id) ?? new Map<string, boolean>();
     latest.set(a.section_id, per);
-    for (const ans of a.answers) {
-      if (ans.correct === null || ans.aided || ans.variant_of) continue;
+    const own = a.answers.filter((ans) => !ans.aided && !ans.variant_of);
+    for (const ans of own) {
+      if (ans.correct === null) continue;
       per.set(ans.id, ans.correct);
-      if (ans.correct) success.add(a.section_id);
     }
+    if (own.length > 0 && own.every((ans) => ans.correct === true)) success.add(a.section_id);
     // Une variante réussie après une erreur reste une réussite aidée : la notion reste à revoir.
   }
   const out: Record<string, PracticeState> = {};

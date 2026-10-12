@@ -7,7 +7,7 @@ import type { SourceEntry } from "@/lib/render/sources";
 import { pieceOf, useAnnex } from "./annex-link";
 
 
-const Ctx = createContext<(evidenceId: string, opener: HTMLElement) => void>(() => {});
+const Ctx = createContext<(evidenceId: string | string[], opener: HTMLElement) => void>(() => {});
 
 /** Panneau des sources : bas d'écran sur mobile, focus restauré à la fermeture (PDF p. 7). */
 export function SourcesProvider({
@@ -25,12 +25,13 @@ export function SourcesProvider({
   const t = useT();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
-  const [current, setCurrent] = useState<SourceEntry | null>(null);
+  const [current, setCurrent] = useState<SourceEntry[]>([]);
 
   const open = useCallback(
-    (evidenceId: string, opener: HTMLElement) => {
+    (evidenceId: string | string[], opener: HTMLElement) => {
       openerRef.current = opener;
-      setCurrent(entries.find((e) => e.evidenceId === evidenceId) ?? null);
+      const ids = Array.isArray(evidenceId) ? evidenceId : [evidenceId];
+      setCurrent(entries.filter((e) => ids.includes(e.evidenceId)).sort((a, b) => a.n - b.n));
       dialogRef.current?.showModal();
     },
     [entries],
@@ -41,8 +42,9 @@ export function SourcesProvider({
       {children}
       <dialog
         ref={dialogRef}
-        className="sheet side"
+        className="sheet side source-sheet"
         aria-labelledby="source-title"
+        data-swipe-close=""
         onClose={() => openerRef.current?.focus()}
       >
         <div className="sheet-grip" aria-hidden="true" />
@@ -52,27 +54,27 @@ export function SourcesProvider({
             <button className="ib" aria-label={t.reader.close}><Icon name="close" /></button>
           </form>
         </div>
-        {current && (
-          <div className="stagger" key={current.evidenceId}>
-            <p className="eyebrow">{t.reader.sources} · [{current.n}]</p>
-            <h3 id="source-title" className="source-sheet-title">{sourceTitle}</h3>
-            <p className="muted">
-              {t.reader.location} : {current.location}
-            </p>
-            <blockquote className="quote">
-              {current.before && <span className="muted">… {current.before} </span>}
-              <mark>{current.quote}</mark>
-              {current.after && <span className="muted"> {current.after} …</span>}
-            </blockquote>
-            {originalHref ? (
+        <div className="source-sheet-body" key={current.map((c) => c.evidenceId).join(",")}>
+          <p id="source-title" className="source-sheet-title">{sourceTitle}</p>
+          {current.map((c) => (
+            <section key={c.evidenceId} className="source-item">
+              <p className="muted source-loc">{t.reader.location} : {c.location}</p>
+              <blockquote className="quote">
+                {c.before && <span className="muted">… {c.before} </span>}
+                <mark>{c.quote}</mark>
+                {c.after && <span className="muted"> {c.after} …</span>}
+              </blockquote>
+            </section>
+          ))}
+          {current.length > 0 &&
+            (originalHref ? (
               <a className="btn btn-block" href={originalHref} target="_blank" rel="noopener noreferrer nofollow">
                 <Icon name="file" /> {t.reader.openOriginal}
               </a>
             ) : (
               <p className="notice">{t.reader.originalMissing}</p>
-            )}
-          </div>
-        )}
+            ))}
+        </div>
       </dialog>
     </Ctx.Provider>
   );
@@ -110,6 +112,31 @@ export function SourceRef({ n, evidenceId }: { n: number; evidenceId: string }) 
       onClick={(e) => open(evidenceId, e.currentTarget)}
     >
       {n}
+    </button>
+  );
+}
+
+/**
+ * Renvoi aux sources (retour lecteur) : un mot du passage est surligné ; le toucher ouvre une
+ * petite fenêtre avec l'extrait du document. Elle se ferme d'un glissement vers le bas.
+ */
+export function SourceMark({ ids, children }: { ids: string[]; children: React.ReactNode }) {
+  const t = useT();
+  const open = useContext(Ctx);
+  return (
+    <button type="button" className="src-mark" aria-haspopup="dialog" aria-label={`${typeof children === "string" ? children : ""} — ${t.reader.source}`} onClick={(e) => open(ids, e.currentTarget)}>
+      {children}
+    </button>
+  );
+}
+
+/** Renvoi sans mot d'ancrage sûr : petite pastille « source » discrète. */
+export function SourceChip({ ids }: { ids: string[] }) {
+  const t = useT();
+  const open = useContext(Ctx);
+  return (
+    <button type="button" className="src-chip" aria-haspopup="dialog" aria-label={t.reader.source} onClick={(e) => open(ids, e.currentTarget)}>
+      <Icon name="source" size={14} />
     </button>
   );
 }
