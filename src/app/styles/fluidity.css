@@ -284,20 +284,14 @@ dialog.sheet .sheet-grip, dialog.sheet .sheet-head { touch-action: none; }
 dialog.sheet .sheet-grip { position: relative; }
 dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px -60px; }
 
-/* Renvois aux sources : un mot surligné, discret, au lieu d'un numéro. */
-.src-mark {
-  display: inline; padding: 0 1px; margin: 0; border: 0; font: inherit; color: inherit; cursor: pointer;
-  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--yellow) 55%, transparent) 58%);
-  border-radius: 2px; text-decoration: none; -webkit-box-decoration-break: clone; box-decoration-break: clone;
-}
-.src-mark:hover { background: color-mix(in srgb, var(--yellow) 45%, transparent); }
-.src-mark:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Renvois aux sources : pastille compacte « p. 79–81 » (distincte du surlignage des notions). */
 .src-chip {
-  display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 2px; vertical-align: -5px;
-  border: 0; border-radius: 50%; background: var(--soft); color: var(--muted); cursor: pointer; position: relative;
+  display: inline-flex; align-items: center; gap: 3px; margin: 0 0 0 2px; padding: 1px 7px; vertical-align: 1px;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted);
+  font: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1.5; white-space: nowrap; cursor: pointer; position: relative;
 }
-.src-chip::after { content: ""; position: absolute; inset: -10px; }
-.src-chip:hover { color: var(--ink); }
+.src-chip::after { content: ""; position: absolute; inset: -10px -4px; }
+.src-chip:hover { color: var(--ink); border-color: var(--line-strong); }
 .src-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .source-sheet-body { display: grid; gap: 12px; }
 .source-sheet-title { margin: 0; font-weight: 600; }
@@ -332,12 +326,6 @@ dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px 
 .cquiz-done p { margin: 0 0 8px; font-weight: 600; }
 .cquiz-actions .btn { margin-top: 0; min-height: 44px; }
 
-/* Vue guidée : console de navigation au-dessus du texte, collée en haut pendant la lecture. */
-.proj-bar {
-  top: 0; bottom: auto; margin: 0 auto var(--s3);
-  padding: var(--s2) var(--s3); border-top: 0; border-bottom: 1px solid var(--line);
-}
-
 /* ---------- « Objectifs du cours » (L'essentiel) ---------- */
 .keypoints .course-goals { margin: var(--s3) 0 var(--s4); padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
 .keypoints .course-goals-title, .keypoints .keypoints-sub { margin: 0 0 var(--s2); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); }
@@ -349,3 +337,8 @@ dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px 
 .course-path-text { min-width: 0; display: grid; gap: 2px; font-size: 0.9375rem; line-height: 1.45; overflow-wrap: anywhere; }
 .course-path-text strong { font-weight: 650; color: var(--ink); }
 .course-path-obj { color: var(--muted); font-size: 0.875rem; }
+
+/* Vue guidée : console figée au pied, compacte (une ligne de boutons, lien « Voir tout » discret). */
+.proj-bar { row-gap: 2px; padding-top: 6px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+.proj-bar .btn { min-height: 40px; padding: 8px 16px; }
+.proj-bar .proj-all { min-height: 32px; font-size: 0.8125rem; }

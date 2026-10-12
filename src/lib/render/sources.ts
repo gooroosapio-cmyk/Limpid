@@ -10,6 +10,8 @@ export interface SourceEntry {
   document: string | null;
   evidenceId: string;
   location: string;
+  /** Page (PDF) ou diapositive : rang physique pour l'ordre, libellé imprimé pour l'affichage. */
+  page: { kind: "page" | "slide"; index: number; label: string } | null;
   before: string;
   quote: string;
   after: string;
@@ -26,6 +28,31 @@ export function describeLocator(l: Locator): string {
     case "image":
       return l.region ? `image, ${l.region}` : "image";
   }
+}
+
+function pageOf(l: Locator): SourceEntry["page"] {
+  if (l.kind === "pdf_page") return { kind: "page", index: l.physical_index, label: l.printed_label || String(l.physical_index) };
+  if (l.kind === "slide") return { kind: "slide", index: l.index, label: String(l.index) };
+  return null;
+}
+
+/**
+ * Renvoi compact d'un passage (retour lecteur) : « p. 79 », « p. 79–81 », « p. 79, 84 » ou
+ * « p. 79 +3 » au lieu d'une suite de numéros ; null sans page connue (pastille « Source »).
+ */
+export function refLabel(entries: SourceEntry[], words: { page: string; slide: string } = { page: "p.", slide: "diapo" }): string | null {
+  const withPage = entries.flatMap((e) => (e.page ? [e.page] : []));
+  if (!withPage.length) return null;
+  const kind = withPage.some((p) => p.kind === "page") ? "page" : "slide";
+  const byIndex = new Map(withPage.filter((p) => p.kind === kind).map((p) => [p.index, p.label]));
+  const idx = [...byIndex.keys()].sort((a, b) => a - b);
+  const labels = idx.map((i) => byIndex.get(i)!);
+  const prefix = kind === "page" ? words.page : words.slide;
+  if (labels.length === 1) return `${prefix} ${labels[0]}`;
+  const contiguous = idx.every((v, i) => i === 0 || v === idx[i - 1]! + 1);
+  if (contiguous) return `${prefix} ${labels[0]}–${labels[labels.length - 1]}`;
+  if (labels.length === 2) return `${prefix} ${labels[0]}, ${labels[1]}`;
+  return `${prefix} ${labels[0]} +${labels.length - 1}`;
 }
 
 function contextOf(seg: SourceSegment, e: Evidence) {
@@ -50,7 +77,7 @@ export function sourceEntries(blueprint: ReportBlueprint, evidence: Evidence[], 
       if (!seg || !n) return [];
       const document = multi ? (documents![seg.source_id] ?? null) : null;
       const where = describeLocator(seg.locator);
-      return [{ n, evidenceId: e.id, document, location: document ? `${document}, ${where}` : where, ...contextOf(seg, e) }];
+      return [{ n, evidenceId: e.id, document, location: document ? `${document}, ${where}` : where, page: pageOf(seg.locator), ...contextOf(seg, e) }];
     })
     .sort((a, b) => a.n - b.n);
   return { numbers, entries };

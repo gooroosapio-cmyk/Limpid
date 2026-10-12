@@ -1327,6 +1327,8 @@ export const fr = {
     pdf: "Télécharger le PDF",
     sources: "Sources",
     seeSource: (n: number) => `Voir la source ${n}`,
+    pageShort: "p.",
+    slideShort: "diapo",
     close: "Fermer",
     analogy: "Analogie",
     analogyLimit: "Limite de l'analogie :",

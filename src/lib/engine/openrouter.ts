@@ -18,7 +18,6 @@ import {
   type ImageAspect,
   type ImageProvider,
   type ModelRole,
-  type ModelTier,
   type StageBudget,
   type StructuredRequest,
   type StructuredResponse,

@@ -1356,6 +1356,8 @@ export const en: Dict = {
     pdf: "Download the PDF",
     sources: "Sources",
     seeSource: (n: number) => `See source ${n}`,
+    pageShort: "p.",
+    slideShort: "slide",
     close: "Close",
     analogy: "Analogy",
     analogyLimit: "Limit of the analogy:",

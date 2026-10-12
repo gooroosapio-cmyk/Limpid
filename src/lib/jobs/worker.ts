@@ -6,7 +6,6 @@
 import "server-only";
 import { siteUrl } from "@/lib/site";
 import { selectAll } from "@/lib/supabase/paginate";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { activeProvider, limits } from "@/lib/config";
 import {
@@ -279,7 +278,8 @@ async function finish(jobId: string, status: string, errorCode: string | null, r
       .eq("id", jobId),
     jobId,
   ).select("id");
-  return !!error || !!data?.length;
+  // Écriture en échec (erreur passagère) : rien n'est soldé ; le bail expire et la tâche est reprise.
+  return !error && !!data?.length;
 }
 
 /** Journal de consommation : une ligne par appel, sans double débit (clé tâche/étape/tentative). */
@@ -1055,8 +1055,35 @@ async function afterDelivery(job: JobRow, claimedAt: number) {
   );
 }
 
+/**
+ * Tâches dont l'annulation est demandée (rapport ou compte supprimé) qu'aucun worker ne reprendra :
+ * en file, en relance, en attente, incertaines, ou en cours avec un bail expiré. Elles passent
+ * « annulées » et leurs crédits réservés sont rendus ; sinon elles bloqueraient le compte.
+ */
+export async function cancelOrphans(): Promise<number> {
+  const db = adminClient();
+  const now = new Date().toISOString();
+  const { data: idle } = await db
+    .from("jobs")
+    .update({ status: "cancelled", finished_at: now, lease_owner: null, lease_expires_at: null })
+    .eq("cancel_requested", true)
+    .in("status", ["queued", "retrying", "awaiting_confirmation", "uncertain"])
+    .select("id");
+  const { data: stale } = await db
+    .from("jobs")
+    .update({ status: "cancelled", finished_at: now, lease_owner: null, lease_expires_at: null })
+    .eq("cancel_requested", true)
+    .eq("status", "running")
+    .lt("lease_expires_at", now)
+    .select("id");
+  const ids = [...(idle ?? []), ...(stale ?? [])].map((j) => j.id as string);
+  for (const id of ids) await finishJobReservation(id, false);
+  return ids.length;
+}
+
 /** Vide la file dans la limite de temps donnée (appel depuis after() ou le cron). */
 export async function drainQueue(workerId: string, deadlineMs: number): Promise<number> {
+  await cancelOrphans();
   let n = 0;
   // Une nouvelle tâche seulement s'il reste au moins une minute à l'invocation.
   while (deadlineMs - Date.now() > 60_000) {
