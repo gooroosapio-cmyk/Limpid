@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRich, sourceAnchor, splitParagraph, stripRich } from "./rich";
+import { parseRich, splitParagraph, stripRich } from "./rich";
 
 describe("mise en forme légère", () => {
   it("reconnaît gras et italique", () => {
@@ -36,17 +36,5 @@ describe("splitParagraph", () => {
   it("ne coupe pas une mise en forme à cheval", () => {
     const text = `${s(1)} **${s(2)} ${s(3)} ${s(4)}** ${s(5)} ${s(6)}`;
     expect(splitParagraph(text, 120)).toEqual([text]);
-  });
-});
-
-describe("ancrage des renvois aux sources", () => {
-  it("surligne le dernier mot porteur de sens, ponctuation et petits mots laissés après", () => {
-    expect(sourceAnchor("Conserver les documents probants pour justifier les frais.")).toEqual({ head: "Conserver les documents probants pour justifier les ", word: "frais", tail: "." });
-    expect(sourceAnchor("Petits jouets, mais pas les grands jouets comme les jeux d’extérieur.")).toEqual({ head: "Petits jouets, mais pas les grands jouets comme les jeux ", word: "d’extérieur", tail: "." });
-    expect(sourceAnchor("La TVA est due sur ce bien, pas sur le reste.")?.word).toBe("reste");
-  });
-  it("ne coupe jamais une mise en forme", () => {
-    expect(sourceAnchor("Le point clé est **la trésorerie**.")).toBeNull();
-    expect(sourceAnchor("Un an.")).toBeNull();
   });
 });

@@ -497,9 +497,9 @@ export function LimpidReader({
       </header>
 
       <div ref={deckRef} className="deck continuous" tabIndex={0} role="region" aria-label={t.lim.deckLabel}>
-        {/* Vue guidée : la console de navigation est au-dessus du texte (retour lecteur). */}
-        {proj.bar}
         <div ref={colRef} className="deck-col chapters" data-motion={motion || undefined}>{children}</div>
+        {/* Vue guidée : console de navigation figée au pied de l'écran. */}
+        {proj.bar}
       </div>
 
       {host && chapter &&

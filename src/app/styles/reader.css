@@ -312,7 +312,8 @@ figure.illustration.diagram img { width: 100%; max-width: 560px; height: auto; m
 
 /* Page Annexes (V5, § 14) : lecture continue, hors du carrousel */
 .annex-page { max-width: 720px; margin: 0 auto; }
-.annex-top { position: sticky; top: calc(var(--header) + 4px); z-index: 3; margin: 0 0 var(--s4); }
+/* Pas d'en-tête d'application sur les annexes : collé en haut sans recouvrir le titre au repos. */
+.annex-top { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 3; margin: 0 0 var(--s4); }
 .annex-top .annex-back { box-shadow: var(--shadow); background: var(--surface); }
 .annex-bottom { position: static; margin: var(--s7) 0 0; }
 .annex-head h1 { font-size: clamp(26px, 7vw, 34px); line-height: 1.15; margin: var(--s1) 0 var(--s2); overflow-wrap: anywhere; hyphens: manual; text-wrap: balance; }

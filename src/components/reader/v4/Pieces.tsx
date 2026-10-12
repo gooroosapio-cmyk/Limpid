@@ -8,14 +8,14 @@ import { Fragment } from "react";
 import { Icon, type IconName } from "@/components/Icon";
 import type { Block, Evidence, ExerciseSet, ExplanationObject, ReportBlueprint, SourceSegment, VisualSpec } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
-import { parseRich, sourceAnchor, splitParagraph } from "@/lib/reader/rich";
-import { sourceEntries, type SourceEntry } from "@/lib/render/sources";
+import { parseRich, splitParagraph } from "@/lib/reader/rich";
+import { refLabel, sourceEntries, type SourceEntry } from "@/lib/render/sources";
 import { splitTerms, termMatcher } from "@/lib/render/terms";
 import { NotionTerm, type Notion } from "../Notions";
 import type { ProjectionStats } from "@/lib/reader/projection";
 import { partsCoverBlocks } from "@/lib/contracts/validate";
 import { KitIcon, type KitIconName } from "../KitIcon";
-import { SourceChip, SourceMark } from "../Sources";
+import { SourceChip } from "../Sources";
 import { VisualFigure, type AssetView } from "../Visuals";
 import { ChapterCheck } from "./ChapterCheck";
 import { AnnexLinks, EndActions } from "./EndActions";
@@ -44,6 +44,8 @@ interface Terms {
 interface Ctx {
   t: Dict;
   numbers: Map<string, number>;
+  /** Entrées de sources par preuve (libellé de page des renvois). */
+  sources: Map<string, SourceEntry>;
   terms: Terms;
 }
 
@@ -57,20 +59,10 @@ function chunks<T>(list: T[], size: number): T[][] {
 function Rich({ text, ctx, linkTerms = true, refs }: { text: string; ctx: Ctx; linkTerms?: boolean; refs?: string[] }) {
   const known = refs ? knownRefs(refs, ctx) : [];
   if (known.length) {
-    // Renvoi aux sources : un mot du passage surligné ouvre l'extrait (plus de numéros).
-    const anchor = sourceAnchor(text);
-    if (anchor) {
-      return (
-        <>
-          <Rich text={anchor.head} ctx={ctx} linkTerms={linkTerms} />
-          <SourceMark ids={known}>{anchor.word}</SourceMark>
-          {anchor.tail}
-        </>
-      );
-    }
+    // Renvoi aux sources : une pastille compacte (« p. 79–81 ») en fin de passage.
     return (
       <>
-        <Rich text={text} ctx={ctx} linkTerms={linkTerms} /> <SourceChip ids={known} />
+        <Rich text={text} ctx={ctx} linkTerms={linkTerms} /> <Chip ids={known} ctx={ctx} />
       </>
     );
   }
@@ -98,10 +90,14 @@ function knownRefs(ids: string[], ctx: Ctx): string[] {
   return [...new Set(ids)].filter((id) => ctx.numbers.has(id));
 }
 
-/** Renvoi détaché (tableau, frise, visuel) : petite pastille discrète, sans numéro. */
+function Chip({ ids, ctx }: { ids: string[]; ctx: Ctx }) {
+  return <SourceChip ids={ids} label={refLabel(ids.flatMap((id) => (ctx.sources.get(id) ? [ctx.sources.get(id)!] : [])), { page: ctx.t.reader.pageShort, slide: ctx.t.reader.slideShort })} />;
+}
+
+/** Renvoi détaché (tableau, frise, visuel) : même pastille compacte. */
 function Refs({ ids, ctx }: { ids: string[]; ctx: Ctx }) {
   const known = knownRefs(ids, ctx);
-  return known.length ? <span className="refs"><SourceChip ids={known} /></span> : null;
+  return known.length ? <span className="refs"><Chip ids={known} ctx={ctx} /></span> : null;
 }
 
 /** `plain` : paragraphe courant, replié derrière « Lire l'explication » en projection visuelle. */
@@ -437,7 +433,7 @@ export function composeLimpid({
   const { notions, scopes } = notionIndex(explanation, numbers);
   const termList = [...new Set(notions.map((n) => n.term))];
   const globalTerms: Terms = { matcher: termMatcher(termList), list: termList, used: new Set() };
-  const ctx: Ctx = { t, numbers, terms: globalTerms };
+  const ctx: Ctx = { t, numbers, sources: new Map(entries.map((e) => [e.evidenceId, e])), terms: globalTerms };
   // Lecteur V3 : une notion n'est interactive que dans le chapitre qui la définit, dans le sens
   // qu'il lui donne (première occurrence par chapitre). Anciens rapports : glossaire global.
   const chapterTerms = (id: string): Terms => {

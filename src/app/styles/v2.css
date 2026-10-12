@@ -642,8 +642,10 @@ h1, .page-title h1 { font-weight: 700; letter-spacing: -1px; }
 .plan-credits { margin: 0 0 var(--s3); font-size: 17px; color: var(--ink); max-width: 60%; }
 .plan-tag { display: flex; align-items: center; gap: 10px; margin: 0; padding-top: var(--s3); border-top: 1px solid var(--line); max-width: 62%; color: var(--muted); font-size: 16px; }
 .plan-tag .icon { color: var(--muted); }
-.plan-further { border: 1.5px solid var(--yellow); background: #12160f; }
-:root[data-mode="light"] .plan-further { background: var(--surface); }
+.plan-further { border: 1.5px solid var(--yellow); background: var(--surface); }
+/* Fond profond en thème sombre seulement (en thème clair système, le texte encre y devenait illisible). */
+:root[data-mode="dark"] .plan-further { background: #12160f; }
+@media (prefers-color-scheme: dark) { :root:not([data-mode="light"]) .plan-further { background: #12160f; } }
 .plan-further h2 { margin: 0 0 var(--s3); font-size: 26px; line-height: 31px; font-weight: 700; max-width: 75%; }
 .plan-checks { list-style: none; margin: 0 0 var(--s4); padding: 0; display: grid; gap: 10px; }
 .plan-checks li { position: relative; padding-left: 34px; font-size: 16px; line-height: 22px; }

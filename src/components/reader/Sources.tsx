@@ -117,26 +117,17 @@ export function SourceRef({ n, evidenceId }: { n: number; evidenceId: string }) 
 }
 
 /**
- * Renvoi aux sources (retour lecteur) : un mot du passage est surligné ; le toucher ouvre une
- * petite fenêtre avec l'extrait du document. Elle se ferme d'un glissement vers le bas.
+ * Renvoi aux sources (retour lecteur) : une pastille compacte en fin de passage (« p. 79–81 »,
+ * ou « Source » sans page connue). La toucher ouvre la fenêtre des extraits, refermable d'un
+ * glissement vers le bas.
  */
-export function SourceMark({ ids, children }: { ids: string[]; children: React.ReactNode }) {
+export function SourceChip({ ids, label }: { ids: string[]; label: string | null }) {
   const t = useT();
   const open = useContext(Ctx);
   return (
-    <button type="button" className="src-mark" aria-haspopup="dialog" aria-label={`${typeof children === "string" ? children : ""} — ${t.reader.source}`} onClick={(e) => open(ids, e.currentTarget)}>
-      {children}
-    </button>
-  );
-}
-
-/** Renvoi sans mot d'ancrage sûr : petite pastille « source » discrète. */
-export function SourceChip({ ids }: { ids: string[] }) {
-  const t = useT();
-  const open = useContext(Ctx);
-  return (
-    <button type="button" className="src-chip" aria-haspopup="dialog" aria-label={t.reader.source} onClick={(e) => open(ids, e.currentTarget)}>
-      <Icon name="source" size={14} />
+    <button type="button" className="src-chip" aria-haspopup="dialog" aria-label={`${t.reader.source}${label ? ` ${label}` : ""}`} onClick={(e) => open(ids, e.currentTarget)}>
+      <Icon name="file" size={12} />
+      <span>{label ?? t.reader.source}</span>
     </button>
   );
 }
