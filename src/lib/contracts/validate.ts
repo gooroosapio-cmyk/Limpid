@@ -161,6 +161,13 @@ export function validateKnowledge(
   }
 }
 
+/** Les parties reprennent tous les blocs du chapitre, une fois chacun et dans le même ordre. */
+export function partsCoverBlocks(section: Pick<ExplanationObject["sections"][number], "blocks" | "parts">): boolean {
+  if (!section.parts?.length) return false;
+  const flat = section.parts.flatMap((p) => p.block_ids);
+  return flat.length === section.blocks.length && flat.every((id, i) => section.blocks[i]!.id === id);
+}
+
 export function validateExplanation(
   ex: ExplanationObject,
   ko: KnowledgeObject,
@@ -204,7 +211,14 @@ export function validateExplanation(
       }
     }
   }
-  for (const dup of findDuplicates([...ex.sections.map((s) => s.id), ...blockIds])) {
+  // Sous-chapitres : chaque bloc dans une seule partie, toutes dans l'ordre des blocs (sinon le
+  // lecteur revient à une partie unique, sans rien masquer).
+  for (const section of ex.sections) {
+    if (section.parts && !partsCoverBlocks(section)) {
+      v.fail("parts_cover_blocks", "reference", [section.id], "sous-chapitres incohérents avec les blocs du chapitre", false);
+    }
+  }
+  for (const dup of findDuplicates([...ex.sections.map((s) => s.id), ...ex.sections.flatMap((s) => s.parts?.map((p) => p.id) ?? []), ...blockIds])) {
     v.fail("explanation_ids_unique", "reference", [dup], "identifiant dupliqué");
   }
   for (const chk of ex.checks) {

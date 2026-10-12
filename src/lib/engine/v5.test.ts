@@ -161,6 +161,38 @@ describe("moteur V5 : un chapitre par appel", () => {
     if (res.status === "done") expect(res.output.explanation.sections[0]!.blocks.some((b) => b.claim_ids.includes("clm_2"))).toBe(true);
   });
 
+  it("sous-chapitres : titres et objectifs gardés, identifiants renommés avec les blocs", async () => {
+    const withParts = {
+      ...chapter1,
+      parts: [
+        { title: "Ce qui fait évaporer l'eau", objective: "Relier le Soleil à l'évaporation.", block_ids: ["blk_1"] },
+        { title: "Un exemple du quotidien", objective: null, block_ids: ["blk_2"] },
+      ],
+    };
+    const p = new StageProvider({ comprehension: [comp], plan: [plan], chapitre_1: [withParts], chapitre_2: [chapter2] });
+    const res = await generateV5(p, input(), far());
+    expect(res.status).toBe("done");
+    if (res.status !== "done") return;
+    const s1 = res.output.explanation.sections[0]!;
+    expect(s1.objective).toBe("Comprendre l'évaporation");
+    expect(s1.parts).toEqual([
+      { id: "part_c1_1", title: "Ce qui fait évaporer l'eau", objective: "Relier le Soleil à l'évaporation.", block_ids: [s1.blocks[0]!.id] },
+      { id: "part_c1_2", title: "Un exemple du quotidien", objective: null, block_ids: [s1.blocks[1]!.id] },
+    ]);
+    // Chapitre sans sous-chapitres (cours plus ancien) : aucune partie inventée.
+    expect(res.output.explanation.sections[1]!.parts).toBeUndefined();
+  });
+
+  it("sous-chapitres incohérents : réparation demandée, puis partie unique si l'écart reste", async () => {
+    const bad = { ...chapter1, parts: [{ title: "Tout", objective: null, block_ids: ["blk_2", "blk_1"] }] };
+    const p = new StageProvider({ comprehension: [comp], plan: [plan], chapitre_1: [bad, bad], chapitre_2: [chapter2] });
+    const res = await generateV5(p, input(), far());
+    expect(res.status).toBe("done");
+    const calls = p.calls.filter((c) => c.stage === "chapitre_1");
+    expect(calls).toHaveLength(2);
+    if (res.status === "done") expect(res.output.explanation.sections[0]!.parts).toBeUndefined();
+  });
+
   it("réparation en échec (réponse vide) : le premier brouillon est gardé", async () => {
     const thin = { ...chapter1, blocks: [chapter1.blocks[1]] };
     const both = { ...plan, chapters: [{ ...plan.chapters[0]!, claim_ids: ["clm_1", "clm_2"] }] };

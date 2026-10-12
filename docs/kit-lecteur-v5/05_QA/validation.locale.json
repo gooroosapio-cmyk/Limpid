@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "schema_fixture": "passed",
+  "reference_checks": "passed",
+  "negative_fixtures_rejected": [
+    "unknown_reference",
+    "bad_quote",
+    "invalid_answer",
+    "published_error"
+  ],
+  "svg_files": 27,
+  "production_icons": 26,
+  "contrast_ratios": {
+    "essential/light": 15.35,
+    "essential/dark": 9.57,
+    "definition/light": 8.25,
+    "definition/dark": 8.21,
+    "example/light": 7.75,
+    "example/dark": 9.85,
+    "analogy/light": 7.18,
+    "analogy/dark": 10.0,
+    "caution/light": 6.2,
+    "caution/dark": 9.47,
+    "success/light": 5.53,
+    "success/dark": 7.34,
+    "review/light": 5.56,
+    "review/dark": 7.52
+  },
+  "arithmetic": "passed",
+  "demo_html_structure": "passed",
+  "browser_runtime_and_application": "Not executed here; see RECETTE_APPLICATION.md"
+}

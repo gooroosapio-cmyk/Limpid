@@ -31,7 +31,7 @@ import {
   type Notion,
   type SourceSegment,
 } from "@/lib/contracts/schemas";
-import { ValidationCollector, validateBlueprint, validateExplanation } from "@/lib/contracts/validate";
+import { partsCoverBlocks, ValidationCollector, validateBlueprint, validateExplanation } from "@/lib/contracts/validate";
 import { blocksMissingNumbers, droppedCaveatClaims, droppedNumberClaims } from "./coverage";
 import {
   buildBlueprint,
@@ -446,6 +446,11 @@ export const ChapterDraft = z.preprocess(
     /** V6 : « L'essentiel » du chapitre, en puces (3 à 6 repères, jamais un quota). */
     essential: z.array(txt(300)).max(6).default([]),
     blocks: z.array(Block).min(1).max(40),
+    /** V5 : sous-chapitres (titre, objectif) qui regroupent les blocs dans leur ordre. */
+    parts: z
+      .array(z.strictObject({ title: txt(160), objective: z.string().trim().max(300).nullable().default(null), block_ids: z.array(draftId).min(1).max(40) }))
+      .max(8)
+      .default([]),
     retain: z.array(txt(300)).max(4),
     notions: z.array(NotionDraft).max(6),
     /** Banque de 2 à 8 questions par chapitre (lot de 2 ou 3 tiré au lecteur, sans appel). */
@@ -457,7 +462,7 @@ export type ChapterDraft = z.infer<typeof ChapterDraft>;
 const BLOCK_RULES = (noExamples: boolean) => `Blocs (identifiants blk_1, blk_2… uniques dans le chapitre) :
 · "fact" et "definition" : uniquement des affirmations "supported", citées dans claim_ids avec leurs evidence_ids. emphasis "key" (1 au plus) = l'idée la plus importante.
 · "list" : style "bullets" (éléments parallèles), "numbers" ou "steps" (ordre qui compte) ; text = phrase d'introduction ; items (2 à 12) avec claim_ids et evidence_ids.
-· "formula" : expression exacte (texte), symbols (chaque symbole, sa signification et son unité), text = comment la lire puis une application avec les valeurs de la source.
+· "formula" : expression exacte (texte), symbols (chaque symbole, sa signification et son unité), text = comment la lire puis une application avec les valeurs de la source. Pour une résolution, préfère "calculation" ou "steps" : données de départ, étapes numérotées avec UNE opération principale par étape, courte justification, résultat avec son unité ; jamais plusieurs opérations enchaînées par des points-virgules.
 · Une affirmation "partial" ou "ambiguous" va dans un bloc "caution" ou une formulation prudente ; "contradicted" : bloc "caution" qui expose le désaccord sans trancher.
 ${noExamples ? `· Résumé fidèle : aucun "analogy", "fictional_example" ni "complement".` : `· "analogy" : la relation montrée, la correspondance explicite, puis sa limite dans limit. "fictional_example" : exemple pédagogique présenté comme tel (ses nombres ne deviennent pas ceux de la source). variants = 1 ou 2 autres versions clairement différentes, de même longueur, avec leur limit (null pour un exemple).
 · "complement" : connaissance générale absente de la source, utile pour comprendre, sans claim_ids ni evidence_ids. Avec parcimonie.`}
@@ -484,7 +489,8 @@ Simplifie chaque notion importante dans cet ordre : 1) le terme exact et une dé
 Approche : ${v6 ? MODE_GUIDE[approach] : MODE_GUIDE[mode]}
 ${v6 ? "" : `Niveau « ${input.level} » : ${LEVEL_GUIDE[input.level]}. Le niveau change l'effort d'explication, jamais le sens ni la couverture.`}
 Développe CHAQUE objectif et CHAQUE affirmation du chapitre : ce que cela signifie, comment ou pourquoi cela fonctionne quand c'est pertinent, ${noExamples ? "les éléments clés" : "un exemple concret ou un calcul si utile"}, puis la condition ou la limite. Repères souples : 120 à 250 mots par idée simple, davantage pour une méthode, un calcul ou une exception. Autant de mots que nécessaire, aucun pour remplir.${difficult ? "\nCe chapitre est difficile : raisonnement explicite étape par étape, notation exacte conservée avec une reformulation intuitive à côté." : ""}
-question = titre du chapitre (repris du plan, amélioré si besoin) ; takeaway = l'idée du chapitre en une phrase ; essential = « L'essentiel » en 3 à 6 puces distinctes (une phrase chacune).
+question = titre du chapitre (repris du plan, amélioré si besoin) ; takeaway = l'idée du chapitre en une phrase ; essential = « L'essentiel » : généralement 3 puces distinctes (une phrase chacune, environ 60 mots au total), conditions centrales comprises.
+parts = les sous-chapitres, dans l'ordre : chacun explique une question, un mécanisme ou une application identifiable (généralement 2 à 6 ; un chapitre court peut n'en avoir qu'un ; ce repère ne permet jamais de supprimer du contenu). title = titre court et précis (jamais « Partie 1 ») ; objective = une phrase : ce que le lecteur saura faire ou comprendre ; block_ids = les identifiants de SES blocs. Chaque bloc appartient à un seul sous-chapitre et les sous-chapitres se suivent dans l'ordre des blocs. Ne regroupe pas le chapitre par catégories (toutes les définitions, puis les exemples, puis les nuances) : chaque définition, exemple ou condition reste près du raisonnement qu'il éclaire.
 ${BLOCK_RULES(noExamples)}
 retain : 2 à 4 idées « À retenir », une phrase chacune, sans répéter mot pour mot les blocs.
 notions : pour chaque terme du plan présent dans tes blocs, une définition simple (1 à 2 phrases), un exemple (ou null) et les claim_ids qui la justifient. La définition donne le sens du terme DANS CE CHAPITRE ; si le mot seul y est aussi employé dans un autre sens, garde l'expression complète comme terme (seules ses occurrences exactes ouvriront la notion).
@@ -534,7 +540,8 @@ export function renameChapter(section: Section, index: number): Section {
     return { ...b, id: next };
   });
   const quiz = section.quiz?.map((q) => ({ ...q, revisit_block_id: q.revisit_block_id ? (map.get(q.revisit_block_id) ?? null) : null }));
-  return { ...section, id: `sec_${index}`, blocks, ...(quiz ? { quiz } : {}) };
+  const parts = section.parts?.map((p, k) => ({ ...p, id: `part_c${index}_${k + 1}`, block_ids: p.block_ids.map((id) => map.get(id) ?? id) }));
+  return { ...section, id: `sec_${index}`, blocks, ...(quiz ? { quiz } : {}), ...(parts ? { parts } : {}) };
 }
 
 /** Problèmes d'un chapitre : références, affirmations non expliquées, réserves, chiffres, minceur. */
@@ -558,6 +565,9 @@ export function chapterIssues(section: Section, c: ChapterInputs, evidenceIds: S
   for (const id of unsourcedComponents(section.blocks, statements)) {
     coverage.push(`Le composant ${id} affiche des valeurs absentes des affirmations qu'il cite : reprends les valeurs exactes de la source (avec leurs claim_ids), ou mets example true pour un exemple pédagogique annoncé.`);
   }
+  if (section.parts && !partsCoverBlocks(section)) {
+    coverage.push(`Les sous-chapitres (parts) doivent reprendre chaque bloc une seule fois, dans l'ordre des blocs (${section.blocks.map((b) => b.id).join(", ")}).`);
+  }
   const supported = mine.filter((x) => x.support_status === "supported").length;
   const words = wordsOf(section.blocks);
   if (supported >= 3 && words < Math.min(600, supported * 45)) {
@@ -566,13 +576,16 @@ export function chapterIssues(section: Section, c: ChapterInputs, evidenceIds: S
   return { blocking, coverage };
 }
 
-function toSection(d: ChapterDraft, difficult: boolean, approach: Approach, claimIds: Set<string>): Section {
+function toSection(d: ChapterDraft, difficult: boolean, approach: Approach, claimIds: Set<string>, objective?: string): Section {
   const quiz = cleanQuiz(d.quiz, new Set(d.blocks.map((b) => b.id)), claimIds);
+  const parts = d.parts.map((p, k) => ({ id: `part_${k + 1}`, title: p.title, objective: p.objective?.trim() ? p.objective.trim() : null, block_ids: p.block_ids }));
   return {
     id: "sec_x",
     question: d.question,
     takeaway: d.takeaway,
+    ...(objective ? { objective: objective.slice(0, 500) } : {}),
     blocks: d.blocks,
+    ...(parts.length ? { parts } : {}),
     ...(d.essential.length ? { essential: d.essential.slice(0, 6) } : {}),
     ...(d.retain.length ? { retain: d.retain.slice(0, 4) } : {}),
     ...(d.notions.length ? { notions: cleanNotions(d.notions) } : {}),
@@ -607,7 +620,10 @@ export function unsourcedComponents(blocks: Block[], statements: Map<string, str
 }
 
 /** Dernier recours : un composant aux valeurs non sourcées redevient un paragraphe (son texte). */
-function demoteComponents(section: Section, statements: Map<string, string>): Section {
+function demoteComponents(input: Section, statements: Map<string, string>): Section {
+  // Sous-chapitres incohérents après réparation : partie unique implicite (rien n'est masqué).
+  const { parts: _parts, ...rest } = input;
+  const section: Section = input.parts && !partsCoverBlocks(input) ? rest : input;
   const bad = new Set(unsourcedComponents(section.blocks, statements));
   if (bad.size === 0) return section;
   return {
@@ -668,7 +684,7 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
       if (repair === 0 || !section || input.signal.aborted || !(e instanceof ProviderError) || REPAIR_FATAL.has(e.code)) throw e;
       break;
     }
-    section = toSection(draft, difficult, approach, claimIds);
+    section = toSection(draft, difficult, approach, claimIds, c.chapter.objective);
     const issues = chapterIssues(section, c, evidenceIds);
     if (issues.blocking.length === 0 && issues.coverage.length === 0) break;
     feedback = [...issues.blocking, ...issues.coverage];

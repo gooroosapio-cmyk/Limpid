@@ -1,0 +1,57 @@
+{
+  "version": "5.0.0",
+  "validated_on": "2026-10-12",
+  "reader": {
+    "default": "continuous_chapter",
+    "sections_open_on_chapter_entry": true,
+    "collapse_control_visual_px": 20,
+    "collapse_control_target_px": 44,
+    "collapse_scope": "current_chapter",
+    "persist_collapse": "current_reading_session",
+    "resume": "chapter_start",
+    "preserve_attempts_on_resume": true,
+    "questions_in_course": "chapter_end_only",
+    "calculation_steps": "all_visible"
+  },
+  "toc": {
+    "initial_expanded": "current_chapter_only",
+    "multiple_expanded_allowed": true,
+    "jump_opens_section": true,
+    "bulk_controls_scope": "chapter_groups"
+  },
+  "feedback": {
+    "after_error": "targeted_correction_then_offer_variant",
+    "overwrite_initial_attempt": false
+  },
+  "progress": {
+    "dimensions": [
+      "consulted",
+      "practice_success",
+      "review_due"
+    ],
+    "consultation_visibility_ms_initial": 2000,
+    "consultation_is_not_mastery": true
+  },
+  "blocks": {
+    "critical_conditions_in_details": false,
+    "factual_safety_same_for_all_plans": true
+  },
+  "icons": {
+    "style": "filled_rounded",
+    "viewBox": "0 0 24 24",
+    "visible_label_required": true
+  },
+  "qa": {
+    "viewport_widths": [
+      320,
+      360,
+      390,
+      430,
+      768
+    ],
+    "text_scale_percent": [
+      100,
+      200
+    ]
+  }
+}
