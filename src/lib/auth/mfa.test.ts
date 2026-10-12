@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { adminMfaRequired, mfaStep, qrDataUrl, totpCode } from "./mfa";
 
 describe("double authentification de l'administration", () => {
-  it("exigée par défaut, coupée seulement par LIMPID_ADMIN_MFA=off", () => {
-    expect(adminMfaRequired({})).toBe(true);
+  it("retirée par défaut, rétablie seulement par LIMPID_ADMIN_MFA=on", () => {
+    expect(adminMfaRequired({})).toBe(false);
     expect(adminMfaRequired({ LIMPID_ADMIN_MFA: "on" })).toBe(true);
     expect(adminMfaRequired({ LIMPID_ADMIN_MFA: "off" })).toBe(false);
   });

@@ -34,7 +34,7 @@ export async function adminMfaStep() {
   return mfaStep(data, required);
 }
 
-/** Rôle admin vérifié en base, puis session aal2 (code TOTP) exigée. */
+/** Rôle admin vérifié en base ; code TOTP seulement si LIMPID_ADMIN_MFA=on. */
 export async function requireAdmin() {
   const user = await requireAdminRole();
   if ((await adminMfaStep()) !== "ok") redirect("/admin/securite");

@@ -74,3 +74,17 @@
 @media (prefers-reduced-motion: reduce) {
   .fl-details summary svg { transition: none; }
 }
+
+/* Chat progressif : état réel du message, texte rédigé au fil de l'eau, sans voile de chargement. */
+.ask-meta { margin: 4px 0 0; font-size: 0.8125rem; color: var(--muted); }
+.ask-unsent { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--danger); }
+.ask-unsent .btn-link { min-height: 44px; }
+.ask-q.is-unsent { opacity: 0.7; }
+.ask-text { white-space: pre-line; overflow-wrap: anywhere; }
+.ask-caret {
+  display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: text-bottom;
+  background: var(--yellow); animation: ask-blink 1s steps(2, start) infinite;
+}
+@keyframes ask-blink { to { visibility: hidden; } }
+.ask-tracking { padding: 8px 12px; border-radius: 12px; background: var(--soft); }
+@media (prefers-reduced-motion: reduce) { .ask-caret { animation: none; } }

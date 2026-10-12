@@ -146,6 +146,53 @@ export function errorCodeFor(status: number, message: string): ProviderError["co
   return "unavailable";
 }
 
+/**
+ * Lecture d'une réponse en flux (SSE d'OpenRouter) : le texte est transmis au fil de l'eau,
+ * puis la complétion est reconstituée (fin, consommation) comme une réponse classique.
+ */
+export async function readStream(res: Response, onText: (raw: string) => void): Promise<Completion> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let text = "";
+  const out: Completion = { choices: [{ finish_reason: null, message: { content: "" } }] };
+  const handle = (line: string) => {
+    if (!line.startsWith("data:")) return; // commentaires « : OPENROUTER PROCESSING »
+    const data = line.slice(5).trim();
+    if (!data || data === "[DONE]") return;
+    let chunk: { id?: string; model?: string; error?: Completion["error"]; usage?: Completion["usage"]; choices?: { delta?: { content?: string | null }; finish_reason?: string | null; native_finish_reason?: string | null }[] };
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (chunk.error) out.error = chunk.error;
+    out.id ??= chunk.id;
+    out.model ??= chunk.model;
+    if (chunk.usage) out.usage = chunk.usage;
+    const c = chunk.choices?.[0];
+    if (c?.finish_reason) out.choices![0]!.finish_reason = c.finish_reason;
+    if (c?.native_finish_reason) out.choices![0]!.native_finish_reason = c.native_finish_reason;
+    if (c?.delta?.content) {
+      text += c.delta.content;
+      onText(text);
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      handle(buffer.slice(0, nl).replace(/\r$/, ""));
+      buffer = buffer.slice(nl + 1);
+    }
+  }
+  if (buffer) handle(buffer);
+  out.choices![0]!.message = { content: text };
+  return out;
+}
+
 export class OpenRouterProvider implements AIProvider, ImageProvider {
   readonly name = "openrouter";
   readonly isDemo = false;
@@ -161,7 +208,7 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
     };
   }
 
-  private async post(body: Record<string, unknown>, signal: AbortSignal, timeout: AbortSignal, base: Omit<UsageReport, "durationMs">, started: number): Promise<Completion> {
+  private async post(body: Record<string, unknown>, signal: AbortSignal, timeout: AbortSignal, base: Omit<UsageReport, "durationMs">, started: number, onText?: (raw: string) => void): Promise<Completion> {
     let res: Response;
     try {
       res = await fetch(ENDPOINT, { method: "POST", headers: this.headers(), body: JSON.stringify(body), signal });
@@ -171,7 +218,7 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
       if (signal.aborted) throw new ProviderError("cancelled", "Opération annulée.", usage);
       throw new ProviderError("unavailable", "OpenRouter injoignable.", usage);
     }
-    const json = (await res.json().catch(() => ({}))) as Completion;
+    const json = (onText && res.ok ? await readStream(res, onText).catch(() => ({ error: { code: 502, message: "flux interrompu" } })) : await res.json().catch(() => ({}))) as Completion;
     if (!res.ok || json.error) {
       const status = res.ok ? Number(json.error?.code) || 500 : res.status;
       const message = String(json.error?.message ?? "");
@@ -225,11 +272,13 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
         // Niveau « complexe » : même modèle, réflexion haute.
         ...((req.budget.reasoning ?? (req.budget.tier === "complex" ? "high" : null)) ? { reasoning: { effort: req.budget.reasoning ?? "high" } } : {}),
         usage: { include: true },
+        ...(req.onText ? { stream: true } : {}),
       },
       signal,
       timeout,
       base,
       started,
+      req.onText,
     );
     const usage: UsageReport = {
       provider: this.name,

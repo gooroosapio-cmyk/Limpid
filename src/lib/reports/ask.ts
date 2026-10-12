@@ -96,7 +96,7 @@ export function verifyCitations(cites: { segment_id: string; quote: string }[], 
   return out;
 }
 
-export async function askModel(provider: AIProvider, input: AskRequest, explanation: string, passages: SourceSegment[], signal: AbortSignal) {
+export async function askModel(provider: AIProvider, input: AskRequest, explanation: string, passages: SourceSegment[], signal: AbortSignal, onText?: (raw: string) => void) {
   return provider.generateStructured({
     stage: "ask",
     schema: AskDraft,
@@ -109,7 +109,24 @@ export async function askModel(provider: AIProvider, input: AskRequest, explanat
     ],
     budget: { tier: "fast", role: "chat", maxInputTokens: 12_000, maxOutputTokens: 2_000, timeoutMs: 60_000 },
     signal,
+    onText,
   });
+}
+
+/** Contexte borné d'une question : passages utiles (partie lue d'abord) et explication de la partie. */
+export async function askContext(userId: string, reportId: string, input: Pick<AskRequest, "question" | "section_id">) {
+  const report = await loadReport(reportId);
+  if (!report) throw new ReaderAIError("not_found", "Rapport introuvable.");
+  if (report.state !== "ready") throw new ReaderAIError("not_ready", "Le rapport n'est pas encore prêt.");
+  await guardReaderCall(userId, STAGE, PER_HOUR, RESERVE_CENTS);
+  const section = report.explanation.sections.find((s) => s.id === input.section_id) ?? null;
+  const evidence = new Map(report.evidence.map((e) => [e.id, e.segment_id]));
+  const preferred = new Set(
+    (section?.blocks ?? []).flatMap((b) => blockEvidenceIds(b).map((id) => evidence.get(id)).filter((x): x is string => !!x)),
+  );
+  const passages = pickSegments(report.segments, input.question, preferred);
+  const explanation = section ? explanationText(report.explanation, [section.id], 6_000) : explanationText(report.explanation, undefined, 6_000);
+  return { passages, explanation };
 }
 
 export async function askDocument(userId: string, reportId: string, input: AskRequest): Promise<AskAnswer> {
