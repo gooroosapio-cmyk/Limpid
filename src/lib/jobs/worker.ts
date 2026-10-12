@@ -154,6 +154,11 @@ async function storeExercises(job: JobRow, versionId: string, explanation: Expla
 
 /** Au-delà de cette durée après la réservation, la génération repart dans une nouvelle invocation. */
 const REQUEUE_AFTER_MS = 120_000;
+/**
+ * Marge après l'échéance de l'invocation (`drainQueue` : début + 270 s) avant d'interrompre
+ * les appels en cours : la fonction est coupée à 300 s, il reste ~15 s pour remettre en file.
+ */
+const INVOCATION_GRACE_MS = 15_000;
 /** Fenêtre de génération d'une invocation (fonction de 300 s) : aucun appel long lancé au-delà. */
 const GENERATION_WINDOW_MS = 270_000;
 /** Cours prêt plus tard que cela : illustrations et exercices dans une nouvelle invocation. */
@@ -948,6 +953,14 @@ export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENE
   if (job.lease_version === 1) await recordPerf("job.queue_wait", Date.now() - Date.parse(job.created_at), { jobId: job.id });
   const controller = new AbortController();
   let lost = false;
+  // Fin d'invocation (fonction de 300 s) : un appel IA encore en cours est interrompu juste
+  // avant la coupure, et la tâche repart aussitôt dans une nouvelle invocation, étapes validées
+  // conservées. Sans cela, la fonction est tuée et la tâche attend l'expiration de son bail.
+  let outOfTime = false;
+  const cutoff = setTimeout(() => {
+    outOfTime = true;
+    controller.abort();
+  }, Math.max(0, deadlineMs + INVOCATION_GRACE_MS - Date.now()));
   // Battement régulier pendant une étape longue : le bail reste à cette exécution ; s'il a été
   // perdu (exécution gelée puis reprise ailleurs), le travail en cours s'interrompt.
   const beat = setInterval(() => {
@@ -987,6 +1000,11 @@ export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENE
     const f = failureOf(e);
     // Bail perdu : un autre worker a repris la tâche ; rien n'est écrit ici.
     if (lost || f.status === "lost") return { id: job.id, requeued: true };
+    if (outOfTime) {
+      await requeue(job.id);
+      if (!(await relayWorker())) console.error("worker.relay", job.id);
+      return { id: job.id, requeued: true };
+    }
     // Message technique seulement (ex. « OpenRouter : erreur HTTP 403. »), jamais le contenu du document.
     console.error("job", job.id, f.code, e instanceof Error ? e.message.slice(0, 160) : "");
     if (e instanceof ProviderError && e.issues.length) await recordSchemaIssues(job, e);
@@ -1006,6 +1024,7 @@ export async function runOneJob(workerId: string, deadlineMs = Date.now() + GENE
       await notify(job.owner_id, "report_failed", `job:${job.id}:failed`, { reportId: job.report_id, data: { code: f.code } }).catch(() => undefined);
     }
   } finally {
+    clearTimeout(cutoff);
     clearInterval(beat);
     leases.delete(job.id);
     stageClock.delete(job.id);
