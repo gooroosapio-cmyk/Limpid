@@ -351,3 +351,17 @@ dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px 
   background: var(--bg);
 }
 .deck:has(> .proj-bar) { padding-bottom: calc(var(--deck-bottom) + 96px); }
+
+/* « Vos supports d'apprentissage » : vraies cases à cocher, carte entière tactile, coche visible. */
+.import .support-card { position: relative; cursor: pointer; }
+.import .support-check { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.import .support-tick {
+  align-self: center; display: grid; place-items: center; width: 22px; height: 22px;
+  border: 1.5px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--on-yellow);
+}
+.import .support-card.is-selected .support-tick { background: var(--yellow); border-color: var(--gold); }
+.import .support-card:has(.support-check:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.import .support-count { margin: var(--s2) 0 0; font-size: 0.8125rem; color: var(--muted); }
+.import .support-need { color: var(--danger); font-weight: 600; }
+.import .estimate-text b.is-stale { opacity: 0.55; }
+@media (min-width: 640px) { .import .support-tick { align-self: start; } }

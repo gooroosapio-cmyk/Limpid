@@ -101,6 +101,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
       .from("jobs")
       .select("id, status, stage, error_code, recoverable, attempts, progress")
       .eq("report_id", id)
+      .neq("kind", "generate_support")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -114,6 +115,7 @@ export async function loadReport(id: string, versionNumber?: number): Promise<Lo
       .from("jobs")
       .select("id, status, stage, error_code, recoverable, attempts, progress")
       .eq("report_id", id)
+      .neq("kind", "generate_support")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),

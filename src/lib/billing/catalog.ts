@@ -124,6 +124,14 @@ export const ACTION_PRICES = {
   report_version: 2,
   ask: 1,
   quiz: 3,
+  /**
+   * Support de synthèse (carte mentale ou flashcards) produit depuis la base commune du cours :
+   * coût marginal selon la taille du document (pas de nouvelle lecture du document).
+   */
+  support_short: 2,
+  support_standard: 4,
+  support_long: 10,
+  support_xl: 18,
 } as const;
 export type Action = keyof typeof ACTION_PRICES;
 export type ReportAction = "report_short" | "report_standard" | "report_long" | "report_xl";
@@ -150,6 +158,12 @@ export const MAX_SOURCE_PAGES = 150;
  * suit le contenu ; l'utilisateur ne choisit plus de longueur.
  * ≤ 8 pages : 8 · 9–20 : 20 · 21–80 : 60 · 81–150 : 120 crédits.
  */
+export type SupportAction = "support_short" | "support_standard" | "support_long" | "support_xl";
+/** Prix marginal d'un support de synthèse, à la taille du cours. */
+export function supportAction(action: ReportAction): SupportAction {
+  return action.replace("report_", "support_") as SupportAction;
+}
+
 export function reportAction(pages: number): ReportAction {
   if (pages <= 8) return "report_short";
   if (pages <= 20) return "report_standard";

@@ -24,6 +24,7 @@ describe("OpenRouter : configuration et routage", () => {
       controller: "openai/gpt-6-luna",
       expert: "openai/gpt-6.1-sol",
       vision: "google/gemini-3.8-flash",
+      transform: "google/gemini-3.8-flash",
     });
     expect(openRouterConfigFromEnv({ ...env, MODEL_WRITER: "google/gemini-3.8-flash" }).models.writer).toBe("google/gemini-3.8-flash");
     // Identifiant douteux ignoré.

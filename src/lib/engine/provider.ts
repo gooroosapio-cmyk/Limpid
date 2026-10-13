@@ -18,7 +18,7 @@ export type ModelTier = "lite" | "fast" | "quality" | "complex";
  * complexe, la rédaction pédagogique, le chat et les reformulations, le contrôle courant,
  * l'expertise ciblée (Pro seulement). Le code choisit le rôle ; le modèle vient du registre.
  */
-export type ModelRole = "structure" | "structure_complex" | "writer" | "chat" | "controller" | "expert" | "vision";
+export type ModelRole = "structure" | "structure_complex" | "writer" | "chat" | "controller" | "expert" | "vision" | "transform";
 
 export interface StageBudget {
   tier: ModelTier;

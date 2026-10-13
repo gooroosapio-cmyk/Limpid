@@ -137,7 +137,8 @@ export async function sweepReservations(userId: string) {
     }
     const status = job?.status ?? null;
     // Une tâche en file dont l'annulation est demandée (rapport supprimé) ne démarrera jamais.
-    if (status === "running" || status === "retrying" || (status === "queued" && !job?.cancel_requested)) continue;
+    // Support en attente de la base commune : sa réservation est gardée tant que rien n'est annulé.
+    if (status === "running" || status === "retrying" || ((status === "queued" || status === "awaiting_confirmation") && !job?.cancel_requested)) continue;
     if (status === "succeeded" || status === "incomplete_check") await settleReservation(r.id as string);
     else await releaseReservation(r.id as string);
   }
@@ -258,7 +259,7 @@ export async function reserveCredits(
 
 /** Clé de la tâche d'une réservation de rapport (« report:K » ou « version:K » → K). */
 export function jobKeyOf(reservationKey: string): string | null {
-  const m = /^(?:report|version):(.+)$/.exec(reservationKey);
+  const m = /^(?:report|version|support):(.+)$/.exec(reservationKey);
   return m ? m[1]! : null;
 }
 
@@ -295,7 +296,7 @@ export async function finishJobReservation(jobId: string, delivered: boolean) {
     // Lien jamais posé : la réservation est retrouvée par la clé de la tâche.
     const { data: job } = await db.from("jobs").select("owner_id, kind, idempotency_key").eq("id", jobId).maybeSingle();
     if (job) {
-      const key = `${job.kind === "reexplain_section" ? "version" : "report"}:${job.idempotency_key}`;
+      const key = `${job.kind === "reexplain_section" ? "version" : job.kind === "generate_support" ? "support" : "report"}:${job.idempotency_key}`;
       ({ data } = await db.from("credit_reservations").select("id").eq("owner_id", job.owner_id).eq("idempotency_key", key).eq("status", "reserved").is("job_id", null));
     }
   }
@@ -307,7 +308,8 @@ export async function accountUsage(userId: string) {
   const db = adminClient();
   const [{ count: kept }, { count: active }] = await Promise.all([
     db.from("reports").select("id", { count: "exact", head: true }).eq("owner_id", userId).is("deleted_at", null).eq("is_demo", false),
-    db.from("jobs").select("id", { count: "exact", head: true }).eq("owner_id", userId).in("status", ["queued", "running", "retrying"]),
+    // Les unités des supports dérivés n'occupent pas la place d'une préparation de cours.
+    db.from("jobs").select("id", { count: "exact", head: true }).eq("owner_id", userId).neq("kind", "generate_support").in("status", ["queued", "running", "retrying"]),
   ]);
   return { kept: kept ?? 0, active: active ?? 0 };
 }

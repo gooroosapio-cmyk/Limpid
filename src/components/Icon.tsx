@@ -38,6 +38,10 @@ import {
   Info,
   Key,
   Layers,
+  Network,
+  GalleryVerticalEnd,
+  Undo2,
+  Waypoints,
   LayoutGrid,
   LibraryBig,
   Lightbulb,
@@ -146,6 +150,10 @@ const ICONS = {
   library: LibraryBig,
   credits: Coins,
   admin: ShieldCheck,
+  mindmap: Network,
+  cards: GalleryVerticalEnd,
+  undo: Undo2,
+  path: Waypoints,
 
   // Rôles pédagogiques (couleur du rôle dans le lecteur)
   definition: BookOpenText,

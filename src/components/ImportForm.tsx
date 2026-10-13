@@ -11,6 +11,7 @@ import type { Dict } from "@/lib/i18n";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
 import { ACTION_PRICES } from "@/lib/billing/catalog";
+import { DEFAULT_SUPPORTS, readSupports, SUPPORTS, type Support } from "@/lib/supports/supports";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 import { InsufficientCreditsState } from "@/components/jobs/InsufficientCreditsState";
 
@@ -43,7 +44,17 @@ type V6Mode = (typeof V6_MODES)[number];
 /** Envois et lectures simultanés au plus (le reste attend son tour). */
 const CONCURRENCY = 2;
 
-const MODE_ICONS: Record<Mode, IconName> = { tres_simple: "bulb", claire: "book", resume: "file", revision: "bars", auto: "spark", livre: "book", parcours: "list", atelier: "bars" };
+const SUPPORT_ICONS: Record<Support, IconName> = { livre: "book", parcours: "path", carte: "mindmap", flashcards: "cards" };
+/** Sélection en cours gardée pendant la session (retour arrière, erreur, reprise). */
+const SUPPORTS_KEY = "limpid-supports-draft";
+function readDraftSupports(): Support[] | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(SUPPORTS_KEY) ?? "null");
+    return Array.isArray(v) && v.length ? readSupports(v) : null;
+  } catch {
+    return null;
+  }
+}
 
 const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp";
 /** Formats acceptés, pour le message de non-conformité (TYPE). */
@@ -53,7 +64,7 @@ interface Billing { code: string; topup: string | null; needed?: number; availab
 
 /** Création bloquée par le solde : sources et approche gardées sur l'appareil pour reprendre après recharge. */
 const PENDING_KEY = "limpid-pending-import";
-interface PendingImport { sourceIds: string[]; mode: string; at: number }
+interface PendingImport { sourceIds: string[]; mode: string; supports?: Support[]; at: number }
 /** Une source jamais utilisée est purgée après 24 h : au-delà, la reprise n'est plus proposée. */
 const PENDING_MAX_MS = 20 * 3600_000;
 
@@ -197,7 +208,25 @@ export function ImportForm({
   const t = useT();
   const lang = useLang();
   // V6 : un seul réglage, « Votre approche » (aucun niveau) ; un ancien choix V4 revient à Par défaut.
-  const [mode, setMode] = useState<V6Mode>((V6_MODES as readonly string[]).includes(defaultMode) ? (defaultMode as V6Mode) : "auto");
+  const [mode] = useState<V6Mode>((V6_MODES as readonly string[]).includes(defaultMode) ? (defaultMode as V6Mode) : "auto");
+  // Supports d'apprentissage : le livre interactif est proposé à chaque nouvelle création.
+  const [supports, setSupportsState] = useState<Support[]>(DEFAULT_SUPPORTS);
+  const [needOne, setNeedOne] = useState(false);
+  const setSupports = (next: Support[]) => {
+    setSupportsState(next);
+    try {
+      sessionStorage.setItem(SUPPORTS_KEY, JSON.stringify(next));
+    } catch {}
+  };
+  const toggleSupport = (s: Support) => {
+    const next = supports.includes(s) ? supports.filter((x) => x !== s) : SUPPORTS.filter((x) => x === s || supports.includes(x));
+    if (!next.length) {
+      setNeedOne(true);
+      return;
+    }
+    setNeedOne(false);
+    setSupports(next);
+  };
   const [items, setItems] = useState<Item[]>([]);
   const [output, setOutput] = useState<Output>("common");
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
@@ -208,7 +237,7 @@ export function ImportForm({
   const [pending, setPending] = useState<PendingImport | null>(null);
   const [resuming, setResuming] = useState(false);
   // Devis reçu pour un jeu de documents donné (clé) : affiché seulement s'il correspond encore.
-  const [quoted, setQuoted] = useState<{ key: string; credits: number } | null>(null);
+  const [quoted, setQuoted] = useState<{ key: string; credits: number; extras: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
@@ -223,6 +252,8 @@ export function ImportForm({
     key.current = crypto.randomUUID();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique du stockage de l'appareil
     setPending(readPending());
+    const draft = readDraftSupports();
+    if (draft) setSupportsState(draft);
   }, []);
 
   /** « Reprendre mon Limpid » après recharge : mêmes documents, même approche, sans réimport. */
@@ -231,7 +262,7 @@ export function ImportForm({
     setResuming(true);
     setError(null);
     try {
-      const data = await postJson("/api/reports", { source_ids: pending.sourceIds, mode: pending.mode, idempotency_key: key.current }, t.add.failed, t);
+      const data = await postJson("/api/reports", { source_ids: pending.sourceIds, ...(pending.supports ? { supports: pending.supports } : { mode: pending.mode }), idempotency_key: key.current }, t.add.failed, t);
       writePending(null);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
@@ -341,14 +372,21 @@ export function ImportForm({
 
   const readyItems = items.filter((x) => x.status === "ready" && x.prepared);
   // Devis fixe dès que les documents sont lus (Limpid commun) : affiché sur le bouton.
-  const quoteKey = !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
+  const sourceKey = !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
+  // Devis propre à la sélection (documents + supports) : une réponse devenue obsolète est ignorée.
+  const quoteKey = sourceKey ? `${sourceKey}|${supports.join(",")}` : "";
   const quote = quoted && quoted.key === quoteKey ? quoted.credits : null;
+  // Pendant la mise à jour, la valeur précédente reste affichée (état discret), le lancement attend.
+  const staleQuote = quoted && quote === null && quoteKey ? quoted : null;
   useEffect(() => {
     if (!quoteKey) return;
     let live = true;
-    fetch("/api/billing/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_ids: quoteKey.split(",") }) })
+    const [ids, list] = quoteKey.split("|");
+    fetch("/api/billing/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_ids: ids!.split(","), supports: list!.split(",") }) })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { credits?: number } | null) => live && setQuoted(typeof d?.credits === "number" ? { key: quoteKey, credits: d.credits } : null))
+      .then((d: { credits?: number; extras?: { credits: number }[] } | null) =>
+        live && setQuoted(typeof d?.credits === "number" ? { key: quoteKey, credits: d.credits, extras: (d.extras ?? []).reduce((n, e) => n + e.credits, 0) } : null),
+      )
       .catch(() => undefined);
     return () => {
       live = false;
@@ -363,7 +401,10 @@ export function ImportForm({
     !busy &&
     readyItems.length > 0 &&
     pendingItems.length === 0 &&
-    failedItems.length === 0;
+    failedItems.length === 0 &&
+    supports.length > 0 &&
+    // Un Limpid commun ne part qu'avec un devis correspondant à la sélection affichée.
+    (!quoteKey || quote !== null);
 
   /** Condition manquante, dite à côté du bouton désactivé. */
   const missing = !enabled || busy
@@ -385,7 +426,7 @@ export function ImportForm({
         setPhase({ step: "creating" });
         const data = await postJson(
           "/api/reports/batch",
-          { source_ids: readyItems.map((x) => x.prepared!.sourceId), mode, idempotency_key: key.current, folder_id: folderId },
+          { source_ids: readyItems.map((x) => x.prepared!.sourceId), supports, idempotency_key: key.current, folder_id: folderId },
           t.add.failed,
           t,
         );
@@ -396,7 +437,7 @@ export function ImportForm({
       }
       const sourceIds = readyItems.map((x) => x.prepared!.sourceId);
       setPhase({ step: "creating" });
-      const data = await postJson("/api/reports", { source_ids: sourceIds, mode, idempotency_key: key.current, folder_id: folderId }, t.add.failed, t);
+      const data = await postJson("/api/reports", { source_ids: sourceIds, supports, idempotency_key: key.current, folder_id: folderId }, t.add.failed, t);
       writePending(null);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
@@ -407,7 +448,7 @@ export function ImportForm({
       setError(err instanceof FormError ? err.message : t.create.networkError);
       setBilling(err instanceof FormError ? (err.billing ?? null) : null);
       if (err instanceof FormError && err.billing?.code === "credits" && !(many && output === "each")) {
-        writePending({ sourceIds: readyItems.map((x) => x.prepared!.sourceId), mode });
+        writePending({ sourceIds: readyItems.map((x) => x.prepared!.sourceId), mode, supports });
       }
       setPhase({ step: "idle" });
       key.current = crypto.randomUUID();
@@ -587,22 +628,28 @@ export function ImportForm({
 
       {(!hero || items.length > 0) && (
       <>
-      <fieldset className="modes" disabled={busy}>
-        <legend>{t.add.v2.approach}</legend>
-        <p className="modes-sub">{t.add.v2.approachSub}</p>
-        <div className="mode-grid">
-          {V6_MODES.map((m) => (
-            <label key={m} className={`mode-card${mode === m ? " is-selected" : ""}`}>
-              <input type="radio" className="sr-only" name={`${base}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} aria-describedby={`${base}-mode-${m}`} />
-              <span className="mode-ic" aria-hidden="true"><Icon name={MODE_ICONS[m]} size={30} /></span>
-              <span className="mode-txt">
-                <strong>{t.add.modes[m]?.title}</strong>
-                <span id={`${base}-mode-${m}`} className="mode-desc">{t.add.v2.modeShort[m]}</span>
-              </span>
-              <span className="mode-radio" aria-hidden="true" />
-            </label>
-          ))}
+      <fieldset className="modes supports" disabled={busy} aria-describedby={`${base}-sup-count`}>
+        <legend>{t.add.v2.supportsTitle}</legend>
+        <p className="modes-sub">{t.add.v2.supportsSub}</p>
+        <div className="mode-grid support-grid">
+          {SUPPORTS.map((m) => {
+            const on = supports.includes(m);
+            return (
+              <label key={m} className={`mode-card support-card${on ? " is-selected" : ""}`}>
+                <input type="checkbox" className="support-check" name={`${base}-supports`} value={m} checked={on} onChange={() => toggleSupport(m)} aria-describedby={`${base}-sup-${m}`} />
+                <span className="mode-ic" aria-hidden="true"><Icon name={SUPPORT_ICONS[m]} size={28} /></span>
+                <span className="mode-txt">
+                  <strong>{t.add.v2.supports[m]?.title}</strong>
+                  <span id={`${base}-sup-${m}`} className="mode-desc">{t.add.v2.supports[m]?.desc}</span>
+                </span>
+                <span className="support-tick" aria-hidden="true">{on && <Icon name="check" size={16} />}</span>
+              </label>
+            );
+          })}
         </div>
+        <p id={`${base}-sup-count`} className="support-count" aria-live="polite">
+          {needOne ? <span className="support-need">{t.add.v2.supportsNeedOne}</span> : t.add.v2.supportsCount(supports.length)}
+        </p>
       </fieldset>
 
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
@@ -624,7 +671,10 @@ export function ImportForm({
       <div className="estimate">
         <span className="estimate-icon" aria-hidden="true"><Icon name="coins" size={26} /></span>
         <span className="estimate-text">
-          <b>{count === 1 ? (quote ? t.add.v2.estimate(quote) : t.billing.createCostFrom(ACTION_PRICES.report_short)) : t.add.v2.estimateMany(count)}</b>
+          <b className={staleQuote ? "is-stale" : undefined}>
+            {count === 1 ? (quote ? t.add.v2.estimate(quote) : staleQuote ? t.add.v2.estimate(staleQuote.credits) : t.billing.createCostFrom(ACTION_PRICES.report_short)) : t.add.v2.estimateMany(count)}
+          </b>
+          {staleQuote ? <small aria-live="polite">{t.add.v2.estimateUpdating}</small> : count === 1 && quote && quoted && quoted.extras > 0 ? <small>{t.add.v2.estimateSupports(quoted.extras)}</small> : null}
           {pages > 0 && <small>{t.add.v2.estimatePages(pages)}</small>}
         </span>
         <button

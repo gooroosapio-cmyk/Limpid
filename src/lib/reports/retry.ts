@@ -37,6 +37,7 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
     .from("jobs")
     .select("id, status, kind, params, source_id, recoverable")
     .eq("report_id", reportId)
+    .neq("kind", "generate_support")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
