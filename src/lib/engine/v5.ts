@@ -498,6 +498,29 @@ export const ChapterComplement = z.preprocess(
   z.strictObject({ blocks: z.array(Block).min(1).max(12) }),
 );
 
+/**
+ * Preuves d'un complément réparées par code (le sens ne change pas) : une référence inconnue est
+ * retirée et remplacée par les preuves des affirmations citées par le bloc ; un bloc qui ne cite
+ * finalement aucune preuve ni affirmation connue est écarté.
+ */
+export function sanitizeComplement(
+  blocks: ChapterDraft["blocks"],
+  evidenceIds: Set<string>,
+  claimEvidence: Map<string, string[]>,
+): ChapterDraft["blocks"] {
+  const out: ChapterDraft["blocks"] = [];
+  for (const b of blocks) {
+    const claims = b.claim_ids.filter((id) => claimEvidence.has(id));
+    let evidence = b.evidence_ids.filter((id) => evidenceIds.has(id));
+    if (evidence.length < b.evidence_ids.length || (!evidence.length && claims.length)) {
+      evidence = [...new Set([...evidence, ...claims.flatMap((id) => claimEvidence.get(id) ?? []).filter((id) => evidenceIds.has(id))])];
+    }
+    if (!claims.length && !evidence.length && (b.claim_ids.length || b.evidence_ids.length)) continue;
+    out.push({ ...b, claim_ids: claims, evidence_ids: evidence });
+  }
+  return out;
+}
+
 /** Ajoute les blocs d'un complément à la fin du chapitre (dernier sous-chapitre), identifiants uniques. */
 export function mergeComplement(draft: ChapterDraft, extra: { blocks: ChapterDraft["blocks"] }): ChapterDraft {
   const taken = new Set(draft.blocks.map((b) => b.id));
@@ -787,7 +810,9 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
           budget: { ...budgetFor(1), maxOutputTokens: 6_000 },
           attempts,
         });
-        draft = mergeComplement(draft, extra);
+        const claimEvidence = new Map(c.ko.claims.map((x) => [x.id, x.evidence_ids]));
+        const blocks = sanitizeComplement(extra.blocks, evidenceIds, claimEvidence);
+        if (blocks.length) draft = mergeComplement(draft, { blocks });
         section = toSection(draft, difficult, approach, claimIds, c.chapter.objective);
       } catch (e) {
         if (input.signal.aborted || !(e instanceof ProviderError) || REPAIR_FATAL.has(e.code)) throw e;
