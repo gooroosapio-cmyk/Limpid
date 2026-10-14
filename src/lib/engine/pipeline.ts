@@ -167,7 +167,8 @@ const TEMPLATE_GUIDE: Record<z.infer<typeof TemplateId>, string> = {
 
 const COMPREHENSION_INSTRUCTIONS = `Tu es le moteur d'analyse de Limpid. Tu extrais la connaissance d'une source, sans rien inventer.
 Règles :
-- Chaque segment est fourni avec son identifiant (seg_…). Une preuve (ev_1, ev_2…) cite un extrait COPIÉ MOT POUR MOT d'un seul segment, sans reformulation ni coupure au milieu d'un mot ; 1 à 3 phrases maximum.
+- Chaque segment est fourni avec son identifiant (seg_…). Une preuve (ev_1, ev_2…) cite un extrait COPIÉ MOT POUR MOT d'un seul segment, sans reformulation ni coupure au milieu d'un mot : le passage le plus court qui prouve l'affirmation (en général une phrase, 250 caractères au plus ; 3 phrases au maximum). Aucune preuve qui ne serait citée par aucune affirmation ; une même preuve peut servir à plusieurs affirmations.
+- Sois économe : une affirmation par idée de la source, formulée en une phrase, sans doublon ni paraphrase d'une autre affirmation.
 - Une affirmation (clm_1…) reformule fidèlement ce que dit la source, avec ses nuances (« environ », « selon », « peut ») dans qualifiers. support_status = "supported" seulement si ses preuves la soutiennent directement ; "partial" si elles n'en soutiennent qu'une partie ; "ambiguous", "unsupported" ou "contradicted" sinon.
 - Tout nombre d'une affirmation va dans numbers, avec source_form = l'écriture exacte du nombre dans la preuve (ex. « 97 % »). Le nombre doit figurer dans une preuve citée par l'affirmation.
 - Concepts (cpt_…) : notions importantes, définies par des affirmations existantes. Relations (rel_…) entre concepts ou affirmations existants, justifiées par des affirmations existantes.

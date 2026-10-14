@@ -598,7 +598,8 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     signal: controller.signal,
     // Registre par rôle : structure (GLM ou DeepSeek), rédaction (MiMo), contrôle (Luna).
     budgets: {
-      comprehension: { tier: "fast" as const, role: structure.role, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000, reasoning: "low" as const },
+      // Sortie bornée (§ 11.1) : élargie une seule fois si la réponse est coupée.
+      comprehension: { tier: "fast" as const, role: structure.role, maxInputTokens: 120_000, maxOutputTokens: 12_000, timeoutMs: 180_000, reasoning: "low" as const },
       explanation: { tier: "fast" as const, role: writerRole(job), maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
       plan: { tier: "fast" as const, role: structure.role, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const },
     },
