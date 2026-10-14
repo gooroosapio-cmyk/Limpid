@@ -75,6 +75,14 @@ export async function requestSupport(userId: string, reportId: string, support: 
     .select("id")
     .single();
   if (job.error || !job.data) {
+    if (job.error?.code === "23505") {
+      // Même clé déjà acceptée (double envoi) : la réservation est la sienne, jamais rendue ici.
+      const { data: winner } = await db.from("jobs").select("id").eq("owner_id", userId).eq("idempotency_key", unitKey).maybeSingle();
+      if (winner) return { jobId: winner.id as string };
+      // Autre unité active pour ce support (index unique) : cette réservation-ci est rendue.
+      await releaseReservation(reservationId);
+      throw new SupportRequestError("busy", "Ce support est déjà en préparation.");
+    }
     await releaseReservation(reservationId);
     throw new SupportRequestError("storage", "Création de la tâche impossible.");
   }

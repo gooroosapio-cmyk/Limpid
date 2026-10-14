@@ -1108,6 +1108,33 @@ export async function cancelOrphans(): Promise<number> {
   return ids.length;
 }
 
+/** Délai au-delà duquel un support attendant une base en échec (jamais relancée) est rendu. */
+const SUPPORT_WAIT_MAX_MS = 7 * 24 * 3600_000;
+
+/**
+ * Rattrapage des supports en attente (worker interrompu, annulation par l'administration, base
+ * abandonnée après un échec) : d'après la dernière préparation du cours, ils partent, attendent
+ * encore, ou sont annulés avec leurs crédits rendus. Jamais de réservation bloquée sans fin.
+ */
+export async function reconcileSupports(): Promise<void> {
+  const db = adminClient();
+  const { data: waiting } = await db.from("jobs").select("report_id").eq("kind", "generate_support").eq("status", "awaiting_confirmation").limit(50);
+  const reports = [...new Set((waiting ?? []).map((w) => w.report_id as string).filter(Boolean))];
+  for (const reportId of reports) {
+    const { data: base } = await db
+      .from("jobs")
+      .select("status, recoverable, finished_at, cancel_requested")
+      .eq("report_id", reportId)
+      .eq("kind", "generate_report")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!base || base.status === "cancelled" || base.cancel_requested) await cancelSupports(reportId);
+    else if (base.status === "succeeded" || base.status === "incomplete_check") await releaseSupports(reportId);
+    else if (base.status === "failed" && (base.recoverable === false || Date.now() - Date.parse((base.finished_at as string) ?? "") > SUPPORT_WAIT_MAX_MS)) await cancelSupports(reportId);
+  }
+}
+
 /** Supports en attente d'un cours dont la base commune vient d'être livrée : mis en file. */
 async function releaseSupports(reportId: string) {
   await adminClient()
@@ -1145,8 +1172,12 @@ async function runSupport(job: JobRow, controller: AbortController): Promise<str
   const { data: report } = await db.from("reports").select("current_version_id, title").eq("id", job.report_id).is("deleted_at", null).maybeSingle();
   const versionId = job.params.version_id ?? (report?.current_version_id as string | null);
   if (!report || !versionId) throw new JobFailure("version_missing");
-  const { data: existing } = await db.from("support_artifacts").select("id").eq("report_version_id", versionId).eq("type", support).maybeSingle();
-  if (existing) return "succeeded";
+  const { data: existing } = await db.from("support_artifacts").select("job_id").eq("report_version_id", versionId).eq("type", support).maybeSingle();
+  if (existing) {
+    // Déjà publié par une autre unité : celle-ci ne livre rien, sa réservation est rendue.
+    if (existing.job_id !== job.id) await finishJobReservation(job.id, false);
+    return "succeeded";
+  }
   await checkBudget(job.owner_id, job.id);
 
   const { data: version } = await db.from("report_versions").select("id, knowledge_id, explanation, blueprint").eq("id", versionId).eq("report_id", job.report_id).single();
@@ -1205,12 +1236,16 @@ async function runSupport(job: JobRow, controller: AbortController): Promise<str
       { onConflict: "report_version_id,type", ignoreDuplicates: true },
     );
   if (ins.error) throw new JobFailure("persist_version");
+  // Publication concurrente gagnée par une autre unité : aucun débit pour celle-ci.
+  const { data: owner } = await db.from("support_artifacts").select("job_id").eq("report_version_id", versionId).eq("type", support).maybeSingle();
+  if (owner && owner.job_id !== job.id) await finishJobReservation(job.id, false);
   return "succeeded";
 }
 
 /** Vide la file dans la limite de temps donnée (appel depuis after() ou le cron). */
 export async function drainQueue(workerId: string, deadlineMs: number): Promise<number> {
   await cancelOrphans();
+  await reconcileSupports().catch((e) => console.error("supports.reconcile", e instanceof Error ? e.message.slice(0, 120) : ""));
   let n = 0;
   // Une nouvelle tâche seulement s'il reste au moins une minute à l'invocation.
   while (deadlineMs - Date.now() > 60_000) {

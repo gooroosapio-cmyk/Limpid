@@ -79,8 +79,9 @@ export function FlashcardSession({
   const byId = useMemo(() => new Map(bank.cards.map((c) => [c.id, c])), [bank]);
   const visualsById = useMemo(() => new Map(visuals.map((v) => [v.id, v])), [visuals]);
   const [queue, setQueue] = useState(() => snapshot.queue.filter((id) => byId.has(id)));
-  const [position, setPosition] = useState(snapshot.position);
-  const [revealed, setRevealed] = useState(!!snapshot.revealed && snapshot.revealed === snapshot.queue[snapshot.position]);
+  // Reprise après une mise à jour de la banque : la position suit les cartes retirées avant elle.
+  const [position, setPosition] = useState(() => snapshot.position - snapshot.queue.slice(0, snapshot.position).filter((id) => !byId.has(id)).length);
+  const [revealed, setRevealed] = useState(!!snapshot.revealed && byId.has(snapshot.revealed) && snapshot.revealed === snapshot.queue[snapshot.position]);
   const [sessionId, setSessionId] = useState<string | null>(snapshot.id);
   const [history, setHistory] = useState<Rated[]>([]);
   const [correcting, setCorrecting] = useState<Rated | null>(null);
@@ -92,40 +93,41 @@ export function FlashcardSession({
   const done = position >= queue.length;
   const card = !done ? byId.get(queue[position]!) : undefined;
 
-  /** Envoie les notes en attente (ordre conservé) ; garde celles qui échouent pour plus tard. */
+  /**
+   * Envoie les notes en attente, dans l'ordre, une seule exécution à la fois. Seules les notes
+   * envoyées (ou refusées définitivement) sont retirées de la file : une note ajoutée pendant
+   * l'envoi n'est jamais écrasée ; session expirée (401) ou erreur serveur : gardée pour plus tard.
+   */
+  const flushing = useRef(false);
   const flush = useCallback(async () => {
-    const list = readPending(reportId);
-    if (!list.length) {
-      setOffline(false);
-      return;
+    if (flushing.current) return;
+    flushing.current = true;
+    try {
+      for (;;) {
+        const next = readPending(reportId)[0];
+        if (!next) break;
+        const res = await fetch(`/api/reports/${reportId}/revisions/note`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(next),
+        }).catch(() => null);
+        // Réseau absent, session expirée ou erreur serveur : on réessaiera (retour du réseau, note suivante).
+        if (!res || res.status === 401 || res.status === 429 || res.status >= 500) break;
+        if (res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { state?: CardState };
+          if (body.state) setUpdates((u) => ({ ...u, [next.card_id]: { next_review_at: body.state!.next_review_at, last_rating: body.state!.last_rating } }));
+        }
+        // Envoyée, ou refusée définitivement (carte retirée) : retirée de la file, par sa clé.
+        writePending(reportId, readPending(reportId).filter((e) => e.idempotency_key !== next.idempotency_key));
+      }
+    } finally {
+      flushing.current = false;
+      setOffline(readPending(reportId).length > 0);
     }
-    const left: PendingEvent[] = [];
-    for (const ev of list) {
-      if (left.length) {
-        left.push(ev);
-        continue;
-      }
-      const res = await fetch(`/api/reports/${reportId}/revisions/note`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ev),
-      }).catch(() => null);
-      if (!res) {
-        left.push(ev);
-        continue;
-      }
-      if (res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { state?: CardState };
-        if (body.state) setUpdates((u) => ({ ...u, [ev.card_id]: { next_review_at: body.state!.next_review_at, last_rating: body.state!.last_rating } }));
-      }
-      // Erreur définitive (carte retirée, requête refusée) : la note n'est pas renvoyée en boucle.
-    }
-    writePending(reportId, left);
-    setOffline(left.length > 0);
   }, [reportId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronisation réseau (notes en attente)
+     
     void flush();
     const online = () => void flush();
     window.addEventListener("online", online);

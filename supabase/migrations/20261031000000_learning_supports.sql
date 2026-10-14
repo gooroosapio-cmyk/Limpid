@@ -28,6 +28,10 @@ alter table public.generation_checkpoints drop constraint if exists generation_c
 alter table public.generation_checkpoints add constraint generation_checkpoints_stage_check
   check (stage ~ '^(comprehension|explication|plan|publication|frag_[0-9]{1,3}|chap_[0-9]{1,3}|lot_[0-9]{1,3})$');
 
+-- Une seule unité active par support et par cours (deux demandes simultanées : une seule passe).
+create unique index if not exists jobs_one_active_support_idx on public.jobs (report_id, (params->>'support'))
+  where kind = 'generate_support' and status in ('queued', 'running', 'retrying', 'awaiting_confirmation');
+
 create table if not exists public.support_artifacts (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -109,7 +113,7 @@ revoke insert, update, delete on public.flashcard_sessions from anon, authentica
 
 -- down (manuel) :
 --   drop table public.flashcard_sessions; drop table public.flashcard_events; drop table public.flashcard_progress;
---   drop table public.support_artifacts;
+--   drop table public.support_artifacts; drop index public.jobs_one_active_support_idx;
 --   delete from public.jobs where kind = 'generate_support';
 --   alter table public.jobs drop constraint jobs_kind_check;
 --   alter table public.jobs add constraint jobs_kind_check check (kind in ('generate_report','reexplain_section','comprehension_check','export_pdf','purge'));
