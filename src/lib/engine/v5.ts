@@ -653,14 +653,14 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
   const base = chapterInstructions(input, difficult, approach);
   const claimIds = new Set(c.chapter.claim_ids);
   const statements = new Map(c.ko.claims.map((x) => [x.id, x.statement]));
-  // Chapitre difficile d'un compte Pro : rédigé par Sol dès le premier essai (notions et
-  // passages difficiles), dans la limite d'appels experts de la génération ; sinon Luna Pro.
-  const expertOk = difficult && input.tier === "pro";
+  // Chapitre difficile : rédigé par Sol dès le premier essai, dans la limite d'appels experts du
+  // forfait (compteur persistant du cours et de la période) ; sinon le rédacteur courant.
+  const expertOk = difficult;
   const budgetFor = (repair: number): StageBudget => {
     const expert = expertOk && (input.expert?.left ?? 0) > 0 && input.expert!.left-- > 0;
     return {
       ...input.budgets.explanation,
-      role: expert ? "expert" : "writer",
+      role: expert ? "expert" : (input.budgets.explanation.role ?? "writer"),
       tier: repair > 0 && difficult ? "complex" : "fast",
       // Sol en réflexion haute dépassait le délai d'un chapitre (production, 11 oct.) : moyenne.
       reasoning: expert ? "medium" : repair > 0 && difficult ? "high" : difficult ? "medium" : "low",

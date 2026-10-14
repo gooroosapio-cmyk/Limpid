@@ -105,7 +105,7 @@ export async function createReport(
     .maybeSingle();
   if (existing.data?.report_id) return { reportId: existing.data.report_id };
 
-  const settings = await db.from("app_settings").select("generation_enabled").single();
+  const settings = await db.from("app_settings").select("generation_enabled, writer_model").single();
   if (!settings.data?.generation_enabled) {
     throw new CreateError("generation_disabled", "La génération est suspendue par l'administrateur.");
   }
@@ -221,6 +221,7 @@ export async function createReport(
       ...(sourceIds.length > 1 ? { source_ids: sourceIds } : {}),
       ...(ocrSources.length ? { ocr: true, ocr_sources: ocrSources } : {}),
       ai_tier: ent.wallet.aiTier,
+      writer: writerOf(settings.data),
       supports,
       images: quote.G,
       credits: { action: "report", amount: quote.credits, pages: quote.P, ocr_pages: quote.R, images: quote.G },
@@ -371,6 +372,16 @@ export function pagesForLength(chars: number): number {
 }
 
 type Entitlements = Awaited<ReturnType<typeof getEntitlements>>;
+
+/** Rédacteur des nouvelles tâches (réglage d'administration) : Luna standard ou Luna Pro. */
+export function writerOf(row: { writer_model?: unknown } | null | undefined): "standard" | "pro" {
+  return row?.writer_model === "standard" ? "standard" : "pro";
+}
+
+export async function currentWriter(): Promise<"standard" | "pro"> {
+  const { data } = await adminClient().from("app_settings").select("writer_model").single();
+  return writerOf(data);
+}
 
 /** Mesure d'un ensemble de documents pour le devis et les limites (somme des fichiers). */
 export interface SourceMeasure {

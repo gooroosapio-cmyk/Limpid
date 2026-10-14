@@ -51,6 +51,16 @@ export async function setMarketingBudget(form: FormData) {
   done(`Budget marketing mensuel fixé à ${xof.data.toLocaleString("fr-FR")} FCFA.`);
 }
 
+/** Rédacteur des nouveaux cours : Luna standard ou Luna Pro (test comparatif, § 8.1). */
+export async function setWriterModel(form: FormData) {
+  const user = await requireAdmin();
+  const writer = form.get("writer") === "standard" ? "standard" : "pro";
+  const { error } = await adminClient().from("app_settings").update({ writer_model: writer, updated_at: new Date().toISOString() }).eq("id", true);
+  if (error) done("La modification n'a pas été enregistrée.");
+  await audit(user.id, "pipeline.writer", null, { writer });
+  done(writer === "standard" ? "Les nouveaux cours seront rédigés par Luna standard." : "Les nouveaux cours seront rédigés par Luna Pro.");
+}
+
 /** Lecteur V3 (projections Livre / Guidé / Visuel / Auto) : interrupteur global. */
 export async function setReaderV3(form: FormData) {
   const user = await requireAdmin();

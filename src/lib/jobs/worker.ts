@@ -47,16 +47,17 @@ import { afterFailure } from "@/lib/jobs/retry-policy";
 import { recordPerf } from "@/lib/perf/server";
 import { checkImage } from "@/lib/visuals/sources";
 import { ProviderError, type UsageReport } from "@/lib/engine/provider";
-import { finishJobReservation } from "@/lib/billing/wallet";
+import { finishJobReservation, periodStart } from "@/lib/billing/wallet";
 import { chooseCover } from "@/lib/library/cover-gen";
 import { notify } from "@/lib/notifications";
 import { assemble, ExtractionError } from "@/lib/extract";
 import { engineEvidence, engineSegments, storedEvidence } from "@/lib/reports/source-set";
-import { OCR_MIME, ocrDocument } from "@/lib/extract/ocr";
+import { OCR_MIME, OcrDraft, ocrDocument, type OcrStore } from "@/lib/extract/ocr";
 import { BUCKET, purgeDate, purgeOriginal } from "@/lib/sources/uploads";
 import { adminClient } from "@/lib/supabase/admin";
 import { profileOf, structureRoute } from "@/lib/engine/routing";
-import { expertCalls, imageFallbackCap, ocrAllowed, type AiTier } from "@/lib/billing/tier";
+import { expertLeft, imageFallbackCap, ocrAllowed, type AiTier } from "@/lib/billing/tier";
+import { openRouterConfigFromEnv } from "@/lib/engine/openrouter";
 import type { JobStage } from "./state";
 import { generateFlashcardDrafts, generateMindMapDrafts, type SupportSource } from "@/lib/engine/supports";
 import { buildBank, FlashcardBank } from "@/lib/supports/flashcards";
@@ -97,6 +98,8 @@ interface JobRow {
     ai_tier?: AiTier;
     /** Nouvelles images raster choisies dans le devis (prix continu). */
     images?: number;
+    /** Rédacteur figé à la création : « standard » (Luna) ou « pro » (Luna Pro, par défaut). */
+    writer?: "standard" | "pro";
     /** Nouvelle version d'un rapport existant. */
     variation?: Variation;
     base_version_id?: string;
@@ -128,6 +131,11 @@ const SECTION_CHANGE_REASON: Record<Variation, string> = {
 
 const EXERCISE_BUDGET = { tier: "quality" as const, role: "writer" as const, maxInputTokens: 60_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const };
 
+/** Rédacteur de la tâche, figé à sa création : Luna standard ou Luna Pro (réglage d'administration). */
+function writerRole(job: JobRow): "writer" | "writer_standard" {
+  return job.params.writer === "standard" ? "writer_standard" : "writer";
+}
+
 /**
  * Exercices du support (points de contrôle et bilan), rédigés une fois avec la version.
  * Un échec n'empêche jamais le rapport : le lecteur pourra demander un test plus tard.
@@ -141,7 +149,7 @@ async function prepareExercises(job: JobRow, explanation: ExplanationObject, kno
       evidenceIds,
       mode: explanation.mode ?? job.params.mode ?? "claire",
       language: job.params.language ?? null,
-      budget: EXERCISE_BUDGET,
+      budget: { ...EXERCISE_BUDGET, role: writerRole(job) },
       signal: controller.signal,
       onUsage: (u) => recordUsage(job, "exercises", 0, u),
     });
@@ -295,6 +303,39 @@ async function finish(jobId: string, status: string, errorCode: string | null, r
 }
 
 /** Journal de consommation : une ligne par appel, sans double débit (clé tâche/étape/tentative). */
+/** Lots OCR sauvegardés de la tâche (un par source et par lot) : reprise sans relecture. */
+function ocrStore(job: JobRow, sourceId: string): OcrStore {
+  const ids = job.params.source_ids ?? job.params.ocr_sources ?? [job.source_id];
+  const index = Math.max(0, ids.indexOf(sourceId));
+  const store = jobStore(job.id);
+  return {
+    load: (first) => store.load(`ocr_${index}_${first}`, OcrDraft),
+    save: (first, _last, draft) => store.save(`ocr_${index}_${first}`, draft),
+  };
+}
+
+/**
+ * Appels experts (Sol) encore permis pour cette tâche (spécification, § 8.2) : plafond du cours
+ * et de la période du forfait, moins les appels déjà enregistrés au journal d'usage (toutes les
+ * tâches du cours, et tout le compte sur la période). Une reprise ne remet rien à zéro.
+ */
+async function expertBudget(job: JobRow): Promise<number> {
+  const tier = job.params.ai_tier ?? "free";
+  if (expertLeft(tier, 0, 0) === 0) return 0;
+  const db = adminClient();
+  const model = openRouterConfigFromEnv().models.expert;
+  const [{ data: courseJobs }, since] = await Promise.all([
+    job.report_id ? db.from("jobs").select("id").eq("report_id", job.report_id).limit(200) : Promise.resolve({ data: [{ id: job.id }] }),
+    periodStart(job.owner_id),
+  ]);
+  const ids = (courseJobs ?? []).map((j) => j.id as string);
+  const [{ count: onCourse }, { count: inPeriod }] = await Promise.all([
+    db.from("usage_ledger").select("job_id", { count: "exact", head: true }).in("job_id", ids.length ? ids : [job.id]).like("model", `${model}%`),
+    db.from("usage_ledger").select("job_id", { count: "exact", head: true }).eq("owner_id", job.owner_id).gte("created_at", since.toISOString()).like("model", `${model}%`),
+  ]);
+  return expertLeft(tier, onCourse ?? 0, inPeriod ?? 0);
+}
+
 async function recordUsage(job: JobRow, stage: string, attempt: number, u: UsageReport) {
   const cents = usageCents(u);
   const known = u.inputTokens !== null || typeof u.costUsd === "number";
@@ -383,6 +424,7 @@ async function runOcr(job: JobRow, sourceId: string, controller: AbortController
         pageCount,
         maxPages: limits.maxOcrPages,
         pages: pages ?? undefined,
+        store: ocrStore(job, sourceId),
         signal: controller.signal,
         budget: { tier: "fast", role: "vision", maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
         onUsage: (stage, attempt, u) => recordUsage(job, stage, attempt, u),
@@ -557,7 +599,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     // Registre par rôle : structure (GLM ou DeepSeek), rédaction (MiMo), contrôle (Luna).
     budgets: {
       comprehension: { tier: "fast" as const, role: structure.role, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000, reasoning: "low" as const },
-      explanation: { tier: "fast" as const, role: "writer" as const, maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
+      explanation: { tier: "fast" as const, role: writerRole(job), maxInputTokens: 120_000, maxOutputTokens: 16_000, timeoutMs: 170_000 },
       plan: { tier: "fast" as const, role: structure.role, maxInputTokens: 200_000, maxOutputTokens: 24_000, timeoutMs: 150_000, reasoning: "low" as const },
     },
     onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
@@ -568,7 +610,7 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     tier: job.params.ai_tier ?? "plus",
     // Images raster du devis (prix continu) ; absentes : ancienne tâche, plafond de l'approche.
     ...(typeof job.params.images === "number" ? { rasterImages: job.params.images } : {}),
-    expert: { left: expertCalls(job.params.ai_tier ?? "free") },
+    expert: { left: await expertBudget(job) },
   };
 
   // Moteur V5 : lecture (par fragments si besoin), plan, chapitres en parallèle. Chaque étape
@@ -862,7 +904,7 @@ async function runReexplain(job: JobRow, controller: AbortController): Promise<s
     signal: controller.signal,
     budgets: {
       comprehension: { tier: "fast" as const, role: "structure" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
-      explanation: { tier: "quality" as const, role: "writer" as const, maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
+      explanation: { tier: "quality" as const, role: writerRole(job), maxInputTokens: 120_000, maxOutputTokens: 32_000, timeoutMs: 180_000 },
     },
     onStage: (stage: "comprehension" | "explication" | "verification" | "plan") => setStage(job.id, stage),
     onUsage: (stage: string, attempt: number, u: UsageReport) => recordUsage(job, stage, attempt, u),

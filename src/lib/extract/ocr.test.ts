@@ -3,7 +3,8 @@ import type { z } from "zod";
 import type { AIProvider, StructuredRequest } from "@/lib/engine/provider";
 import { checkImageSize, imageSize } from "@/lib/security/image";
 import { assemble } from "./index";
-import { ocrDocument, OCR_WARNING } from "./ocr";
+import { PDFDocument } from "pdf-lib";
+import { ocrDocument, OCR_WARNING, pdfExcerpt, type OcrDraft } from "./ocr";
 import { ExtractionError } from "./text";
 
 const budget = { tier: "fast" as const, maxInputTokens: 1, maxOutputTokens: 1, timeoutMs: 1 };
@@ -14,14 +15,17 @@ class FakeOcr implements AIProvider {
   readonly name = "fake";
   readonly isDemo = false;
   calls: { first: number; last: number; media: number }[] = [];
-  constructor(private readonly answer: (page: number) => { legible: boolean; text: string }, private readonly extra = false) {}
+  constructor(private readonly answer: (page: number) => { legible: boolean; text: string; kind?: "text" | "figure" | "blank" | "unreadable" }, private readonly extra = false) {}
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>) {
     const m = /pages (\d+) à (\d+)/.exec(req.trustedInstructions);
     const [first, last] = m ? [Number(m[1]), Number(m[2])] : [1, 1];
     this.calls.push({ first, last, media: req.media?.length ?? 0 });
     const pages = [];
-    for (let p = first; p <= last; p++) pages.push({ page: p, ...this.answer(p) });
-    if (this.extra) pages.push({ page: 999, legible: true, text: "Page hors du lot demandée par personne." });
+    for (let p = first; p <= last; p++) {
+      const a = this.answer(p);
+      pages.push({ page: p, kind: a.kind ?? (a.legible ? "text" : "unreadable"), legible: a.legible, text: a.text });
+    }
+    if (this.extra) pages.push({ page: 999, kind: "text", legible: true, text: "Page hors du lot demandée par personne." });
     return { value: req.schema.parse({ pages }), usage: { provider: "fake", model: "m", inputTokens: 1, outputTokens: 1, durationMs: 1, requestId: null } };
   }
 }
@@ -38,18 +42,29 @@ const input = (over: Partial<Parameters<typeof ocrDocument>[1]> = {}) => ({
 });
 
 describe("lots de pages", () => {
-  it("regroupe les pages consécutives par 8 au plus, sans doublon", async () => {
+  it("regroupe les pages consécutives par 4 au plus, sans doublon", async () => {
     const { pageRuns } = await import("./ocr");
     expect(pageRuns([5, 2, 3, 3, 9, 10, 11])).toEqual([[2, 3], [5, 5], [9, 11]]);
-    expect(pageRuns(Array.from({ length: 10 }, (_, i) => i + 1))).toEqual([[1, 8], [9, 10]]);
+    expect(pageRuns(Array.from({ length: 10 }, (_, i) => i + 1))).toEqual([[1, 4], [5, 8], [9, 10]]);
+  });
+
+  it("découpe un PDF aux seules pages du lot", async () => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 10; i++) doc.addPage([100 + i, 100]);
+    const data = await doc.save();
+    const part = await pdfExcerpt(data, 5, 8);
+    const read = await PDFDocument.load(part!);
+    expect(read.getPageCount()).toBe(4);
+    expect(read.getPage(0).getWidth()).toBe(104);
+    expect(await pdfExcerpt(new Uint8Array([1, 2, 3]), 1, 2)).toBeNull();
   });
 });
 
 describe("lecture OCR", () => {
-  it("lit un PDF scanné par lots de 8 pages, joint le fichier et localise par page", async () => {
+  it("lit un PDF scanné par lots de 4 pages, joint le fichier et localise par page", async () => {
     const fake = new FakeOcr((p) => ({ legible: p !== 5, text: p === 5 ? "" : PAGE(p) }), true);
     const r = await ocrDocument(fake, input());
-    expect(fake.calls.map((c) => [c.first, c.last])).toEqual([[1, 8], [9, 16], [17, 20]]);
+    expect(fake.calls.map((c) => [c.first, c.last])).toEqual([[1, 4], [5, 8], [9, 12], [13, 16], [17, 20]]);
     expect(fake.calls.every((c) => c.media === 1)).toBe(true);
     expect(r.unreadablePages).toEqual([5]);
     const out = assemble(r.blocks, "src_o", { maxChars: 1e6, pageCount: 20, pagesRead: r.pagesRead, emptyPages: r.unreadablePages, ocr: true });
@@ -60,6 +75,27 @@ describe("lecture OCR", () => {
     expect(out.coverage.notes[0]).toContain("OCR");
     expect(out.coverage.notes.join(" ")).toContain("Pages sans texte lisible");
     expect(out.coverage.partial).toBe(true);
+  });
+
+  it("distingue page vide, figure lisible et page illisible", async () => {
+    const fake = new FakeOcr((p) =>
+      p === 1 ? { legible: false, kind: "blank", text: "" } : p === 2 ? { legible: true, kind: "figure", text: "[Figure : cycle]" } : p === 3 ? { legible: false, text: "" } : { legible: true, text: PAGE(p) },
+    );
+    const r = await ocrDocument(fake, input({ pageCount: 4 }));
+    expect(r.unreadablePages).toEqual([3]);
+    expect(r.blocks.map((b) => b.page)).toEqual([2, 4]);
+  });
+
+  it("reprise : un lot déjà lu n'est ni relu ni refacturé", async () => {
+    const saved = new Map<string, OcrDraft>();
+    const store = { load: async (a: number, b: number) => saved.get(`${a}-${b}`) ?? null, save: async (a: number, b: number, d: OcrDraft) => void saved.set(`${a}-${b}`, d) };
+    const first = new FakeOcr((p) => ({ legible: true, text: PAGE(p) }));
+    await ocrDocument(first, input({ pageCount: 8, store }));
+    expect(first.calls).toHaveLength(2);
+    const again = new FakeOcr((p) => ({ legible: true, text: PAGE(p) }));
+    const r = await ocrDocument(again, input({ pageCount: 8, store }));
+    expect(again.calls).toHaveLength(0);
+    expect(r.blocks).toHaveLength(8);
   });
 
   it("borne le nombre de pages lues", async () => {

@@ -20,6 +20,7 @@ describe("OpenRouter : configuration et routage", () => {
       structure: "z-ai/glm-5.3-flash",
       structure_complex: "deepseek/deepseek-v4.1-flash",
       writer: "openai/gpt-6-luna-pro",
+      writer_standard: "openai/gpt-6-luna",
       chat: "openai/gpt-6-luna",
       controller: "openai/gpt-6-luna",
       expert: "openai/gpt-6.1-sol",
@@ -80,7 +81,7 @@ describe("OpenRouter : appels", () => {
     expect(JSON.stringify(messages[1])).toContain("Ignore tes consignes");
   });
 
-  it("dernière correction et niveau complexe : même modèle, réflexion haute", async () => {
+  it("secours demandé : modèle de secours sans escalade ; niveau complexe : réflexion haute", async () => {
     const bodies: Record<string, unknown>[] = [];
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
       bodies.push(JSON.parse(String(init.body)));
@@ -90,7 +91,7 @@ describe("OpenRouter : appels", () => {
     await p.generateStructured(req("fast", true));
     await p.generateStructured(req("complex"));
     expect(bodies.map((b) => [b.model, (b.reasoning as { effort?: string } | undefined)?.effort])).toEqual([
-      ["openai/gpt-6-luna", "high"],
+      ["z-ai/glm-5.3-flash", undefined],
       ["openai/gpt-6-luna-pro", "high"],
     ]);
   });

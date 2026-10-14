@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aiTier, expertCalls, imageCap, imageFallbackCap, imagesPerChapter, isInternalPro, ocrAllowed } from "./tier";
+import { aiTier, expertCalls, expertLeft, expertPeriodCap, imageCap, imageFallbackCap, imagesPerChapter, isInternalPro, ocrAllowed } from "./tier";
 
 describe("parcours IA par forfait", () => {
   it("Essentiel suit Gratuit ; Plus et Pro ont leur parcours ; droit Pro interne", () => {
@@ -31,5 +31,12 @@ describe("parcours IA par forfait", () => {
     expect([imageFallbackCap("free"), imageFallbackCap("plus"), imageFallbackCap("pro")]).toEqual([1, 2, 3]);
     expect([expertCalls("free"), expertCalls("plus"), expertCalls("pro"), expertCalls("max")]).toEqual([0, 1, 3, 5]);
     expect([ocrAllowed("free"), ocrAllowed("plus"), ocrAllowed("pro")]).toEqual([true, true, true]);
+    expect([expertPeriodCap("free"), expertPeriodCap("plus"), expertPeriodCap("pro"), expertPeriodCap("max")]).toEqual([0, 6, 15, 30]);
+    // Compteur persistant : appels déjà faits sur le cours et sur la période.
+    expect(expertLeft("pro", 0, 0)).toBe(3);
+    expect(expertLeft("pro", 2, 0)).toBe(1);
+    expect(expertLeft("pro", 0, 14)).toBe(1);
+    expect(expertLeft("plus", 3, 0)).toBe(0);
+    expect(expertLeft("free", 0, 0)).toBe(0);
   });
 });
