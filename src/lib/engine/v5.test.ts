@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import { riskyClaim, type GenerationInput } from "./pipeline";
 import { ProviderError, type AIProvider, type StructuredRequest } from "./provider";
-import { capChapters, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, isHeading, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -228,6 +228,17 @@ describe("moteur V5 : grandes sources", () => {
   it("découpe aux frontières de segments", () => {
     const segs = Array.from({ length: 5 }, (_, i) => ({ ...input().segments[0]!, id: `seg_${i + 1}`, text: "x".repeat(15_000) }));
     expect(fragmentSegments(segs, 40_000).map((f) => f.length)).toEqual([2, 2, 1]);
+  });
+
+  it("unités sémantiques : coupe avant un titre, un titre reste avec sa suite", () => {
+    const seg = (id: number, text: string) => ({ ...input().segments[0]!, id: `seg_${id}`, text });
+    expect(isHeading("2.1 La photosynthèse")).toBe(true);
+    expect(isHeading("Chapitre 3 : les cellules")).toBe(true);
+    expect(isHeading("La cellule contient un noyau.")).toBe(false);
+    const body = "La cellule contient un noyau et des organites. ".repeat(260); // ≈ 12 000 caractères
+    const segs = [seg(1, "1. Introduction"), seg(2, body), seg(3, "2. La cellule"), seg(4, body), seg(5, body), seg(6, "3. Le noyau"), seg(7, body)];
+    const units = fragmentSegments(segs, 20_000, 32_000).map((u) => u.map((x) => x.id));
+    expect(units).toEqual([["seg_1", "seg_2"], ["seg_3", "seg_4"], ["seg_5"], ["seg_6", "seg_7"]]);
   });
 
   it("identifiants uniques par fragment et notions homonymes fusionnées", () => {

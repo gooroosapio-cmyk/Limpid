@@ -323,14 +323,28 @@ export function resolveEvidence(draft: ComprehensionDraft, segments: Map<string,
 
 /** Corrections demandées au modèle quand sa réponse ne respecte pas le schéma JSON. */
 const MAX_SCHEMA_FIXES = 2;
+/** Sortie élargie au plus une fois, jamais au-delà (spécification, § 9.8). */
+const MAX_WIDENED_OUTPUT = 32_000;
+
+/**
+ * Nouvelles tentatives payantes d'une unité (spécification, § 9.8) : un premier appel et au plus
+ * deux nouvelles tentatives, tous mécanismes confondus (correction de schéma, sortie coupée,
+ * réparation pédagogique). Partagé par les appels d'une même unité. Les erreurs passagères sans
+ * réponse facturée (surcharge, quota par minute) n'en consomment pas.
+ */
+export interface UnitAttempts {
+  left: number;
+}
+export const unitAttempts = (): UnitAttempts => ({ left: 2 });
 
 export async function callWithRetry<T extends z.ZodType>(
   provider: AIProvider,
   input: GenerationInput,
   stage: string,
   attemptBase: number,
-  req: { schema: T; instructions: string; data: { label: string; text: string }[]; budget: StageBudget },
+  req: { schema: T; instructions: string; data: { label: string; text: string }[]; budget: StageBudget; attempts?: UnitAttempts },
 ): Promise<z.infer<T>> {
+  const attempts = req.attempts ?? unitAttempts();
   // Erreurs passagères (surcharge, quota par minute) : nouvel essai après attente.
   // Réponse hors schéma : nouvel essai avec la liste des écarts (chemins et règles seulement).
   const delays = [5_000, 20_000, 40_000];
@@ -357,14 +371,16 @@ export async function callWithRetry<T extends z.ZodType>(
       return res.value;
     } catch (e) {
       if (e instanceof ProviderError && e.usage) await input.onUsage?.(stage, attemptBase + i, e.usage);
-      if (e instanceof ProviderError && e.code === "schema_mismatch" && fixes < MAX_SCHEMA_FIXES) {
+      if (e instanceof ProviderError && e.code === "schema_mismatch" && fixes < MAX_SCHEMA_FIXES && attempts.left > 0) {
+        attempts.left--;
         fixes++;
         schemaFeedback = e.issues.length ? e.issues : ["structure générale invalide"];
         continue;
       }
-      if (e instanceof ProviderError && e.code === "truncated" && !widened) {
+      if (e instanceof ProviderError && e.code === "truncated" && !widened && attempts.left > 0 && budget.maxOutputTokens < MAX_WIDENED_OUTPUT) {
+        attempts.left--;
         widened = true;
-        budget = { ...budget, maxOutputTokens: Math.min(budget.maxOutputTokens * 2, 64_000) };
+        budget = { ...budget, maxOutputTokens: Math.min(budget.maxOutputTokens * 2, MAX_WIDENED_OUTPUT) };
         continue;
       }
       const transient = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited");
@@ -380,6 +396,7 @@ export async function comprehension(provider: AIProvider, input: GenerationInput
   let feedback: string[] = [];
   // Une seule demande de correction pour la couverture des réserves (coût borné).
   let coverageAsked = false;
+  const attempts = unitAttempts();
   for (let repair = 0; repair <= MAX_REPAIRS; repair++) {
     const data = [{ label: "source", text: sourceText }];
     if (draft) {
@@ -394,6 +411,7 @@ export async function comprehension(provider: AIProvider, input: GenerationInput
       instructions,
       data,
       budget: input.budgets.comprehension,
+      attempts,
     });
 
     const { evidence, errors } = resolveEvidence(draft, segments);
@@ -412,8 +430,10 @@ export async function comprehension(provider: AIProvider, input: GenerationInput
         (g) => `${g.segment_id}: chiffre non repris — « ${g.sentence} ». Ajoute l'affirmation correspondante, avec ses nombres (source_form exacte) et une preuve copiée mot pour mot.`,
       ),
     ];
-    const askCoverage = gapLines.length > 0 && !coverageAsked && repair < MAX_REPAIRS;
-    if ((v.blocking.length === 0 && !askCoverage) || repair === MAX_REPAIRS) {
+    // Réparation : seulement s'il reste une tentative à l'unité (schéma et sortie compris).
+    const canRepair = repair < MAX_REPAIRS && attempts.left > 0;
+    const askCoverage = gapLines.length > 0 && !coverageAsked && canRepair;
+    if ((v.blocking.length === 0 && !askCoverage) || !canRepair) {
       for (const g of gaps) v.fail("caveat_covered", "reference", [g.segment_id], `réserve non reprise : « ${g.sentence.slice(0, 120)} »`, false);
       for (const g of figures) v.fail("figure_covered", "number_match", [g.segment_id], `chiffre non repris : « ${g.sentence.slice(0, 120)} »`, false);
       if (gaps.length === 0) v.pass("caveat_covered", "reference", []);
@@ -421,6 +441,7 @@ export async function comprehension(provider: AIProvider, input: GenerationInput
       return { knowledge, evidence, validation: v.result(`${knowledge.id}@${SCHEMA_VERSION}`, repair) };
     }
     if (askCoverage) coverageAsked = true;
+    attempts.left--;
     feedback = [...v.blocking, ...(askCoverage ? gapLines : [])];
   }
   throw new Error("inaccessible");
@@ -486,6 +507,28 @@ export function riskyClaim(c: { statement: string; support_status: string }): bo
   return /\d|%|\b(si|sauf|uniquement|seulement|exception|interdit|obligatoire|doit|ne\s+\S+\s+pas|jamais|toujours|au plus|au moins|if|unless|only|except|must|never|always)\b/i.test(c.statement);
 }
 
+/** Empreinte stable d'un identifiant (FNV-1a), pour un échantillon reproductible. */
+function stableHash(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+}
+
+/** Part stable des autres affirmations relue par le vérificateur (au moins une s'il en existe). */
+export const SAMPLE_RATE = 0.1;
+
+/**
+ * Affirmations relues (spécification, § 9.4) : à risque (chiffres, conditions, statut incertain),
+ * définitions des notions centrales, et un échantillon stable de 10 % des autres.
+ */
+export function reviewSelection(ko: Pick<KnowledgeObject, "claims" | "concepts">): { required: Set<string>; sample: Set<string>; rest: string[] } {
+  const central = new Set(ko.concepts.filter((c) => c.importance === "central").flatMap((c) => c.definition_claim_ids));
+  const required = new Set(ko.claims.filter((c) => riskyClaim(c) || central.has(c.id)).map((c) => c.id));
+  const others = ko.claims.filter((c) => !required.has(c.id)).map((c) => c.id).sort((a, b) => stableHash(a) - stableHash(b) || a.localeCompare(b));
+  const n = others.length ? Math.max(1, Math.ceil(others.length * SAMPLE_RATE)) : 0;
+  return { required, sample: new Set(others.slice(0, n)), rest: others.slice(n) };
+}
+
 export async function verifyClaims(
   provider: AIProvider,
   input: GenerationInput,
@@ -494,24 +537,37 @@ export async function verifyClaims(
   segments: Map<string, SourceSegment>,
   v: ValidationCollector,
 ): Promise<KnowledgeObject> {
-  // Revue ciblée (kit V6) : seules les affirmations à risque (chiffres, conditions, exceptions,
-  // statut incertain) sont relues ; les autres gardent le contrôle déterministe des citations.
-  const risky = new Set(ko.claims.filter(riskyClaim).map((c) => c.id));
-  if (risky.size === 0) return ko;
-  const draft = await callWithRetry(provider, input, "verification", 0, {
-    schema: VerificationDraft,
-    instructions: VERIFY_INSTRUCTIONS,
-    data: [{ label: "affirmations et extraits", text: verificationPayload({ ...ko, claims: ko.claims.filter((c) => risky.has(c.id)) }, evidence, segments) }],
-    // Contrôle courant : Luna, pour tous les forfaits (plus d'audit systématique par Sol, § 8.2).
-    budget: { ...input.budgets.comprehension, role: "controller", reasoning: "low" },
-  });
-  const verdicts = new Map(draft.verdicts.map((x) => [x.claim_id, x]));
+  // Revue ciblée (spécification, § 9.4) : affirmations à risque, définitions centrales et
+  // échantillon stable de 10 % des autres ; les autres gardent le contrôle déterministe des citations.
+  const { required, sample, rest } = reviewSelection(ko);
+  const review = async (ids: Set<string>, stage: string) => {
+    if (ids.size === 0) return new Map<string, VerificationDraft["verdicts"][number]>();
+    const draft = await callWithRetry(provider, input, stage, 0, {
+      schema: VerificationDraft,
+      instructions: VERIFY_INSTRUCTIONS,
+      data: [{ label: "affirmations et extraits", text: verificationPayload({ ...ko, claims: ko.claims.filter((c) => ids.has(c.id)) }, evidence, segments) }],
+      // Contrôle courant : Luna, pour tous les forfaits (plus d'audit systématique par Sol, § 8.2).
+      budget: { ...input.budgets.comprehension, role: "controller", reasoning: "low" },
+    });
+    return new Map(draft.verdicts.map((x) => [x.claim_id, x]));
+  };
+  const reviewed = new Set([...required, ...sample]);
+  if (reviewed.size === 0) return ko;
+  const verdicts = await review(reviewed, "verification");
+  // Erreur majeure dans l'échantillon : le contrôle s'étend aux autres affirmations (une fois).
+  const sampleFailed = [...sample].some((id) => ["unsupported", "contradicted"].includes(verdicts.get(id)?.status ?? ""));
+  if (sampleFailed && rest.length) {
+    const wider = new Set(rest.slice(0, 120));
+    for (const [id, x] of await review(wider, "verification_extra")) verdicts.set(id, x);
+    for (const id of wider) reviewed.add(id);
+  }
   const claims = ko.claims.map((c) => {
-    if (!risky.has(c.id)) return c;
+    if (!reviewed.has(c.id)) return c;
     const verdict = verdicts.get(c.id);
     if (!verdict) {
+      // Verdict manquant : signalé ; sur une définition centrale, la notion passe « à vérifier ».
       v.fail("claim_verified", "model_review", [c.id], "affirmation sans verdict du vérificateur", false);
-      return c;
+      return required.has(c.id) && !riskyClaim(c) ? { ...c, support_status: mostCautious(c.support_status, "partial") } : c;
     }
     const status = mostCautious(c.support_status, verdict.status);
     if (status !== c.support_status) {

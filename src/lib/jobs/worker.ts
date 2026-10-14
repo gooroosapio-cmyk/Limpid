@@ -59,7 +59,7 @@ import { profileOf, structureRoute } from "@/lib/engine/routing";
 import { expertLeft, imageFallbackCap, ocrAllowed, type AiTier } from "@/lib/billing/tier";
 import { openRouterConfigFromEnv } from "@/lib/engine/openrouter";
 import type { JobStage } from "./state";
-import { generateFlashcardDrafts, generateMindMapDrafts, type SupportSource } from "@/lib/engine/supports";
+import { courseLanguage, generateFlashcardDrafts, generateMindMapDrafts, type SupportSource } from "@/lib/engine/supports";
 import { buildBank, FlashcardBank } from "@/lib/supports/flashcards";
 import { buildMindMap, MindMap } from "@/lib/supports/mindmap";
 import type { DerivedSupport } from "@/lib/supports/supports";
@@ -1236,7 +1236,8 @@ async function runSupport(job: JobRow, controller: AbortController): Promise<str
     const row = engineEvidence(e, sourceIds);
     return [row.id as string, String(row.quote ?? "")];
   }));
-  const src: SupportSource = { explanation, blueprint, quotes, language: job.params.language ?? null };
+  // Langue du cours rédigé (celle du lecteur), à défaut la langue demandée à la création.
+  const src: SupportSource = { explanation, blueprint, quotes, language: courseLanguage(explanation) ?? job.params.language ?? null };
   const store = jobStore(job.id);
   const provider = getProvider();
   const run = {

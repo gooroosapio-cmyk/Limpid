@@ -24,6 +24,25 @@ export interface SupportSource {
   language: "fr" | "en" | null;
 }
 
+const FR_WORDS = new Set(["le", "la", "les", "des", "est", "et", "une", "un", "du", "dans", "pour", "que", "qui", "sur", "avec", "par", "pas", "sont", "au", "aux", "cette", "ce"]);
+const EN_WORDS = new Set(["the", "is", "and", "of", "to", "in", "are", "for", "that", "with", "on", "by", "this", "it", "as", "be", "an", "not", "from", "which"]);
+
+/**
+ * Langue réelle d'un cours rédigé (spécification, § 10 : supports dans la langue du cours),
+ * d'après ses mots-outils ; null si le texte ne permet pas de trancher.
+ */
+export function courseLanguage(explanation: Pick<ExplanationObject, "sections">): "fr" | "en" | null {
+  let fr = 0;
+  let en = 0;
+  const text = explanation.sections.flatMap((x) => [x.question, x.takeaway, ...x.blocks.slice(0, 6).map((b) => b.text ?? "")]).join(" ").slice(0, 20_000);
+  for (const w of text.toLowerCase().split(/[^a-zà-öø-ÿ']+/)) {
+    if (FR_WORDS.has(w)) fr++;
+    else if (EN_WORDS.has(w)) en++;
+  }
+  if (fr + en < 20) return null;
+  return fr >= en * 1.5 ? "fr" : en >= fr * 1.5 ? "en" : null;
+}
+
 function blockText(b: Section["blocks"][number]): string {
   const extra = b.type === "list" ? b.items.map((i) => `- ${i.text}`).join("\n") : b.type === "formula" ? b.expression : "";
   return [b.text, extra].filter(Boolean).join("\n");
