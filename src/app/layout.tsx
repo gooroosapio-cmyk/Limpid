@@ -29,6 +29,7 @@ import "./styles/motion.css";
 import "./styles/kit-v4.css";
 import "./styles/reader-kit-v5.css";
 import "./styles/fluidity.css";
+import "./styles/supports.css";
 import "./styles/tailwind.css";
 import { WebVitals } from "@/components/perf/WebVitals";
 import { SheetSwipe } from "@/components/shell/SheetSwipe";

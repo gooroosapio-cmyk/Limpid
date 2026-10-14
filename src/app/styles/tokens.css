@@ -34,6 +34,15 @@
   --accent-text: light-dark(#8a6b11, #f8d94b);
   --hero: linear-gradient(115deg, #f8d94b, #fce570);
 
+  /* Fonds post-it des supports (carte mentale, flashcards) : texte principal dédié, contrastes vérifiés. */
+  --pastel-jaune: light-dark(#fff1b8, #403a20);
+  --pastel-peche: light-dark(#ffe1d2, #432e29);
+  --pastel-menthe: light-dark(#ddf1e4, #243c32);
+  --pastel-bleu: light-dark(#ddebff, #26374b);
+  --pastel-lavande: light-dark(#eae2ff, #352d49);
+  --pastel-ink: light-dark(#17241c, #f5f5ed);
+  --pastel-edge: light-dark(rgb(23 36 28 / 16%), rgb(245 245 237 / 18%));
+
   /* États d'interface */
   --sage: light-dark(#2f6846, #b7dec3);
   --green: var(--sage);

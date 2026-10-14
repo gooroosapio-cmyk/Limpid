@@ -79,11 +79,23 @@ export function useProjection({
 
   useEffect(() => {
     if (!on) return;
+    // Ouverture depuis l'aperçu du cours : « Lire le livre » (?vue=livre) ou « Continuer le
+    // parcours » (?vue=guide) choisit la projection, retenue pour la session.
+    const url = new URL(window.location.href);
+    const vue = url.searchParams.get("vue");
+    const asked = vue === "guide" ? "guided" : vue === "livre" ? "book" : null;
+    if (vue) {
+      url.searchParams.delete("vue");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
     try {
-      const saved = sessionStorage.getItem(storeKey(reportId));
+      if (asked) sessionStorage.setItem(storeKey(reportId), asked);
+      const saved = asked ?? sessionStorage.getItem(storeKey(reportId));
       // eslint-disable-next-line react-hooks/set-state-in-effect -- préférence de session lue après le montage
       if (isProjectionChoice(saved)) setChoiceState(saved);
-    } catch {}
+    } catch {
+      if (asked) setChoiceState(asked);
+    }
   }, [on, reportId]);
 
   /** Applique la projection au DOM du chapitre `i` (étape active, paragraphes repliés). */
