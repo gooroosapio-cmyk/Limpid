@@ -6,7 +6,7 @@ import { Illustration } from "@/components/Illustration";
 import { Wordmark } from "@/components/Logo";
 import { Screen } from "@/components/shell/Screen";
 import { currentUser } from "@/lib/auth";
-import { ACTION_PRICES, formatXof, PAID_PLANS, PLANS, reportsFor, TOPUPS, type PlanCode } from "@/lib/billing/catalog";
+import { ACTION_PRICES, formatXof, maxContentPages, PAID_PLANS, PLANS, reportsFor, TOPUPS, type PlanCode } from "@/lib/billing/catalog";
 import { getWallet } from "@/lib/billing/wallet";
 import { getLang, getT } from "@/lib/i18n/server";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
@@ -79,8 +79,11 @@ export default async function OffersPage() {
               <tr><th scope="row">{c.yearly}</th>{all.map((p) => <td key={p}>{p === "free" ? c.none : formatXof(PLANS[p].yearlyXof, lang)}</td>)}</tr>
               <tr><th scope="row">{c.credits}</th>{all.map((p) => <td key={p}>{PLANS[p].monthlyCredits.toLocaleString(lang)}</td>)}</tr>
               <tr><th scope="row">{c.reports}</th>{all.map((p) => <td key={p}>{reportsFor(PLANS[p].monthlyCredits)}</td>)}</tr>
-              <tr><th scope="row">{c.daily}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.dailyReports}</td>)}</tr>
-              <tr><th scope="row">{c.weekly}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.weeklyReports}</td>)}</tr>
+              <tr><th scope="row">{c.generations}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.generationsPerPeriod}</td>)}</tr>
+              <tr><th scope="row">{c.pages}</th>{all.map((p) => <td key={p}>{maxContentPages(p)}</td>)}</tr>
+              <tr><th scope="row">{c.ocr}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.ocrPagesPerTask}</td>)}</tr>
+              <tr><th scope="row">{c.images}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.imagesPerCourse || c.none}</td>)}</tr>
+              <tr><th scope="row">{c.expert}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.expertPerCourse || c.none}</td>)}</tr>
               <tr><th scope="row">{c.kept}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.keptReports}</td>)}</tr>
               <tr><th scope="row">{c.sources}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.sourcesPerReport}</td>)}</tr>
               <tr><th scope="row">{c.concurrent}</th>{all.map((p) => <td key={p}>{PLANS[p].limits.concurrentJobs}</td>)}</tr>
@@ -89,8 +92,10 @@ export default async function OffersPage() {
           </table>
         </div>
         <h3>{o.actionsTitle}</h3>
+        <p><b>{o.coursePrice}</b></p>
+        <p className="muted small">{o.coursePriceNote}</p>
         <ul className="price-list">
-          {(Object.keys(ACTION_PRICES) as (keyof typeof ACTION_PRICES)[]).map((a) => (
+          {(["report_version", "ask", "quiz"] as const).map((a) => (
             <li key={a}><span>{o.actions[a]}</span><b>{t.billing.actionCost(ACTION_PRICES[a])}</b></li>
           ))}
           <li><span>{o.actions.free}</span><b>{o.freeAction}</b></li>

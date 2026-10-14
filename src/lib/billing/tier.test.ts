@@ -4,8 +4,9 @@ import { aiTier, expertCalls, imageCap, imageFallbackCap, imagesPerChapter, isIn
 describe("parcours IA par forfait", () => {
   it("Essentiel suit Gratuit ; Plus et Pro ont leur parcours ; droit Pro interne", () => {
     expect(aiTier("free", "free")).toBe("free");
-    expect(aiTier("essential", "subscription")).toBe("free");
-    expect(aiTier("essential", "topup")).toBe("free");
+    expect(aiTier("essential", "subscription")).toBe("plus");
+    expect(aiTier("essential", "topup")).toBe("plus");
+    expect(aiTier("max", "subscription")).toBe("max");
     expect(aiTier("plus", "subscription")).toBe("plus");
     expect(aiTier("pro", "subscription")).toBe("pro");
     expect(aiTier("free", "free", true)).toBe("pro");
@@ -28,7 +29,7 @@ describe("parcours IA par forfait", () => {
 
   it("secours d'image, Sol et OCR selon le niveau", () => {
     expect([imageFallbackCap("free"), imageFallbackCap("plus"), imageFallbackCap("pro")]).toEqual([1, 2, 3]);
-    expect([expertCalls("free"), expertCalls("plus"), expertCalls("pro")]).toEqual([0, 0, 6]);
-    expect([ocrAllowed("free"), ocrAllowed("plus"), ocrAllowed("pro")]).toEqual([false, false, true]);
+    expect([expertCalls("free"), expertCalls("plus"), expertCalls("pro"), expertCalls("max")]).toEqual([0, 1, 3, 5]);
+    expect([ocrAllowed("free"), ocrAllowed("plus"), ocrAllowed("pro")]).toEqual([true, true, true]);
   });
 });

@@ -282,6 +282,8 @@ export interface GenerationInput {
   plan?: boolean;
   /** Parcours IA du forfait (images, Sol) ; absent : parcours Plus pour les anciennes tâches. */
   tier?: AiTier;
+  /** Images générées nouvelles du devis (G) ; absent : ancienne tâche, plafond de l'approche. */
+  rasterImages?: number;
   /** Interventions de Sol restantes pour cette génération (Pro : 2 ; partagé entre chapitres). */
   expert?: { left: number };
 }

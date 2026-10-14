@@ -4,66 +4,136 @@
  * n'envoie jamais un prix, seulement un code produit.
  */
 
-export type PlanCode = "free" | "essential" | "plus" | "pro";
+export type PlanCode = "free" | "essential" | "plus" | "pro" | "max";
 export type PaidPlan = Exclude<PlanCode, "free">;
+/** Offres vendues (Essentiel n'est plus vendu ; ses abonnements en cours restent honorés). */
+export type SoldPlan = "plus" | "pro" | "max";
 export type Period = "monthly" | "yearly";
 
-/** Crédits d'un rapport standard : l'unité des équivalents « rapports » affichés. */
-export const STANDARD_REPORT_CREDITS = 20;
+/** Crédits d'un cours numérique standard de 40 pages : l'unité des équivalents affichés. */
+export const STANDARD_REPORT_CREDITS = 16;
+
+export interface PlanLimits {
+  /** Limpid générés conservés (documents produits, hors sources). */
+  keptReports: number;
+  /** Fichiers réunis dans un même cours. */
+  sourcesPerReport: number;
+  /** Tâches de cours actives simultanément. */
+  concurrentJobs: number;
+  /** Nouvelles générations de cours par période (cycle du forfait). */
+  generationsPerPeriod: number;
+  /** Pages physiques par tâche (somme des fichiers). */
+  physicalPagesPerTask: number;
+  /** Pages de contenu normalisées par tâche (800 jetons par page). */
+  contentPagesPerTask: number;
+  /** Pages de contenu normalisées par période. */
+  contentPagesPerPeriod: number;
+  /** Taille maximale d'un fichier (Mo). */
+  maxFileMb: number;
+  /** Pages lues par OCR ou vision : par tâche et par période. */
+  ocrPagesPerTask: number;
+  ocrPagesPerPeriod: number;
+  /** Pages manuscrites (comprises dans l'OCR) : par tâche et par période. */
+  handwrittenPerTask: number;
+  handwrittenPerPeriod: number;
+  /** Nouvelles images générées (raster) : par cours et par période. */
+  imagesPerCourse: number;
+  imagesPerPeriod: number;
+  /** Appels experts (Sol) au plus : par cours et par période. */
+  expertPerCourse: number;
+  expertPerPeriod: number;
+  /** Stockage personnel (Mo). */
+  storageMb: number;
+}
 
 export interface PlanDef {
   code: PlanCode;
   monthlyXof: number;
   yearlyXof: number;
   monthlyCredits: number;
-  limits: {
-    /** Limpid générés conservés (documents produits, hors sources). */
-    keptReports: number;
-    sourcesPerReport: number;
-    concurrentJobs: number;
-    /** Plafonds de rythme (V2, § 15) : rapports par jour (UTC) et par semaine (lundi, UTC). */
-    dailyReports: number;
-    weeklyReports: number;
-  };
+  limits: PlanLimits;
   watermark: boolean;
 }
 
+/**
+ * Grille de lancement (spécification du 14 octobre 2026, § 3). Les crédits et les autres limites
+ * s'appliquent ensemble ; les plafonds techniques ne sont pas des allocations gratuites.
+ */
 export const PLANS: Record<PlanCode, PlanDef> = {
   free: {
     code: "free",
     monthlyXof: 0,
     yearlyXof: 0,
-    monthlyCredits: 80,
-    limits: { keptReports: 3, sourcesPerReport: 1, concurrentJobs: 1, dailyReports: 2, weeklyReports: 5 },
+    /** Allocation mensuelle après le bonus de bienvenue (voir FREE_WELCOME). */
+    monthlyCredits: 20,
+    limits: {
+      keptReports: 10, sourcesPerReport: 1, concurrentJobs: 1, generationsPerPeriod: 2,
+      physicalPagesPerTask: 40, contentPagesPerTask: 40, contentPagesPerPeriod: 80, maxFileMb: 10,
+      ocrPagesPerTask: 10, ocrPagesPerPeriod: 20, handwrittenPerTask: 5, handwrittenPerPeriod: 10,
+      imagesPerCourse: 0, imagesPerPeriod: 0, expertPerCourse: 0, expertPerPeriod: 0, storageMb: 250,
+    },
     watermark: true,
   },
+  /** Ancienne offre, honorée jusqu'à la fin des abonnements payés ; plus vendue. */
   essential: {
     code: "essential",
     monthlyXof: 2_900,
     yearlyXof: 29_000,
     monthlyCredits: 240,
-    limits: { keptReports: 30, sourcesPerReport: 5, concurrentJobs: 1, dailyReports: 5, weeklyReports: 20 },
+    limits: {
+      keptReports: 100, sourcesPerReport: 3, concurrentJobs: 1, generationsPerPeriod: 20,
+      physicalPagesPerTask: 200, contentPagesPerTask: 240, contentPagesPerPeriod: 1_500, maxFileMb: 30,
+      ocrPagesPerTask: 80, ocrPagesPerPeriod: 160, handwrittenPerTask: 20, handwrittenPerPeriod: 40,
+      imagesPerCourse: 1, imagesPerPeriod: 8, expertPerCourse: 1, expertPerPeriod: 6, storageMb: 2_048,
+    },
     watermark: false,
   },
   plus: {
     code: "plus",
-    monthlyXof: 5_900,
-    yearlyXof: 59_000,
-    monthlyCredits: 600,
-    limits: { keptReports: 100, sourcesPerReport: 5, concurrentJobs: 2, dailyReports: 10, weeklyReports: 50 },
+    monthlyXof: 4_900,
+    yearlyXof: 49_000,
+    monthlyCredits: 350,
+    limits: {
+      keptReports: 300, sourcesPerReport: 3, concurrentJobs: 1, generationsPerPeriod: 20,
+      physicalPagesPerTask: 200, contentPagesPerTask: 240, contentPagesPerPeriod: 1_500, maxFileMb: 30,
+      ocrPagesPerTask: 80, ocrPagesPerPeriod: 160, handwrittenPerTask: 20, handwrittenPerPeriod: 40,
+      imagesPerCourse: 1, imagesPerPeriod: 8, expertPerCourse: 1, expertPerPeriod: 6, storageMb: 2_048,
+    },
     watermark: false,
   },
   pro: {
     code: "pro",
-    monthlyXof: 11_900,
-    yearlyXof: 119_000,
-    monthlyCredits: 1_500,
-    limits: { keptReports: 300, sourcesPerReport: 5, concurrentJobs: 3, dailyReports: 20, weeklyReports: 100 },
+    monthlyXof: 9_900,
+    yearlyXof: 99_000,
+    monthlyCredits: 700,
+    limits: {
+      keptReports: 1_000, sourcesPerReport: 5, concurrentJobs: 2, generationsPerPeriod: 40,
+      physicalPagesPerTask: 400, contentPagesPerTask: 480, contentPagesPerPeriod: 3_000, maxFileMb: 60,
+      ocrPagesPerTask: 200, ocrPagesPerPeriod: 400, handwrittenPerTask: 60, handwrittenPerPeriod: 120,
+      imagesPerCourse: 2, imagesPerPeriod: 16, expertPerCourse: 3, expertPerPeriod: 15, storageMb: 5_120,
+    },
+    watermark: false,
+  },
+  max: {
+    code: "max",
+    monthlyXof: 14_900,
+    yearlyXof: 149_000,
+    monthlyCredits: 1_050,
+    limits: {
+      keptReports: 2_000, sourcesPerReport: 8, concurrentJobs: 3, generationsPerPeriod: 60,
+      physicalPagesPerTask: 600, contentPagesPerTask: 720, contentPagesPerPeriod: 4_500, maxFileMb: 100,
+      ocrPagesPerTask: 400, ocrPagesPerPeriod: 600, handwrittenPerTask: 120, handwrittenPerPeriod: 240,
+      imagesPerCourse: 3, imagesPerPeriod: 24, expertPerCourse: 5, expertPerPeriod: 30, storageMb: 10_240,
+    },
     watermark: false,
   },
 };
 
-export const PAID_PLANS: PaidPlan[] = ["essential", "plus", "pro"];
+/** Offres affichées et vendues. */
+export const PAID_PLANS: SoldPlan[] = ["plus", "pro", "max"];
+
+/** Gratuit : bonus de bienvenue unique (compte vérifié), puis allocation mensuelle de 20. */
+export const FREE_WELCOME = { credits: 80, days: 90 };
 
 export type TopupCode = "topup_70" | "topup_180" | "topup_500";
 export const TOPUPS: Record<TopupCode, { code: TopupCode; xof: number; credits: number }> = {
@@ -73,7 +143,7 @@ export const TOPUPS: Record<TopupCode, { code: TopupCode; xof: number; credits: 
 };
 export const TOPUP_VALIDITY_MONTHS = 12;
 
-/** Les neuf produits vendus sur Chariow. */
+/** Produits Chariow : les six abonnements vendus, les recharges et l'ancienne offre Essentiel. */
 export type ProductCode = `${PaidPlan}_${Period}` | TopupCode;
 export const PRODUCT_CODES: ProductCode[] = [
   "essential_monthly",
@@ -82,6 +152,8 @@ export const PRODUCT_CODES: ProductCode[] = [
   "plus_yearly",
   "pro_monthly",
   "pro_yearly",
+  "max_monthly",
+  "max_yearly",
   "topup_70",
   "topup_180",
   "topup_500",
@@ -96,7 +168,7 @@ export function product(code: string): Product | null {
     const t = TOPUPS[code as TopupCode];
     return { code: t.code, kind: "topup", xof: t.xof, credits: t.credits };
   }
-  const m = /^(essential|plus|pro)_(monthly|yearly)$/.exec(code);
+  const m = /^(essential|plus|pro|max)_(monthly|yearly)$/.exec(code);
   if (!m) return null;
   const plan = PLANS[m[1] as PaidPlan];
   const period = m[2] as Period;
@@ -111,64 +183,43 @@ export function product(code: string): Product | null {
 }
 
 /**
- * Prix fixes des actions (comparatif IA du 6 octobre 2026, § 14 ; chaîne GPT-6 Luna Pro) :
- * court 8, standard 20, long 60, très long 120 crédits ; question 1, QCM 3, chapitre 2.
+ * Prix fixes des actions annexes. Un cours se paie au prix continu (« report », montant calculé
+ * par quoteCourse, voir quote.ts) ; les anciens paliers restent reconnus pour les réservations et
+ * l'historique existants.
  */
 export const ACTION_PRICES = {
+  /** Anciens paliers (réservations antérieures à la grille du 14 octobre 2026). */
   report_short: 8,
   report_standard: 20,
   report_long: 60,
-  /** Document de 81 à 150 pages. */
   report_xl: 120,
   /** Nouvelle formulation d'un chapitre (« Plus simple », « Un autre exemple »). */
   report_version: 2,
   ask: 1,
   quiz: 3,
-  /**
-   * Support de synthèse (carte mentale ou flashcards) produit depuis la base commune du cours :
-   * coût marginal selon la taille du document (pas de nouvelle lecture du document).
-   */
+  /** Anciens prix des supports payants (cours antérieurs aux supports inclus). */
   support_short: 2,
   support_standard: 4,
   support_long: 10,
   support_xl: 18,
 } as const;
-export type Action = keyof typeof ACTION_PRICES;
-export type ReportAction = "report_short" | "report_standard" | "report_long" | "report_xl";
-/** Actions qui comptent pour une « unité rapport » dans les plafonds jour/semaine. */
-export const REPORT_UNIT_ACTIONS: Action[] = ["report_short", "report_standard", "report_long", "report_xl", "report_version"];
-
-/** Fenêtres des plafonds : jour calendaire UTC, semaine du lundi 00:00 UTC (V2, § 15). */
-export function quotaWindows(now = new Date()) {
-  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const dayEnd = new Date(dayStart.getTime() + 24 * 3600_000);
-  const sinceMonday = (now.getUTCDay() + 6) % 7;
-  const weekStart = new Date(dayStart.getTime() - sinceMonday * 24 * 3600_000);
-  const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3600_000);
-  return { dayStart, dayEnd, weekStart, weekEnd };
-}
+export type FixedAction = keyof typeof ACTION_PRICES;
+/** « report » : cours au prix continu ; « support » : ajout d'un support à un ancien cours. */
+export type Action = FixedAction | "report" | "support";
+/** Actions qui comptent comme une nouvelle génération de cours dans la limite de période. */
+export const COURSE_ACTIONS: Action[] = ["report", "report_short", "report_standard", "report_long", "report_xl"];
 
 /** Une page équivalente de texte (document sans pagination, texte collé, page web). */
 export const CHARS_PER_PAGE = 2_500;
-/** Au-delà, le document est refusé avec un message clair (moteur V5 : ~150 pages). */
-export const MAX_SOURCE_PAGES = 150;
-
 /**
- * Prix selon la source seule (V5) : pages du PDF, ou équivalent texte. Le nombre de chapitres
- * suit le contenu ; l'utilisateur ne choisit plus de longueur.
- * ≤ 8 pages : 8 · 9–20 : 20 · 21–80 : 60 · 81–150 : 120 crédits.
+ * Capacité actuelle du moteur (environ 400 000 caractères de source) : au-delà, le document est
+ * refusé avec un message clair, quel que soit le forfait.
  */
-export type SupportAction = "support_short" | "support_standard" | "support_long" | "support_xl";
-/** Prix marginal d'un support de synthèse, à la taille du cours. */
-export function supportAction(action: ReportAction): SupportAction {
-  return action.replace("report_", "support_") as SupportAction;
-}
+export const ENGINE_MAX_CONTENT_PAGES = 150;
 
-export function reportAction(pages: number): ReportAction {
-  if (pages <= 8) return "report_short";
-  if (pages <= 20) return "report_standard";
-  if (pages <= 80) return "report_long";
-  return "report_xl";
+/** Pages de contenu autorisées par tâche pour un forfait (plafond du forfait et du moteur). */
+export function maxContentPages(plan: PlanCode): number {
+  return Math.min(PLANS[plan].limits.contentPagesPerTask, ENGINE_MAX_CONTENT_PAGES);
 }
 
 /** Pages d'un document : sa pagination si elle existe, sinon l'équivalent texte (au moins 1). */

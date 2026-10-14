@@ -10,8 +10,8 @@ import { V6_MODES, type Mode } from "@/lib/contracts/schemas";
 import type { Dict } from "@/lib/i18n";
 import { apiMessage } from "@/lib/i18n/api";
 import { useLang, useT } from "@/lib/i18n/client";
-import { ACTION_PRICES } from "@/lib/billing/catalog";
-import { DEFAULT_SUPPORTS, readSupports, SUPPORTS, type Support } from "@/lib/supports/supports";
+import { IMAGE_CREDITS, quoteCourse } from "@/lib/billing/quote";
+import { DEFAULT_SUPPORTS, readSupports, type Support } from "@/lib/supports/supports";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/env";
 import { InsufficientCreditsState } from "@/components/jobs/InsufficientCreditsState";
 
@@ -47,10 +47,13 @@ const CONCURRENCY = 2;
 const SUPPORT_ICONS: Record<Support, IconName> = { livre: "book", parcours: "path", carte: "mindmap", flashcards: "cards" };
 /** Sélection en cours gardée pendant la session (retour arrière, erreur, reprise). */
 const SUPPORTS_KEY = "limpid-supports-draft";
+/** Consultations au choix ; la carte mentale et les flashcards sont toujours incluses. */
+const SELECTABLE: Support[] = ["livre", "parcours"];
 function readDraftSupports(): Support[] | null {
   try {
     const v = JSON.parse(sessionStorage.getItem(SUPPORTS_KEY) ?? "null");
-    return Array.isArray(v) && v.length ? readSupports(v) : null;
+    const list = Array.isArray(v) ? readSupports(v).filter((s) => SELECTABLE.includes(s)) : [];
+    return list.length ? list : null;
   } catch {
     return null;
   }
@@ -219,7 +222,7 @@ export function ImportForm({
     } catch {}
   };
   const toggleSupport = (s: Support) => {
-    const next = supports.includes(s) ? supports.filter((x) => x !== s) : SUPPORTS.filter((x) => x === s || supports.includes(x));
+    const next = supports.includes(s) ? supports.filter((x) => x !== s) : SELECTABLE.filter((x) => x === s || supports.includes(x));
     if (!next.length) {
       setNeedOne(true);
       return;
@@ -237,7 +240,9 @@ export function ImportForm({
   const [pending, setPending] = useState<PendingImport | null>(null);
   const [resuming, setResuming] = useState(false);
   // Devis reçu pour un jeu de documents donné (clé) : affiché seulement s'il correspond encore.
-  const [quoted, setQuoted] = useState<{ key: string; credits: number; extras: number } | null>(null);
+  const [quoted, setQuoted] = useState<{ key: string; credits: number; maxImages: number; block: { code: string; limit?: number } | null } | null>(null);
+  /** Nouvelles images générées choisies dans le devis (0 par défaut). */
+  const [images, setImages] = useState(0);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
@@ -374,18 +379,18 @@ export function ImportForm({
   // Devis fixe dès que les documents sont lus (Limpid commun) : affiché sur le bouton.
   const sourceKey = !(readyItems.length > 1 && output === "each") ? readyItems.map((x) => x.prepared!.sourceId).join(",") : "";
   // Devis propre à la sélection (documents + supports) : une réponse devenue obsolète est ignorée.
-  const quoteKey = sourceKey ? `${sourceKey}|${supports.join(",")}` : "";
+  const quoteKey = sourceKey ? `${sourceKey}|${supports.join(",")}|${images}` : "";
   const quote = quoted && quoted.key === quoteKey ? quoted.credits : null;
   // Pendant la mise à jour, la valeur précédente reste affichée (état discret), le lancement attend.
   const staleQuote = quoted && quote === null && quoteKey ? quoted : null;
   useEffect(() => {
     if (!quoteKey) return;
     let live = true;
-    const [ids, list] = quoteKey.split("|");
-    fetch("/api/billing/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_ids: ids!.split(","), supports: list!.split(",") }) })
+    const [ids, list, n] = quoteKey.split("|");
+    fetch("/api/billing/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_ids: ids!.split(","), supports: list!.split(","), images: Number(n) }) })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { credits?: number; extras?: { credits: number }[] } | null) =>
-        live && setQuoted(typeof d?.credits === "number" ? { key: quoteKey, credits: d.credits, extras: (d.extras ?? []).reduce((n, e) => n + e.credits, 0) } : null),
+      .then((d: { credits?: number; limits?: { images?: number }; block?: { code: string; limit?: number } | null } | null) =>
+        live && setQuoted(typeof d?.credits === "number" ? { key: quoteKey, credits: d.credits, maxImages: d.limits?.images ?? 0, block: d.block ?? null } : null),
       )
       .catch(() => undefined);
     return () => {
@@ -403,8 +408,17 @@ export function ImportForm({
     pendingItems.length === 0 &&
     failedItems.length === 0 &&
     supports.length > 0 &&
-    // Un Limpid commun ne part qu'avec un devis correspondant à la sélection affichée.
-    (!quoteKey || quote !== null);
+    // Un Limpid commun ne part qu'avec un devis correspondant à la sélection affichée, dans les limites de l'offre.
+    (!quoteKey || (quote !== null && !quoted?.block));
+  const maxImages = quoted?.maxImages ?? 0;
+  const block = quote !== null && quoted?.block ? quoted.block : null;
+  const blockText = !block
+    ? null
+    : block.code === "plan_ocr"
+      ? t.billing.blocks.planOcr(block.limit ?? 0)
+      : block.code === "plan_images"
+        ? t.billing.blocks.planImages(block.limit ?? 0)
+        : t.add.v2.tooLong(block.limit ?? 0);
 
   /** Condition manquante, dite à côté du bouton désactivé. */
   const missing = !enabled || busy
@@ -426,7 +440,7 @@ export function ImportForm({
         setPhase({ step: "creating" });
         const data = await postJson(
           "/api/reports/batch",
-          { source_ids: readyItems.map((x) => x.prepared!.sourceId), supports, idempotency_key: key.current, folder_id: folderId },
+          { source_ids: readyItems.map((x) => x.prepared!.sourceId), supports, images, idempotency_key: key.current, folder_id: folderId },
           t.add.failed,
           t,
         );
@@ -437,7 +451,7 @@ export function ImportForm({
       }
       const sourceIds = readyItems.map((x) => x.prepared!.sourceId);
       setPhase({ step: "creating" });
-      const data = await postJson("/api/reports", { source_ids: sourceIds, supports, idempotency_key: key.current, folder_id: folderId }, t.add.failed, t);
+      const data = await postJson("/api/reports", { source_ids: sourceIds, supports, images, idempotency_key: key.current, folder_id: folderId }, t.add.failed, t);
       writePending(null);
       router.push(`/rapports/${String(data.reportId)}`);
     } catch (err) {
@@ -632,7 +646,7 @@ export function ImportForm({
         <legend>{t.add.v2.supportsTitle}</legend>
         <p className="modes-sub">{t.add.v2.supportsSub}</p>
         <div className="mode-grid support-grid">
-          {SUPPORTS.map((m) => {
+          {SELECTABLE.map((m) => {
             const on = supports.includes(m);
             return (
               <label key={m} className={`mode-card support-card${on ? " is-selected" : ""}`}>
@@ -650,7 +664,24 @@ export function ImportForm({
         <p id={`${base}-sup-count`} className="support-count" aria-live="polite">
           {needOne ? <span className="support-need">{t.add.v2.supportsNeedOne}</span> : t.add.v2.supportsCount(supports.length)}
         </p>
+        <p className="supports-included">
+          <Icon name="mindmap" size={18} /> <Icon name="cards" size={18} /> <span>{t.add.v2.supportsIncluded}</span>
+        </p>
       </fieldset>
+
+      {maxImages > 0 && (
+        <div className="images-option">
+          <span id={`${base}-img`} className="images-option-label">
+            <strong>{t.add.v2.imagesTitle}</strong>
+            <small>{t.add.v2.imagesSub(IMAGE_CREDITS, maxImages)}</small>
+          </span>
+          <span className="stepper" role="group" aria-labelledby={`${base}-img`}>
+            <button type="button" className="ib" disabled={busy || images <= 0} onClick={() => setImages((n) => Math.max(0, n - 1))} aria-label={t.add.v2.imagesLess}>−</button>
+            <output aria-live="polite">{images}</output>
+            <button type="button" className="ib" disabled={busy || images >= maxImages} onClick={() => setImages((n) => Math.min(maxImages, n + 1))} aria-label={t.add.v2.imagesMore}>+</button>
+          </span>
+        </div>
+      )}
 
       <p role="status" aria-live="polite" className="sr-only">{status}</p>
       {/* Le fichier n'est reçu qu'après l'envoi : jamais de faux « Document reçu » avant. */}
@@ -672,9 +703,9 @@ export function ImportForm({
         <span className="estimate-icon" aria-hidden="true"><Icon name="coins" size={26} /></span>
         <span className="estimate-text">
           <b className={staleQuote ? "is-stale" : undefined}>
-            {count === 1 ? (quote ? t.add.v2.estimate(quote) : staleQuote ? t.add.v2.estimate(staleQuote.credits) : t.billing.createCostFrom(ACTION_PRICES.report_short)) : t.add.v2.estimateMany(count)}
+            {count === 1 ? (quote ? t.add.v2.estimate(quote) : staleQuote ? t.add.v2.estimate(staleQuote.credits) : t.billing.createCostFrom(quoteCourse({ P: 1, R: 0, H: 0, G: 0 }).credits)) : t.add.v2.estimateMany(count)}
           </b>
-          {staleQuote ? <small aria-live="polite">{t.add.v2.estimateUpdating}</small> : count === 1 && quote && quoted && quoted.extras > 0 ? <small>{t.add.v2.estimateSupports(quoted.extras)}</small> : null}
+          {staleQuote ? <small aria-live="polite">{t.add.v2.estimateUpdating}</small> : count === 1 && quote ? <small>{t.add.v2.estimateSupports}</small> : null}
           {pages > 0 && <small>{t.add.v2.estimatePages(pages)}</small>}
         </span>
         <button
@@ -687,6 +718,7 @@ export function ImportForm({
         </button>
       </div>
       {missing && <p id={`${base}-missing`} className="muted small center">{missing}</p>}
+      {blockText && <p className="notice notice-warn" role="alert">{blockText}</p>}
       <p className="retention"><Icon name="shield" size={14} /> {t.add.v2.retention}</p>
       </>
       )}

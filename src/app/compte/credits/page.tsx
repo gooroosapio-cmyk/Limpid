@@ -47,12 +47,8 @@ export default async function CreditsPage({ searchParams }: { searchParams: Prom
         {wallet.quotas && (
           <ul className="quota-list">
             <li>
-              {w.today(wallet.quotas.day.used, wallet.quotas.day.limit)}
-              {wallet.quotas.day.used >= wallet.quotas.day.limit ? ` · ${w.resetAt(when(wallet.quotas.day.resetAt))}` : ""}
-            </li>
-            <li>
-              {w.thisWeek(wallet.quotas.week.used, wallet.quotas.week.limit)}
-              {wallet.quotas.week.used >= wallet.quotas.week.limit ? ` · ${w.resetAt(when(wallet.quotas.week.resetAt))}` : ""}
+              {w.thisPeriod(wallet.quotas.period.used, wallet.quotas.period.limit)}
+              {wallet.quotas.period.used >= wallet.quotas.period.limit ? ` · ${w.resetAt(when(wallet.quotas.period.resetAt))}` : ""}
             </li>
           </ul>
         )}

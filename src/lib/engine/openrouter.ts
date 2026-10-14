@@ -58,8 +58,8 @@ export const DEFAULT_MODELS: Record<ModelRole, string> = {
   controller: "openai/gpt-6-luna",
   expert: "openai/gpt-6.1-sol",
   vision: "google/gemini-3.8-flash",
-  /** Supports dérivés (carte mentale, flashcards) depuis une base déjà validée. */
-  transform: "google/gemini-3.8-flash",
+  /** Supports dérivés (carte mentale, flashcards) depuis une base déjà validée : GPT-6 Luna. */
+  transform: "openai/gpt-6-luna",
 };
 /** Replis : un autre fournisseur de même gamme ; Sol n'est jamais un repli. */
 export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
@@ -70,7 +70,7 @@ export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
   controller: "z-ai/glm-5.3-flash",
   expert: "openai/gpt-6-luna",
   vision: "openai/gpt-6-luna",
-  transform: "openai/gpt-6-luna",
+  transform: "google/gemini-3.8-flash",
 };
 /** Variables d'environnement du registre (prompt V2). */
 const ROLE_ENV: Record<ModelRole, string> = {
