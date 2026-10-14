@@ -68,6 +68,19 @@ export function expertCalls(tier: AiTier): number {
   return PLANS[TIER_PLAN[tier]].limits.expertPerCourse;
 }
 
+/** Appels experts au plus sur une période (cycle du forfait) : 0, 6, 15 ou 30. */
+export function expertPeriodCap(tier: AiTier): number {
+  return PLANS[TIER_PLAN[tier]].limits.expertPerPeriod;
+}
+
+/**
+ * Appels experts encore permis : plafond du cours et de la période, moins les appels déjà
+ * enregistrés (le compteur est en base : une reprise du worker ne le remet jamais à zéro).
+ */
+export function expertLeft(tier: AiTier, usedOnCourse: number, usedInPeriod: number): number {
+  return Math.max(0, Math.min(expertCalls(tier) - usedOnCourse, expertPeriodCap(tier) - usedInPeriod));
+}
+
 /** Lecture des pages scannées (OCR) : tous les forfaits, dans leurs limites de pages. */
 export function ocrAllowed(_tier: AiTier): boolean {
   return true;

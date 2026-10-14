@@ -7,7 +7,7 @@ import "server-only";
 import { z } from "zod";
 import { Level, Mode } from "@/lib/contracts/schemas";
 import { REFORMULATE_REASONS, simplerLevel } from "@/lib/engine/pipeline";
-import { levelFor } from "./create";
+import { currentWriter, levelFor } from "./create";
 import { accountUsage, attachReservation, CreditError, getEntitlements, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -105,6 +105,7 @@ export async function requestVersion(userId: string, reportId: string, input: z.
             ? simplerLevel(level)
             : level,
       ...(input.section_id ? { section_id: input.section_id } : {}),
+      writer: await currentWriter(),
       mode,
       language: prefs?.explanation_lang === "fr" || prefs?.explanation_lang === "en" ? prefs.explanation_lang : null,
       ...(input.variation === "reformulate" ? { reasons: input.reasons ?? [], comment: input.comment || null } : {}),

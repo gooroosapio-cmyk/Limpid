@@ -81,7 +81,7 @@ export async function adminOverview() {
   const [readerV3, settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
     // Colonne absente tant que la migration du lecteur V3 n'est pas appliquée : null.
     db.from("app_settings").select("reader_v3_enabled").single().then((r) => (r.error ? null : (r.data as { reader_v3_enabled?: boolean }).reader_v3_enabled === true)),
-    db.from("app_settings").select("generation_enabled, monthly_cap_cents, marketing_budget_xof, welcome_cost_xof, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
+    db.from("app_settings").select("generation_enabled, monthly_cap_cents, marketing_budget_xof, writer_model, welcome_cost_xof, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
     db.from("usage_ledger").select("model").gte("created_at", quotaStart.toISOString()),
@@ -121,7 +121,59 @@ export async function adminOverview() {
     jobs: jobs.data ?? [],
     audit: audit.data ?? [],
     reportCount: reports.count ?? 0,
+    writer: (settings.data as { writer_model?: string } | null)?.writer_model === "standard" ? ("standard" as const) : ("pro" as const),
+    writers: await writerComparison(),
   };
+}
+
+export interface WriterStats {
+  writer: "standard" | "pro";
+  courses: number;
+  /** Cours livrés « à vérifier » (incomplets). */
+  incomplete: number;
+  avgCents: number;
+  /** Coût moyen pour 10 pages de contenu (prix continu). */
+  per10PagesCents: number | null;
+  avgMinutes: number;
+}
+
+/**
+ * Test comparatif de la rédaction (spécification, § 8.1) : cours livrés sur 30 jours, par
+ * rédacteur figé à la création, avec leur coût réel (toutes étapes) et leur durée.
+ */
+export async function writerComparison(now = new Date()): Promise<WriterStats[]> {
+  const db = adminClient();
+  const since = new Date(now.getTime() - 30 * 24 * 3600_000).toISOString();
+  const { data: jobs } = await db
+    .from("jobs")
+    .select("id, status, params, created_at, finished_at")
+    .eq("kind", "generate_report")
+    .in("status", ["succeeded", "incomplete_check"])
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const rows = (jobs ?? []) as { id: string; status: string; params: { writer?: string; credits?: { pages?: number } } | null; created_at: string; finished_at: string | null }[];
+  if (!rows.length) return [];
+  const { data: usage } = await db.from("usage_ledger").select("job_id, actual_cents, reserved_cents").in("job_id", rows.map((r) => r.id));
+  const cost = new Map<string, number>();
+  for (const u of usage ?? []) cost.set(u.job_id as string, (cost.get(u.job_id as string) ?? 0) + ((u.actual_cents as number | null) ?? (u.reserved_cents as number | null) ?? 0));
+  return (["standard", "pro"] as const)
+    .map((writer) => {
+      const mine = rows.filter((r) => (r.params?.writer === "standard" ? "standard" : "pro") === writer);
+      const cents = mine.map((r) => cost.get(r.id) ?? 0);
+      const paged = mine.filter((r) => (r.params?.credits?.pages ?? 0) > 0);
+      const pages = paged.reduce((n, r) => n + r.params!.credits!.pages!, 0);
+      const minutes = mine.filter((r) => r.finished_at).map((r) => (Date.parse(r.finished_at!) - Date.parse(r.created_at)) / 60_000);
+      return {
+        writer,
+        courses: mine.length,
+        incomplete: mine.filter((r) => r.status === "incomplete_check").length,
+        avgCents: mine.length ? cents.reduce((a, b) => a + b, 0) / mine.length : 0,
+        per10PagesCents: pages ? (paged.reduce((n, r) => n + (cost.get(r.id) ?? 0), 0) / pages) * 10 : null,
+        avgMinutes: minutes.length ? minutes.reduce((a, b) => a + b, 0) / minutes.length : 0,
+      };
+    })
+    .filter((w) => w.courses > 0);
 }
 
 export type AdminOverview = Awaited<ReturnType<typeof adminOverview>>;

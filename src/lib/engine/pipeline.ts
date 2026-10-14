@@ -502,8 +502,8 @@ export async function verifyClaims(
     schema: VerificationDraft,
     instructions: VERIFY_INSTRUCTIONS,
     data: [{ label: "affirmations et extraits", text: verificationPayload({ ...ko, claims: ko.claims.filter((c) => risky.has(c.id)) }, evidence, segments) }],
-    // Contrôle courant : Luna ; source complexe d'un compte Pro : audit par Sol (texte).
-    budget: { ...input.budgets.comprehension, role: input.tier === "pro" && input.budgets.comprehension.role === "structure_complex" ? "expert" : "controller", reasoning: "low" },
+    // Contrôle courant : Luna, pour tous les forfaits (plus d'audit systématique par Sol, § 8.2).
+    budget: { ...input.budgets.comprehension, role: "controller", reasoning: "low" },
   });
   const verdicts = new Map(draft.verdicts.map((x) => [x.claim_id, x]));
   const claims = ko.claims.map((c) => {

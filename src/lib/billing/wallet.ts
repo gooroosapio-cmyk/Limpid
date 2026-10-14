@@ -114,6 +114,17 @@ export function quotaBlock(q: Quotas): QuotaDetail | null {
   return { periodUsed: q.period.used, periodLimit: q.period.limit, nextAt: q.period.resetAt };
 }
 
+/** Début de la période en cours d'un compte : cycle de l'abonnement actif, sinon de la création du compte. */
+export async function periodStart(userId: string, now = new Date()): Promise<Date> {
+  const db = adminClient();
+  const [{ data: sub }, { data: user }] = await Promise.all([
+    db.from("subscriptions").select("starts_at").eq("owner_id", userId).lte("starts_at", now.toISOString()).gt("ends_at", now.toISOString()).order("starts_at").limit(1).maybeSingle(),
+    db.auth.admin.getUserById(userId),
+  ]);
+  const anchor = new Date((sub?.starts_at as string | undefined) ?? user?.user?.created_at ?? now.toISOString());
+  return cycleBounds(anchor, now).start;
+}
+
 export async function ensureAllocations(userId: string) {
   const { error } = await adminClient().rpc("ensure_allocations_v2", {
     p_owner: userId,

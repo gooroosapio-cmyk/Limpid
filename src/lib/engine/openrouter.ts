@@ -54,6 +54,8 @@ export const DEFAULT_MODELS: Record<ModelRole, string> = {
   structure: "z-ai/glm-5.3-flash",
   structure_complex: "deepseek/deepseek-v4.1-flash",
   writer: "openai/gpt-6-luna-pro",
+  /** Rédaction courante visée (spécification, § 8.1), activée après le test comparatif. */
+  writer_standard: "openai/gpt-6-luna",
   chat: "openai/gpt-6-luna",
   controller: "openai/gpt-6-luna",
   expert: "openai/gpt-6.1-sol",
@@ -66,6 +68,7 @@ export const DEFAULT_FALLBACKS: Record<ModelRole, string> = {
   structure: "deepseek/deepseek-v4.1-flash",
   structure_complex: "z-ai/glm-5.3-flash",
   writer: "z-ai/glm-5.3-flash",
+  writer_standard: "z-ai/glm-5.3-flash",
   chat: "z-ai/glm-5.3-flash",
   controller: "z-ai/glm-5.3-flash",
   expert: "openai/gpt-6-luna",
@@ -77,6 +80,7 @@ const ROLE_ENV: Record<ModelRole, string> = {
   structure: "MODEL_STRUCTURE_STANDARD",
   structure_complex: "MODEL_STRUCTURE_COMPLEX",
   writer: "MODEL_WRITER",
+  writer_standard: "MODEL_WRITER_STANDARD",
   chat: "MODEL_CHAT",
   controller: "MODEL_CONTROLLER_DEFAULT",
   expert: "MODEL_EXPERT_PRO",
@@ -238,12 +242,14 @@ export class OpenRouterProvider implements AIProvider, ImageProvider {
 
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<StructuredResponse<z.infer<T>>> {
     const role = roleOf(req.budget);
-    const models = [...new Set([this.config.models[role], this.config.fallbacks[role]])];
-    // Dernière correction de schéma : même modèle, réflexion haute (aucune escalade payante).
-    const final = req.preferFallback ? { ...req, budget: { ...req.budget, reasoning: "high" as const } } : req;
+    // Secours demandé (dernière correction de schéma) : le modèle de secours d'abord, au même
+    // niveau de raisonnement. Un raisonnement plus élevé ne se demande que par le budget
+    // (escalade explicite), jamais implicitement par un secours (spécification, § 8.3).
+    const pair = [this.config.models[role], this.config.fallbacks[role]];
+    const models = [...new Set(req.preferFallback ? pair.reverse() : pair)];
     for (let i = 0; ; i++) {
       try {
-        return await this.generateWith(models[i]!, final);
+        return await this.generateWith(models[i]!, req);
       } catch (e) {
         // Modèle indisponible ou requête refusée par ce modèle : le modèle de secours prend le relais.
         const switchable = e instanceof ProviderError && (e.code === "unavailable" || e.code === "rate_limited" || e.code === "bad_request");

@@ -16,9 +16,10 @@ export type ModelTier = "lite" | "fast" | "quality" | "complex";
 /**
  * Rôle d'un appel (registre des modèles, prompt V2) : la structure d'une source standard ou
  * complexe, la rédaction pédagogique, le chat et les reformulations, le contrôle courant,
- * l'expertise ciblée (Pro seulement). Le code choisit le rôle ; le modèle vient du registre.
+ * l'expertise ciblée (dans la limite du forfait). Le code choisit le rôle ; le modèle vient du
+ * registre. « writer_standard » : rédaction par Luna standard (réglage d'administration).
  */
-export type ModelRole = "structure" | "structure_complex" | "writer" | "chat" | "controller" | "expert" | "vision" | "transform";
+export type ModelRole = "structure" | "structure_complex" | "writer" | "writer_standard" | "chat" | "controller" | "expert" | "vision" | "transform";
 
 export interface StageBudget {
   tier: ModelTier;

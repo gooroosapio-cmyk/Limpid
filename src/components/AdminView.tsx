@@ -2,7 +2,7 @@ import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
-import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMarketingBudget, setMonthlyCap, setReaderV3 } from "@/app/admin/actions";
+import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMarketingBudget, setMonthlyCap, setReaderV3, setWriterModel } from "@/app/admin/actions";
 import { IMAGE_MODELS, IMAGE_STYLES } from "@/lib/visuals/image-models";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 import { nowMs } from "@/lib/time";
@@ -165,6 +165,36 @@ export async function AdminView({
           <input id="cap" name="euros" type="number" inputMode="decimal" min={0} max={o.envCapCents / 100} step="0.5" defaultValue={o.monthlyCapCents / 100} />
           <button type="submit" className="btn">{t.admin.save}</button>
         </form>
+        <form action={setWriterModel} className="admin-form">
+          <label htmlFor="writer">{t.admin.writer.label}</label>
+          <select id="writer" name="writer" defaultValue={o.writer}>
+            <option value="standard">{t.admin.writer.standard}</option>
+            <option value="pro">{t.admin.writer.pro}</option>
+          </select>
+          <button type="submit" className="btn">{t.admin.save}</button>
+        </form>
+        {o.writers.length > 0 && (
+          <div className="table-scroll" role="region" aria-label={t.admin.writer.compare} tabIndex={0}>
+            <table>
+              <caption className="small muted">{t.admin.writer.compare}</caption>
+              <thead>
+                <tr><th scope="col">{t.admin.writer.label}</th><th scope="col">{t.admin.writer.courses}</th><th scope="col">{t.admin.writer.incomplete}</th><th scope="col">{t.admin.writer.avg}</th><th scope="col">{t.admin.writer.per10}</th><th scope="col">{t.admin.writer.minutes}</th></tr>
+              </thead>
+              <tbody>
+                {o.writers.map((w) => (
+                  <tr key={w.writer}>
+                    <th scope="row">{w.writer === "standard" ? t.admin.writer.standard : t.admin.writer.pro}</th>
+                    <td>{w.courses}</td>
+                    <td>{w.incomplete}</td>
+                    <td>{euros(w.avgCents)}</td>
+                    <td>{w.per10PagesCents === null ? "—" : euros(w.per10PagesCents)}</td>
+                    <td>{w.avgMinutes.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         <form action={setMarketingBudget} className="admin-form">
           <label htmlFor="mkt">{t.admin.marketingLabel(o.welcomeCostXof)}</label>
           <input id="mkt" name="xof" type="number" inputMode="numeric" min={0} step="1000" defaultValue={o.marketingBudgetXof} />
