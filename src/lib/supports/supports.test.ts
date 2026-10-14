@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ACTION_PRICES } from "@/lib/billing/catalog";
 import { assignColors, COLOR_KEYS } from "./colors";
 import { buildBank, cardId, revealsAnswer, type FlashcardDraft } from "./flashcards";
 import { buildMindMap, shortLabel, type MindMapDraft } from "./mindmap";
 import { applyRating, endOfLocalDay, intervalFor, isDue, NEW_CARD, replay, requeue } from "./schedule";
-import { modeForSupports, quoteSupports, readSupports, SUPPORTS, SupportSelection, supportsForMode } from "./supports";
+import { modeForSupports, readSupports, SUPPORTS, SupportSelection, supportsForMode, withIncludedSupports } from "./supports";
 
 describe("sélection des supports", () => {
   it("les 15 combinaisons non vides sont acceptées, la vide est refusée", () => {
@@ -20,13 +19,10 @@ describe("sélection des supports", () => {
   it("ordre canonique, doublons retirés", () => {
     expect(SupportSelection.parse(["flashcards", "livre", "flashcards"])).toEqual(["livre", "flashcards"]);
   });
-  it("devis : une préparation commune, coût marginal par support dérivé", () => {
-    const q = quoteSupports("report_standard", ["livre", "parcours", "carte", "flashcards"]);
-    expect(q.base.credits).toBe(ACTION_PRICES.report_standard);
-    expect(q.extras.map((e) => e.support)).toEqual(["carte", "flashcards"]);
-    expect(q.total).toBe(ACTION_PRICES.report_standard + 2 * ACTION_PRICES.support_standard);
-    // Livre et parcours : même texte, aucun supplément.
-    expect(quoteSupports("report_short", ["livre", "parcours"]).total).toBe(ACTION_PRICES.report_short);
+  it("carte mentale et flashcards incluses dans tout nouveau cours", () => {
+    expect(withIncludedSupports(["livre"])).toEqual(["livre", "carte", "flashcards"]);
+    expect(withIncludedSupports(["parcours", "livre"])).toEqual(["livre", "parcours", "carte", "flashcards"]);
+    expect(withIncludedSupports(["carte"])).toEqual(["carte", "flashcards"]);
   });
   it("approche interne et compatibilité des anciens Limpid", () => {
     expect(modeForSupports(["parcours"])).toBe("parcours");

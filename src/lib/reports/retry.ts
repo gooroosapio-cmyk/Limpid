@@ -2,20 +2,20 @@
  * « Reprendre la génération » d'un Limpid interrompu (V4, § 13 ; prompt « Fluidité », § 6) :
  * la même tâche repart (mêmes réglages, même document, étapes déjà validées conservées) ; seules
  * les unités manquantes sont refaites. L'échec a rendu les crédits : la reprise réserve à nouveau
- * le même prix fixe, donc un seul débit au total, sans surcoût. Idempotent par clé.
+ * le prix du devis d'origine, donc un seul débit au total, sans surcoût. Idempotent par clé.
  */
 import "server-only";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
-import { reportAction } from "@/lib/billing/catalog";
+import { ACTION_PRICES, type Action } from "@/lib/billing/catalog";
 import { accountUsage, attachReservation, CreditError, getEntitlements, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
-import { automaticSettings } from "@/lib/reports/create";
+import { automaticSettings, courseQuote } from "@/lib/reports/create";
 import { adminClient } from "@/lib/supabase/admin";
 
 export class RetryError extends Error {
   constructor(
     readonly code: "not_found" | "not_failed" | "limit" | "disabled" | "storage" | "credits" | "quota",
     message: string,
-    readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number; dayLimit?: number; weekLimit?: number } = {},
+    readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number; periodLimit?: number } = {},
   ) {
     super(message);
   }
@@ -57,10 +57,16 @@ export async function retryReport(userId: string, reportId: string, idempotencyK
   }
   const { data: set } = await db.from("report_sources").select("source_id").eq("report_id", reportId).order("position");
   const sourceIds = set?.length ? set.map((r) => r.source_id as string) : [(last.source_id ?? report.source_id) as string];
-  const action = reportAction((await automaticSettings(userId, sourceIds)).pages);
+  // Même prix que le devis d'origine (prix continu, ou ancien palier fixe) ; à défaut, nouveau devis.
+  const credits = (last.params as { credits?: { action?: string; amount?: number } } | null)?.credits;
+  let action: Action;
+  let amount: number;
+  if (credits?.action === "report" && credits.amount) [action, amount] = ["report", credits.amount];
+  else if (credits?.action && credits.action in ACTION_PRICES) [action, amount] = [credits.action as Action, ACTION_PRICES[credits.action as keyof typeof ACTION_PRICES]];
+  else [action, amount] = ["report", courseQuote((await automaticSettings(userId, sourceIds)).measure, 0).credits];
   let reservationId: string;
   try {
-    ({ reservationId } = await reserveCredits(userId, action, `report:${idempotencyKey}`, { reportId }, { wallet: ent.wallet }));
+    ({ reservationId } = await reserveCredits(userId, action, `report:${idempotencyKey}`, { reportId }, { wallet: ent.wallet, amount }));
   } catch (e) {
     if (e instanceof CreditError && (e.code === "insufficient" || e.code === "quota")) {
       throw new RetryError(e.code === "insufficient" ? "credits" : "quota", e.message, e.detail);

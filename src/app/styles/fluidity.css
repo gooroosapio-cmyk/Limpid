@@ -364,4 +364,10 @@ dialog.sheet .sheet-grip::after { content: ""; position: absolute; inset: -14px 
 .import .support-count { margin: var(--s2) 0 0; font-size: 0.8125rem; color: var(--muted); }
 .import .support-need { color: var(--danger); font-weight: 600; }
 .import .estimate-text b.is-stale { opacity: 0.55; }
+.import .supports-included { display: flex; align-items: center; gap: 6px; margin: var(--s2) 0 0; font-size: 0.875rem; color: var(--ink); }
+.import .supports-included svg { color: var(--gold); flex: none; }
+.import .images-option { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin: var(--s3) 0; padding: var(--s3); border: 1px solid var(--line); border-radius: var(--r-control); }
+.import .images-option-label { display: grid; gap: 2px; }
+.import .images-option-label small { color: var(--muted); }
+.import .images-option output { min-width: 2ch; text-align: center; font-weight: 600; }
 @media (min-width: 640px) { .import .support-tick { align-self: start; } }

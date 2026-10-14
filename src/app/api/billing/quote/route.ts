@@ -1,22 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { currentUser } from "@/lib/auth";
-import { reportAction } from "@/lib/billing/catalog";
-import { automaticSettings } from "@/lib/reports/create";
+import { getEntitlements } from "@/lib/billing/wallet";
+import { assertWithinPlan, automaticSettings, contentCap, courseQuote, CreateError, ocrCap } from "@/lib/reports/create";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient, isAdminConfigured } from "@/lib/supabase/admin";
-import { DEFAULT_SUPPORTS, quoteSupports, SupportSelection } from "@/lib/supports/supports";
+import { DEFAULT_SUPPORTS, SupportSelection, withIncludedSupports } from "@/lib/supports/supports";
 
 const Body = z.strictObject({
   source_ids: z.array(z.string().uuid()).min(1).max(MAX_SOURCES),
-  /** Supports choisis ; absents : le livre seul (ancien client). */
+  /** Supports choisis ; absents : le livre seul (ancien client). Carte et flashcards incluses. */
   supports: SupportSelection.optional(),
+  /** Nouvelles images générées demandées (0 par défaut). */
+  images: z.number().int().min(0).max(10).optional(),
 });
 
 /**
- * Devis d'un Limpid (§ 19 ; supports § 3) : préparation commune selon la taille réelle des
- * documents lus, puis coût marginal de chaque support dérivé. Aucun appel IA. `credits` reste le
- * total (compatibilité) ; `supports` reprend la sélection pour écarter un devis obsolète.
+ * Devis d'un Limpid (spécification du 14 octobre 2026, § 4 et § 5) : prix continu selon les
+ * pages de contenu, les pages scannées et les images choisies. Aucun appel IA. `limits` borne le
+ * choix d'images ; `block` signale une limite de l'offre dépassée avant tout lancement.
  */
 export async function POST(request: NextRequest) {
   const user = await currentUser();
@@ -27,11 +29,27 @@ export async function POST(request: NextRequest) {
   const ids = [...new Set(parsed.data.source_ids)];
   const { count } = await adminClient().from("sources").select("id", { count: "exact", head: true }).in("id", ids).eq("owner_id", user.id).is("deleted_at", null);
   if (count !== ids.length) return NextResponse.json({ error: "introuvable" }, { status: 404 });
-  const supports = parsed.data.supports ?? DEFAULT_SUPPORTS;
-  const action = reportAction((await automaticSettings(user.id, ids)).pages);
-  const quote = quoteSupports(action, supports);
+  const [ent, settings] = await Promise.all([getEntitlements(user.id), automaticSettings(user.id, ids)]);
+  const images = Math.min(parsed.data.images ?? 0, ent.limits.imagesPerCourse);
+  const quote = courseQuote(settings.measure, images);
+  let block: { code: string; limit?: number } | null = null;
+  try {
+    assertWithinPlan(ent, settings.measure, images);
+  } catch (e) {
+    if (!(e instanceof CreateError)) throw e;
+    block = { code: e.code, limit: e.detail.limit };
+  }
   return NextResponse.json(
-    { action, credits: quote.total, base: quote.base.credits, extras: quote.extras.map((e) => ({ support: e.support, credits: e.credits })), supports },
+    {
+      action: "report",
+      credits: quote.credits,
+      pages: quote.P,
+      ocr_pages: quote.R,
+      images: quote.G,
+      supports: withIncludedSupports(parsed.data.supports ?? DEFAULT_SUPPORTS),
+      limits: { images: ent.limits.imagesPerCourse, pages: contentCap(ent), ocr_pages: ocrCap(ent) },
+      block,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

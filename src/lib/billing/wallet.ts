@@ -4,8 +4,8 @@
  * écritures passent par les fonctions SQL transactionnelles (verrou par compte).
  */
 import "server-only";
-import { aiTier, INTERNAL_PRO_QUOTAS, isInternalPro, type AiTier } from "./tier";
-import { ACTION_PRICES, PLANS, quotaWindows, REPORT_UNIT_ACTIONS, type Action, type PlanCode } from "./catalog";
+import { aiTier, INTERNAL_PRO_GENERATIONS, isInternalPro, type AiTier } from "./tier";
+import { ACTION_PRICES, COURSE_ACTIONS, FREE_WELCOME, PLANS, type Action, type FixedAction, type PlanCode } from "./catalog";
 import { adminClient } from "@/lib/supabase/admin";
 
 export type WalletMode = "free" | "topup" | "subscription";
@@ -21,17 +21,16 @@ export interface Wallet {
   accessEndsAt: string | null;
   /** Prochaine allocation mensuelle (gratuite ou d'abonnement) et sa quantité. */
   nextGrant: { at: string; credits: number } | null;
-  /** Plafonds de rapports (jour UTC, semaine du lundi) ; null : administrateur, sans plafond. */
+  /** Nouvelles générations de cours dans la période (cycle) ; null : administrateur, sans limite. */
   quotas: Quotas | null;
-  /** Parcours IA (OCR, Sol, images) : Gratuit et Essentiel → free, Plus, Pro. */
+  /** Parcours IA (Sol, secours d'image) : free, plus (Plus, Essentiel, Recharge), pro, max. */
   aiTier: AiTier;
   /** Droit Pro interne (adresse configurée) : parcours Pro, aucune offre payée simulée. */
   internalPro: boolean;
 }
 
 export interface Quotas {
-  day: { used: number; limit: number; resetAt: string };
-  week: { used: number; limit: number; resetAt: string };
+  period: { used: number; limit: number; since: string; resetAt: string };
 }
 
 interface LotRow {
@@ -61,10 +60,8 @@ export class CreditError extends Error {
 export interface QuotaDetail {
   needed?: number;
   available?: number;
-  dayUsed?: number;
-  dayLimit?: number;
-  weekUsed?: number;
-  weekLimit?: number;
+  periodUsed?: number;
+  periodLimit?: number;
   /** Date à laquelle toutes les limites atteintes sont levées. */
   nextAt?: string | null;
 }
@@ -78,35 +75,52 @@ export function resolvePlan(subs: SubRow[], lots: LotRow[], now = new Date()): {
   return { plan: topup ? "essential" : "free", mode: topup ? "topup" : "free", active: null };
 }
 
+/** Ajoute n mois (comme PostgreSQL : le jour est ramené à la fin d'un mois plus court). */
+export function addMonths(d: Date, n: number): Date {
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + n;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(d.getUTCDate(), last), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
+}
+
+/** Cycle mensuel courant depuis une ancre (même règle que cycle_bounds en base). */
+export function cycleBounds(anchor: Date, at = new Date()): { start: Date; end: Date } {
+  if (at < anchor) return { start: anchor, end: addMonths(anchor, 1) };
+  let n = Math.max(0, (at.getUTCFullYear() - anchor.getUTCFullYear()) * 12 + at.getUTCMonth() - anchor.getUTCMonth());
+  while (n > 0 && addMonths(anchor, n) > at) n--;
+  while (addMonths(anchor, n + 1) <= at) n++;
+  return { start: addMonths(anchor, n), end: addMonths(anchor, n + 1) };
+}
+
 /**
- * Plafonds de rythme (V2, § 15) : unités rapport réservées ou livrées dans le jour UTC et la
- * semaine (lundi UTC) en cours ; une réservation rendue (échec) ne compte pas.
+ * Limite de nouvelles générations par période (§ 3) : cours réservés ou livrés depuis le début
+ * du cycle ; une réservation rendue (échec) ne compte pas.
  */
-export function quotaState(starts: string[], limits: { day: number; week: number }, now = new Date()): Quotas {
-  const w = quotaWindows(now);
-  const times = starts.map((s) => new Date(s).getTime());
+export function quotaState(starts: string[], limit: number, period: { start: Date; end: Date }): Quotas {
+  const since = period.start.getTime();
   return {
-    day: { used: times.filter((t) => t >= w.dayStart.getTime()).length, limit: limits.day, resetAt: w.dayEnd.toISOString() },
-    week: { used: times.filter((t) => t >= w.weekStart.getTime()).length, limit: limits.week, resetAt: w.weekEnd.toISOString() },
+    period: {
+      used: starts.filter((s) => new Date(s).getTime() >= since).length,
+      limit,
+      since: period.start.toISOString(),
+      resetAt: period.end.toISOString(),
+    },
   };
 }
 
-/** Limites atteintes et date à laquelle elles sont toutes levées (la plus tardive). */
+/** Limite atteinte et date à laquelle elle est levée. */
 export function quotaBlock(q: Quotas): QuotaDetail | null {
-  const dayFull = q.day.used >= q.day.limit;
-  const weekFull = q.week.used >= q.week.limit;
-  if (!dayFull && !weekFull) return null;
-  return {
-    dayUsed: q.day.used,
-    dayLimit: dayFull ? q.day.limit : undefined,
-    weekUsed: q.week.used,
-    weekLimit: weekFull ? q.week.limit : undefined,
-    nextAt: weekFull ? q.week.resetAt : q.day.resetAt,
-  };
+  if (q.period.used < q.period.limit) return null;
+  return { periodUsed: q.period.used, periodLimit: q.period.limit, nextAt: q.period.resetAt };
 }
 
 export async function ensureAllocations(userId: string) {
-  const { error } = await adminClient().rpc("ensure_allocations", { p_owner: userId, p_free_credits: PLANS.free.monthlyCredits });
+  const { error } = await adminClient().rpc("ensure_allocations_v2", {
+    p_owner: userId,
+    p_welcome: FREE_WELCOME.credits,
+    p_welcome_days: FREE_WELCOME.days,
+    p_monthly: PLANS.free.monthlyCredits,
+  });
   if (error) console.error("ensure_allocations", error.code);
 }
 
@@ -149,16 +163,9 @@ export async function getWallet(userId: string): Promise<Wallet> {
   await sweepReservations(userId);
   const db = adminClient();
   const now = new Date();
-  const [{ data: lots }, { data: subs }, { data: unitRows }, { data: user }, { data: profile }] = await Promise.all([
+  const [{ data: lots }, { data: subs }, { data: user }, { data: profile }] = await Promise.all([
     db.from("credit_lots").select("origin, available, reserved, expires_at").eq("owner_id", userId),
     db.from("subscriptions").select("plan, starts_at, ends_at, monthly_credits").eq("owner_id", userId).order("starts_at"),
-    db
-      .from("credit_reservations")
-      .select("created_at")
-      .eq("owner_id", userId)
-      .in("action", REPORT_UNIT_ACTIONS)
-      .neq("status", "released")
-      .gte("created_at", new Date(Math.min(quotaWindows(now).weekStart.getTime(), quotaWindows(now).dayStart.getTime())).toISOString()),
     db.auth.admin.getUserById(userId),
     db.from("profiles").select("role").eq("id", userId).maybeSingle(),
   ]);
@@ -166,6 +173,16 @@ export async function getWallet(userId: string): Promise<Wallet> {
   const subRows = (subs ?? []) as SubRow[];
   const valid = lotRows.filter((l) => new Date(l.expires_at) > now);
   const { plan, mode, active } = resolvePlan(subRows, lotRows, now);
+  // Période : cycle de l'abonnement actif, sinon cycle mensuel depuis la création du compte.
+  const anchor = new Date(active?.starts_at ?? user?.user?.created_at ?? now.toISOString());
+  const period = cycleBounds(anchor, now);
+  const { data: unitRows } = await db
+    .from("credit_reservations")
+    .select("created_at")
+    .eq("owner_id", userId)
+    .in("action", COURSE_ACTIONS)
+    .neq("status", "released")
+    .gte("created_at", period.start.toISOString());
   const nextExpiry = valid.filter((l) => l.available > 0).map((l) => l.expires_at).sort()[0] ?? null;
   const accessEndsAt = subRows.length ? subRows.map((s) => s.ends_at).sort().at(-1)! : null;
 
@@ -176,17 +193,16 @@ export async function getWallet(userId: string): Promise<Wallet> {
     const continues = cycleEnd && subRows.some((s) => new Date(s.ends_at) > new Date(cycleEnd));
     if (cycleEnd && continues) nextGrant = { at: cycleEnd, credits: subRows.find((s) => new Date(s.ends_at) > new Date(cycleEnd))!.monthly_credits };
   } else if (user?.user?.email_confirmed_at) {
-    const cycleEnd = valid.filter((l) => l.origin === "free_cycle").map((l) => l.expires_at).sort().at(-1);
+    const cycleEnd = valid.filter((l) => l.origin === "free_monthly" || l.origin === "free_cycle").map((l) => l.expires_at).sort().at(-1);
     if (cycleEnd) nextGrant = { at: cycleEnd, credits: PLANS.free.monthlyCredits };
   }
-  // Plafonds de l'offre (le mode Recharge suit ceux d'Essentiel). Administrateurs : sans
-  // plafond de rythme, mais les crédits restent dus (jamais d'accès illimité).
-  // Droit Pro interne : limites de l'offre Pro (conservation, documents, tâches simultanées)
-  // et plafonds de rythme élevés mais bornés (jamais illimités). Les crédits restent dus.
+  // Limites de l'offre (le mode Recharge suit celles d'Essentiel). Administrateurs : sans
+  // limite de générations, mais les crédits restent dus (jamais d'accès illimité).
+  // Droit Pro interne : limites de l'offre Pro et générations élevées mais bornées.
   const internalPro = isInternalPro(user?.user?.email);
   const limits = PLANS[internalPro ? "pro" : mode === "free" ? "free" : plan].limits;
-  const rhythm = internalPro ? INTERNAL_PRO_QUOTAS : { day: limits.dailyReports, week: limits.weeklyReports };
-  const quotas = profile?.role === "admin" ? null : quotaState((unitRows ?? []).map((r) => r.created_at as string), rhythm, now);
+  const limit = internalPro ? INTERNAL_PRO_GENERATIONS : limits.generationsPerPeriod;
+  const quotas = profile?.role === "admin" ? null : quotaState((unitRows ?? []).map((r) => r.created_at as string), limit, period);
   return {
     available: valid.reduce((n, l) => n + l.available, 0),
     reserved: lotRows.reduce((n, l) => n + l.reserved, 0),
@@ -208,17 +224,19 @@ export async function getEntitlements(userId: string) {
 }
 
 /**
- * Réserve le prix fixe d'une action avant tout appel IA. Idempotente par clé : un double clic
- * renvoie la même réservation. Lève CreditError si le solde ou un plafond de rapports manque.
+ * Réserve le prix d'une action avant tout appel IA : prix fixe, ou montant du devis pour un
+ * cours (« report ») et l'ajout d'un support (« support »). Idempotente par clé : un double clic
+ * renvoie la même réservation. Lève CreditError si le solde ou la limite de période manque.
  */
 export async function reserveCredits(
   userId: string,
   action: Action,
   key: string,
   refs: { jobId?: string; reportId?: string } = {},
-  opts: { wallet?: Wallet } = {},
+  opts: { wallet?: Wallet; amount?: number } = {},
 ): Promise<{ reservationId: string; amount: number }> {
-  const amount = ACTION_PRICES[action];
+  const amount = action === "report" || action === "support" ? opts.amount : ACTION_PRICES[action as FixedAction];
+  if (!amount || amount <= 0 || !Number.isInteger(amount)) throw new CreditError("storage", "Montant de la demande invalide.");
   const db = adminClient();
   const { data: existing } = await db.from("credit_reservations").select("id, amount, action, status").eq("owner_id", userId).eq("idempotency_key", key).maybeSingle();
   // Seule une réservation encore en cours est réutilisée (double envoi). Rendue ou consommée,
@@ -228,25 +246,22 @@ export async function reserveCredits(
     return { reservationId: existing.id as string, amount };
   }
   const wallet = opts.wallet ?? (await getWallet(userId));
-  // Plafonds revérifiés en base, sous le même verrou que les crédits (dernière place disputée).
-  const { data, error } = await db.rpc("reserve_credits_v2", {
+  // Limite revérifiée en base, sous le même verrou que les crédits (dernière place disputée).
+  const { data, error } = await db.rpc("reserve_credits_v3", {
     p_owner: userId,
     p_amount: amount,
     p_action: action,
     p_key: key,
     p_job: refs.jobId ?? null,
     p_report: refs.reportId ?? null,
-    p_day_limit: wallet.quotas?.day.limit ?? null,
-    p_week_limit: wallet.quotas?.week.limit ?? null,
+    p_period_start: wallet.quotas?.period.since ?? null,
+    p_period_limit: wallet.quotas?.period.limit ?? null,
   });
   if (error) {
-    const q = /quota_atteint:(\d+):(-?\d+):(\d+):(-?\d+)/.exec(error.message ?? "");
+    const q = /periode_atteinte:(\d+):(\d+)/.exec(error.message ?? "");
     if (q && wallet.quotas) {
-      const detail = quotaBlock({
-        day: { ...wallet.quotas.day, used: Number(q[1]) },
-        week: { ...wallet.quotas.week, used: Number(q[3]) },
-      });
-      throw new CreditError("quota", "Plafond de rapports atteint.", detail ?? {});
+      const detail = quotaBlock({ period: { ...wallet.quotas.period, used: Number(q[1]) } });
+      throw new CreditError("quota", "Limite de cours de la période atteinte.", detail ?? {});
     }
     const m = /credits_insuffisants:(\d+)/.exec(error.message ?? "");
     if (m) throw new CreditError("insufficient", "Crédits insuffisants.", { needed: amount, available: Number(m[1]) });

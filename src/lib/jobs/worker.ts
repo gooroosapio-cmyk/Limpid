@@ -95,6 +95,8 @@ interface JobRow {
     template?: z.infer<typeof TemplateId>;
     /** Parcours IA du forfait à la création (OCR, Sol, images) ; absent : ancienne tâche. */
     ai_tier?: AiTier;
+    /** Nouvelles images raster choisies dans le devis (prix continu). */
+    images?: number;
     /** Nouvelle version d'un rapport existant. */
     variation?: Variation;
     base_version_id?: string;
@@ -348,7 +350,7 @@ async function checkBudget(ownerId: string, jobId?: string) {
  * scannées) sont lues, puis rejoignent leur place dans l'ordre des pages. Déjà lu : rien.
  */
 async function runOcr(job: JobRow, sourceId: string, controller: AbortController) {
-  // Seconde garde : la lecture des pages scannées est réservée au Pro (refusée dès la création).
+  // Seconde garde : ancienne tâche d'un parcours sans OCR (tous les forfaits le permettent désormais).
   if (job.params.ai_tier && !ocrAllowed(job.params.ai_tier)) throw new JobFailure("plan_ocr");
   const db = adminClient();
   const { data: src } = await db.from("sources").select("kind, storage_path, page_count, coverage").eq("id", sourceId).single();
@@ -564,6 +566,8 @@ async function runGenerate(job: JobRow, controller: AbortController, claimedAt: 
     template: job.params.template ?? null,
     visualMode: job.params.visual_mode ?? "auto",
     tier: job.params.ai_tier ?? "plus",
+    // Images raster du devis (prix continu) ; absentes : ancienne tâche, plafond de l'approche.
+    ...(typeof job.params.images === "number" ? { rasterImages: job.params.images } : {}),
     expert: { left: expertCalls(job.params.ai_tier ?? "free") },
   };
 

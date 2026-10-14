@@ -10,13 +10,14 @@ import { MindMapView } from "@/components/supports/MindMapView";
 import { Revisions } from "@/components/supports/Revisions";
 import { SupportState } from "@/components/supports/SupportState";
 import { requireUser } from "@/lib/auth";
-import { ACTION_PRICES, reportAction, supportAction } from "@/lib/billing/catalog";
+import { supportAddonCredits } from "@/lib/billing/quote";
 import { getT } from "@/lib/i18n/server";
 import { lessonCover } from "@/lib/library/covers";
 import { automaticSettings } from "@/lib/reports/create";
 import { loadReport } from "@/lib/reports/load";
 import { createUserClient } from "@/lib/supabase/server";
 import { loadSupports } from "@/lib/supports/load";
+import { includesSupports } from "@/lib/supports/request";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -58,11 +59,13 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   const hasBook = supports.requested.includes("livre");
   const hasPath = supports.requested.includes("parcours");
   const tabHref = (k: Tab) => (k === "apercu" ? `/rapports/${id}/apercu` : `/rapports/${id}/apercu?onglet=${k}`);
-  // Coût d'un support à ajouter, annoncé avant le lancement (taille réelle du cours).
+  // Coût d'un support à ajouter à un ancien cours, annoncé avant le lancement (taille réelle du
+  // cours) ; inclus et repris sans frais pour un cours au prix continu.
   const missing = (["carte", "flashcards"] as const).some((k) => supports[k].status === "absent" || supports[k].status === "failed");
-  const addCost = missing
-    ? ACTION_PRICES[supportAction(reportAction((await automaticSettings(user.id, report.documents.map((d) => d.sourceId))).pages))]
-    : null;
+  const addCost =
+    missing && !(await includesSupports(id))
+      ? supportAddonCredits((await automaticSettings(user.id, report.documents.map((d) => d.sourceId))).measure.contentPages)
+      : null;
   const chapters = ex.sections.map((x) => ({ id: x.id, title: x.question }));
   // Révisions : progression personnelle et session en cours (lecture seule, sous RLS).
   const [{ data: progressRows }, { data: active }] =

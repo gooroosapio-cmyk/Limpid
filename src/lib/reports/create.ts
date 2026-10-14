@@ -9,13 +9,14 @@ import { Goal, Level, Mode, TargetPages, TemplateId, ThemeId, V6_MODES, VisualMo
 import { selectAll } from "@/lib/supabase/paginate";
 import { planPages } from "@/lib/engine/pipeline";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
-import { ACTION_PRICES, CHARS_PER_PAGE, MAX_SOURCE_PAGES, reportAction, sourcePages } from "@/lib/billing/catalog";
+import { CHARS_PER_PAGE, ENGINE_MAX_CONTENT_PAGES, sourcePages } from "@/lib/billing/catalog";
+import { contentPages, quoteCourse, type CourseQuote } from "@/lib/billing/quote";
 import { accountUsage, attachReservation, CreditError, getEntitlements, quotaBlock, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
-import { ocrAllowed } from "@/lib/billing/tier";
+import { limits as engineLimits } from "@/lib/config";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient } from "@/lib/supabase/admin";
-import { modeForSupports, quoteSupports, SupportSelection, supportsForMode, type Support } from "@/lib/supports/supports";
+import { DERIVED_SUPPORTS, modeForSupports, SupportSelection, supportsForMode, withIncludedSupports, type Support } from "@/lib/supports/supports";
 import { effectiveVisualMode } from "@/lib/visuals/config";
 
 const Settings = {
@@ -38,6 +39,8 @@ const Settings = {
    * envoi, déduits de l'approche (le livre par défaut).
    */
   supports: SupportSelection.optional(),
+  /** Nouvelles images raster choisies dans le devis (0 par défaut, plafond du forfait). */
+  images: z.number().int().min(0).max(10).optional(),
 };
 
 export const CreateRequest = z.union([
@@ -71,6 +74,7 @@ export class CreateError extends Error {
       | "plan_reports"
       | "plan_sources"
       | "plan_ocr"
+      | "plan_images"
       | "too_long",
     message: string,
     /** Pages à lire par OCR (demande d'accord). */
@@ -78,7 +82,7 @@ export class CreateError extends Error {
     /** Rapport déjà créé pour cette source. */
     public readonly reportId?: string,
     /** Crédits manquants, limite atteinte : de quoi expliquer la limite exacte (§ 11). */
-    public readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number; dayLimit?: number; weekLimit?: number } = {},
+    public readonly detail: { needed?: number; available?: number; nextAt?: string | null; limit?: number; periodLimit?: number } = {},
   ) {
     super(message);
   }
@@ -115,7 +119,7 @@ export async function createReport(
   } else if ("source_id" in input) {
     sourceIds = [input.source_id];
   } else {
-    const { mode: _m, level: _l, goal: _g, target_pages: _t, template: _tp, theme: _th, visual_mode: _vm, idempotency_key: _k, ...source } = input;
+    const { mode: _m, level: _l, goal: _g, target_pages: _t, template: _tp, theme: _th, visual_mode: _vm, idempotency_key: _k, supports: _s, images: _i, folder_id: _f, ...source } = input;
     try {
       sourceIds = [(await prepareSource(userId, source as PrepareRequest)).sourceId];
     } catch (e) {
@@ -141,12 +145,6 @@ export async function createReport(
     }
     if (pendingOcr) ocrSources.push(id);
   }
-  // Pages scannées (document entier ou pages isolées) : lecture réservée au Pro, refusée avant
-  // tout appel payant et toute réservation de crédits (prompt V2, § II).
-  const scanned = ocrSources.length > 0 || sourceIds.some((id) => ((byId.get(id)?.coverage as { pending_ocr_pages?: number[] } | null)?.pending_ocr_pages?.length ?? 0) > 0);
-  if (scanned && !ocrAllowed(ent.wallet.aiTier)) {
-    throw new CreateError("plan_ocr", "Lecture des pages scannées réservée à l'offre Pro.");
-  }
   // Un document, un Limpid : supprimer le Limpid supprime aussi ses documents.
   const [{ data: usedSet }, { data: usedLegacy }] = await Promise.all([
     db.from("report_sources").select("report_id, reports!inner(deleted_at)").in("source_id", sourceIds).is("reports.deleted_at", null).limit(1).maybeSingle(),
@@ -161,7 +159,8 @@ export async function createReport(
   const first = byId.get(sourceId)!;
   const title = sourceIds.length > 1 ? `${first.title} + ${sourceIds.length - 1}`.slice(0, 300) : first.title;
 
-  const supports: Support[] = input.supports ?? supportsForMode(input.mode);
+  // Carte mentale et flashcards : incluses dans tout nouveau cours, sans supplément.
+  const supports: Support[] = withIncludedSupports(input.supports ?? supportsForMode(input.mode));
   // L'adaptation au document est la règle interne ; un parcours seul garde l'écriture par étapes.
   const chosenMode = input.supports ? modeForSupports(supports) : input.mode;
   const auto = await automaticSettings(userId, sourceIds, chosenMode);
@@ -172,32 +171,16 @@ export async function createReport(
   const theme = input.theme ?? null;
   const visualMode = effectiveVisualMode(input.visual_mode ?? "auto");
 
-  // Devis fixe selon la taille réelle du texte lu, puis réservation avant tout appel IA.
-  if (auto.pages > MAX_SOURCE_PAGES) {
-    throw new CreateError("too_long", `Ce document compte environ ${auto.pages} pages : Limpid en traite ${MAX_SOURCE_PAGES} au plus. Importez-le en plusieurs parties.`, auto.pages, undefined, { limit: MAX_SOURCE_PAGES });
-  }
-  const action = reportAction(auto.pages);
-  const quote = quoteSupports(action, supports);
+  // Limites de la tâche (somme des documents), puis devis continu et réservation avant tout appel IA.
+  assertWithinPlan(ent, auto.measure, input.images ?? 0);
+  const quote = courseQuote(auto.measure, input.images ?? 0);
   let reservationId: string;
   try {
-    ({ reservationId } = await reserveCredits(userId, action, `report:${input.idempotency_key}`, {}, { wallet: ent.wallet }));
+    ({ reservationId } = await reserveCredits(userId, "report", `report:${input.idempotency_key}`, {}, { wallet: ent.wallet, amount: quote.credits }));
   } catch (e) {
-    throw creditFailure(e, quote.total);
+    throw creditFailure(e, quote.credits);
   }
-  // Supports dérivés : réservés aussi avant toute unité payante (tout ou rien).
-  const extraReservations: { support: Support; id: string }[] = [];
-  for (const extra of quote.extras) {
-    try {
-      const r = await reserveCredits(userId, extra.action, `support:${input.idempotency_key}-${extra.support}`);
-      extraReservations.push({ support: extra.support, id: r.reservationId });
-    } catch (e) {
-      for (const r of [reservationId, ...extraReservations.map((x) => x.id)]) await releaseReservation(r);
-      throw creditFailure(e, quote.total);
-    }
-  }
-  const releaseAll = async () => {
-    for (const r of [reservationId, ...extraReservations.map((x) => x.id)]) await releaseReservation(r);
-  };
+  const releaseAll = () => releaseReservation(reservationId);
   // Dossier : seulement un dossier de ce compte (sinon le Limpid reste dans la bibliothèque).
   const folderId = input.folder_id
     ? ((await db.from("folders").select("id").eq("id", input.folder_id).eq("owner_id", userId).maybeSingle()).data?.id ?? null)
@@ -239,7 +222,8 @@ export async function createReport(
       ...(ocrSources.length ? { ocr: true, ocr_sources: ocrSources } : {}),
       ai_tier: ent.wallet.aiTier,
       supports,
-      credits: { action, amount: ACTION_PRICES[action] },
+      images: quote.G,
+      credits: { action: "report", amount: quote.credits, pages: quote.P, ocr_pages: quote.R, images: quote.G },
     },
   }).select("id").single();
   if (job.error) {
@@ -260,27 +244,19 @@ export async function createReport(
     throw new CreateError("storage", "Création de la tâche impossible.");
   }
   await attachReservation(reservationId, { jobId: job.data.id as string, reportId: report.data.id });
-  // Unités dépendantes : en attente de la base commune, lancées par le worker dès sa livraison.
-  for (const extra of extraReservations) {
-    const unit = await db
-      .from("jobs")
-      .insert({
-        owner_id: userId,
-        report_id: report.data.id,
-        source_id: sourceId,
-        kind: "generate_support",
-        status: "awaiting_confirmation",
-        idempotency_key: `${input.idempotency_key}-${extra.support}`,
-        params: { support: extra.support, depends_on: job.data.id, language: auto.language, ai_tier: ent.wallet.aiTier, credits: quote.extras.find((x) => x.support === extra.support)! },
-      })
-      .select("id")
-      .single();
-    if (unit.error || !unit.data) {
-      // Support non programmé : son crédit est rendu, le cours se prépare quand même.
-      await releaseReservation(extra.id);
-      continue;
-    }
-    await attachReservation(extra.id, { jobId: unit.data.id as string, reportId: report.data.id });
+  // Supports inclus : en attente de la base commune, lancés par le worker dès sa livraison. Leur
+  // échec éventuel n'affecte pas le cours (ils se relancent depuis l'onglet, sans frais).
+  for (const support of DERIVED_SUPPORTS) {
+    const { error } = await db.from("jobs").insert({
+      owner_id: userId,
+      report_id: report.data.id,
+      source_id: sourceId,
+      kind: "generate_support",
+      status: "awaiting_confirmation",
+      idempotency_key: `${input.idempotency_key}-${support}`,
+      params: { support, depends_on: job.data.id, language: auto.language, ai_tier: ent.wallet.aiTier, included: true },
+    });
+    if (error && error.code !== "23505") console.error("support_job", error.code);
   }
   await recordLimitEvent(userId, REPORT_CREATED, report.data.id);
   // Le dernier choix explicite est retenu pour le prochain import.
@@ -292,6 +268,7 @@ export const BatchRequest = z.strictObject({
   source_ids: z.array(z.string().uuid()).min(1).max(MAX_SOURCES),
   mode: Mode.optional(),
   supports: SupportSelection.optional(),
+  images: z.number().int().min(0).max(10).optional(),
   level: Level.optional(),
   target_pages: TargetPages.optional(),
   visual_mode: VisualMode.optional(),
@@ -324,7 +301,7 @@ export async function createBatch(userId: string, input: z.infer<typeof BatchReq
     }
     const { reportId } = await createReport(
       userId,
-      { source_id: sourceId, mode: input.mode, ...(input.supports ? { supports: input.supports } : {}), level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key, folder_id: input.folder_id ?? null },
+      { source_id: sourceId, mode: input.mode, ...(input.supports ? { supports: input.supports } : {}), ...(input.images ? { images: input.images } : {}), level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key, folder_id: input.folder_id ?? null },
       { limitsChecked: true },
     );
     reportIds.push(reportId);
@@ -352,17 +329,26 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
     db.from("reader_preferences").select("familiarity, goal, default_mode, explanation_lang").eq("owner_id", userId).maybeSingle(),
     selectAll<{ source_id: string; text: string }>((from, to) => db.from("source_segments").select("source_id, text").in("source_id", ids).order("source_id").order("ordinal").range(from, to)),
   ]);
-  // Pages encore à lire par OCR : estimées (2 500 caractères par page) pour le devis.
+  // Pages encore à lire par OCR : estimées (2 500 caractères par page) pour le plan de pages.
   const { data: meta } = await db.from("sources").select("id, page_count, coverage").in("id", ids);
   const charsBy = new Map<string, number>();
   for (const x of segs ?? []) charsBy.set(x.source_id as string, (charsBy.get(x.source_id as string) ?? 0) + (x.text as string).length);
   let chars = 0;
   let pages = 0;
+  const measure: SourceMeasure = { physicalPages: 0, contentPages: 0, ocrPages: 0 };
   for (const m of meta ?? []) {
-    const pendingOcr = (m.coverage as { pending_ocr?: boolean } | null)?.pending_ocr === true;
-    const c = (charsBy.get(m.id as string) ?? 0) + (pendingOcr ? ((m.page_count as number | null) ?? 1) * CHARS_PER_PAGE : 0);
+    const coverage = m.coverage as { pending_ocr?: boolean; pending_ocr_pages?: number[] } | null;
+    const pendingOcr = coverage?.pending_ocr === true;
+    const pageCount = m.page_count as number | null;
+    const native = charsBy.get(m.id as string) ?? 0;
+    const c = native + (pendingOcr ? (pageCount ?? 1) * CHARS_PER_PAGE : 0);
     chars += c;
-    pages += sourcePages(m.page_count as number | null, c);
+    pages += sourcePages(pageCount, c);
+    // Devis (§ 4) : pages scannées à lire (R) et pages de contenu normalisées (P).
+    const ocrPages = pendingOcr ? (pageCount ?? 1) : (coverage?.pending_ocr_pages?.length ?? 0);
+    measure.physicalPages += pageCount ?? 0;
+    measure.ocrPages += ocrPages;
+    measure.contentPages += contentPages({ pages: pageCount, chars: native, ocrPages });
   }
   // V6 : sans choix, l'approche « Par défaut » (une ancienne préférence V4 n'est plus proposée).
   const saved = Mode.safeParse(prefs?.default_mode).data;
@@ -370,6 +356,7 @@ export async function automaticSettings(userId: string, sourceIds: string | stri
   return {
     chars,
     pages,
+    measure,
     mode,
     level: levelFor(mode, prefs?.familiarity),
     goal: mode === "revision" ? ("reviser" as const) : (Goal.safeParse(prefs?.goal).data ?? "comprendre"),
@@ -385,9 +372,46 @@ export function pagesForLength(chars: number): number {
 
 type Entitlements = Awaited<ReturnType<typeof getEntitlements>>;
 
+/** Mesure d'un ensemble de documents pour le devis et les limites (somme des fichiers). */
+export interface SourceMeasure {
+  physicalPages: number;
+  contentPages: number;
+  ocrPages: number;
+}
+
+/** Devis d'un cours : prix continu (§ 4), pages manuscrites non détectées pour l'instant (H = 0). */
+export function courseQuote(m: SourceMeasure, images: number): CourseQuote {
+  return quoteCourse({ P: m.contentPages, R: m.ocrPages, H: 0, G: images });
+}
+
+/** Pages de contenu permises par tâche : plafond du forfait et capacité actuelle du moteur. */
+export function contentCap(ent: Pick<Entitlements, "limits">): number {
+  return Math.min(ent.limits.contentPagesPerTask, ENGINE_MAX_CONTENT_PAGES);
+}
+
+/** Pages scannées lisibles par tâche : plafond du forfait et du lecteur OCR. */
+export function ocrCap(ent: Pick<Entitlements, "limits">): number {
+  return Math.min(ent.limits.ocrPagesPerTask, engineLimits.maxOcrPages);
+}
+
+/** Limites d'une tâche (§ 3), vérifiées avant toute réservation et tout appel payant. */
+export function assertWithinPlan(ent: Pick<Entitlements, "limits">, m: SourceMeasure, images: number) {
+  const cap = contentCap(ent);
+  if (m.contentPages > cap || m.physicalPages > ent.limits.physicalPagesPerTask) {
+    const limit = m.contentPages > cap ? cap : ent.limits.physicalPagesPerTask;
+    throw new CreateError("too_long", `Ce cours compte environ ${Math.max(m.contentPages, m.physicalPages)} pages : votre offre en traite ${limit} au plus par cours. Importez-le en plusieurs parties.`, Math.max(m.contentPages, m.physicalPages), undefined, { limit });
+  }
+  if (m.ocrPages > ocrCap(ent)) {
+    throw new CreateError("plan_ocr", "Trop de pages scannées pour votre offre.", m.ocrPages, undefined, { limit: ocrCap(ent) });
+  }
+  if (images > ent.limits.imagesPerCourse) {
+    throw new CreateError("plan_images", "Trop d'images générées pour votre offre.", undefined, undefined, { limit: ent.limits.imagesPerCourse });
+  }
+}
+
 /**
  * Droits de l'offre pour `count` nouveaux Limpid : préparations simultanées, Limpid conservés,
- * limite hebdomadaire du gratuit, crédits pour au moins un rapport court chacun.
+ * générations de la période, crédits pour au moins un cours court chacun.
  */
 async function assertCanCreate(userId: string, ent: Entitlements, count: number) {
   const usage = await accountUsage(userId);
@@ -397,16 +421,14 @@ async function assertCanCreate(userId: string, ent: Entitlements, count: number)
   if (usage.kept + count > ent.limits.keptReports) {
     throw new CreateError("plan_reports", "Limite de Limpid conservés atteinte.", undefined, undefined, { limit: ent.limits.keptReports });
   }
-  // Plafonds de rythme pour tout le lot (revérifiés à la réservation, sous verrou).
+  // Générations de la période pour tout le lot (revérifiées à la réservation, sous verrou).
   const q = ent.wallet.quotas;
   if (q) {
-    const block = quotaBlock({
-      day: { ...q.day, used: q.day.used + count - 1 },
-      week: { ...q.week, used: q.week.used + count - 1 },
-    });
-    if (block) throw new CreateError("quota", "Plafond de rapports atteint.", undefined, undefined, block);
+    const block = quotaBlock({ period: { ...q.period, used: q.period.used + count - 1 } });
+    if (block) throw new CreateError("quota", "Limite de cours de la période atteinte.", undefined, undefined, block);
   }
-  const needed = ACTION_PRICES.report_short * count;
+  // Au moins le prix d'un cours d'une page chacun (le devis exact est réservé ensuite).
+  const needed = quoteCourse({ P: 1, R: 0, H: 0, G: 0 }).credits * count;
   if (ent.wallet.available < needed) {
     throw new CreateError("credits", "Crédits insuffisants.", undefined, undefined, { needed, available: ent.wallet.available });
   }
@@ -414,7 +436,7 @@ async function assertCanCreate(userId: string, ent: Entitlements, count: number)
 
 function creditFailure(e: unknown, total?: number): CreateError {
   if (e instanceof CreditError) {
-    // Crédits insuffisants : le besoin annoncé est le devis complet (préparation + supports).
+    // Crédits insuffisants : le besoin annoncé est le devis complet.
     if (e.code === "insufficient") return new CreateError("credits", e.message, undefined, undefined, total ? { ...e.detail, needed: total } : e.detail);
     if (e.code === "quota") return new CreateError("quota", e.message, undefined, undefined, e.detail);
     return new CreateError("storage", e.message);

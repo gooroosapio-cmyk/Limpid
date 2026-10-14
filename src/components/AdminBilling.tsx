@@ -37,7 +37,7 @@ export async function AdminBilling({ siteUrl }: { siteUrl: string }) {
       <form action={setSignupOpen} className="stack-form">
         <label className="check">
           <input type="checkbox" name="open" defaultChecked={settings?.signup_open === true} />
-          Inscriptions publiques ouvertes (offre gratuite : 80 crédits par mois, 2 rapports par jour et 5 par semaine)
+          Inscriptions publiques ouvertes (offre gratuite : 80 crédits de bienvenue, puis 20 par mois, 2 nouveaux cours par mois)
         </label>
         <button type="submit" className="btn">Enregistrer</button>
       </form>

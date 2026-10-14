@@ -2,50 +2,74 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/admin", () => ({ adminClient: () => ({}) }));
 
-import { ACTION_PRICES, PLANS, PRODUCT_CODES, product, quotaWindows, reportAction, reportsFor, sourcePages, TOPUPS } from "./catalog";
-import { quotaBlock, quotaState, resolvePlan } from "./wallet";
+import { ACTION_PRICES, ENGINE_MAX_CONTENT_PAGES, maxContentPages, PLANS, PRODUCT_CODES, product, reportsFor, sourcePages, TOPUPS } from "./catalog";
+import { contentPages, nominalCredits, prudentCostXof, quoteCourse, supportAddonCredits } from "./quote";
+import { addMonths, cycleBounds, quotaBlock, quotaState, resolvePlan } from "./wallet";
 
-describe("catalogue (révision tarifaire)", () => {
-  it("offres : prix, crédits mensuels et équivalents en rapports standard", () => {
-    expect([PLANS.essential.monthlyXof, PLANS.plus.monthlyXof, PLANS.pro.monthlyXof]).toEqual([2_900, 5_900, 11_900]);
-    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => reportsFor(p.monthlyCredits))).toEqual([4, 12, 30, 75]);
+describe("catalogue (grille du 14 octobre 2026)", () => {
+  it("offres : prix, crédits mensuels et équivalents en cours de 40 pages", () => {
+    expect([PLANS.plus.monthlyXof, PLANS.pro.monthlyXof, PLANS.max.monthlyXof]).toEqual([4_900, 9_900, 14_900]);
+    expect([PLANS.free, PLANS.plus, PLANS.pro, PLANS.max].map((p) => p.monthlyCredits)).toEqual([20, 350, 700, 1_050]);
+    expect([PLANS.plus, PLANS.pro, PLANS.max].map((p) => reportsFor(p.monthlyCredits))).toEqual([21, 43, 65]);
     // Annuel : douze mois pour le prix de dix.
-    for (const p of [PLANS.essential, PLANS.plus, PLANS.pro]) expect(p.yearlyXof).toBe(p.monthlyXof * 10);
-    // Plafonds V2 : jour / semaine.
-    expect([PLANS.free, PLANS.essential, PLANS.plus, PLANS.pro].map((p) => [p.limits.dailyReports, p.limits.weeklyReports])).toEqual([
-      [2, 5],
-      [5, 20],
-      [10, 50],
-      [20, 100],
-    ]);
+    for (const p of [PLANS.essential, PLANS.plus, PLANS.pro, PLANS.max]) expect(p.yearlyXof).toBe(p.monthlyXof * 10);
+    // Limites par période et par cours.
+    expect([PLANS.free, PLANS.plus, PLANS.pro, PLANS.max].map((p) => p.limits.generationsPerPeriod)).toEqual([2, 20, 40, 60]);
+    expect([PLANS.free, PLANS.plus, PLANS.pro, PLANS.max].map((p) => p.limits.imagesPerCourse)).toEqual([0, 1, 2, 3]);
+    expect([PLANS.free, PLANS.plus, PLANS.pro, PLANS.max].map((p) => p.limits.expertPerCourse)).toEqual([0, 1, 3, 5]);
+    // Capacité du moteur : jamais au-delà de 150 pages de contenu par cours pour l'instant.
+    expect(["free", "plus", "pro", "max"].map((p) => maxContentPages(p as "free"))).toEqual([40, ENGINE_MAX_CONTENT_PAGES, ENGINE_MAX_CONTENT_PAGES, ENGINE_MAX_CONTENT_PAGES]);
   });
-  it("recharges : pas en dessous de 1 000 FCFA, 25 rapports standard pour 5 000", () => {
+  it("recharges : pas en dessous de 1 000 FCFA", () => {
     expect(Object.values(TOPUPS).map((t) => t.xof)).toEqual([1_000, 2_500, 5_000]);
-    expect(reportsFor(TOPUPS.topup_500.credits)).toBe(25);
+    expect(reportsFor(TOPUPS.topup_500.credits)).toBe(31);
   });
-  it("neuf produits, tous résolus côté serveur ; un code inconnu ne vaut rien", () => {
-    expect(PRODUCT_CODES).toHaveLength(9);
+  it("onze produits (six abonnements vendus, Essentiel honoré, trois recharges), résolus côté serveur", () => {
+    expect(PRODUCT_CODES).toHaveLength(11);
     for (const c of PRODUCT_CODES) expect(product(c)).not.toBeNull();
-    expect(product("pro_yearly")).toMatchObject({ kind: "subscription", plan: "pro", period: "yearly", xof: 119_000, monthlyCredits: 1_500 });
+    expect(product("max_yearly")).toMatchObject({ kind: "subscription", plan: "max", period: "yearly", xof: 149_000, monthlyCredits: 1_050 });
+    expect(product("plus_monthly")).toMatchObject({ kind: "subscription", plan: "plus", xof: 4_900, monthlyCredits: 350 });
     expect(product("topup_500")).toMatchObject({ kind: "topup", xof: 5_000, credits: 500 });
     expect(product("topup_30")).toBeNull();
     expect(product("admin")).toBeNull();
   });
-  it("devis d'un rapport selon la taille réelle du texte lu", () => {
-    // Pages du document (comparatif IA) : ≤ 8 / 9–20 / 21–80 / 81–150.
-    expect(reportAction(6)).toBe("report_short");
-    expect(reportAction(8)).toBe("report_short");
-    expect(reportAction(9)).toBe("report_standard");
-    expect(reportAction(20)).toBe("report_standard");
-    expect(reportAction(21)).toBe("report_long");
-    expect(reportAction(80)).toBe("report_long");
-    expect(reportAction(81)).toBe("report_xl");
-    expect(ACTION_PRICES.report_xl).toBe(120);
-    // PDF paginé : sa pagination ; texte sans pages : 2 500 caractères par page.
+  it("pages d'un document : pagination ou équivalent texte", () => {
     expect(sourcePages(6, 9_328)).toBe(6);
     expect(sourcePages(null, 9_328)).toBe(4);
     expect(sourcePages(2, 60_000)).toBe(6);
     expect([ACTION_PRICES.report_short, ACTION_PRICES.report_standard, ACTION_PRICES.report_long]).toEqual([8, 20, 60]);
+  });
+});
+
+describe("prix continu d'un cours", () => {
+  it("crédits nominaux : 6 + ceil(P/4) + 2R + 4H + 20G", () => {
+    expect(nominalCredits({ P: 8, R: 0, H: 0, G: 0 })).toBe(8);
+    expect(nominalCredits({ P: 40, R: 0, H: 0, G: 0 })).toBe(16);
+    expect(nominalCredits({ P: 100, R: 0, H: 0, G: 0 })).toBe(31);
+    expect(nominalCredits({ P: 40, R: 10, H: 0, G: 0 })).toBe(36);
+    expect(nominalCredits({ P: 40, R: 0, H: 0, G: 1 })).toBe(36);
+    expect(nominalCredits({ P: 0, R: 0, H: 0, G: 0 })).toBe(7);
+  });
+  it("le coût prudent (marge comprise) ne dépasse pas le nominal dans les scénarios standards", () => {
+    for (const P of [8, 40, 100, 150]) expect(quoteCourse({ P, R: 0, H: 0, G: 0 }).credits).toBe(nominalCredits({ P, R: 0, H: 0, G: 0 }));
+    // Simulation § 12.1 : 40 pages et une image ≈ 80,64 FCFA.
+    expect(prudentCostXof({ P: 40, R: 0, H: 0, G: 1 })).toBeCloseTo(80.64, 1);
+    expect(quoteCourse({ P: 40, R: 0, H: 0, G: 1 }).credits).toBe(36);
+  });
+  it("le coût prudent relève le prix quand il dépasse le nominal", () => {
+    const q = quoteCourse({ P: 1, R: 0, H: 60, G: 0 });
+    expect(q.credits).toBe(Math.max(q.nominal, Math.ceil(q.prudentXof / 3)));
+    expect(q.credits).toBeGreaterThanOrEqual(q.nominal);
+  });
+  it("pages de contenu normalisées : pages du PDF, ou 800 jetons par page si le texte est dense", () => {
+    expect(contentPages({ pages: 40, chars: 40_000, ocrPages: 0 })).toBe(40);
+    expect(contentPages({ pages: 10, chars: 64_000, ocrPages: 0 })).toBe(20);
+    expect(contentPages({ pages: null, chars: 6_400, ocrPages: 0 })).toBe(2);
+    expect(contentPages({ pages: 12, chars: 3_200, ocrPages: 10 })).toBe(12);
+    expect(contentPages({ pages: null, chars: 0, ocrPages: 0 })).toBe(1);
+  });
+  it("support ajouté à un ancien cours : coût marginal", () => {
+    expect([supportAddonCredits(8), supportAddonCredits(40), supportAddonCredits(150)]).toEqual([3, 4, 10]);
   });
 });
 
@@ -69,29 +93,22 @@ describe("offre active", () => {
   });
 });
 
-describe("plafonds jour et semaine (UTC)", () => {
-  it("jour calendaire UTC, semaine du lundi 00:00 UTC", () => {
-    const w = quotaWindows(new Date("2026-10-07T23:30:00Z")); // mercredi
-    expect(w.dayStart.toISOString()).toBe("2026-10-07T00:00:00.000Z");
-    expect(w.dayEnd.toISOString()).toBe("2026-10-08T00:00:00.000Z");
-    expect(w.weekStart.toISOString()).toBe("2026-10-05T00:00:00.000Z");
-    expect(w.weekEnd.toISOString()).toBe("2026-10-12T00:00:00.000Z");
-    // Dimanche : encore la semaine commencée le lundi précédent.
-    expect(quotaWindows(new Date("2026-10-11T12:00:00Z")).weekStart.toISOString()).toBe("2026-10-05T00:00:00.000Z");
+describe("limite de nouveaux cours par période", () => {
+  it("cycle mensuel depuis l'ancre, fin de mois ramenée comme en base", () => {
+    expect(addMonths(new Date("2026-01-31T10:00:00Z"), 1).toISOString()).toBe("2026-02-28T10:00:00.000Z");
+    const c = cycleBounds(new Date("2026-08-15T09:00:00Z"), new Date("2026-10-14T12:00:00Z"));
+    expect(c.start.toISOString()).toBe("2026-09-15T09:00:00.000Z");
+    expect(c.end.toISOString()).toBe("2026-10-15T09:00:00.000Z");
+    const edge = cycleBounds(new Date("2026-08-15T09:00:00Z"), new Date("2026-10-15T09:00:00Z"));
+    expect(edge.start.toISOString()).toBe("2026-10-15T09:00:00.000Z");
   });
-  it("compte les rapports du jour et de la semaine", () => {
-    const now = new Date("2026-10-07T12:00:00Z");
-    const q = quotaState(["2026-10-07T08:00:00Z", "2026-10-06T08:00:00Z", "2026-10-04T08:00:00Z"], { day: 2, week: 5 }, now);
-    expect(q.day).toMatchObject({ used: 1, limit: 2 });
-    expect(q.week).toMatchObject({ used: 2, limit: 5 });
-  });
-  it("limite atteinte : la date donnée est celle où toutes les limites sont levées", () => {
-    const now = new Date("2026-10-07T12:00:00Z");
-    const dayOnly = quotaBlock(quotaState(["2026-10-07T08:00:00Z", "2026-10-07T09:00:00Z"], { day: 2, week: 5 }, now))!;
-    expect(dayOnly).toMatchObject({ dayLimit: 2, weekLimit: undefined, nextAt: "2026-10-08T00:00:00.000Z" });
-    const both = quotaBlock(quotaState(["2026-10-07T08:00:00Z", "2026-10-07T09:00:00Z"], { day: 2, week: 2 }, now))!;
-    expect(both).toMatchObject({ dayLimit: 2, weekLimit: 2, nextAt: "2026-10-12T00:00:00.000Z" });
-    expect(quotaBlock(quotaState([], { day: 2, week: 5 }, now))).toBeNull();
+  it("compte les cours depuis le début de la période et annonce la date de levée", () => {
+    const period = { start: new Date("2026-10-01T00:00:00Z"), end: new Date("2026-11-01T00:00:00Z") };
+    const q = quotaState(["2026-10-07T08:00:00Z", "2026-09-30T08:00:00Z"], 2, period);
+    expect(q.period).toMatchObject({ used: 1, limit: 2 });
+    expect(quotaBlock(q)).toBeNull();
+    const full = quotaState(["2026-10-07T08:00:00Z", "2026-10-08T08:00:00Z"], 2, period);
+    expect(quotaBlock(full)).toEqual({ periodUsed: 2, periodLimit: 2, nextAt: "2026-11-01T00:00:00.000Z" });
   });
 });
 

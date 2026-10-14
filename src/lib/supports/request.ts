@@ -1,11 +1,11 @@
 /**
  * Ajout ou reprise d'un support dérivé sur un Limpid existant (§ 4 et § 13) : la base commune
  * conservée (version courante) est réutilisée, sans relire le document ni refacturer la
- * préparation. Devis à coût marginal, réservation atomique avant l'unité payante, une seule
- * unité active par support, idempotent par clé client.
+ * préparation. Cours au prix continu : supports inclus, reprise sans frais. Ancien cours : coût
+ * marginal réservé avant l'unité payante. Une seule unité active par support, idempotent par clé.
  */
 import "server-only";
-import { reportAction, ACTION_PRICES, supportAction } from "@/lib/billing/catalog";
+import { supportAddonCredits } from "@/lib/billing/quote";
 import { attachReservation, CreditError, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { automaticSettings } from "@/lib/reports/create";
 import { adminClient } from "@/lib/supabase/admin";
@@ -48,19 +48,21 @@ export async function requestSupport(userId: string, reportId: string, support: 
     .maybeSingle();
   if (active) throw new SupportRequestError("busy", "Ce support est déjà en préparation.");
 
-  // Coût marginal selon la taille du cours (sources figées au lancement).
   const { data: set } = await db.from("report_sources").select("source_id").eq("report_id", reportId).order("position");
   const ids = (set ?? []).map((r) => r.source_id as string);
   const settings = await automaticSettings(userId, ids.length ? ids : (report.source_id as string));
-  const action = supportAction(reportAction(settings.pages));
-  let reservationId: string;
-  try {
-    ({ reservationId } = await reserveCredits(userId, action, `support:${unitKey}`, { reportId }));
-  } catch (e) {
-    if (e instanceof CreditError && (e.code === "insufficient" || e.code === "quota")) {
-      throw new SupportRequestError(e.code === "insufficient" ? "credits" : "quota", e.message, { ...e.detail, needed: ACTION_PRICES[action] });
+  // Ancien cours (paliers) : coût marginal selon sa taille ; cours au prix continu : inclus.
+  const amount = (await includesSupports(reportId)) ? 0 : supportAddonCredits(settings.measure.contentPages);
+  let reservationId: string | null = null;
+  if (amount > 0) {
+    try {
+      ({ reservationId } = await reserveCredits(userId, "support", `support:${unitKey}`, { reportId }, { amount }));
+    } catch (e) {
+      if (e instanceof CreditError && (e.code === "insufficient" || e.code === "quota")) {
+        throw new SupportRequestError(e.code === "insufficient" ? "credits" : "quota", e.message, { ...e.detail, needed: amount });
+      }
+      throw new SupportRequestError("storage", "Réservation impossible.");
     }
-    throw new SupportRequestError("storage", "Réservation impossible.");
   }
   const job = await db
     .from("jobs")
@@ -70,7 +72,7 @@ export async function requestSupport(userId: string, reportId: string, support: 
       source_id: report.source_id,
       kind: "generate_support",
       idempotency_key: unitKey,
-      params: { support, version_id: report.current_version_id, language: settings.language, credits: { action, amount: ACTION_PRICES[action] } },
+      params: { support, version_id: report.current_version_id, language: settings.language, ...(reservationId ? { credits: { action: "support", amount } } : { included: true }) },
     })
     .select("id")
     .single();
@@ -80,14 +82,27 @@ export async function requestSupport(userId: string, reportId: string, support: 
       const { data: winner } = await db.from("jobs").select("id").eq("owner_id", userId).eq("idempotency_key", unitKey).maybeSingle();
       if (winner) return { jobId: winner.id as string };
       // Autre unité active pour ce support (index unique) : cette réservation-ci est rendue.
-      await releaseReservation(reservationId);
+      if (reservationId) await releaseReservation(reservationId);
       throw new SupportRequestError("busy", "Ce support est déjà en préparation.");
     }
-    await releaseReservation(reservationId);
+    if (reservationId) await releaseReservation(reservationId);
     throw new SupportRequestError("storage", "Création de la tâche impossible.");
   }
-  await attachReservation(reservationId, { jobId: job.data.id as string, reportId });
+  if (reservationId) await attachReservation(reservationId, { jobId: job.data.id as string, reportId });
   const supports = readSupports(report.requested_supports);
   if (!supports.includes(support)) await db.from("reports").update({ requested_supports: [...supports, support] }).eq("id", reportId);
   return { jobId: job.data.id as string };
+}
+
+/** Cours créé au prix continu (première génération « report ») : carte mentale et flashcards incluses. */
+export async function includesSupports(reportId: string): Promise<boolean> {
+  const { data } = await adminClient()
+    .from("jobs")
+    .select("params")
+    .eq("report_id", reportId)
+    .eq("kind", "generate_report")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return (data?.params as { credits?: { action?: string } } | null)?.credits?.action === "report";
 }

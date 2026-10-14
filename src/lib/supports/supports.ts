@@ -1,11 +1,10 @@
 /**
  * Supports d'apprentissage (prompt « Supports et révisions », § 1 et § 3) : quatre formats
  * sélectionnables ensemble, une seule préparation commune. Le livre et le parcours sont deux
- * consultations du même texte (aucun coût en plus) ; la carte mentale et les flashcards sont des
- * productions dérivées de la base commune, facturées à leur coût marginal.
+ * consultations du même texte ; la carte mentale et les flashcards sont des productions dérivées
+ * de la base commune, incluses dans le prix de tout nouveau cours (grille du 14 octobre 2026).
  */
 import { z } from "zod";
-import { ACTION_PRICES, supportAction, type ReportAction, type SupportAction } from "@/lib/billing/catalog";
 
 export const SUPPORTS = ["livre", "parcours", "carte", "flashcards"] as const;
 export type Support = (typeof SUPPORTS)[number];
@@ -47,18 +46,7 @@ export function supportsForMode(mode: string | null | undefined): Support[] {
   return mode === "parcours" ? ["parcours"] : ["livre"];
 }
 
-export interface SupportQuote {
-  /** Préparation commune (lecture, base pédagogique, explications). */
-  base: { action: ReportAction; credits: number };
-  /** Coût marginal de chaque support dérivé demandé. */
-  extras: { support: DerivedSupport; action: SupportAction; credits: number }[];
-  total: number;
-}
-
-/** Devis : préparation commune + coût marginal des supports dérivés (une seule lecture du document). */
-export function quoteSupports(action: ReportAction, supports: Support[]): SupportQuote {
-  const extra = supportAction(action);
-  const extras = supports.filter(isDerived).map((support) => ({ support, action: extra, credits: ACTION_PRICES[extra] }));
-  const base = { action, credits: ACTION_PRICES[action] };
-  return { base, extras, total: base.credits + extras.reduce((n, e) => n + e.credits, 0) };
+/** Sélection d'un nouveau cours : la consultation choisie, plus la carte mentale et les flashcards incluses. */
+export function withIncludedSupports(supports: Support[]): Support[] {
+  return SUPPORTS.filter((s) => supports.includes(s) || isDerived(s));
 }

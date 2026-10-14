@@ -40,6 +40,17 @@ export async function setMonthlyCap(form: FormData) {
   done(`Plafond mensuel fixé à ${(cents / 100).toLocaleString("fr-FR")} €.`);
 }
 
+/** Budget marketing mensuel (FCFA) qui finance les bonus de bienvenue du forfait Gratuit. */
+export async function setMarketingBudget(form: FormData) {
+  const user = await requireAdmin();
+  const xof = z.coerce.number().int().min(0).max(100_000_000).safeParse(form.get("xof"));
+  if (!xof.success) done("Budget invalide (nombre entier de FCFA).");
+  const { error } = await adminClient().from("app_settings").update({ marketing_budget_xof: xof.data, updated_at: new Date().toISOString() }).eq("id", true);
+  if (error) done("La modification n'a pas été enregistrée.");
+  await audit(user.id, "budget.marketing", null, { xof: xof.data });
+  done(`Budget marketing mensuel fixé à ${xof.data.toLocaleString("fr-FR")} FCFA.`);
+}
+
 /** Lecteur V3 (projections Livre / Guidé / Visuel / Auto) : interrupteur global. */
 export async function setReaderV3(form: FormData) {
   const user = await requireAdmin();

@@ -81,7 +81,7 @@ export async function adminOverview() {
   const [readerV3, settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
     // Colonne absente tant que la migration du lecteur V3 n'est pas appliquée : null.
     db.from("app_settings").select("reader_v3_enabled").single().then((r) => (r.error ? null : (r.data as { reader_v3_enabled?: boolean }).reader_v3_enabled === true)),
-    db.from("app_settings").select("generation_enabled, monthly_cap_cents, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
+    db.from("app_settings").select("generation_enabled, monthly_cap_cents, marketing_budget_xof, welcome_cost_xof, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
     db.from("usage_ledger").select("model").gte("created_at", quotaStart.toISOString()),
@@ -104,6 +104,9 @@ export async function adminOverview() {
     imageProviders: { nanobanana: !!process.env.OPENROUTER_API_KEY?.trim(), gptimage: !!process.env.OPENROUTER_API_KEY?.trim() },
     monthlyCapCents: Math.min(settings.data?.monthly_cap_cents ?? budget.monthlyCapCents, budget.monthlyCapCents),
     envCapCents: budget.monthlyCapCents,
+    /** Budget marketing mensuel des bonus de bienvenue (FCFA) et coût interne d'un bonus. */
+    marketingBudgetXof: (settings.data as { marketing_budget_xof?: number } | null)?.marketing_budget_xof ?? 50_000,
+    welcomeCostXof: (settings.data as { welcome_cost_xof?: number } | null)?.welcome_cost_xof ?? 240,
     dailyAccountCapCents: budget.perAccountDailyCapCents,
     spentMonthCents: sum(monthRows.data ?? []),
     spent24hCents: sum(dayRows.data ?? []),

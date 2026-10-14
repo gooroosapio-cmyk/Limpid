@@ -358,7 +358,9 @@ export function normalizePlanV5(draft: PlanV5, ko: KnowledgeObject, input: Gener
   const diagramsOnly = input.visualMode === "schemas";
   // Plafond du forfait et de l'approche (couverture éventuelle comprise : une place lui est
   // gardée) ; dessins, schémas et scènes partagent la même enveloppe (Nano Banana).
-  const total = Math.max(1, imageCap(input.tier ?? "plus", input.mode) - 1);
+  // Prix continu : toute image générée (dessin, schéma, scène) est une image raster du devis (G,
+  // 0 par défaut) ; les graphiques, frises et scènes locales restent dessinés par le lecteur.
+  const total = typeof input.rasterImages === "number" ? Math.max(0, input.rasterImages) : Math.max(1, imageCap(input.tier ?? "plus", input.mode) - 1);
   let images = noImages ? 0 : total;
   let svg = images;
   const statements = new Map(ko.claims.map((c) => [c.id, c.statement]));
