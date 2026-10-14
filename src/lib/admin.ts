@@ -4,6 +4,7 @@
  * comptes. Aucun contenu de document n'est exposé : seulement des compteurs et des codes.
  */
 import "server-only";
+import { accountEnvelope } from "@/lib/billing/envelope";
 import { imageSettingsFrom } from "@/lib/visuals/image-models";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -81,7 +82,7 @@ export async function adminOverview() {
   const [readerV3, settings, monthRows, dayRows, quotaRows, emails, jobs, audit, reports] = await Promise.all([
     // Colonne absente tant que la migration du lecteur V3 n'est pas appliquée : null.
     db.from("app_settings").select("reader_v3_enabled").single().then((r) => (r.error ? null : (r.data as { reader_v3_enabled?: boolean }).reader_v3_enabled === true)),
-    db.from("app_settings").select("generation_enabled, monthly_cap_cents, marketing_budget_xof, writer_model, welcome_cost_xof, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
+    db.from("app_settings").select("generation_enabled, monthly_cap_cents, marketing_budget_xof, writer_model, account_cap_mode, welcome_cost_xof, updated_at, images_enabled, image_vector_provider, image_vector_model, image_realistic_provider, image_realistic_model, image_diagram_provider, image_diagram_model, image_illustration_provider, image_illustration_model").single(),
     db.from("usage_ledger").select("stage, actual_cents, reserved_cents").gte("created_at", month),
     db.from("usage_ledger").select("actual_cents, reserved_cents").gte("created_at", day),
     db.from("usage_ledger").select("model").gte("created_at", quotaStart.toISOString()),
@@ -123,7 +124,46 @@ export async function adminOverview() {
     reportCount: reports.count ?? 0,
     writer: (settings.data as { writer_model?: string } | null)?.writer_model === "standard" ? ("standard" as const) : ("pro" as const),
     writers: await writerComparison(),
+    accountCapMode: (settings.data as { account_cap_mode?: string } | null)?.account_cap_mode === "enforce" ? ("enforce" as const) : ("observe" as const),
+    accounts: await accountCosts(),
+    calls: await recentCalls(),
   };
+}
+
+export interface AccountCostRow {
+  email: string;
+  revenueXof: number;
+  creditsUsed: number;
+  budgetXof: number;
+  spentXof: number;
+  exempt: boolean;
+}
+
+/** Comptes les plus coûteux du mois, face à leur enveloppe de 30 % (spécification, § 7). */
+export async function accountCosts(limit = 20): Promise<AccountCostRow[]> {
+  const db = adminClient();
+  const now = new Date();
+  const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const { data } = await db.from("usage_ledger").select("owner_id, actual_cents, reserved_cents").gte("created_at", month).limit(20_000);
+  const byOwner = new Map<string, number>();
+  for (const r of data ?? []) if (r.owner_id) byOwner.set(r.owner_id as string, (byOwner.get(r.owner_id as string) ?? 0) + ((r.actual_cents as number | null) ?? (r.reserved_cents as number | null) ?? 0));
+  const top = [...byOwner.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+  return Promise.all(
+    top.map(async (id) => {
+      const [env, { data: user }] = await Promise.all([accountEnvelope(id, now), db.auth.admin.getUserById(id)]);
+      return { email: user?.user?.email ?? id.slice(0, 8), revenueXof: env.revenueXof, creditsUsed: env.creditsUsed, budgetXof: env.budgetXof, spentXof: env.spentXof, exempt: env.exempt };
+    }),
+  );
+}
+
+/** Journal des derniers appels facturés (coût réel ou estimé, sans contenu). */
+export async function recentCalls(limit = 30) {
+  const { data } = await adminClient()
+    .from("usage_ledger")
+    .select("created_at, stage, model, input_tokens, output_tokens, actual_cents, reserved_cents, status")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []) as { created_at: string; stage: string; model: string | null; input_tokens: number | null; output_tokens: number | null; actual_cents: number | null; reserved_cents: number | null; status: string }[];
 }
 
 export interface WriterStats {

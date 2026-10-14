@@ -78,6 +78,7 @@ const BUDGET_MESSAGES: Record<string, string> = {
   generation_disabled: "La génération est suspendue par l'administrateur.",
   budget_monthly: "Le plafond mensuel de dépense IA est atteint.",
   budget_daily: "Le plafond quotidien de ce compte est atteint. Réessayez demain.",
+  budget_account: "Le budget IA de votre offre pour cette période est atteint. Il se renouvelle au prochain cycle.",
   budget_unreadable: "Le budget n'a pas pu être vérifié. Réessayez.",
 };
 

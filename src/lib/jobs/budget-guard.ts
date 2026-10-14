@@ -1,13 +1,15 @@
 /**
- * Coupe-circuit de dépense IA (cadrage Q17) : plafond global mensuel et plafond par compte
- * sur 24 h, vérifiés avant chaque appel facturable (génération, OCR, correction de quiz).
+ * Coupe-circuit de dépense IA (cadrage Q17) : plafond global mensuel, plafond par compte sur
+ * 24 h et enveloppe de 30 % par compte et par période (§ 7, si activée par l'administration),
+ * vérifiés avant chaque appel facturable (génération, OCR, chat, correction de quiz).
  */
 import "server-only";
+import { accountEnvelope, overEnvelope } from "@/lib/billing/envelope";
 import { budget } from "@/lib/config";
 import { adminClient } from "@/lib/supabase/admin";
 
 export class BudgetError extends Error {
-  constructor(public readonly code: "generation_disabled" | "budget_monthly" | "budget_daily" | "budget_unreadable") {
+  constructor(public readonly code: "generation_disabled" | "budget_monthly" | "budget_daily" | "budget_account" | "budget_unreadable") {
     super(code);
   }
 }
@@ -29,11 +31,15 @@ async function spentCents(filter: { since: string; ownerId?: string }): Promise<
 /** `reserveCents` : coût maximal prévu de l'opération (un rapport par défaut). */
 export async function assertBudget(ownerId: string, reserveCents = budget.perReportCapCents) {
   const db = adminClient();
-  const { data: settings } = await db.from("app_settings").select("generation_enabled, monthly_cap_cents").single();
+  const { data: settings } = await db.from("app_settings").select("generation_enabled, monthly_cap_cents, account_cap_mode").single();
   if (!settings?.generation_enabled) throw new BudgetError("generation_disabled");
   const cap = Math.min(settings.monthly_cap_cents ?? budget.monthlyCapCents, budget.monthlyCapCents);
   if ((await spentCents({ since: monthStart() })) + reserveCents > cap) throw new BudgetError("budget_monthly");
   if ((await spentCents({ since: dayStart(), ownerId })) + reserveCents > budget.perAccountDailyCapCents) {
     throw new BudgetError("budget_daily");
+  }
+  // Enveloppe par compte : bloquante seulement en mode « enforce » (sinon suivie dans l'admin).
+  if ((settings as { account_cap_mode?: string }).account_cap_mode === "enforce" && overEnvelope(await accountEnvelope(ownerId), reserveCents)) {
+    throw new BudgetError("budget_account");
   }
 }

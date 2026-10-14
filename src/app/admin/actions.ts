@@ -51,6 +51,16 @@ export async function setMarketingBudget(form: FormData) {
   done(`Budget marketing mensuel fixé à ${xof.data.toLocaleString("fr-FR")} FCFA.`);
 }
 
+/** Enveloppe de 30 % par compte : suivie seulement (« observe ») ou bloquante (« enforce »). */
+export async function setAccountCapMode(form: FormData) {
+  const user = await requireAdmin();
+  const mode = form.get("mode") === "enforce" ? "enforce" : "observe";
+  const { error } = await adminClient().from("app_settings").update({ account_cap_mode: mode, updated_at: new Date().toISOString() }).eq("id", true);
+  if (error) done("La modification n'a pas été enregistrée.");
+  await audit(user.id, "budget.account_cap", null, { mode });
+  done(mode === "enforce" ? "Enveloppe par compte bloquante : aucun appel au-delà de 30 %." : "Enveloppe par compte suivie, sans blocage.");
+}
+
 /** Rédacteur des nouveaux cours : Luna standard ou Luna Pro (test comparatif, § 8.1). */
 export async function setWriterModel(form: FormData) {
   const user = await requireAdmin();

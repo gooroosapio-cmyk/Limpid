@@ -114,6 +114,22 @@ export function quotaBlock(q: Quotas): QuotaDetail | null {
   return { periodUsed: q.period.used, periodLimit: q.period.limit, nextAt: q.period.resetAt };
 }
 
+/** Compte payant (abonnement actif ou recharge valide non épuisée) : limites du chat plus larges. */
+export async function isPaidAccount(userId: string, now = new Date()): Promise<boolean> {
+  const db = adminClient();
+  const [{ count: subs }, { count: topups }] = await Promise.all([
+    db.from("subscriptions").select("id", { count: "exact", head: true }).eq("owner_id", userId).lte("starts_at", now.toISOString()).gt("ends_at", now.toISOString()),
+    db.from("credit_lots").select("id", { count: "exact", head: true }).eq("owner_id", userId).eq("origin", "topup").gt("expires_at", now.toISOString()).gt("available", 0),
+  ]);
+  return (subs ?? 0) > 0 || (topups ?? 0) > 0;
+}
+
+/** Questions au chat par heure (spécification, § 11.3) : 10 en gratuit, 30 en payant. */
+export const CHAT_PER_HOUR = { free: 10, paid: 30 } as const;
+export async function chatPerHour(userId: string): Promise<number> {
+  return (await isPaidAccount(userId)) ? CHAT_PER_HOUR.paid : CHAT_PER_HOUR.free;
+}
+
 /** Début de la période en cours d'un compte : cycle de l'abonnement actif, sinon de la création du compte. */
 export async function periodStart(userId: string, now = new Date()): Promise<Date> {
   const db = adminClient();
