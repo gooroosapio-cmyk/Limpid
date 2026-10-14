@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { segmentText } from "@/lib/extract/text";
 import { riskyClaim, type GenerationInput } from "./pipeline";
 import { ProviderError, type AIProvider, type StructuredRequest } from "./provider";
-import { capChapters, isHeading, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
+import { capChapters, isHeading, sanitizeComplement, diagramContentOk, unsourcedComponents, fragmentSegments, generateV5, memoryStore, mergeFragments, normalizePlanV5, prefixFragment, type FragmentCheckpoint, type PlanV5 } from "./v5";
 
 const TEXT = `Le cycle
 
@@ -331,5 +331,19 @@ describe("moteur V5 : 15 chapitres au plus", () => {
     expect(out.flatMap((c) => c.claim_ids)).toEqual(chapters.flatMap((c) => c.claim_ids));
     expect(out.some((c) => c.difficulty === "difficile")).toBe(true);
     expect(capChapters(chapters.slice(0, 4))).toHaveLength(4);
+  });
+});
+
+describe("complément ciblé : preuves réparées par code", () => {
+  it("une preuve inconnue est remplacée par celles des affirmations citées ; un bloc sans appui est écarté", () => {
+    const claimEvidence = new Map([["clm_f2_1", ["ev_f2_1"]]]);
+    const ev = new Set(["ev_f2_1"]);
+    const blocks = [
+      { id: "blk_x1", type: "fact", text: "Un fait.", claim_ids: ["clm_f2_1"], evidence_ids: ["ev_f2_37"] },
+      { id: "blk_x2", type: "fact", text: "Inventé.", claim_ids: ["clm_zz"], evidence_ids: ["ev_zz"] },
+    ] as never;
+    const out = sanitizeComplement(blocks, ev, claimEvidence);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: "blk_x1", claim_ids: ["clm_f2_1"], evidence_ids: ["ev_f2_1"] });
   });
 });
