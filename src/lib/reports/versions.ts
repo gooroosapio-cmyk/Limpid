@@ -50,6 +50,7 @@ export async function requestVersion(userId: string, reportId: string, input: z.
     .from("jobs")
     .select("id, idempotency_key")
     .eq("report_id", reportId)
+    .neq("kind", "generate_support")
     .in("status", ["queued", "running", "retrying"])
     .limit(1)
     .maybeSingle();

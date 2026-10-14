@@ -11,6 +11,14 @@ import { requireUser } from "@/lib/auth";
 import { readDisplayPrefs } from "@/lib/display/prefs";
 import { getT } from "@/lib/i18n/server";
 import { readerV3Enabled } from "@/lib/reader/flags";
+import { createUserClient } from "@/lib/supabase/server";
+import { readSupports } from "@/lib/supports/supports";
+
+/** Parcours guidé demandé à la création : la vue guidée est proposée dans le lecteur. */
+async function requestedPath(id: string): Promise<boolean> {
+  const { data } = await (await createUserClient()).from("reports").select("requested_supports").eq("id", id).maybeSingle();
+  return readSupports(data?.requested_supports).includes("parcours");
+}
 import { offlineKey } from "@/lib/offline-key";
 import { loadReport } from "@/lib/reports/load";
 import { chapterPractice } from "@/lib/reports/reading";
@@ -98,7 +106,7 @@ export default async function ReportPage({
   return (
     <LimpidScreen
       doc={doc}
-      readerV3={await readerV3Enabled()}
+      readerV3={(await readerV3Enabled()) || (await requestedPath(id))}
       quizzes={chapterQuizzes(report.explanation.sections)}
       practice={report.isCurrent && isAdminConfigured() ? await chapterPractice(user.id, report.versionId).catch(() => ({})) : {}}
       reportId={report.isCurrent ? id : null}

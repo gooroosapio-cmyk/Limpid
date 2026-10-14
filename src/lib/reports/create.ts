@@ -15,6 +15,7 @@ import { ocrAllowed } from "@/lib/billing/tier";
 import { PrepareError, PrepareText, PrepareUpload, PrepareUrl, prepareSource, type PrepareRequest } from "@/lib/sources/prepare";
 import { MAX_SOURCES } from "@/lib/reports/source-set";
 import { adminClient } from "@/lib/supabase/admin";
+import { modeForSupports, quoteSupports, SupportSelection, supportsForMode, type Support } from "@/lib/supports/supports";
 import { effectiveVisualMode } from "@/lib/visuals/config";
 
 const Settings = {
@@ -32,6 +33,11 @@ const Settings = {
   idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/),
   /** Dossier sélectionné dans la bibliothèque : le nouveau Limpid y est rangé. */
   folder_id: z.string().uuid().nullable().optional(),
+  /**
+   * Supports d'apprentissage (livre, parcours, carte, flashcards), au moins un. Absents : ancien
+   * envoi, déduits de l'approche (le livre par défaut).
+   */
+  supports: SupportSelection.optional(),
 };
 
 export const CreateRequest = z.union([
@@ -155,8 +161,11 @@ export async function createReport(
   const first = byId.get(sourceId)!;
   const title = sourceIds.length > 1 ? `${first.title} + ${sourceIds.length - 1}`.slice(0, 300) : first.title;
 
-  const auto = await automaticSettings(userId, sourceIds, input.mode);
-  const mode = input.mode ?? auto.mode;
+  const supports: Support[] = input.supports ?? supportsForMode(input.mode);
+  // L'adaptation au document est la règle interne ; un parcours seul garde l'écriture par étapes.
+  const chosenMode = input.supports ? modeForSupports(supports) : input.mode;
+  const auto = await automaticSettings(userId, sourceIds, chosenMode);
+  const mode = chosenMode ?? auto.mode;
   const level = input.level ?? auto.level;
   const goal = input.goal ?? auto.goal;
   const targetPages = input.target_pages ?? auto.targetPages;
@@ -168,23 +177,38 @@ export async function createReport(
     throw new CreateError("too_long", `Ce document compte environ ${auto.pages} pages : Limpid en traite ${MAX_SOURCE_PAGES} au plus. Importez-le en plusieurs parties.`, auto.pages, undefined, { limit: MAX_SOURCE_PAGES });
   }
   const action = reportAction(auto.pages);
+  const quote = quoteSupports(action, supports);
   let reservationId: string;
   try {
     ({ reservationId } = await reserveCredits(userId, action, `report:${input.idempotency_key}`, {}, { wallet: ent.wallet }));
   } catch (e) {
-    throw creditFailure(e);
+    throw creditFailure(e, quote.total);
   }
+  // Supports dérivés : réservés aussi avant toute unité payante (tout ou rien).
+  const extraReservations: { support: Support; id: string }[] = [];
+  for (const extra of quote.extras) {
+    try {
+      const r = await reserveCredits(userId, extra.action, `support:${input.idempotency_key}-${extra.support}`);
+      extraReservations.push({ support: extra.support, id: r.reservationId });
+    } catch (e) {
+      for (const r of [reservationId, ...extraReservations.map((x) => x.id)]) await releaseReservation(r);
+      throw creditFailure(e, quote.total);
+    }
+  }
+  const releaseAll = async () => {
+    for (const r of [reservationId, ...extraReservations.map((x) => x.id)]) await releaseReservation(r);
+  };
   // Dossier : seulement un dossier de ce compte (sinon le Limpid reste dans la bibliothèque).
   const folderId = input.folder_id
     ? ((await db.from("folders").select("id").eq("id", input.folder_id).eq("owner_id", userId).maybeSingle()).data?.id ?? null)
     : null;
   const report = await db
     .from("reports")
-    .insert({ owner_id: userId, source_id: sourceId, title, theme_id: theme, visual_mode: visualMode, mode, folder_id: folderId })
+    .insert({ owner_id: userId, source_id: sourceId, title, theme_id: theme, visual_mode: visualMode, mode, folder_id: folderId, requested_supports: supports })
     .select("id")
     .single();
   if (report.error || !report.data) {
-    await releaseReservation(reservationId);
+    await releaseAll();
     throw new CreateError("storage", "Création du rapport impossible.");
   }
   // Ensemble de sources figé au lancement, dans l'ordre choisi.
@@ -193,7 +217,7 @@ export async function createReport(
     .insert(sourceIds.map((id, position) => ({ report_id: report.data.id, source_id: id, owner_id: userId, position })));
   if (set.error) {
     await db.from("reports").delete().eq("id", report.data.id);
-    await releaseReservation(reservationId);
+    await releaseAll();
     throw new CreateError("storage", "Création du rapport impossible.");
   }
 
@@ -214,6 +238,7 @@ export async function createReport(
       ...(sourceIds.length > 1 ? { source_ids: sourceIds } : {}),
       ...(ocrSources.length ? { ocr: true, ocr_sources: ocrSources } : {}),
       ai_tier: ent.wallet.aiTier,
+      supports,
       credits: { action, amount: ACTION_PRICES[action] },
     },
   }).select("id").single();
@@ -231,10 +256,32 @@ export async function createReport(
       if (winner.data?.report_id) return { reportId: winner.data.report_id };
       throw new CreateError("storage", "Création de la tâche impossible.");
     }
-    await releaseReservation(reservationId);
+    await releaseAll();
     throw new CreateError("storage", "Création de la tâche impossible.");
   }
   await attachReservation(reservationId, { jobId: job.data.id as string, reportId: report.data.id });
+  // Unités dépendantes : en attente de la base commune, lancées par le worker dès sa livraison.
+  for (const extra of extraReservations) {
+    const unit = await db
+      .from("jobs")
+      .insert({
+        owner_id: userId,
+        report_id: report.data.id,
+        source_id: sourceId,
+        kind: "generate_support",
+        status: "awaiting_confirmation",
+        idempotency_key: `${input.idempotency_key}-${extra.support}`,
+        params: { support: extra.support, depends_on: job.data.id, language: auto.language, ai_tier: ent.wallet.aiTier, credits: quote.extras.find((x) => x.support === extra.support)! },
+      })
+      .select("id")
+      .single();
+    if (unit.error || !unit.data) {
+      // Support non programmé : son crédit est rendu, le cours se prépare quand même.
+      await releaseReservation(extra.id);
+      continue;
+    }
+    await attachReservation(extra.id, { jobId: unit.data.id as string, reportId: report.data.id });
+  }
   await recordLimitEvent(userId, REPORT_CREATED, report.data.id);
   // Le dernier choix explicite est retenu pour le prochain import.
   if (input.mode) await db.from("reader_preferences").upsert({ owner_id: userId, default_mode: input.mode });
@@ -244,6 +291,7 @@ export async function createReport(
 export const BatchRequest = z.strictObject({
   source_ids: z.array(z.string().uuid()).min(1).max(MAX_SOURCES),
   mode: Mode.optional(),
+  supports: SupportSelection.optional(),
   level: Level.optional(),
   target_pages: TargetPages.optional(),
   visual_mode: VisualMode.optional(),
@@ -276,7 +324,7 @@ export async function createBatch(userId: string, input: z.infer<typeof BatchReq
     }
     const { reportId } = await createReport(
       userId,
-      { source_id: sourceId, mode: input.mode, level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key, folder_id: input.folder_id ?? null },
+      { source_id: sourceId, mode: input.mode, ...(input.supports ? { supports: input.supports } : {}), level: input.level, target_pages: input.target_pages, visual_mode: input.visual_mode, idempotency_key: key, folder_id: input.folder_id ?? null },
       { limitsChecked: true },
     );
     reportIds.push(reportId);
@@ -364,9 +412,10 @@ async function assertCanCreate(userId: string, ent: Entitlements, count: number)
   }
 }
 
-function creditFailure(e: unknown): CreateError {
+function creditFailure(e: unknown, total?: number): CreateError {
   if (e instanceof CreditError) {
-    if (e.code === "insufficient") return new CreateError("credits", e.message, undefined, undefined, e.detail);
+    // Crédits insuffisants : le besoin annoncé est le devis complet (préparation + supports).
+    if (e.code === "insufficient") return new CreateError("credits", e.message, undefined, undefined, total ? { ...e.detail, needed: total } : e.detail);
     if (e.code === "quota") return new CreateError("quota", e.message, undefined, undefined, e.detail);
     return new CreateError("storage", e.message);
   }

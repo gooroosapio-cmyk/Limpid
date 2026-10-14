@@ -57,7 +57,8 @@ export async function loadLibrary(opts: { q?: string; limit?: number } = {}): Pr
   ]);
   const items: LibraryItem[] = (data ?? []).map((r) => {
     const jobs = (r.jobs as { kind: string; status: string; stage: string | null; error_code: string | null; created_at: string; progress?: { chapters_done?: number; chapters_total?: number } | null }[] | null) ?? [];
-    const job = [...jobs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    // Unités des supports dérivés (carte, flashcards) : suivies dans le cours, pas dans la bibliothèque.
+    const job = [...jobs].filter((j) => j.kind !== "generate_support").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     const running = !!job && isActiveJob(job.status);
     // Publication progressive : une première génération interrompue laisse une version
     // partielle ; le cours reste en échec (jamais « Prêt ») tant qu'une génération n'a pas abouti.
