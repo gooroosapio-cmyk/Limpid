@@ -120,3 +120,17 @@ describe("réservations de rapports", () => {
     expect(jobKeyOf("ask:uuid")).toBeNull();
   });
 });
+
+describe("enveloppe de coût par compte (§ 7)", () => {
+  it("30 % du revenu reconnu, au moins 3 FCFA par crédit engagé ; annuel réparti sur 12 mois", async () => {
+    const { envelopeXof, monthlyRevenueXof, overEnvelope, centsToXof } = await import("./envelope");
+    expect(monthlyRevenueXof("plus", "monthly")).toBe(4_900);
+    expect(monthlyRevenueXof("plus", "yearly")).toBeCloseTo(4_083.33, 1);
+    expect(envelopeXof(4_900, 350)).toBe(1_470);
+    expect(envelopeXof(0, 80)).toBe(240);
+    expect(centsToXof(100)).toBeCloseTo(655.957, 2);
+    expect(overEnvelope({ budgetXof: 240, spentXof: 200, exempt: false }, 10)).toBe(true);
+    expect(overEnvelope({ budgetXof: 240, spentXof: 200, exempt: true }, 10)).toBe(false);
+    expect(overEnvelope({ budgetXof: 240, spentXof: 100, exempt: false }, 10)).toBe(false);
+  });
+});

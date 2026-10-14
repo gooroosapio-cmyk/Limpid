@@ -5,6 +5,7 @@
  * seul « Arrêter » interrompt, en gardant le texte déjà écrit.
  */
 import "server-only";
+import { chatPerHour } from "@/lib/billing/wallet";
 import { z } from "zod";
 import { getProvider } from "@/lib/engine";
 import { ProviderError } from "@/lib/engine/provider";
@@ -112,6 +113,15 @@ export async function sendChat(userId: string, reportId: string, input: ChatSend
     return { resumed: reply as ChatMessageView, run: null, userId: prior.id as string, messageId: (reply as ChatMessageView).id };
   }
 
+  // Une seule réponse à la fois par conversation ; questions par heure selon l'offre (§ 11.3).
+  const since = new Date(Date.now() - 3600_000).toISOString();
+  const [{ count: running }, { count: asked }, perHour] = await Promise.all([
+    db.from("chat_messages").select("id", { count: "exact", head: true }).eq("owner_id", userId).eq("report_id", reportId).eq("role", "assistant").in("status", ["streaming", "stopping"]).gte("created_at", new Date(Date.now() - 3 * 60_000).toISOString()),
+    db.from("chat_messages").select("id", { count: "exact", head: true }).eq("owner_id", userId).eq("role", "user").gte("created_at", since),
+    chatPerHour(userId),
+  ]);
+  if ((running ?? 0) > 0) throw new ReaderAIError("rate", "Une réponse est déjà en cours dans cette conversation : attendez-la ou arrêtez-la.");
+  if ((asked ?? 0) >= perHour) throw new ReaderAIError("rate", `Vous avez posé ${perHour} questions en une heure, la limite de votre offre : réessayez un peu plus tard.`);
   const ctx = await askContext(userId, reportId, input);
   const history = await recentPairs(userId, reportId);
   const { data: q, error: qErr } = await db

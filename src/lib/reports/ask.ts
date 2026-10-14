@@ -4,6 +4,7 @@
  * pour mot dans la source ; l'échange n'est pas enregistré (seule la consommation l'est).
  */
 import "server-only";
+import { chatPerHour } from "@/lib/billing/wallet";
 import { z } from "zod";
 import { blockEvidenceIds, type SourceSegment } from "@/lib/contracts/schemas";
 import { getProvider } from "@/lib/engine";
@@ -37,6 +38,7 @@ export interface AskAnswer {
 }
 
 const STAGE = "ask";
+/** Plafond technique ; la limite réelle dépend de l'offre (10 en gratuit, 30 en payant). */
 const PER_HOUR = 30;
 const RESERVE_CENTS = 2;
 const CONTEXT_CHARS = 14_000;
@@ -118,7 +120,7 @@ export async function askContext(userId: string, reportId: string, input: Pick<A
   const report = await loadReport(reportId);
   if (!report) throw new ReaderAIError("not_found", "Rapport introuvable.");
   if (report.state !== "ready") throw new ReaderAIError("not_ready", "Le rapport n'est pas encore prêt.");
-  await guardReaderCall(userId, STAGE, PER_HOUR, RESERVE_CENTS);
+  await guardReaderCall(userId, STAGE, await chatPerHour(userId), RESERVE_CENTS);
   const section = report.explanation.sections.find((s) => s.id === input.section_id) ?? null;
   const evidence = new Map(report.evidence.map((e) => [e.id, e.segment_id]));
   const preferred = new Set(
@@ -133,7 +135,7 @@ export async function askDocument(userId: string, reportId: string, input: AskRe
   const report = await loadReport(reportId);
   if (!report) throw new ReaderAIError("not_found", "Rapport introuvable.");
   if (report.state !== "ready") throw new ReaderAIError("not_ready", "Le rapport n'est pas encore prêt.");
-  await guardReaderCall(userId, STAGE, PER_HOUR, RESERVE_CENTS);
+  await guardReaderCall(userId, STAGE, Math.min(PER_HOUR, await chatPerHour(userId)), RESERVE_CENTS);
 
   const section = report.explanation.sections.find((s) => s.id === input.section_id) ?? null;
   const evidence = new Map(report.evidence.map((e) => [e.id, e.segment_id]));

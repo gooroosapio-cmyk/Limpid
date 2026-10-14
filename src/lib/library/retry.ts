@@ -5,7 +5,7 @@
  * Le plafond quotidien est glissant (24 h) : il se libère au fil des heures, la relance reste
  * proposée (le serveur la refuse, avec le message du plafond, tant qu'il est atteint).
  */
-const LATER = new Set(["budget_monthly", "provider_quota_exhausted", "generation_disabled"]);
+const LATER = new Set(["budget_monthly", "budget_account", "provider_quota_exhausted", "generation_disabled"]);
 
 export function canRetryNow(errorCode: string | null | undefined): boolean {
   return !LATER.has(errorCode ?? "");

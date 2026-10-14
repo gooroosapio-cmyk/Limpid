@@ -2,11 +2,12 @@ import { getT } from "@/lib/i18n/server";
 import type { AdminOverview } from "@/lib/admin";
 import type { performance } from "@/lib/diagnostic";
 import { DiagnosticPanel } from "@/components/DiagnosticPanel";
-import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMarketingBudget, setMonthlyCap, setReaderV3, setWriterModel } from "@/app/admin/actions";
+import { addAllowedEmail, cancelJobAction, removeAllowedEmail, retryJobAction, resetTestSpaceAction, setGeneration, setImageSettings, setMarketingBudget, setMonthlyCap, setReaderV3, setWriterModel, setAccountCapMode } from "@/app/admin/actions";
 import { IMAGE_MODELS, IMAGE_STYLES } from "@/lib/visuals/image-models";
 import { CANCELLABLE, RETRYABLE, type AdminJob } from "@/lib/admin-jobs";
 import { nowMs } from "@/lib/time";
 
+const fcfa = (xof: number) => `${Math.round(xof).toLocaleString("fr-FR")} FCFA`;
 const euros = (cents: number) => `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const when = (iso: string) =>
   new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
@@ -194,6 +195,59 @@ export async function AdminView({
               </tbody>
             </table>
           </div>
+        )}
+        <form action={setAccountCapMode} className="admin-form">
+          <label htmlFor="capmode">{t.admin.envelope.mode}</label>
+          <select id="capmode" name="mode" defaultValue={o.accountCapMode}>
+            <option value="observe">{t.admin.envelope.observe}</option>
+            <option value="enforce">{t.admin.envelope.enforce}</option>
+          </select>
+          <button type="submit" className="btn">{t.admin.save}</button>
+        </form>
+        {o.accounts.length > 0 && (
+          <div className="table-scroll" role="region" aria-label={t.admin.envelope.title} tabIndex={0}>
+            <table>
+              <caption className="small muted">{t.admin.envelope.title}</caption>
+              <thead>
+                <tr><th scope="col">{t.admin.envelope.account}</th><th scope="col">{t.admin.envelope.revenue}</th><th scope="col">{t.admin.envelope.credits}</th><th scope="col">{t.admin.envelope.budget}</th><th scope="col">{t.admin.envelope.spent}</th><th scope="col">%</th></tr>
+              </thead>
+              <tbody>
+                {o.accounts.map((a) => (
+                  <tr key={a.email}>
+                    <th scope="row">{a.email}{a.exempt ? " (admin)" : ""}</th>
+                    <td>{fcfa(a.revenueXof)}</td>
+                    <td>{a.creditsUsed}</td>
+                    <td>{fcfa(a.budgetXof)}</td>
+                    <td>{fcfa(a.spentXof)}</td>
+                    <td className={a.spentXof > a.budgetXof ? "over" : undefined}>{a.budgetXof > 0 ? Math.round((a.spentXof / a.budgetXof) * 100) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {o.calls.length > 0 && (
+          <details>
+            <summary>{t.admin.envelope.calls}</summary>
+            <div className="table-scroll" role="region" aria-label={t.admin.envelope.calls} tabIndex={0}>
+              <table>
+                <thead>
+                  <tr><th scope="col">{t.admin.envelope.when}</th><th scope="col">{t.admin.envelope.stage}</th><th scope="col">{t.admin.envelope.model}</th><th scope="col">{t.admin.envelope.tokens}</th><th scope="col">{t.admin.envelope.cost}</th></tr>
+                </thead>
+                <tbody>
+                  {o.calls.map((c, i) => (
+                    <tr key={i}>
+                      <td>{when(c.created_at)}</td>
+                      <td>{c.stage}</td>
+                      <td>{c.model ?? "—"}</td>
+                      <td>{c.input_tokens ?? "—"} / {c.output_tokens ?? "—"}</td>
+                      <td>{euros(c.actual_cents ?? c.reserved_cents ?? 0)}{c.status === "uncertain" ? " ?" : ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         )}
         <form action={setMarketingBudget} className="admin-form">
           <label htmlFor="mkt">{t.admin.marketingLabel(o.welcomeCostXof)}</label>

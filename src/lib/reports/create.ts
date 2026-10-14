@@ -10,6 +10,7 @@ import { selectAll } from "@/lib/supabase/paginate";
 import { planPages } from "@/lib/engine/pipeline";
 import { recordLimitEvent, REPORT_CREATED } from "@/lib/jobs/limits";
 import { CHARS_PER_PAGE, ENGINE_MAX_CONTENT_PAGES, sourcePages } from "@/lib/billing/catalog";
+import { accountEnvelope, envelopeXof } from "@/lib/billing/envelope";
 import { contentPages, quoteCourse, type CourseQuote } from "@/lib/billing/quote";
 import { accountUsage, attachReservation, CreditError, getEntitlements, quotaBlock, releaseReservation, reserveCredits } from "@/lib/billing/wallet";
 import { limits as engineLimits } from "@/lib/config";
@@ -105,7 +106,7 @@ export async function createReport(
     .maybeSingle();
   if (existing.data?.report_id) return { reportId: existing.data.report_id };
 
-  const settings = await db.from("app_settings").select("generation_enabled, writer_model").single();
+  const settings = await db.from("app_settings").select("generation_enabled, writer_model, account_cap_mode").single();
   if (!settings.data?.generation_enabled) {
     throw new CreateError("generation_disabled", "La génération est suspendue par l'administrateur.");
   }
@@ -174,6 +175,14 @@ export async function createReport(
   // Limites de la tâche (somme des documents), puis devis continu et réservation avant tout appel IA.
   assertWithinPlan(ent, auto.measure, input.images ?? 0);
   const quote = courseQuote(auto.measure, input.images ?? 0);
+  // Enveloppe de coût du compte (§ 7.2, si activée) : refus avant toute réservation et tout appel.
+  if ((settings.data as { account_cap_mode?: string } | null)?.account_cap_mode === "enforce") {
+    const env = await accountEnvelope(userId);
+    const budgetXof = envelopeXof(env.revenueXof, env.creditsUsed + quote.credits);
+    if (!env.exempt && env.spentXof + quote.prudentXof > budgetXof) {
+      throw new CreateError("limit", "Le budget IA de votre offre pour cette période est atteint. Il se renouvelle au prochain cycle.");
+    }
+  }
   let reservationId: string;
   try {
     ({ reservationId } = await reserveCredits(userId, "report", `report:${input.idempotency_key}`, {}, { wallet: ent.wallet, amount: quote.credits }));
