@@ -41,6 +41,7 @@ import {
   LEVEL_GUIDE,
   MODE_GUIDE,
   repairDraftBlocks,
+  unitAttempts,
   verifyClaims,
   type ExplanationDraft,
   type GenerationInput,
@@ -51,10 +52,15 @@ import { ProviderError, type AIProvider, type StageBudget, type UsageReport } fr
 const draftId = z.string().regex(/^[a-z]{1,6}_[A-Za-z0-9_-]{1,64}$/);
 const txt = (max: number) => z.string().trim().min(1).max(max);
 
-/** En deçà, la source est comprise en un seul appel (~5 pages) ; au-delà, morceaux lus en parallèle. */
-export const SINGLE_PASS_CHARS = 12_000;
-/** Taille visée d'un fragment de lecture (découpe aux frontières de segments). */
-export const FRAGMENT_CHARS = 12_000;
+/**
+ * Unités sémantiques de lecture (spécification, § 9.3) : environ 5 000 jetons de source, 8 000 au
+ * plus (≈ 4 caractères par jeton). En deçà d'une unité, la source est comprise en un seul appel.
+ */
+export const SINGLE_PASS_CHARS = 20_000;
+/** Taille visée d'une unité de lecture (découpe aux frontières de segments, de préférence à un titre). */
+export const FRAGMENT_CHARS = 20_000;
+/** Taille maximale d'une unité de lecture. */
+export const FRAGMENT_MAX_CHARS = 32_000;
 /** Chapitres par cours, au plus (un long cours regroupe davantage d'objectifs par chapitre). */
 export const MAX_CHAPTERS = 15;
 /** Illustrations : 0 ou 1 par chapitre, 10 au plus par cours (Pro ; plafond réel selon le forfait). */
@@ -89,19 +95,39 @@ export type FragmentCheckpoint = z.infer<typeof FragmentCheckpoint>;
 
 /* ---------- 1. Lecture par fragments ---------- */
 
-/** Fragments consécutifs d'environ `max` caractères, sans couper un segment. */
-export function fragmentSegments(segments: SourceSegment[], max = FRAGMENT_CHARS): SourceSegment[][] {
+/** Segment qui ressemble à un titre (court, sans ponctuation finale de phrase). */
+export function isHeading(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 120 || t.includes("\n")) return false;
+  if (/^(chapitre|partie|section|chapter|part|annexe|appendix)\b/i.test(t)) return true;
+  if (/^((\d+|[IVXLC]+)[.)]?(\d+[.)]?)*)\s+\S/.test(t) && !/[.;:,]$/.test(t)) return true;
+  return !/[.;:,!?…»"]$/.test(t) && /^[A-ZÀ-ÖØ-Þ0-9]/.test(t) && t.split(/\s+/).length <= 12;
+}
+
+/**
+ * Unités sémantiques consécutives (spécification, § 9.3) : environ `target` caractères, coupées de
+ * préférence avant un titre (une partie garde son titre et sa suite), jamais au milieu d'un segment
+ * (une condition, un tableau ou une formule restent avec leur contexte), `max` caractères au plus.
+ */
+export function fragmentSegments(segments: SourceSegment[], target = FRAGMENT_CHARS, max = Math.max(target, FRAGMENT_MAX_CHARS)): SourceSegment[][] {
   const out: SourceSegment[][] = [];
   let cur: SourceSegment[] = [];
   let size = 0;
+  const cut = () => {
+    // Un titre ne termine jamais une unité : il passe avec la suite qu'il annonce.
+    const carry: SourceSegment[] = [];
+    while (cur.length > 1 && isHeading(cur[cur.length - 1]!.text)) carry.unshift(cur.pop()!);
+    out.push(cur);
+    cur = carry;
+    size = carry.reduce((n, s) => n + s.text.length, 0);
+  };
   for (const s of segments) {
-    if (cur.length && size + s.text.length > max) {
-      out.push(cur);
-      cur = [];
-      size = 0;
-    }
+    const len = s.text.length;
+    const atHeading = isHeading(s.text);
+    // Avant un titre, dès la moitié de la taille visée ; sinon à la taille visée ; jamais au-delà du maximum.
+    if (cur.length && ((atHeading && size >= target / 2) || size + len > max || (size + len > target && size >= target / 2))) cut();
     cur.push(s);
-    size += s.text.length;
+    size += len;
   }
   if (cur.length) out.push(cur);
   return out;
@@ -670,7 +696,13 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
   let draft: ChapterDraft | null = null;
   let feedback: string[] = [];
   let section: Section | null = null;
+  // Une unité : un premier appel et au plus deux nouvelles tentatives, réparation comprise.
+  const attempts = unitAttempts();
   for (let repair = 0; repair <= 1; repair++) {
+    if (repair > 0) {
+      if (attempts.left <= 0) break;
+      attempts.left--;
+    }
     const data = chapterPayload(c);
     if (draft) {
       data.push({ label: "brouillon precedent", text: JSON.stringify(draft) });
@@ -682,6 +714,7 @@ async function writeChapter(provider: AIProvider, input: GenerationInput, c: Cha
         instructions: draft ? `${base}\nCorrige les points listés et renvoie le chapitre complet.` : base,
         data,
         budget: budgetFor(repair),
+        attempts,
       });
     } catch (e) {
       // Réparation qui échoue (délai, réponse vide ou coupée) : le premier brouillon, déjà
