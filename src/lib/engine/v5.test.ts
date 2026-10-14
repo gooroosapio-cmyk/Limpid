@@ -148,16 +148,18 @@ describe("moteur V5 : un chapitre par appel", () => {
     expect(riskyClaim({ statement: "L'eau s'évapore au soleil.", support_status: "supported" })).toBe(false);
   });
 
-  it("un chapitre qui oublie une affirmation est réécrit seul", async () => {
+  it("un chapitre qui oublie une affirmation reçoit un complément ciblé, sans réécriture", async () => {
     const thin = { ...chapter1, blocks: [chapter1.blocks[1]] };
     const both = { ...plan, chapters: [{ ...plan.chapters[0]!, claim_ids: ["clm_1", "clm_2"] }] };
-    const full = { ...chapter1, blocks: [...chapter1.blocks, chapter2.blocks[0]!].map((b, i) => ({ ...b, id: `blk_${i + 1}` })) };
-    const p = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin, full] });
+    const extra = { blocks: [{ ...chapter2.blocks[0]!, id: "blk_x1" }] };
+    const p = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin], chapitre_1_complement: [extra] });
     const res = await generateV5(p, input(), far());
     expect(res.status).toBe("done");
-    const calls = p.calls.filter((c) => c.stage === "chapitre_1");
-    expect(calls).toHaveLength(2);
-    expect(calls[1]!.data).toContain("a corriger");
+    expect(p.calls.filter((c) => c.stage === "chapitre_1")).toHaveLength(1);
+    const complement = p.calls.filter((c) => c.stage === "chapitre_1_complement");
+    expect(complement).toHaveLength(1);
+    expect(complement[0]!.data).toContain("a corriger");
+    expect(complement[0]!.data).toContain("blocs existants");
     if (res.status === "done") expect(res.output.explanation.sections[0]!.blocks.some((b) => b.claim_ids.includes("clm_2"))).toBe(true);
   });
 
@@ -197,12 +199,12 @@ describe("moteur V5 : un chapitre par appel", () => {
     const thin = { ...chapter1, blocks: [chapter1.blocks[1]] };
     const both = { ...plan, chapters: [{ ...plan.chapters[0]!, claim_ids: ["clm_1", "clm_2"] }] };
     const empty = new ProviderError("empty", "Réponse vide.");
-    const p = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin, empty] });
+    const p = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin], chapitre_1_complement: [empty] });
     const res = await generateV5(p, input(), far());
     expect(res.status).toBe("done");
-    expect(p.calls.filter((c) => c.stage === "chapitre_1")).toHaveLength(2);
+    expect(p.calls.filter((c) => c.stage === "chapitre_1_complement").length).toBeGreaterThanOrEqual(1);
     // Une erreur de compte n'est jamais masquée.
-    const denied = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin, new ProviderError("auth", "Clé refusée.")] });
+    const denied = new StageProvider({ comprehension: [comp], plan: [both], chapitre_1: [thin], chapitre_1_complement: [new ProviderError("auth", "Clé refusée.")] });
     await expect(generateV5(denied, input(), far())).rejects.toMatchObject({ code: "auth" });
   });
 

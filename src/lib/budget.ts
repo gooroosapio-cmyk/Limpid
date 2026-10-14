@@ -19,15 +19,18 @@ export const PRICE_BASIS = `estimation ${PRICES.inputCentsPerMTok}/${PRICES.outp
 
 export function estimateCents(inputTokens: number | null, outputTokens: number | null): number {
   const cents = ((inputTokens ?? 0) * PRICES.inputCentsPerMTok + (outputTokens ?? 0) * PRICES.outputCentsPerMTok) / 1e6;
-  return Math.ceil(cents);
+  return roundCents(cents);
 }
+
+/** Centimes au dix-millième près : le coût exact est conservé (plus d'arrondi au centime par appel). */
+export const roundCents = (cents: number) => Math.round(cents * 10_000) / 10_000;
 
 /** Taux de conversion USD → euro pour le journal (coût réel OpenRouter / Recraft). */
 export const USD_TO_EUR = price("LIMPID_USD_TO_EUR", 0.92);
 
 /** Centimes d'euro d'un appel : coût réel du fournisseur s'il est connu, sinon estimation par jetons. */
 export function usageCents(u: { inputTokens: number | null; outputTokens: number | null; costUsd?: number | null }): number {
-  if (typeof u.costUsd === "number" && Number.isFinite(u.costUsd) && u.costUsd >= 0) return Math.ceil(u.costUsd * 100 * USD_TO_EUR);
+  if (typeof u.costUsd === "number" && Number.isFinite(u.costUsd) && u.costUsd >= 0) return roundCents(u.costUsd * 100 * USD_TO_EUR);
   return estimateCents(u.inputTokens, u.outputTokens);
 }
 

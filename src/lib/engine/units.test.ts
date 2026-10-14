@@ -66,3 +66,27 @@ describe("langue du cours pour les supports (§ 10)", () => {
     expect(courseLanguage({ sections: [sec("ADN ARN")] })).toBeNull();
   });
 });
+
+describe("coûts (lot 5)", () => {
+  it("coût exact au dix-millième de centime, plus d'arrondi au centime supérieur", async () => {
+    const { usageCents, roundCents } = await import("@/lib/budget");
+    expect(roundCents(0.123456)).toBe(0.1235);
+    expect(usageCents({ inputTokens: 1, outputTokens: 1, costUsd: 0.0001 })).toBeLessThan(1);
+  });
+  it("bilan : données abrégées sous la taille visée, questions existantes transmises", async () => {
+    const { explanationPayload } = await import("./exercises");
+    const long = "x".repeat(2_000);
+    const ex = {
+      key_points: [],
+      glossary: [],
+      sections: Array.from({ length: 30 }, (_, i) => ({
+        id: `sec_${i}`, question: `Q${i}`, takeaway: "t",
+        blocks: Array.from({ length: 12 }, (_, j) => ({ id: `blk_${j}`, type: "fact", text: long, evidence_ids: [] })),
+        quiz: [{ prompt: "Déjà posée ?" }],
+      })),
+    } as never;
+    const out = explanationPayload(ex, 36_000);
+    expect(out.length).toBeLessThanOrEqual(60_000);
+    expect(out).toContain("Déjà posée ?");
+  });
+});
